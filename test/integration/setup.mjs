@@ -102,11 +102,24 @@ async function setup() {
     await downloadFile(`${RELEASES_URL}/demo-${demoHyphen}.tar.gz`, join(tarballs, `demo-${demoHyphen}.tar.gz`));
   }
 
-  // Extract demo
+  // Extract demo (now pure Rails, no Juntos config)
   console.log(`\n2. Extracting ${demo} demo...`);
   execSync(`tar -xzf ${tarballs}/demo-${demoHyphen}.tar.gz -C ${WORK_DIR}`);
 
   const demoDir = join(WORK_DIR, demo);
+
+  // Extract ruby2js-rails to get the CLI for init
+  console.log('\n3. Extracting ruby2js-rails CLI...');
+  const cliDir = join(tarballs, 'ruby2js-rails');
+  mkdirSync(cliDir, { recursive: true });
+  execSync(`tar -xzf ${tarballs}/ruby2js-rails-beta.tgz -C ${cliDir}`);
+
+  // Run init from local CLI to add Juntos config (package.json, vite.config.js, etc.)
+  console.log('\n4. Initializing Juntos config...');
+  execSync(`node ${cliDir}/package/cli.mjs init --no-install`, {
+    cwd: demoDir,
+    stdio: 'inherit'
+  });
 
   // Delete package-lock.json to avoid checksum mismatches with GitHub Pages URLs.
   // We'll install from local tarballs instead.
@@ -117,13 +130,13 @@ async function setup() {
 
   // Install local tarballs + better-sqlite3 in one command.
   // This uses local tarballs instead of fetching from GitHub Pages URLs in package.json.
-  console.log('\n3. Installing dependencies from local tarballs...');
+  console.log('\n5. Installing dependencies from local tarballs...');
   execSync(`npm install ${tarballs}/ruby2js-beta.tgz ${tarballs}/ruby2js-rails-beta.tgz ${tarballs}/vite-plugin-ruby2js-beta.tgz better-sqlite3`, {
     cwd: demoDir,
     stdio: 'inherit'
   });
 
-  console.log('\n5. Setup complete!');
+  console.log('\n6. Setup complete!');
   console.log(`   Demo at: ${demoDir}`);
   console.log('   Run tests with: npm test');
 }

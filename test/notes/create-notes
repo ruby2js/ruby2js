@@ -26,10 +26,6 @@ rails generate scaffold Note title:string body:text
 # Create database
 rails db:create
 
-# Add ruby2js gem from GitHub
-bundle add ruby2js --github ruby2js/ruby2js --branch master
-bundle install
-
 # Update Note model with validations and real-time broadcasting
 cat > app/models/note.rb << 'MODEL'
 class Note < ApplicationRecord
@@ -156,9 +152,6 @@ Note.create!(
 
 puts "Created #{Note.count} notes"
 SEEDS
-
-# Run ruby2js:install generator
-bin/rails generate ruby2js:install
 
 # Create JSX.rb-based index view that demonstrates path helper RPC
 mkdir -p app/views/notes

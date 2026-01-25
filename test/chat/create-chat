@@ -29,12 +29,6 @@ rm -f app/views/messages/show.html.erb \
 # Create database
 rails db:create
 
-# Add ruby2js gem from GitHub
-bundle add ruby2js --github ruby2js/ruby2js --branch master
-
-# Ensure git checkout is complete
-bundle install
-
 # Update Message model with broadcasting
 cat > app/models/message.rb << 'MODEL'
 class Message < ApplicationRecord
@@ -192,9 +186,6 @@ Message.create!(username: "Alice", body: "Yeah, Turbo Streams makes it so easy."
 
 puts "Created #{Message.count} sample messages"
 SEEDS
-
-# Run ruby2js:install generator
-bin/rails generate ruby2js:install
 
 # Create Stimulus controller for auto-scroll and form clearing (in Ruby for transpilation)
 mkdir -p app/javascript/controllers

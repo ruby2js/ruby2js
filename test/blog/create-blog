@@ -27,12 +27,6 @@ rails generate scaffold Comment article:references commenter:string body:text
 # Create database (migration and seeding done separately)
 rails db:create
 
-# Add ruby2js gem from GitHub (branch required for bundle config local to work)
-bundle add ruby2js --github ruby2js/ruby2js --branch master
-
-# Ensure git checkout is complete (handles Bundler version upgrade)
-bundle install
-
 # Update Article model with associations, validations, and broadcasting
 cat > app/models/article.rb << 'MODEL'
 class Article < ApplicationRecord
@@ -286,9 +280,6 @@ two:
   commenter: Bob
   body: This pattern really helps keep code organized!
 FIXTURES
-
-# Run ruby2js:install generator to set up package.json, vite config, vitest config, and test setup
-bin/rails generate ruby2js:install
 
 # Create integration test for articles (demo-specific)
 cat > test/articles.test.mjs << 'TEST'

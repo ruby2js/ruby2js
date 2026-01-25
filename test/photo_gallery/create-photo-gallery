@@ -29,12 +29,6 @@ rails generate model Photo client_id:string image_data:text caption:string taken
 # Create database
 rails db:create
 
-# Add ruby2js gem from GitHub
-bundle add ruby2js --github ruby2js/ruby2js --branch master
-
-# Ensure git checkout is complete (handles Bundler version upgrade)
-bundle install
-
 # Update Photo model with validations and real-time broadcasting
 cat > app/models/photo.rb << 'MODEL'
 class Photo < ApplicationRecord
@@ -305,9 +299,6 @@ cat > config/ruby2js.yml << 'CONFIG'
 dependencies:
   "@capacitor/camera": "^6.0.0"
 CONFIG
-
-# Run ruby2js:install generator to set up dist/, package.json, and npm dependencies
-bin/rails generate ruby2js:install
 
 echo ""
 echo "Photo gallery created: $APP_NAME/"

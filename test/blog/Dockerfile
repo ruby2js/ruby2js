@@ -27,11 +27,14 @@ RUN gem install rails
 
 WORKDIR /app
 
-# Copy and run the blog creation script
+# Copy and run the blog creation script (creates pure Rails app)
 COPY create-blog .
 RUN chmod +x create-blog && ./create-blog blog
 
 WORKDIR /app/blog
+
+# Initialize Juntos config (package.json, vite.config.js, etc.)
+RUN npx github:ruby2js/juntos init --no-install
 
 # Build args for Juntos
 ARG DATABASE=dexie

@@ -16,6 +16,36 @@ The CLI automatically installs required npm packages based on your options. For 
 
 {% toc %}
 
+## Getting Started
+
+### Install a Demo
+
+Download and set up a complete demo application:
+
+```bash
+npx github:ruby2js/juntos --demo blog           # Install blog demo
+npx github:ruby2js/juntos --demo blog my-blog   # Install to my-blog/
+npx github:ruby2js/juntos --list-demos          # List all demos
+```
+
+Available demos: `blog`, `chat`, `notes`, `photo-gallery`, `workflow`, `ssg-blog`, `astro-blog`
+
+### Initialize in Existing Project
+
+Add Juntos to an existing project:
+
+```bash
+npx github:ruby2js/juntos init              # Current directory
+npx github:ruby2js/juntos init my-app       # Specific directory
+```
+
+This creates the configuration files needed for Juntos:
+- `package.json` (or merges dependencies into existing)
+- `vite.config.js`
+- `vitest.config.js`
+- `test/setup.mjs`
+- `bin/juntos`
+
 ## juntos dev
 
 Start a development server with hot reload.
