@@ -1,0 +1,85 @@
+// Integration tests for the photo gallery demo
+// Runs the demo's own test suite using Vitest
+//
+// The demo contains:
+// - app/models/photo.rb - Photo model with validations and broadcasting
+// - app/controllers/photos_controller.rb - Controller actions
+// - test/*.test.mjs - Vitest tests that exercise the above
+//
+// The Vite plugin transforms .rb files on-the-fly during test runs.
+// Note: Capacitor-specific features are not tested here (requires native build)
+
+import { describe, it, expect, beforeAll } from 'vitest';
+import { execSync } from 'child_process';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DEMO_DIR = join(__dirname, 'workspace/photo_gallery');
+
+describe('Photo Gallery Demo Integration Tests', () => {
+  beforeAll(() => {
+    // Verify the demo exists
+    if (!existsSync(DEMO_DIR)) {
+      throw new Error(`Demo not found at ${DEMO_DIR}. Run: node setup.mjs photo_gallery`);
+    }
+
+    // Verify test files exist
+    if (!existsSync(join(DEMO_DIR, 'test/photos.test.mjs'))) {
+      throw new Error('Test files not found. The demo may need to be regenerated.');
+    }
+  });
+
+  it('runs the demo test suite successfully', () => {
+    // Run npm test in the demo directory
+    // This executes vitest which transforms .rb files on-the-fly
+    try {
+      const output = execSync('JUNTOS_DATABASE=sqlite npm test', {
+        cwd: DEMO_DIR,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          JUNTOS_DATABASE: 'sqlite',
+          JUNTOS_TARGET: 'node'
+        }
+      });
+
+      console.log('Test output:', output);
+      expect(output).toContain('pass');
+    } catch (error) {
+      // If tests fail, show the output for debugging
+      if (error.stdout) {
+        console.log('stdout:', error.stdout);
+      }
+      if (error.stderr) {
+        console.log('stderr:', error.stderr);
+      }
+      throw new Error(`Demo tests failed: ${error.message}`);
+    }
+  });
+
+  it('can build the demo with Vite', () => {
+    // Verify the build pipeline works
+    try {
+      execSync('JUNTOS_DATABASE=sqlite JUNTOS_TARGET=node npm run build', {
+        cwd: DEMO_DIR,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          JUNTOS_DATABASE: 'sqlite',
+          JUNTOS_TARGET: 'node'
+        }
+      });
+
+      // Verify dist was created
+      expect(existsSync(join(DEMO_DIR, 'dist'))).toBe(true);
+    } catch (error) {
+      if (error.stdout) console.log('stdout:', error.stdout);
+      if (error.stderr) console.log('stderr:', error.stderr);
+      throw new Error(`Build failed: ${error.message}`);
+    }
+  });
+});

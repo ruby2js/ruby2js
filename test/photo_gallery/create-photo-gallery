@@ -300,6 +300,91 @@ dependencies:
   "@capacitor/camera": "^6.0.0"
 CONFIG
 
+# Create integration test for photos (demo-specific)
+cat > test/photos.test.mjs << 'TEST'
+import { describe, it, expect } from 'vitest';
+
+describe('Photo Model', () => {
+  it('creates a photo with valid attributes', async () => {
+    const { Photo } = await import('juntos:models');
+
+    const photo = await Photo.create({
+      image_data: 'base64encodedimagedata',
+      caption: 'Test photo'
+    });
+
+    expect(photo.id).toBeDefined();
+    expect(photo.image_data).toBe('base64encodedimagedata');
+    expect(photo.caption).toBe('Test photo');
+  });
+
+  it('validates image_data presence', async () => {
+    const { Photo } = await import('juntos:models');
+
+    const photo = new Photo({ image_data: '', caption: 'No image' });
+    const saved = await photo.save();
+
+    expect(saved).toBe(false);
+    expect(photo.errors.image_data).toBeDefined();
+  });
+
+  it('allows photo without caption', async () => {
+    const { Photo } = await import('juntos:models');
+
+    const photo = await Photo.create({
+      image_data: 'base64data'
+    });
+
+    expect(photo.id).toBeDefined();
+    expect(photo.caption).toBeUndefined();
+  });
+});
+
+describe('PhotosController', () => {
+  it('index action returns list', async () => {
+    const { Photo } = await import('juntos:models');
+    const { PhotosController } = await import('../app/controllers/photos_controller.rb');
+
+    await Photo.create({ image_data: 'testdata', caption: 'Gallery photo' });
+
+    const context = {
+      params: {},
+      flash: { get: () => '', consumeNotice: () => ({ present: false }), consumeAlert: () => '' },
+      contentFor: {}
+    };
+
+    const html = await PhotosController.index(context);
+    expect(html).toContain('Photo Gallery');
+  });
+
+  it('create action adds a new photo', async () => {
+    const { Photo } = await import('juntos:models');
+    const { PhotosController } = await import('../app/controllers/photos_controller.rb');
+
+    const context = {
+      params: {},
+      flash: { set: () => {} },
+      contentFor: {},
+      request: { headers: { get: () => 'text/html' } }
+    };
+
+    const params = {
+      image_data: 'newphotobase64data',
+      caption: 'New photo from controller'
+    };
+
+    const result = await PhotosController.create(context, params);
+
+    // Should return redirect after successful create
+    expect(result.redirect).toBeDefined();
+
+    const photos = await Photo.all();
+    expect(photos.length).toBe(1);
+    expect(photos[0].caption).toBe('New photo from controller');
+  });
+});
+TEST
+
 echo ""
 echo "Photo gallery created: $APP_NAME/"
 echo ""

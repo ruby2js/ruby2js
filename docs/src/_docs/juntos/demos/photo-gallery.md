@@ -26,9 +26,11 @@ This creates a Rails app with:
 
 ## Run with Rails
 
-First, verify it works as a standard Rails app:
+The demo includes a Stimulus controller written in Ruby (`app/javascript/controllers/camera_controller.rb`). To transpile it automatically, install ruby2js:
 
 ```bash
+bundle add ruby2js --github ruby2js/ruby2js --branch master
+bin/rails generate ruby2js:install
 RAILS_ENV=production bin/rails db:prepare
 bin/rails server -e production
 ```
