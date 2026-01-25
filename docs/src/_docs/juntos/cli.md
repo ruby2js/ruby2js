@@ -7,96 +7,96 @@ category: juntos
 
 # Juntos CLI Reference
 
-The `juntos` command (via `bin/juntos`) provides commands for development, building, and deployment.
+The `juntos` command provides Rails-like commands for development, testing, building, and deployment. It can be invoked via:
+
+- `npx juntos` — Run from anywhere (auto-installs required packages)
+- `bin/juntos` — Binstub in Rails projects (delegates to npx)
+
+The CLI automatically installs required npm packages based on your options. For example, `juntos dev -d dexie` installs `dexie` if not present.
 
 {% toc %}
 
 ## juntos dev
 
-Start a development server for browser targets with hot reload.
+Start a development server with hot reload.
 
 ```bash
-bin/juntos dev [options]
+npx juntos dev [options]
 ```
 
 **Options:**
 
 | Option | Description |
 |--------|-------------|
-| `-d, --database ADAPTER` | Database adapter (dexie, sqljs, pglite) |
-| `-e, --environment ENV` | Rails environment (default: development) |
-| `-p, --port PORT` | Server port (default: 3000) |
-| `-v, --verbose` | Show detailed output |
+| `-d, --database ADAPTER` | Database adapter (dexie, sqlite, pglite, etc.) |
+| `-p, --port PORT` | Server port (default: 5173) |
+| `-o, --open` | Open browser automatically |
 | `-h, --help` | Show help |
 
 **Examples:**
 
 ```bash
-bin/juntos dev                    # Default: dexie adapter
-bin/juntos dev -d sqljs           # SQLite in WebAssembly
-bin/juntos dev -d pglite          # PostgreSQL in WebAssembly
-bin/juntos dev -p 8080            # Custom port
-bin/juntos dev -e test            # Use test environment from database.yml
+npx juntos dev                    # Uses database.yml settings
+npx juntos dev -d dexie           # Browser with IndexedDB
+npx juntos dev -d sqlite          # Node.js with SQLite
+npx juntos dev -p 8080            # Custom port
+npx juntos dev -o                 # Open browser automatically
 ```
 
 **What it does:**
 
-1. Builds the app to `dist/`
-2. Starts a development server with hot module reloading
-3. Watches Ruby files for changes and rebuilds automatically
-4. Opens browser to http://localhost:3000
+1. Loads database configuration (from `-d` flag or `config/database.yml`)
+2. Installs required packages if missing (e.g., `dexie` for IndexedDB)
+3. Starts Vite dev server with hot module reloading
+4. Watches Ruby files for changes and retranspiles automatically
 
-## juntos up
+## juntos test
 
-Build and run a server locally. Supports all targets including browser.
+Run tests with Vitest.
 
 ```bash
-bin/juntos up [options]
+npx juntos test [options] [files...]
 ```
 
 **Options:**
 
 | Option | Description |
 |--------|-------------|
-| `-t, --target TARGET` | Runtime target (browser, node, bun, deno) |
-| `-d, --database ADAPTER` | Database adapter |
-| `-e, --environment ENV` | Rails environment (default: development) |
-| `-p, --port PORT` | Server port (default: 3000) |
-| `-v, --verbose` | Show detailed output |
-| `--sourcemap` | Generate source maps |
+| `-d, --database ADAPTER` | Database adapter for tests |
 | `-h, --help` | Show help |
 
 **Examples:**
 
 ```bash
-bin/juntos up -d dexie            # Browser with IndexedDB
-bin/juntos up -d sqlite           # Node.js with SQLite
-bin/juntos up -t bun -d postgres  # Bun with PostgreSQL
-bin/juntos up -e production       # Production build (bundled, minified)
+npx juntos test                        # Run all tests
+npx juntos test articles.test.mjs      # Run specific test file
+npx juntos test -d sqlite              # Run tests with SQLite
+npx juntos test test/models/           # Run tests in directory
 ```
 
 **What it does:**
 
-1. Builds the app to `dist/` (uses Vite if configured, bundles and fingerprints assets)
-2. Starts a static server (browser) or runtime server (Node/Bun/Deno)
-3. Connects to the configured database
+1. Loads database configuration
+2. Installs vitest and database packages if missing
+3. Runs `vitest run` with any additional arguments passed through
+
+This mirrors `bin/rails test` — tests can be run with Rails (`bin/rails test`), with Juntos (`npx juntos test`), or directly with Vitest (`npx vitest`).
 
 ## juntos build
 
-Build the app without starting a server.
+Build the app for deployment.
 
 ```bash
-bin/juntos build [options]
+npx juntos build [options]
 ```
 
 **Options:**
 
 | Option | Description |
 |--------|-------------|
-| `-t, --target TARGET` | Target (browser, node, bun, deno, vercel, cloudflare, capacitor, electron, tauri) |
 | `-d, --database ADAPTER` | Database adapter |
-| `-e, --environment ENV` | Rails environment (default: development) |
-| `-v, --verbose` | Show detailed output |
+| `-t, --target TARGET` | Build target (browser, node, bun, vercel, cloudflare) |
+| `-e, --environment ENV` | Environment (default: development) |
 | `--sourcemap` | Generate source maps |
 | `--base PATH` | Base public path for assets (e.g., `/demos/blog/`) |
 | `-h, --help` | Show help |
@@ -104,44 +104,80 @@ bin/juntos build [options]
 **Examples:**
 
 ```bash
-bin/juntos build -d dexie                # Browser build
-bin/juntos build -e production           # Build for production environment
-bin/juntos build -t vercel -d neon       # Vercel Edge build
-bin/juntos build -t cloudflare -d d1     # Cloudflare Workers build
-bin/juntos build -t capacitor -d dexie   # Mobile app (iOS/Android)
-bin/juntos build -t electron -d sqlite   # Desktop app (macOS/Windows/Linux)
-bin/juntos build -t tauri -d sqljs       # Lightweight desktop app
-bin/juntos build -e production --sourcemap  # Production with source maps
-bin/juntos build -d dexie --base /app/   # Serve from subdirectory
+npx juntos build -d dexie                # Browser build
+npx juntos build -e production           # Production (bundled, minified)
+npx juntos build -t vercel -d neon       # Vercel Edge build
+npx juntos build -t cloudflare -d d1     # Cloudflare Workers build
+npx juntos build -d dexie --base /app/   # Serve from subdirectory
+npx juntos build --sourcemap             # Include source maps
 ```
 
 **Output:**
 
-Creates the `dist/` directory containing:
+Creates the `dist/` directory containing the built application. Production builds (`-e production`) are bundled, tree-shaken, minified, and fingerprinted by Vite.
 
-- `app/` — Transpiled models, controllers, views
-- `config/` — Routes and configuration
-- `db/` — Migrations and seeds
-- `lib/` — Runtime framework files
-- `index.html` — Entry point (browser targets)
-- `api/` or `src/` — Entry point (serverless targets)
-- `package.json` — Dependencies
-- `assets/` — Bundled JS/CSS with fingerprinted filenames (production builds)
+## juntos up
 
-**Production vs Development:**
+Build and run locally. Combines `build` and `server` in one command.
 
-The build mode is derived from `RAILS_ENV` or `NODE_ENV`:
+```bash
+npx juntos up [options]
+```
 
-- **Development** (default): Unbundled modules, fast rebuilds
-- **Production** (`-e production`): Vite bundles, tree-shakes, minifies, and fingerprints assets
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-d, --database ADAPTER` | Database adapter |
+| `-t, --target TARGET` | Runtime target (browser, node, bun, deno) |
+| `-p, --port PORT` | Server port (default: 3000) |
+| `-h, --help` | Show help |
+
+**Examples:**
+
+```bash
+npx juntos up -d dexie            # Browser with IndexedDB
+npx juntos up -d sqlite           # Node.js with SQLite
+npx juntos up -t bun -d postgres  # Bun with PostgreSQL
+```
+
+**What it does:**
+
+1. Builds the app to `dist/`
+2. Starts a preview server (browser) or runtime server (Node/Bun/Deno)
+
+## juntos server
+
+Start production server (requires prior build).
+
+```bash
+npx juntos server [options]
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-t, --target TARGET` | Runtime target (browser, node, bun, deno) |
+| `-p, --port PORT` | Server port (default: 3000) |
+| `-e, --environment ENV` | Environment (default: production) |
+| `-h, --help` | Show help |
+
+**Examples:**
+
+```bash
+npx juntos server                 # Start preview server
+npx juntos server -t node         # Start Node.js server
+npx juntos server -p 8080         # Custom port
+```
 
 ## juntos db
 
 Database management commands. Supports Rails-style colon syntax (`db:migrate`) or space syntax (`db migrate`).
 
 ```bash
-bin/juntos db <command> [options]
-bin/juntos db:command [options]
+npx juntos db <command> [options]
+npx juntos db:command [options]
 ```
 
 **Commands:**
@@ -160,9 +196,7 @@ bin/juntos db:command [options]
 | Option | Description |
 |--------|-------------|
 | `-d, --database ADAPTER` | Database adapter (overrides database.yml) |
-| `-e, --environment ENV` | Rails environment (default: development) |
-| `-t, --target TARGET` | Target runtime |
-| `-v, --verbose` | Show detailed output |
+| `-e, --environment ENV` | Environment (default: development) |
 | `-h, --help` | Show help |
 
 ### db:migrate
@@ -170,9 +204,9 @@ bin/juntos db:command [options]
 Run database migrations.
 
 ```bash
-bin/juntos db:migrate -d sqlite           # Local SQLite
-bin/juntos db:migrate -d d1               # D1 via Wrangler
-bin/juntos db:migrate -d neon             # Neon PostgreSQL
+npx juntos db:migrate -d sqlite           # Local SQLite
+npx juntos db:migrate -d d1               # D1 via Wrangler
+npx juntos db:migrate -d neon             # Neon PostgreSQL
 ```
 
 ### db:seed
@@ -180,8 +214,8 @@ bin/juntos db:migrate -d neon             # Neon PostgreSQL
 Run database seeds (always runs, unlike `prepare`).
 
 ```bash
-bin/juntos db:seed -d sqlite              # Seed local SQLite
-bin/juntos db:seed -d d1                  # Seed D1 database
+npx juntos db:seed -d sqlite              # Seed local SQLite
+npx juntos db:seed -d d1                  # Seed D1 database
 ```
 
 ### db:prepare
@@ -189,83 +223,39 @@ bin/juntos db:seed -d d1                  # Seed D1 database
 Smart setup: migrate + seed only if database is fresh (no existing tables).
 
 ```bash
-bin/juntos db:prepare                     # Uses database.yml settings
-bin/juntos db:prepare -d sqlite           # SQLite: migrate + seed if fresh
-bin/juntos db:prepare -d d1               # D1: create + migrate + seed if fresh
-bin/juntos db:prepare -e production       # Prepare production database
+npx juntos db:prepare                     # Uses database.yml settings
+npx juntos db:prepare -d sqlite           # SQLite: migrate + seed if fresh
+npx juntos db:prepare -d d1               # D1: create + migrate + seed if fresh
 ```
-
-For D1, `db:prepare` also creates the database if `D1_DATABASE_ID` (or `D1_DATABASE_ID_PRODUCTION` for production) is not set.
 
 ### db:reset
 
-Complete database reset: drop, create, migrate, and seed. Useful for development when you want a fresh start.
+Complete database reset: drop, create, migrate, and seed.
 
 ```bash
-bin/juntos db:reset                       # Reset development database
-bin/juntos db:reset -d d1                 # Reset D1 database
-bin/juntos db:reset -e staging            # Reset staging database
+npx juntos db:reset                       # Reset development database
+npx juntos db:reset -d d1                 # Reset D1 database
 ```
 
 **Warning:** This is destructive. D1 and Turso will prompt for confirmation before dropping.
 
-### db:create
+### db:create / db:drop
 
-Create a new database. Support varies by adapter:
-
-```bash
-bin/juntos db:create -d d1                # Create D1 database via Wrangler
-bin/juntos db:create -d turso             # Create Turso database via CLI
-```
+Create or delete databases. Support varies by adapter:
 
 | Adapter | Support |
 |---------|---------|
-| D1 | Creates via Wrangler, saves ID to `.env.local` |
-| Turso | Creates via `turso` CLI |
-| SQLite | Created automatically by `db:migrate` |
-| Neon, PlanetScale | Use their web console or CLI |
+| D1 | Creates/deletes via Wrangler, saves ID to `.env.local` |
+| Turso | Creates/deletes via `turso` CLI |
+| SQLite | File created automatically, deleted with `db:drop` |
 | Dexie | Created automatically in browser |
-
-### db:drop
-
-Delete a database. Support varies by adapter:
-
-```bash
-bin/juntos db:drop -d d1                  # Delete D1 database
-bin/juntos db:drop -d turso               # Delete Turso database
-bin/juntos db:drop -d sqlite              # Delete SQLite file
-```
-
-| Adapter | Support |
-|---------|---------|
-| D1 | Deletes via Wrangler |
-| Turso | Deletes via `turso` CLI |
-| SQLite | Deletes the `.sqlite3` file |
-| Neon, PlanetScale | Use their web console or CLI |
-| Dexie | Use browser DevTools |
-
-### Environment Variables
-
-For remote databases, credentials are read from `.env.local`:
-
-```bash
-# .env.local
-DATABASE_URL=postgres://user:pass@host/db   # Neon, Turso, PlanetScale
-D1_DATABASE_ID=xxxx-xxxx-xxxx               # Cloudflare D1 (development)
-D1_DATABASE_ID_PRODUCTION=yyyy-yyyy-yyyy    # Cloudflare D1 (production)
-D1_DATABASE_ID_STAGING=zzzz-zzzz-zzzz       # Cloudflare D1 (staging)
-TURSO_URL=libsql://db-name.turso.io         # Turso
-TURSO_TOKEN=your-token                       # Turso auth token
-```
-
-D1 database IDs are environment-specific. `juntos db:create -e production` saves to `D1_DATABASE_ID_PRODUCTION`, while development uses `D1_DATABASE_ID`. Commands fall back to `D1_DATABASE_ID` if the per-environment variable is not set.
 
 ## juntos deploy
 
 Build and deploy to a serverless platform.
 
 ```bash
-bin/juntos deploy [options]
+npx juntos deploy [options]
 ```
 
 **Options:**
@@ -274,21 +264,19 @@ bin/juntos deploy [options]
 |--------|-------------|
 | `-t, --target TARGET` | Deploy target (vercel, cloudflare) |
 | `-d, --database ADAPTER` | Database adapter |
-| `-e, --environment ENV` | Rails environment (default: production) |
+| `-e, --environment ENV` | Environment (default: production) |
 | `--skip-build` | Use existing dist/ |
 | `-f, --force` | Clear remote build cache |
-| `-v, --verbose` | Show detailed output |
 | `--sourcemap` | Generate source maps |
 | `-h, --help` | Show help |
 
 **Examples:**
 
 ```bash
-bin/juntos deploy -e production       # Deploy production (adapter from database.yml)
-bin/juntos deploy -d neon             # Vercel with Neon (target inferred)
-bin/juntos deploy -d d1               # Cloudflare with D1 (target inferred)
-bin/juntos deploy -d neon --force     # Clear cache and deploy
-bin/juntos deploy --sourcemap         # Deploy with source maps for debugging
+npx juntos deploy -d neon             # Vercel with Neon (target inferred)
+npx juntos deploy -d d1               # Cloudflare with D1 (target inferred)
+npx juntos deploy -t vercel -d neon   # Explicit target
+npx juntos deploy --force             # Clear cache and deploy
 ```
 
 **What it does:**
@@ -298,75 +286,79 @@ bin/juntos deploy --sourcemap         # Deploy with source maps for debugging
 3. Verifies the build loads correctly
 4. Runs the platform CLI (vercel or wrangler)
 
-## Static Hosting
+## juntos info
 
-Browser builds (`dexie`, `sqljs`, `pglite`) produce static files in `dist/` that can be hosted anywhere. No server runtime required—the app runs entirely in the browser.
-
-### Quick Start
+Show current Juntos configuration.
 
 ```bash
-bin/juntos build -d dexie
-cd dist && npx serve -s
+npx juntos info [options]
 ```
 
-### Subdirectory Hosting
+**Options:**
 
-When hosting at a path other than root (e.g., `https://example.com/myapp/`), use `--base` to rewrite asset paths:
+| Option | Description |
+|--------|-------------|
+| `-v, --verbose` | Show detailed information |
+| `-h, --help` | Show help |
+
+**Example output:**
+
+```
+Juntos Configuration
+========================================
+
+Environment:
+  RAILS_ENV:        development (default)
+  JUNTOS_DATABASE:  (not set)
+  JUNTOS_TARGET:    (not set)
+
+Database Configuration:
+  config/database.yml (development):
+    adapter:  dexie
+    database: blog_dev
+
+Project:
+  Directory:    blog
+  Rails app:    Yes
+  node_modules: Installed
+  dist/:        Not built
+```
+
+## juntos doctor
+
+Check environment and prerequisites.
 
 ```bash
-bin/juntos build -d dexie --base /myapp/
+npx juntos doctor
 ```
 
-This ensures all asset references use the correct base path (e.g., `/myapp/assets/application.js` instead of `/assets/application.js`).
+**What it checks:**
 
-### Production Hosting
-
-For traditional web servers, configure SPA fallback routing so client-side routes like `/articles/1` serve `index.html` instead of 404:
-
-**nginx:**
-
-```nginx
-server {
-    listen 80;
-    root /path/to/dist;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-}
-```
-
-**Apache (.htaccess in dist/):**
-
-```apache
-RewriteEngine On
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.html [L]
-```
-
-**Static Hosts:**
-
-- **GitHub Pages:** Push `dist/` contents to gh-pages branch, add a 404.html that's a copy of index.html
-- **Netlify:** Add `_redirects` file: `/* /index.html 200`
-- **Vercel:** Add `vercel.json`: `{"rewrites": [{"source": "/(.*)", "destination": "/index.html"}]}`
-- **Cloudflare Pages:** Automatically handles SPA routing
+| Check | Requirement |
+|-------|-------------|
+| Node.js | 18+ required |
+| npm | Must be installed |
+| Rails app | `app/` and `config/` directories |
+| database.yml | Valid configuration |
+| vite.config.js | Present |
+| node_modules | Dependencies installed |
+| dist/ | Build status |
 
 ## Database Adapters
 
-| Adapter | Targets | Storage |
-|---------|---------|---------|
-| `dexie` | browser, capacitor | IndexedDB |
-| `sqljs` | browser, capacitor, electron, tauri | SQLite/WASM |
-| `pglite` | browser, node, tauri | PostgreSQL/WASM |
-| `sqlite` | node, bun, electron | SQLite file |
-| `pg` | node, bun, deno | PostgreSQL |
-| `mysql2` | node, bun | MySQL |
-| `neon` | node, vercel, capacitor, electron, tauri | Serverless PostgreSQL |
-| `turso` | node, vercel, capacitor, electron, tauri | SQLite edge |
-| `planetscale` | node, vercel, capacitor, electron, tauri | Serverless MySQL |
-| `d1` | cloudflare | Cloudflare D1 |
+The CLI auto-installs the required npm package for each adapter:
+
+| Adapter | npm Package | Targets |
+|---------|-------------|---------|
+| `dexie` | dexie | browser |
+| `sqlite` | better-sqlite3 | node, bun |
+| `sqljs` | sql.js | browser |
+| `pglite` | @electric-sql/pglite | browser, node |
+| `pg` | pg | node, bun, deno |
+| `neon` | @neondatabase/serverless | vercel, node |
+| `turso` | @libsql/client | vercel, node |
+| `d1` | (none - Cloudflare binding) | cloudflare |
+| `mysql` | mysql2 | node, bun |
 
 ## Default Targets
 
@@ -375,8 +367,8 @@ When target is not specified, it's inferred from the database:
 | Database | Default Target |
 |----------|---------------|
 | dexie, sqljs, pglite | browser |
-| sqlite, pg, mysql2 | node |
-| neon, turso, planetscale | vercel |
+| sqlite, pg, mysql | node |
+| neon, turso | vercel |
 | d1 | cloudflare |
 
 ## Configuration
@@ -393,100 +385,6 @@ production:
   target: vercel
 ```
 
-### config/ruby2js.yml
-
-Configure Ruby2JS transpilation options. Supports environment-specific and section-specific settings.
-
-```yaml
-# Base configuration inherited by all environments
-default: &default
-  eslevel: 2022
-  include:
-    - class
-    - call
-  autoexports: true
-  comparison: identity
-
-# Environment-specific overrides
-development:
-  <<: *default
-
-production:
-  <<: *default
-  strict: true
-
-# Section-specific configuration
-components:
-  <<: *default
-  filters:
-    - phlex
-    - functions
-    - esm
-```
-
-**Supported sections:**
-
-| Section | Directory | Purpose |
-|---------|-----------|---------|
-| `controllers` | `app/controllers/` | Rails controllers |
-| `components` | `app/components/` | Phlex view components |
-| `stimulus` | `app/javascript/controllers/` | Stimulus controllers |
-
-Section config overrides the environment config for files in that directory.
-
-**Using preset mode:**
-
-```yaml
-# Preset enables: functions, esm, pragma, return + ES2022 + identity comparison
-preset: true
-
-# Add extra filters on top of preset
-filters:
-  - camelCase
-
-# Remove specific filters from preset
-disable_filters:
-  - return
-```
-
-**Available options:**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `preset` | boolean | Enable preset configuration |
-| `eslevel` | integer | ECMAScript target (2020-2025) |
-| `filters` | array | Filters to apply |
-| `disable_filters` | array | Filters to remove from preset |
-| `autoexports` | boolean/string | Auto-export declarations (true, false, "default") |
-| `comparison` | string | "equality" or "identity" |
-| `include` | array | Methods to opt-in for conversion |
-| `exclude` | array | Methods to exclude |
-| `strict` | boolean | Add "use strict" directive |
-| `dependencies` | object | NPM packages to add to generated package.json |
-| `external` | array | Modules to externalize (not bundled, resolved at runtime) |
-
-**Build configuration:**
-
-```yaml
-# Add npm dependencies to the generated package.json
-# These are installed and bundled by Vite
-dependencies:
-  "@capacitor/camera": "^6.0.0"
-  "chart.js": "^4.0.0"
-
-# Externalize modules (resolve at runtime, not bundled)
-# Use for CDN-loaded libraries or platform-provided modules
-external:
-  - "react"
-  - "react-dom"
-```
-
-**Available filters:**
-
-`functions`, `esm`, `cjs`, `return`, `erb`, `pragma`, `camelCase`, `tagged_templates`, `phlex`, `stimulus`, `active_support`, `securerandom`, `nokogiri`, `haml`, `jest`, `rails/model`, `rails/controller`, `rails/routes`, `rails/seeds`, `rails/helpers`, `rails/migration`
-
-See [Ruby2JS Options](/docs/options) for the full list of transpilation options.
-
 ### Environment Variables
 
 | Variable | Description |
@@ -494,88 +392,27 @@ See [Ruby2JS Options](/docs/options) for the full list of transpilation options.
 | `JUNTOS_TARGET` | Override target |
 | `JUNTOS_DATABASE` | Override database adapter |
 | `DATABASE_URL` | Database connection string |
-| `D1_DATABASE_ID` | Cloudflare D1 database ID (development) |
-| `D1_DATABASE_ID_PRODUCTION` | Cloudflare D1 database ID (production) |
+| `D1_DATABASE_ID` | Cloudflare D1 database ID |
 
-## juntos info
+Environment variables in `.env.local` are automatically loaded.
 
-Show current Juntos configuration.
+## Static Hosting
 
-```bash
-bin/juntos info [options]
-```
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `-v, --verbose` | Show detailed information (dependencies, D1 config) |
-| `-h, --help` | Show help |
-
-**Example output:**
-
-```
-Juntos Configuration
-========================================
-
-Environment:
-  RAILS_ENV:        development (default)
-  JUNTOS_DATABASE:  (not set)
-  JUNTOS_TARGET:    (not set)
-
-Database Configuration:
-  config/database.yml (development):
-    adapter:  d1
-    database: myapp_development
-
-Project:
-  Directory: myapp
-  Rails app: Yes
-  ruby2js:   In Gemfile
-  dist/:     Built
-  Target:    Cloudflare (wrangler.toml present)
-```
-
-Use `--verbose` to also see D1 database IDs and installed dependencies.
-
-## juntos doctor
-
-Check environment and prerequisites for Juntos.
+Browser builds (`dexie`, `sqljs`, `pglite`) produce static files that can be hosted anywhere:
 
 ```bash
-bin/juntos doctor
+npx juntos build -d dexie
+cd dist && npx serve -s
 ```
 
-**What it checks:**
+For subdirectory hosting, use `--base`:
 
-| Check | Requirement |
-|-------|-------------|
-| Ruby | 3.0+ required, 3.2+ recommended |
-| Node.js | 18+ required, 22+ recommended |
-| npm | Must be installed |
-| Rails app | `app/` and `config/` directories |
-| database.yml | Valid configuration |
-| .env.local | D1 database ID (if using D1) |
-| wrangler | Available (if using Cloudflare) |
-| dist/ | Build status |
-
-**Example output:**
-
-```
-Juntos Doctor
-========================================
-
-Checking Ruby... OK (3.4.0)
-Checking Node.js... OK (v22.0.0)
-Checking npm... OK (10.0.0)
-Checking Rails app structure... OK
-Checking config/database.yml... OK (d1)
-Checking .env.local... OK (D1 configured)
-Checking wrangler CLI... OK
-Checking dist/ directory... OK (built)
-
-========================================
-All checks passed! Your environment is ready.
+```bash
+npx juntos build -d dexie --base /myapp/
 ```
 
-Issues are reported with actionable suggestions for how to fix them.
+Configure SPA fallback routing so client-side routes serve `index.html`:
+
+- **Netlify:** Add `_redirects`: `/* /index.html 200`
+- **Vercel:** Add `vercel.json`: `{"rewrites": [{"source": "/(.*)", "destination": "/index.html"}]}`
+- **nginx:** `try_files $uri $uri/ /index.html;`
