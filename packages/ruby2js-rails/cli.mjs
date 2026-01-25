@@ -164,6 +164,16 @@ function loadDatabaseConfig(options) {
     }
   }
 
+  // Normalize Rails adapter names to Juntos equivalents
+  const ADAPTER_ALIASES = {
+    sqlite3: 'sqlite',
+    postgresql: 'pg',
+    mysql2: 'mysql'
+  };
+  if (options.database && ADAPTER_ALIASES[options.database]) {
+    options.database = ADAPTER_ALIASES[options.database];
+  }
+
   // Defaults
   options.database = options.database || 'dexie';
   options.dbName = options.dbName || `${basename(APP_ROOT)}_${env}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
