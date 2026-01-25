@@ -39,12 +39,12 @@ rails generate model Edge workflow:references source_node_id:integer target_node
 rails db:create
 
 # Exclude app/components from Zeitwerk autoloading (JSX.rb files are for Juntos, not Rails)
-cat >> config/application.rb << 'ZEITWERK'
-
-    # Ignore app/components - these are JSX.rb files transpiled by Juntos/Vite, not Rails
-    config.autoload_lib(ignore: %w[assets tasks])
+# Insert after 'config.load_defaults' line inside the Application class
+sed -i.bak '/config\.load_defaults/a\
+\
+    # Ignore app/components - these are JSX.rb files transpiled by Juntos/Vite, not Rails\
     Rails.autoloaders.main.ignore(Rails.root.join("app/components"))
-ZEITWERK
+' config/application.rb && rm config/application.rb.bak
 
 # Update Workflow model with associations and validations
 cat > app/models/workflow.rb << 'MODEL'
