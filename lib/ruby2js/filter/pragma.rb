@@ -60,20 +60,20 @@ module Ruby2JS
         'server' => :target_server   # alias for node/bun/deno/cloudflare/vercel/fly
       }.freeze
 
-      # Map target pragma symbols to their target names
-      TARGET_PRAGMAS = {
-        target_browser: 'browser',
-        target_capacitor: 'capacitor',
-        target_electron: 'electron',
-        target_tauri: 'tauri',
-        target_node: 'node',
-        target_bun: 'bun',
-        target_deno: 'deno',
-        target_cloudflare: 'cloudflare',
-        target_vercel: 'vercel',
-        target_fly: 'fly',
-        target_server: 'server'
-      }.freeze
+      # Map target pragma symbols to their target names (as array for JS compatibility)
+      TARGET_PRAGMAS = [
+        [:target_browser, 'browser'],
+        [:target_capacitor, 'capacitor'],
+        [:target_electron, 'electron'],
+        [:target_tauri, 'tauri'],
+        [:target_node, 'node'],
+        [:target_bun, 'bun'],
+        [:target_deno, 'deno'],
+        [:target_cloudflare, 'cloudflare'],
+        [:target_vercel, 'vercel'],
+        [:target_fly, 'fly'],
+        [:target_server, 'server']
+      ].freeze
 
       # Server-side targets (for 'server' meta-target)
       SERVER_TARGETS = %w[node bun deno cloudflare vercel fly].freeze
@@ -406,18 +406,28 @@ module Ruby2JS
       def skip_for_target?(node)
         return false unless @pragma_target  # No target set = include everything
 
-        TARGET_PRAGMAS.each do |pragma_sym, target_name| # Pragma: entries
+        # Check each target pragma to see if it applies to this node
+        # TARGET_PRAGMAS is an array of [symbol, name] pairs for JS compatibility
+        idx = 0
+        target_name = nil
+
+        while idx < TARGET_PRAGMAS.length
+          pragma_sym, name = TARGET_PRAGMAS[idx]
           if pragma?(node, pragma_sym)
-            # Handle 'server' meta-target
-            if target_name == 'server'
-              return !SERVER_TARGETS.include?(@pragma_target)
-            else
-              return @pragma_target != target_name
-            end
+            target_name = name
+            idx = TARGET_PRAGMAS.length  # Exit loop
           end
+          idx += 1
         end
 
-        false  # No target pragma = include for all targets
+        return false unless target_name  # No target pragma = include for all targets
+
+        # Handle 'server' meta-target
+        if target_name == 'server'
+          !SERVER_TARGETS.include?(@pragma_target)
+        else
+          @pragma_target != target_name
+        end
       end
 
       # Get the source buffer name and line number for a node
