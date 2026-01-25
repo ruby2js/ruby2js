@@ -774,6 +774,33 @@ export { ${members.join(', ')} };
 `;
       }
 
+      // Intercept app/javascript/controllers/index.js - generate Vite-compatible controller loading
+      // Rails' index.js uses @hotwired/stimulus-loading (importmap-only), so we replace it
+      // with import.meta.glob which works with Vite and supports both .js and .rb controllers
+      if (id.endsWith('/app/javascript/controllers/index.js')) {
+        return `import { Application } from "@hotwired/stimulus";
+
+const application = Application.start();
+
+// Import all controllers (both .js and .rb - Vite transforms .rb on the fly)
+const controllers = import.meta.glob([
+  './*_controller.js',
+  './*_controller.rb'
+], { eager: true });
+
+for (const [path, module] of Object.entries(controllers)) {
+  // Extract controller name: ./hello_controller.js -> hello
+  const match = path.match(/\\.\\/(.+)_controller/);
+  if (match) {
+    const identifier = match[1].replace(/_/g, '-');
+    application.register(identifier, module.default);
+  }
+}
+
+export { application };
+`;
+      }
+
       // Transform Ruby source files
       if (!id.endsWith('.rb')) return null;
       if (id.includes('/node_modules/')) return null;
