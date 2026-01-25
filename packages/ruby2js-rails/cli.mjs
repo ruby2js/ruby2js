@@ -14,7 +14,7 @@
  */
 
 import { spawn, spawnSync, execSync } from 'child_process';
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, chmodSync } from 'fs';
 import { join, basename, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -210,6 +210,187 @@ function validateRailsApp() {
     console.error('Expected to find app/ and config/ directories.');
     process.exit(1);
   }
+}
+
+// ============================================
+// Init command - set up Juntos in a project
+// ============================================
+
+const RELEASES_URL = 'https://ruby2js.github.io/ruby2js/releases';
+
+function runInit(options) {
+  const destDir = APP_ROOT;
+  const quiet = options.quiet || false;
+
+  if (!quiet) {
+    console.log(`Initializing Juntos in ${basename(destDir)}/\n`);
+  }
+
+  // Create or merge package.json
+  const packagePath = join(destDir, 'package.json');
+  if (existsSync(packagePath)) {
+    if (!quiet) console.log('  Updating package.json...');
+    const existing = JSON.parse(readFileSync(packagePath, 'utf8'));
+    existing.type = existing.type || 'module';
+    existing.dependencies = existing.dependencies || {};
+    existing.devDependencies = existing.devDependencies || {};
+    existing.scripts = existing.scripts || {};
+
+    // Add dependencies if missing
+    if (!existing.dependencies['ruby2js-rails']) {
+      existing.dependencies['ruby2js-rails'] = `${RELEASES_URL}/ruby2js-rails-beta.tgz`;
+    }
+    if (!existing.devDependencies['vite']) {
+      existing.devDependencies['vite'] = '^6.0.0';
+    }
+    if (!existing.devDependencies['vitest']) {
+      existing.devDependencies['vitest'] = '^2.0.0';
+    }
+
+    // Add scripts if missing
+    existing.scripts.dev = existing.scripts.dev || 'vite';
+    existing.scripts.build = existing.scripts.build || 'vite build';
+    existing.scripts.preview = existing.scripts.preview || 'vite preview';
+    existing.scripts.test = existing.scripts.test || 'vitest run';
+
+    writeFileSync(packagePath, JSON.stringify(existing, null, 2) + '\n');
+  } else {
+    if (!quiet) console.log('  Creating package.json...');
+    const appName = basename(destDir).toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    const pkg = {
+      name: appName,
+      type: 'module',
+      scripts: {
+        dev: 'vite',
+        build: 'vite build',
+        preview: 'vite preview',
+        test: 'vitest run'
+      },
+      dependencies: {
+        'ruby2js-rails': `${RELEASES_URL}/ruby2js-rails-beta.tgz`
+      },
+      devDependencies: {
+        vite: '^6.0.0',
+        vitest: '^2.0.0'
+      }
+    };
+    writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + '\n');
+  }
+
+  // Create vite.config.js
+  const viteConfigPath = join(destDir, 'vite.config.js');
+  if (!existsSync(viteConfigPath)) {
+    if (!quiet) console.log('  Creating vite.config.js...');
+    writeFileSync(viteConfigPath, `import { defineConfig } from 'vite';
+import { juntos } from 'ruby2js-rails/vite';
+
+export default defineConfig({
+  plugins: juntos()
+});
+`);
+  } else {
+    if (!quiet) console.log('  Skipping vite.config.js (already exists)');
+  }
+
+  // Create vitest.config.js
+  const vitestConfigPath = join(destDir, 'vitest.config.js');
+  if (!existsSync(vitestConfigPath)) {
+    if (!quiet) console.log('  Creating vitest.config.js...');
+    writeFileSync(vitestConfigPath, `import { defineConfig, mergeConfig } from 'vitest/config';
+import viteConfig from './vite.config.js';
+
+export default mergeConfig(viteConfig, defineConfig({
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
+    setupFiles: ['./test/setup.mjs']
+  }
+}));
+`);
+  } else {
+    if (!quiet) console.log('  Skipping vitest.config.js (already exists)');
+  }
+
+  // Create test/setup.mjs
+  const testDir = join(destDir, 'test');
+  const setupPath = join(testDir, 'setup.mjs');
+  if (!existsSync(setupPath)) {
+    if (!quiet) console.log('  Creating test/setup.mjs...');
+    if (!existsSync(testDir)) {
+      mkdirSync(testDir, { recursive: true });
+    }
+    writeFileSync(setupPath, `// Test setup for Vitest
+// Initializes the database before each test
+
+import { beforeAll, beforeEach } from 'vitest';
+
+beforeAll(async () => {
+  // Import models (registers them with Application and modelRegistry)
+  await import('juntos:models');
+
+  // Configure migrations
+  const rails = await import('juntos:rails');
+  const migrations = await import('juntos:migrations');
+  rails.Application.configure({ migrations: migrations.migrations });
+});
+
+beforeEach(async () => {
+  // Fresh in-memory database for each test
+  const activeRecord = await import('juntos:active-record');
+  await activeRecord.initDatabase({ database: ':memory:' });
+
+  const rails = await import('juntos:rails');
+  await rails.Application.runMigrations(activeRecord);
+});
+`);
+  } else {
+    if (!quiet) console.log('  Skipping test/setup.mjs (already exists)');
+  }
+
+  // Create bin/juntos binstub
+  const binDir = join(destDir, 'bin');
+  const binstubPath = join(binDir, 'juntos');
+  if (!existsSync(binstubPath)) {
+    if (!quiet) console.log('  Creating bin/juntos...');
+    if (!existsSync(binDir)) {
+      mkdirSync(binDir, { recursive: true });
+    }
+    writeFileSync(binstubPath, `#!/bin/sh
+# Juntos - Rails patterns, JavaScript runtimes
+# This binstub delegates to the juntos CLI from ruby2js-rails
+exec npx juntos "$@"
+`);
+    chmodSync(binstubPath, 0o755);
+  } else {
+    if (!quiet) console.log('  Skipping bin/juntos (already exists)');
+  }
+
+  // In quiet mode or --no-install, we're done
+  if (quiet || options.noInstall) {
+    if (!quiet) {
+      console.log('\nJuntos initialized! Run `npm install` to install dependencies.');
+    }
+    return;
+  }
+
+  // Run npm install
+  console.log('\nInstalling dependencies...\n');
+  const result = spawnSync('npm', ['install'], {
+    cwd: destDir,
+    stdio: 'inherit'
+  });
+
+  if (result.status !== 0) {
+    console.error('\nnpm install failed. You can retry manually with: npm install');
+    process.exit(1);
+  }
+
+  console.log('\nJuntos initialized!\n');
+  console.log('Next steps:');
+  console.log('  npx juntos dev -d dexie        # Browser with IndexedDB');
+  console.log('  npx juntos up -d sqlite        # Node.js with SQLite');
+  console.log('\nFor more information: https://www.ruby2js.com/docs/juntos');
 }
 
 // ============================================
@@ -1458,6 +1639,7 @@ Juntos - Rails patterns, JavaScript runtimes
 Usage: juntos [options] <command> [command-options]
 
 Commands:
+  init      Initialize Juntos in a project
   dev       Start development server with hot reload
   build     Build for deployment
   test      Run tests with Vitest
@@ -1513,6 +1695,20 @@ if (!command || options.help && !command) {
 }
 
 switch (command) {
+  case 'init':
+    if (options.help) {
+      console.log('Usage: juntos init [options]\n\nInitialize Juntos in a project.\n');
+      console.log('Options:');
+      console.log('  --no-install   Skip npm install');
+      console.log('  --quiet        Suppress output');
+      process.exit(0);
+    }
+    // Parse --no-install flag
+    options.noInstall = process.argv.includes('--no-install');
+    options.quiet = process.argv.includes('--quiet');
+    runInit(options);
+    break;
+
   case 'dev':
     if (options.help) {
       console.log('Usage: juntos dev [options]\n\nStart development server with hot reload.\n');
