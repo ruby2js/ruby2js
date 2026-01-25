@@ -184,8 +184,9 @@ function loadDatabaseConfig(options) {
     options.database = ADAPTER_ALIASES[options.database];
   }
 
-  // Defaults
-  options.database = options.database || 'dexie';
+  // Environment variables take precedence over defaults (but not over CLI/config)
+  options.database = options.database || process.env.JUNTOS_DATABASE || 'dexie';
+  options.target = options.target || process.env.JUNTOS_TARGET;
   options.dbName = options.dbName || `${basename(APP_ROOT)}_${env}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
 
   // Infer target from database if not specified
@@ -236,9 +237,15 @@ function runInit(options) {
     existing.devDependencies = existing.devDependencies || {};
     existing.scripts = existing.scripts || {};
 
-    // Add dependencies if missing
+    // Add dependencies if missing (ruby2js and vite-plugin-ruby2js are peer deps of ruby2js-rails)
+    if (!existing.dependencies['ruby2js']) {
+      existing.dependencies['ruby2js'] = `${RELEASES_URL}/ruby2js-beta.tgz`;
+    }
     if (!existing.dependencies['ruby2js-rails']) {
       existing.dependencies['ruby2js-rails'] = `${RELEASES_URL}/ruby2js-rails-beta.tgz`;
+    }
+    if (!existing.dependencies['vite-plugin-ruby2js']) {
+      existing.dependencies['vite-plugin-ruby2js'] = `${RELEASES_URL}/vite-plugin-ruby2js-beta.tgz`;
     }
     if (!existing.devDependencies['vite']) {
       existing.devDependencies['vite'] = '^6.0.0';
@@ -267,7 +274,9 @@ function runInit(options) {
         test: 'vitest run'
       },
       dependencies: {
-        'ruby2js-rails': `${RELEASES_URL}/ruby2js-rails-beta.tgz`
+        'ruby2js': `${RELEASES_URL}/ruby2js-beta.tgz`,
+        'ruby2js-rails': `${RELEASES_URL}/ruby2js-rails-beta.tgz`,
+        'vite-plugin-ruby2js': `${RELEASES_URL}/vite-plugin-ruby2js-beta.tgz`
       },
       devDependencies: {
         vite: '^6.0.0',
@@ -654,24 +663,25 @@ function runServer(options) {
   const isServerTarget = ['node', 'bun', 'deno'].includes(options.target);
 
   if (isServerTarget) {
-    const runtime = options.target || 'node';
-    const script = `start:${runtime}`;
-    console.log(`Starting ${runtime} server on port ${options.port}...`);
+    // Run the built server directly (like 'up' command)
+    const runtime = options.target === 'bun' ? 'bun' : options.target === 'deno' ? 'deno' : 'node';
+    const entryPoint = join(APP_ROOT, 'dist', 'index.js');
 
-    const child = spawn('npm', ['run', script], {
+    if (!existsSync(entryPoint)) {
+      console.error(`Error: ${entryPoint} not found. Run "juntos build -t ${options.target}" first.`);
+      process.exit(1);
+    }
+
+    console.log(`Starting ${runtime} server on port ${options.port}...`);
+    spawn(runtime, [entryPoint], {
       cwd: APP_ROOT,
       stdio: 'inherit',
-      env: process.env
-    });
-
-    child.on('error', (err) => {
-      console.error(`Failed to start server: ${err.message}`);
-      process.exit(1);
+      env: { ...process.env, PORT: String(options.port) }
     });
   } else {
-    // Browser target - serve static files
+    // Browser target - serve static files with vite preview
     console.log(`Starting static server on port ${options.port}...`);
-    spawn('npm', ['run', 'start'], {
+    spawn('npx', ['vite', 'preview', '--port', String(options.port)], {
       cwd: APP_ROOT,
       stdio: 'inherit',
       env: process.env

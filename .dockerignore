@@ -60,4 +60,12 @@ demo/photo_gallery/
 demo/ssg-blog/
 demo/workflow_builder/
 testrails
-artifacts/
+
+# Artifacts - exclude intermediate files but keep tarballs for Docker builds
+artifacts/blog/
+artifacts/chat/
+artifacts/notes/
+artifacts/photo_gallery/
+artifacts/workflow/
+artifacts/astro-blog/
+artifacts/ssg-blog/

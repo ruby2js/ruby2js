@@ -1,0 +1,302 @@
+# Test orchestration for Ruby2JS demos
+#
+# Usage (from repository root):
+#   bundle exec rake -f test/Rakefile integration[blog]   # Automated tests
+#   bundle exec rake -f test/Rakefile system[blog]        # Manual browser testing
+#
+# Or from test/ directory:
+#   rake integration[blog]
+#   rake system[blog]
+#
+# These commands ensure all dependencies are up-to-date before testing.
+
+require 'fileutils'
+
+ROOT = File.expand_path('..', __dir__)
+TEST_DIR = __dir__
+ARTIFACTS = File.join(ROOT, 'artifacts')
+TARBALLS = File.join(ARTIFACTS, 'tarballs')
+
+# Demos that can be tested
+DEMOS = %w[blog chat notes photo_gallery workflow]
+
+# ============================================
+# Helper methods
+# ============================================
+
+def demo_tarball(demo)
+  # Tarballs use hyphens, directories use underscores
+  # CI creates artifacts/demo-blog.tar.gz (not in subdirectory)
+  demo_hyphen = demo.tr('_', '-')
+  File.join(ARTIFACTS, "demo-#{demo_hyphen}.tar.gz")
+end
+
+def demo_create_script(demo)
+  # Scripts use hyphens in directory names
+  demo_hyphen = demo.tr('_', '-')
+  File.join(TEST_DIR, demo_hyphen, "create-#{demo_hyphen}")
+end
+
+def package_tarballs_exist?
+  %w[ruby2js-beta.tgz ruby2js-rails-beta.tgz vite-plugin-ruby2js-beta.tgz].all? do |name|
+    File.exist?(File.join(TARBALLS, name))
+  end
+end
+
+def demo_tarball_exists?(demo)
+  File.exist?(demo_tarball(demo))
+end
+
+# ============================================
+# Build tasks
+# ============================================
+
+desc "Build npm package tarballs"
+task :tarballs do
+  if package_tarballs_exist?
+    puts "Package tarballs exist, checking if rebuild needed..."
+  end
+
+  # Always rebuild to ensure they're current
+  # The selfhost Rakefile has proper dependency tracking
+  Dir.chdir(ROOT) do
+    sh 'bundle exec rake -f demo/selfhost/Rakefile release'
+  end
+end
+
+# Define file tasks for each demo tarball
+# These only rebuild when the create script changes
+DEMOS.each do |demo|
+  demo_hyphen = demo.tr('_', '-')
+  script = File.join(TEST_DIR, demo_hyphen, "create-#{demo_hyphen}")
+  tarball = File.join(ARTIFACTS, "demo-#{demo_hyphen}.tar.gz")
+
+  next unless File.exist?(script)  # Skip demos without create scripts
+
+  # File task: tarball depends on create script
+  file tarball => script do
+    demo_dir = File.join(ARTIFACTS, demo)
+
+    # Clean existing demo directory
+    FileUtils.rm_rf(demo_dir)
+    FileUtils.mkdir_p(ARTIFACTS)
+
+    puts "Creating #{demo} demo..."
+    Dir.chdir(ROOT) do
+      # Run in a clean shell without Bundler environment (create script needs Rails)
+      # Using env -i with explicit PATH to find rails and other tools
+      path = ENV['PATH']
+      sh "env -i PATH=#{path} HOME=#{ENV['HOME']} #{script} #{demo_dir}"
+      sh "tar --exclude='node_modules' -czf #{tarball} -C #{ARTIFACTS} #{demo}"
+    end
+
+    puts "Created: #{tarball}"
+  end
+end
+
+desc "Create demo tarball (only if create script changed)"
+task :demo_tarball, [:demo] do |t, args|
+  demo = args[:demo] || 'blog'
+
+  unless DEMOS.include?(demo)
+    abort "Unknown demo: #{demo}. Available: #{DEMOS.join(', ')}"
+  end
+
+  script = demo_create_script(demo)
+  unless File.exist?(script)
+    abort "Create script not found: #{script}"
+  end
+
+  tarball = demo_tarball(demo)
+
+  # Invoke the file task (checks timestamps automatically)
+  Rake::Task[tarball].invoke
+end
+
+# ============================================
+# Integration tests (automated, no browser)
+# ============================================
+
+desc "Run integration tests for a demo (default: blog)"
+task :integration, [:demo] do |t, args|
+  demo = args[:demo] || 'blog'
+
+  # Ensure tarballs are built
+  Rake::Task[:tarballs].invoke
+
+  # Ensure demo tarball exists
+  unless demo_tarball_exists?(demo)
+    Rake::Task[:demo_tarball].invoke(demo)
+  end
+
+  # Run integration tests
+  integration_dir = File.join(TEST_DIR, 'integration')
+
+  Dir.chdir(integration_dir) do
+    # Install test dependencies if needed
+    unless File.exist?('node_modules')
+      sh 'npm install'
+    end
+
+    # Setup demo from local tarballs
+    puts "\nSetting up #{demo} demo from local tarballs..."
+    sh "node setup.mjs --local #{demo}"
+
+    # Run tests
+    puts "\nRunning tests..."
+    demo_hyphen = demo.tr('_', '-')
+    # Handle special cases where test file uses underscore or hyphen
+    test_files = Dir.glob("#{demo}*.test.mjs") + Dir.glob("#{demo_hyphen}*.test.mjs")
+    if test_files.empty?
+      # Try with underscores
+      test_files = Dir.glob("#{demo.tr('-', '_')}*.test.mjs")
+    end
+
+    if test_files.empty?
+      abort "No test file found for #{demo}"
+    end
+
+    sh "npm test -- #{test_files.first}"
+  end
+end
+
+# ============================================
+# System tests (manual browser testing)
+# ============================================
+
+desc "Start system test container for manual browser testing (default: blog)"
+task :system, [:demo, :database, :target] do |t, args|
+  demo = args[:demo] || 'blog'
+  database = args[:database] || 'dexie'
+  target = args[:target] || 'browser'
+
+  # Ensure tarballs are built
+  Rake::Task[:tarballs].invoke
+
+  # Ensure demo tarball exists
+  unless demo_tarball_exists?(demo)
+    Rake::Task[:demo_tarball].invoke(demo)
+  end
+
+  demo_hyphen = demo.tr('_', '-')
+  image_name = "ruby2js-#{demo_hyphen}-test"
+  container_name = "#{image_name}-container"
+
+  # Stop and remove existing container
+  system "docker stop #{container_name} 2>/dev/null"
+  system "docker rm #{container_name} 2>/dev/null"
+
+  # Generate a Dockerfile that uses local tarballs
+  dockerfile = File.join(ARTIFACTS, 'Dockerfile.system-test')
+  generate_system_test_dockerfile(dockerfile, demo, database, target)
+
+  puts "\nBuilding Docker image with local tarballs..."
+  Dir.chdir(ROOT) do
+    sh "docker build -f #{dockerfile} -t #{image_name} ."
+  end
+
+  # Run container
+  puts "\nStarting container..."
+  port = target == 'browser' ? 5173 : 3000
+  sh "docker run -d -p #{port}:#{port} --name #{container_name} #{image_name}"
+
+  # Wait for startup and show logs
+  sleep 2
+  puts "\n" + "=" * 60
+  puts "Container started!"
+  puts "=" * 60
+  puts "\nOpen in browser: http://localhost:#{port}"
+  puts "\nView logs:       docker logs -f #{container_name}"
+  puts "Stop container:  docker stop #{container_name}"
+  puts "Remove:          docker rm #{container_name}"
+  puts "\n"
+
+  # Show initial logs
+  sh "docker logs #{container_name}"
+end
+
+desc "Stop and remove system test container"
+task :system_stop, [:demo] do |t, args|
+  demo = args[:demo] || 'blog'
+  demo_hyphen = demo.tr('_', '-')
+  container_name = "ruby2js-#{demo_hyphen}-test-container"
+
+  sh "docker stop #{container_name} 2>/dev/null || true"
+  sh "docker rm #{container_name} 2>/dev/null || true"
+  puts "Stopped and removed #{container_name}"
+end
+
+# ============================================
+# Convenience tasks
+# ============================================
+
+desc "List available demos"
+task :list do
+  puts "Available demos:"
+  DEMOS.each do |demo|
+    script = demo_create_script(demo)
+    status = File.exist?(script) ? "✓" : "✗ (no create script)"
+    puts "  #{demo.ljust(15)} #{status}"
+  end
+end
+
+desc "Clean all built artifacts"
+task :clean do
+  FileUtils.rm_rf(ARTIFACTS)
+  puts "Cleaned artifacts/"
+end
+
+# Generate a Dockerfile for system tests that uses local tarballs
+def generate_system_test_dockerfile(path, demo, database, target)
+  demo_hyphen = demo.tr('_', '-')
+
+  # Determine which database packages to install
+  db_packages = case database
+  when 'sqlite' then 'better-sqlite3'
+  when 'pg' then 'pg'
+  when 'mysql' then 'mysql2'
+  else ''
+  end
+
+  content = <<~DOCKERFILE
+    # Auto-generated system test Dockerfile for #{demo}
+    # Generated by: rake system[#{demo},#{database},#{target}]
+    # Uses local tarballs from artifacts/
+
+    FROM node:24
+
+    WORKDIR /app
+
+    ENV JUNTOS_DATABASE=#{database}
+    ENV JUNTOS_TARGET=#{target}
+
+    # Copy local tarballs
+    COPY artifacts/tarballs/*.tgz /tarballs/
+    COPY artifacts/demo-#{demo_hyphen}.tar.gz /tarballs/
+
+    # Extract demo
+    RUN tar -xzf /tarballs/demo-#{demo_hyphen}.tar.gz --strip-components=1 -C /app
+
+    # Initialize Juntos config and remove stale lock file
+    RUN tar -xzf /tarballs/ruby2js-rails-beta.tgz -C /tmp && \\
+        node /tmp/package/cli.mjs init --no-install && \\
+        rm -rf /tmp/package && \\
+        rm -f package-lock.json
+
+    # Install from local tarballs#{db_packages.empty? ? '' : " + #{db_packages}"}
+    RUN npm install /tarballs/ruby2js-beta.tgz /tarballs/ruby2js-rails-beta.tgz /tarballs/vite-plugin-ruby2js-beta.tgz#{db_packages.empty? ? '' : " #{db_packages}"}
+
+    # Build
+    RUN npx juntos build --verbose
+
+    EXPOSE 3000 5173
+
+    CMD ["npx", "juntos", "server"]
+  DOCKERFILE
+
+  FileUtils.mkdir_p(File.dirname(path))
+  File.write(path, content)
+  puts "Generated: #{path}"
+end
+
+task default: :list
