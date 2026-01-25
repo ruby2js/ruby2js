@@ -127,6 +127,11 @@ export async function insert(tableName, data) {
   await db.table(tableName).add(data);
 }
 
+// Close database connection (no-op for Dexie - IndexedDB manages connections)
+export async function closeDatabase() {
+  // Dexie/IndexedDB connections don't need explicit closing
+}
+
 // Dexie-specific ActiveRecord implementation
 export class ActiveRecord extends ActiveRecordBase {
   // Get the Dexie table for this model

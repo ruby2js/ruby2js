@@ -75,6 +75,11 @@ export function getDatabase() {
   return null; // No local database
 }
 
+// Close database connection (no-op for RPC - server manages database)
+export async function closeDatabase() {
+  // RPC has no local database to close
+}
+
 export async function query(sql, params = []) {
   // Not supported - use model methods instead
   console.warn('Direct SQL queries not supported on RPC client');

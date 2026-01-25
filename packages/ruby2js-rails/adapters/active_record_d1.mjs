@@ -109,6 +109,11 @@ export function getDatabase() {
   return db;
 }
 
+// Close database connection (no-op for D1 - Worker runtime manages connections)
+export async function closeDatabase() {
+  // D1 connections are managed by Cloudflare Workers runtime
+}
+
 // Query interface for rails_base.js migration system
 export async function query(sql, params = []) {
   const stmt = db.prepare(sql);

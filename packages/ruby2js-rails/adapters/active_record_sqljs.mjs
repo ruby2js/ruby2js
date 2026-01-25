@@ -135,6 +135,14 @@ export function getDatabase() {
   return db;
 }
 
+// Close database connection
+export async function closeDatabase() {
+  if (db) {
+    db.close();
+    db = null;
+  }
+}
+
 // Query interface for rails_base.js migration system
 export async function query(sql, params = []) {
   const stmt = db.prepare(sql);
