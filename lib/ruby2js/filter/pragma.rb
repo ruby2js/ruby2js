@@ -406,7 +406,7 @@ module Ruby2JS
       def skip_for_target?(node)
         return false unless @pragma_target  # No target set = include everything
 
-        TARGET_PRAGMAS.each do |pragma_sym, target_name|
+        TARGET_PRAGMAS.each do |pragma_sym, target_name| # Pragma: entries
           if pragma?(node, pragma_sym)
             # Handle 'server' meta-target
             if target_name == 'server'
