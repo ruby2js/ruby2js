@@ -17,7 +17,16 @@ import { spawn, spawnSync, execSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, chmodSync } from 'fs';
 import { join, basename, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import yaml from 'js-yaml';
+
+// Try to load js-yaml, fall back to naive parsing if not available
+// (js-yaml may not be available when CLI is run standalone from tarball)
+let yaml = null;
+try {
+  yaml = await import('js-yaml');
+  yaml = yaml.default || yaml;
+} catch {
+  // js-yaml not available, will use fallback parser
+}
 
 // CLI runs from the app's working directory
 const APP_ROOT = process.cwd();
@@ -137,13 +146,42 @@ function loadDatabaseConfig(options) {
   if (existsSync(configPath)) {
     try {
       const content = readFileSync(configPath, 'utf-8');
-      const config = yaml.load(content);
-      const envConfig = config[env];
 
-      if (envConfig) {
-        if (envConfig.adapter) options.database = options.database || envConfig.adapter;
-        if (envConfig.database) options.dbName = options.dbName || envConfig.database;
-        if (envConfig.target) options.target = options.target || envConfig.target;
+      if (yaml) {
+        // Use js-yaml for proper YAML parsing (handles anchors like <<: *default)
+        const config = yaml.load(content);
+        const envConfig = config[env];
+
+        if (envConfig) {
+          if (envConfig.adapter) options.database = options.database || envConfig.adapter;
+          if (envConfig.database) options.dbName = options.dbName || envConfig.database;
+          if (envConfig.target) options.target = options.target || envConfig.target;
+        }
+      } else {
+        // Fallback: naive parsing (doesn't handle YAML anchors)
+        // Used when js-yaml isn't available (standalone CLI from tarball)
+        const lines = content.split('\n');
+        let currentEnv = null;
+        let inEnv = false;
+
+        for (const line of lines) {
+          const envMatch = line.match(/^(\w+):$/);
+          if (envMatch) {
+            currentEnv = envMatch[1];
+            inEnv = currentEnv === env;
+            continue;
+          }
+
+          if (inEnv && line.startsWith('  ')) {
+            const adapterMatch = line.match(/^\s+adapter:\s*(.+)$/);
+            const databaseMatch = line.match(/^\s+database:\s*(.+)$/);
+            const targetMatch = line.match(/^\s+target:\s*(.+)$/);
+
+            if (adapterMatch) options.database = options.database || adapterMatch[1].trim();
+            if (databaseMatch) options.dbName = options.dbName || databaseMatch[1].trim();
+            if (targetMatch) options.target = options.target || targetMatch[1].trim();
+          }
+        }
       }
     } catch (e) {
       console.warn(`Warning: Could not parse config/database.yml: ${e.message}`);
