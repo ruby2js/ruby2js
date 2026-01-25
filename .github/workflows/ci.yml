@@ -72,7 +72,7 @@ jobs:
           # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
           bundle config set --global local.ruby2js $GITHUB_WORKSPACE
           test/blog/create-blog artifacts/blog
-          tar -czf artifacts/demo-blog.tar.gz -C artifacts blog
+          tar --exclude='node_modules' -czf artifacts/demo-blog.tar.gz -C artifacts blog
 
       - name: Upload blog demo
         uses: actions/upload-artifact@v4
@@ -105,7 +105,7 @@ jobs:
           # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
           bundle config set --global local.ruby2js $GITHUB_WORKSPACE
           test/chat/create-chat artifacts/chat
-          tar -czf artifacts/demo-chat.tar.gz -C artifacts chat
+          tar --exclude='node_modules' -czf artifacts/demo-chat.tar.gz -C artifacts chat
 
       - name: Upload chat demo
         uses: actions/upload-artifact@v4
@@ -138,7 +138,7 @@ jobs:
           # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
           bundle config set --global local.ruby2js $GITHUB_WORKSPACE
           test/photo_gallery/create-photo-gallery artifacts/photo_gallery
-          tar -czf artifacts/demo-photo-gallery.tar.gz -C artifacts photo_gallery
+          tar --exclude='node_modules' -czf artifacts/demo-photo-gallery.tar.gz -C artifacts photo_gallery
 
       - name: Upload photo_gallery demo
         uses: actions/upload-artifact@v4
@@ -171,7 +171,7 @@ jobs:
           # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
           bundle config set --global local.ruby2js $GITHUB_WORKSPACE
           test/workflow/create-workflow artifacts/workflow
-          tar -czf artifacts/demo-workflow.tar.gz -C artifacts workflow
+          tar --exclude='node_modules' -czf artifacts/demo-workflow.tar.gz -C artifacts workflow
 
       - name: Upload workflow demo
         uses: actions/upload-artifact@v4
@@ -204,7 +204,7 @@ jobs:
           # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
           bundle config set --global local.ruby2js $GITHUB_WORKSPACE
           test/notes/create-notes artifacts/notes
-          tar -czf artifacts/demo-notes.tar.gz -C artifacts notes
+          tar --exclude='node_modules' -czf artifacts/demo-notes.tar.gz -C artifacts notes
 
       - name: Upload notes demo
         uses: actions/upload-artifact@v4
@@ -237,7 +237,7 @@ jobs:
           export VITE_PLUGIN_TARBALL="$GITHUB_WORKSPACE/artifacts/tarballs/vite-plugin-ruby2js-beta.tgz"
           export RAILS_TARBALL="$GITHUB_WORKSPACE/artifacts/tarballs/ruby2js-rails-beta.tgz"
           test/astro-blog/create-astro-blog artifacts/astro-blog
-          tar -czf artifacts/demo-astro-blog.tar.gz -C artifacts astro-blog
+          tar --exclude='node_modules' -czf artifacts/demo-astro-blog.tar.gz -C artifacts astro-blog
 
       - name: Upload astro-blog demo
         uses: actions/upload-artifact@v4
@@ -267,7 +267,7 @@ jobs:
         run: |
           export CONTENT_ADAPTER_TARBALL="$GITHUB_WORKSPACE/artifacts/tarballs/ruby2js-content-adapter-beta.tgz"
           test/ssg-blog/create-ssg-blog artifacts/ssg-blog
-          tar -czf artifacts/demo-ssg-blog.tar.gz -C artifacts ssg-blog
+          tar --exclude='node_modules' -czf artifacts/demo-ssg-blog.tar.gz -C artifacts ssg-blog
 
       - name: Upload ssg-blog demo
         uses: actions/upload-artifact@v4
