@@ -164,10 +164,20 @@ function loadDatabaseConfig(options) {
     }
   }
 
-  // Normalize Rails adapter names to Juntos equivalents
+  // Normalize adapter names to canonical Juntos equivalents
+  // This handles Rails adapter names and common variations
   const ADAPTER_ALIASES = {
+    // IndexedDB variations
+    indexeddb: 'dexie',
+    // SQLite variations (Rails uses sqlite3, npm package is better-sqlite3)
     sqlite3: 'sqlite',
+    better_sqlite3: 'sqlite',
+    // sql.js variations
+    'sql.js': 'sqljs',
+    // PostgreSQL variations
+    postgres: 'pg',
     postgresql: 'pg',
+    // MySQL variations (npm package is mysql2)
     mysql2: 'mysql'
   };
   if (options.database && ADAPTER_ALIASES[options.database]) {
@@ -177,6 +187,11 @@ function loadDatabaseConfig(options) {
   // Defaults
   options.database = options.database || 'dexie';
   options.dbName = options.dbName || `${basename(APP_ROOT)}_${env}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+
+  // Infer target from database if not specified
+  if (!options.target && DEFAULT_TARGETS[options.database]) {
+    options.target = DEFAULT_TARGETS[options.database];
+  }
 }
 
 function applyEnvOptions(options) {
@@ -202,17 +217,25 @@ function validateRailsApp() {
 // ============================================
 
 const DATABASE_PACKAGES = {
+  // Browser databases
   dexie: ['dexie'],
-  sqlite: ['better-sqlite3'],
-  better_sqlite3: ['better-sqlite3'],
+  indexeddb: ['dexie'],
   sqljs: ['sql.js'],
+  'sql.js': ['sql.js'],
   pglite: ['@electric-sql/pglite'],
+  // Node.js databases
+  sqlite: ['better-sqlite3'],
+  sqlite3: ['better-sqlite3'],
+  better_sqlite3: ['better-sqlite3'],
   pg: ['pg'],
   postgres: ['pg'],
+  postgresql: ['pg'],
+  mysql: ['mysql2'],
+  mysql2: ['mysql2'],
+  // Serverless databases
   neon: ['@neondatabase/serverless'],
-  d1: [],  // No npm package needed, uses Cloudflare bindings
   turso: ['@libsql/client'],
-  mysql: ['mysql2']
+  d1: []  // No npm package needed, uses Cloudflare bindings
 };
 
 const RUNTIME_PACKAGES = {
@@ -221,6 +244,55 @@ const RUNTIME_PACKAGES = {
   bun: [],
   deno: []
 };
+
+// Valid target environments for each database adapter
+const VALID_TARGETS = {
+  // Browser-only databases
+  dexie: ['browser', 'capacitor'],
+  sqljs: ['browser', 'capacitor', 'electron', 'tauri'],
+  pglite: ['browser', 'node', 'capacitor', 'electron', 'tauri'],
+  // Node.js databases
+  sqlite: ['node', 'bun', 'electron'],
+  pg: ['node', 'bun', 'deno', 'electron'],
+  mysql: ['node', 'bun', 'electron'],
+  // Serverless databases
+  neon: ['node', 'vercel', 'vercel-edge', 'capacitor', 'electron', 'tauri'],
+  turso: ['node', 'vercel', 'vercel-edge', 'cloudflare', 'capacitor', 'electron', 'tauri'],
+  d1: ['cloudflare']
+};
+
+// Default target for each database adapter
+const DEFAULT_TARGETS = {
+  dexie: 'browser',
+  sqljs: 'browser',
+  pglite: 'browser',
+  sqlite: 'node',
+  pg: 'node',
+  mysql: 'node',
+  neon: 'vercel',
+  turso: 'vercel',
+  d1: 'cloudflare'
+};
+
+function validateDatabaseTarget(options) {
+  const db = options.database;
+  const target = options.target;
+
+  if (!db || !target) return; // Will use defaults
+
+  const validTargets = VALID_TARGETS[db];
+  if (!validTargets) {
+    console.error(`Unknown database adapter: ${db}`);
+    console.error(`Valid adapters: ${Object.keys(VALID_TARGETS).join(', ')}`);
+    process.exit(1);
+  }
+
+  if (!validTargets.includes(target)) {
+    console.error(`Invalid combination: ${db} database with ${target} target`);
+    console.error(`${db} supports: ${validTargets.join(', ')}`);
+    process.exit(1);
+  }
+}
 
 function ensurePackagesInstalled(options) {
   const missing = [];
@@ -272,6 +344,7 @@ function isPackageInstalled(packageName) {
 function runDev(options) {
   validateRailsApp();
   loadDatabaseConfig(options);
+  validateDatabaseTarget(options);
   ensurePackagesInstalled(options);
   applyEnvOptions(options);
 
@@ -303,6 +376,7 @@ function runDev(options) {
 function runBuild(options) {
   validateRailsApp();
   loadDatabaseConfig(options);
+  validateDatabaseTarget(options);
   ensurePackagesInstalled(options);
   applyEnvOptions(options);
 
@@ -335,6 +409,7 @@ function runBuild(options) {
 function runUp(options) {
   validateRailsApp();
   loadDatabaseConfig(options);
+  validateDatabaseTarget(options);
   ensurePackagesInstalled(options);
   applyEnvOptions(options);
 
@@ -380,6 +455,7 @@ function runUp(options) {
 function runServer(options) {
   validateRailsApp();
   loadDatabaseConfig(options);
+  validateDatabaseTarget(options);
   ensurePackagesInstalled(options);
   applyEnvOptions(options);
 
@@ -964,6 +1040,7 @@ function runDoctor(options) {
 function runTest(options, testArgs) {
   validateRailsApp();
   loadDatabaseConfig(options);
+  validateDatabaseTarget(options);
   ensurePackagesInstalled(options);
 
   // Ensure vitest is installed
@@ -1013,6 +1090,7 @@ function runDeploy(options) {
   validateRailsApp();
   loadEnvLocal();
   loadDatabaseConfig(options);
+  validateDatabaseTarget(options);
   ensurePackagesInstalled(options);
 
   // Default to production environment for deploy

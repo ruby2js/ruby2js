@@ -360,6 +360,15 @@ The CLI auto-installs the required npm package for each adapter:
 | `d1` | (none - Cloudflare binding) | cloudflare |
 | `mysql` | mysql2 | node, bun |
 
+**Aliases:** Common variations are accepted automatically:
+- `indexeddb` → dexie
+- `sqlite3`, `better_sqlite3` → sqlite
+- `sql.js` → sqljs
+- `postgres`, `postgresql` → pg
+- `mysql2` → mysql
+
+This means existing Rails apps with `adapter: sqlite3` in `database.yml` work without changes.
+
 ## Default Targets
 
 When target is not specified, it's inferred from the database:
