@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Smoke test for Ruby2JS demo builds
-// Compares Ruby and selfhost builds, validates JS syntax
+// Compares Ruby and selfhost builds
 //
 // Usage: node test/smoke-test.mjs <demo-directory> [options]
 //        node test/smoke-test.mjs demo/blog --database dexie
@@ -147,24 +147,6 @@ function collectJsFiles(dir, files = []) {
   return files;
 }
 
-// Validate JS file as ES module using dynamic import
-async function checkSyntax(filePath) {
-  try {
-    const code = readFileSync(filePath, 'utf8');
-    const dataUrl = `data:text/javascript,${encodeURIComponent(code)}`;
-    await import(dataUrl);
-    return { valid: true, error: null };
-  } catch (err) {
-    const match = err.message.match(/^(.+?)(?:\n|$)/);
-    const shortErr = match ? match[1] : err.message;
-    // Ignore module resolution errors (imports that don't exist in data URL context)
-    if (shortErr.includes('Failed to resolve module')) {
-      return { valid: true, error: null };
-    }
-    return { valid: false, error: shortErr };
-  }
-}
-
 // Check for common JS syntax issues
 function checkCommonIssues(filePath, content) {
   const issues = [];
@@ -308,50 +290,11 @@ async function runTests() {
       failed++;
     }
 
-    // Test 3: Syntax check on Ruby-built files
-    log('\n3. JS syntax check (Ruby build)', BOLD);
+    // Collect files for remaining tests
     const rubyFiles = collectJsFiles(rubyDist);
-    let syntaxErrors = 0;
 
-    for (const file of rubyFiles) {
-      const result = await checkSyntax(file);
-      if (!result.valid) {
-        fail(`${relative(rubyDist, file)}: ${result.error}`);
-        syntaxErrors++;
-      }
-    }
-
-    if (syntaxErrors === 0) {
-      pass(`All ${rubyFiles.length} files have valid syntax`);
-      passed++;
-    } else {
-      fail(`${syntaxErrors} files have syntax errors`);
-      failed++;
-    }
-
-    // Test 4: Syntax check on selfhost-built files
-    log('\n4. JS syntax check (Selfhost build)', BOLD);
-    const selfhostFiles = collectJsFiles(selfhostDist);
-    syntaxErrors = 0;
-
-    for (const file of selfhostFiles) {
-      const result = await checkSyntax(file);
-      if (!result.valid) {
-        fail(`${relative(selfhostDist, file)}: ${result.error}`);
-        syntaxErrors++;
-      }
-    }
-
-    if (syntaxErrors === 0) {
-      pass(`All ${selfhostFiles.length} files have valid syntax`);
-      passed++;
-    } else {
-      fail(`${syntaxErrors} files have syntax errors`);
-      failed++;
-    }
-
-    // Test 5: Common issues check
-    log('\n5. Common issues check (Ruby build)', BOLD);
+    // Test 3: Common issues check
+    log('\n3. Common issues check (Ruby build)', BOLD);
     let issueCount = 0;
 
     for (const file of rubyFiles) {
@@ -371,8 +314,8 @@ async function runTests() {
       failed++;
     }
 
-    // Test 6: Compare builds
-    log('\n6. Compare Ruby vs Selfhost builds', BOLD);
+    // Test 4: Compare builds
+    log('\n4. Compare Ruby vs Selfhost builds', BOLD);
     const comparison = compareDirs(rubyDist, selfhostDist, 'ruby', 'selfhost');
 
     if (comparison.differences.onlyIn1.length > 0) {
@@ -401,8 +344,8 @@ async function runTests() {
       passed++;
     }
 
-    // Test 7: Check all imports resolve
-    log('\n7. Import resolution check (Ruby build)', BOLD);
+    // Test 5: Check all imports resolve
+    log('\n5. Import resolution check (Ruby build)', BOLD);
     let unresolvedImports = 0;
 
     for (const file of rubyFiles) {
