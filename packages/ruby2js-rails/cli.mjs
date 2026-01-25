@@ -574,6 +574,9 @@ function runBuild(options) {
   if (options.sourcemap) {
     args.push('--sourcemap');
   }
+  if (options.base) {
+    args.push('--base', options.base);
+  }
 
   console.log('Building application...');
   const result = spawn('npx', args, {
@@ -607,7 +610,10 @@ function runUp(options) {
 
   console.log('Building application...');
   try {
-    execSync('npx vite build', { cwd: APP_ROOT, stdio: 'inherit', env: process.env });
+    const buildCmd = options.base
+      ? `npx vite build --base ${options.base}`
+      : 'npx vite build';
+    execSync(buildCmd, { cwd: APP_ROOT, stdio: 'inherit', env: process.env });
   } catch (e) {
     console.error('Build failed.');
     process.exit(1);
@@ -681,7 +687,7 @@ function runServer(options) {
   } else {
     // Browser target - serve static files with vite preview
     console.log(`Starting static server on port ${options.port}...`);
-    spawn('npx', ['vite', 'preview', '--port', String(options.port)], {
+    spawn('npx', ['vite', 'preview', '--port', String(options.port), '--host'], {
       cwd: APP_ROOT,
       stdio: 'inherit',
       env: process.env

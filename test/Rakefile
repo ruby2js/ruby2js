@@ -195,7 +195,8 @@ task :system, [:demo, :database, :target] do |t, args|
 
   # Run container
   puts "\nStarting container..."
-  port = target == 'browser' ? 5173 : 3000
+  # juntos server uses port 3000 for both browser (static) and node (express)
+  port = 3000
   sh "docker run -d -p #{port}:#{port} --name #{container_name} #{image_name}"
 
   # Wait for startup and show logs
