@@ -7,12 +7,13 @@
  *   dev       Start development server with hot reload
  *   build     Build for deployment
  *   up        Build and run locally
+ *   test      Run tests with Vitest
  *   db        Database commands (migrate, seed, prepare, reset, create, drop)
  *   info      Show current configuration
  *   doctor    Check environment and prerequisites
  */
 
-import { spawn, execSync } from 'child_process';
+import { spawn, spawnSync, execSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'fs';
 import { join, basename, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -947,6 +948,47 @@ function runDoctor(options) {
 }
 
 // ============================================
+// Command: test
+// ============================================
+
+function runTest(options, testArgs) {
+  validateRailsApp();
+  loadDatabaseConfig(options);
+  ensurePackagesInstalled(options);
+
+  // Ensure vitest is installed
+  if (!isPackageInstalled('vitest')) {
+    console.log('Installing vitest...');
+    try {
+      execSync('npm install vitest', {
+        cwd: APP_ROOT,
+        stdio: 'inherit'
+      });
+    } catch (e) {
+      console.error('Failed to install vitest.');
+      process.exit(1);
+    }
+  }
+
+  // Build vitest command
+  const args = ['vitest', 'run'];
+
+  // Pass through any additional arguments (file patterns, etc.)
+  if (testArgs && testArgs.length > 0) {
+    args.push(...testArgs);
+  }
+
+  console.log('Running tests...');
+  const result = spawnSync('npx', args, {
+    cwd: APP_ROOT,
+    stdio: 'inherit',
+    env: process.env
+  });
+
+  process.exit(result.status || 0);
+}
+
+// ============================================
 // Command: deploy
 // ============================================
 
@@ -1330,6 +1372,7 @@ Usage: juntos [options] <command> [command-options]
 Commands:
   dev       Start development server with hot reload
   build     Build for deployment
+  test      Run tests with Vitest
   server    Start production server (requires prior build)
   deploy    Build and deploy to serverless platform
   up        Build and run locally (node, bun, browser)
@@ -1347,6 +1390,8 @@ Examples:
   juntos dev                           # Start dev server (uses database.yml)
   juntos dev -d dexie                  # Dev with IndexedDB
   juntos build                         # Build for deployment
+  juntos test                          # Run all tests
+  juntos test -d sqlite                # Run tests with SQLite
   juntos up -d sqlite                  # Build and run with SQLite
   juntos deploy -t cloudflare -d d1    # Deploy to Cloudflare with D1
   juntos deploy -t vercel -d neon      # Deploy to Vercel with Neon
@@ -1440,6 +1485,20 @@ switch (command) {
 
   case 'doctor':
     runDoctor(options);
+    break;
+
+  case 'test':
+    if (options.help) {
+      console.log('Usage: juntos test [options] [files...]\n\nRun tests with Vitest.\n');
+      console.log('Options:');
+      console.log('  -d, --database ADAPTER   Database adapter for tests');
+      console.log('\nExamples:');
+      console.log('  juntos test                    # Run all tests');
+      console.log('  juntos test articles.test.mjs  # Run specific test file');
+      console.log('  juntos test -d sqlite          # Run tests with SQLite');
+      process.exit(0);
+    }
+    runTest(options, commandArgs);
     break;
 
   case 'deploy':
