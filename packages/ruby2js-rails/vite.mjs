@@ -30,6 +30,15 @@ import 'ruby2js/filters/stimulus.js';
 // Import Pragma filter for target-specific pragmas (browser, capacitor, etc.)
 import 'ruby2js/filters/pragma.js';
 
+// Import Functions filter for core method translations
+import 'ruby2js/filters/functions.js';
+
+// Import ESM filter for ES module imports/exports
+import 'ruby2js/filters/esm.js';
+
+// Import Return filter for implicit returns
+import 'ruby2js/filters/return.js';
+
 // ============================================================
 // Configuration constants (previously from SelfhostBuilder)
 // ============================================================
