@@ -4,7 +4,11 @@
 
 Rewrite the Ruby2JS transpiler core in Rust, producing a single codebase that compiles to native binaries, WASM (for browser/Node.js), and potentially native Vite/Rolldown plugins. This is a strategic investment as the JavaScript tooling ecosystem has consolidated around Rust.
 
-**Timeline:** Re-evaluate when Vite 8 reaches stable and Rust plugin documentation is available (likely mid-2026). Rolldown is already in RC and powers Vite 8 Beta.
+**Estimated effort:** 4-12 weeks (weeks 1-4 are mechanical translation; week 5+ depends on edge cases encountered during parity testing).
+
+**Key insight:** This is translation, not invention—two reference implementations exist with comprehensive tests.
+
+**Current hesitation:** Dual maintenance burden until cutover. Start only when prepared to commit to full transition.
 
 ## Status
 
@@ -127,74 +131,130 @@ The hardest part of any transpiler—parsing—is already solved:
 
 ---
 
+## Key Insight: This Is Translation, Not Invention
+
+This is **not** greenfield development. We have:
+
+1. **Two reference implementations** — Ruby (canonical) and JS (selfhost)
+2. **Comprehensive test suite** — defines expected behavior exactly
+3. **Proven architecture** — handler-per-node, filter chain, visitor pattern
+4. **Comparison tooling** — `bin/compare` already exists
+
+The work is mechanical translation:
+```
+1. Read Ruby implementation
+2. Read JS implementation
+3. Write Rust equivalent
+4. Run tests
+5. Fix until output matches
+```
+
+"Correct" is defined as "produces identical output to existing implementations." There's no architectural exploration, edge case discovery, or "what should this do?" questions.
+
+---
+
+## Project Structure
+
+```
+ruby2js/crates/
+├── Cargo.toml              # Workspace manifest
+├── ruby2js/                # Core library
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs          # pub fn convert(source, options) -> String
+│       ├── main.rs         # CLI (until split out)
+│       ├── converter/
+│       │   ├── mod.rs      # Visitor dispatch
+│       │   ├── literals.rs
+│       │   ├── variables.rs
+│       │   ├── control.rs
+│       │   ├── methods.rs
+│       │   └── classes.rs
+│       ├── filters/
+│       │   ├── mod.rs      # Filter trait, chain
+│       │   ├── functions.rs
+│       │   ├── esm.rs
+│       │   └── camel_case.rs
+│       ├── serializer.rs
+│       └── options.rs
+├── ruby2js-cli/            # CLI (when split from core)
+│   ├── Cargo.toml
+│   └── src/main.rs
+├── ruby2js-wasm/           # WASM bindings for npm
+│   ├── Cargo.toml
+│   └── src/lib.rs
+└── ruby2js-sys/            # CRuby FFI bindings
+    ├── Cargo.toml
+    └── src/lib.rs
+```
+
+**Naming convention:** Directory names match crate names (what gets published to crates.io).
+
+**Initial structure:** Start with just `ruby2js/` containing both library and CLI. Split when complexity warrants it.
+
+---
+
 ## Implementation Approach
 
-### Phase 0: Proof of Concept
+### Week 1: Full Converter
 
-**Goal:** Validate that Prism Rust bindings work and basic conversion is tractable.
+**Days 1-2: PoC**
+- Project setup, Cargo workspace, dependencies
+- Learn Prism Rust API (`ruby-prism` crate)
+- Establish patterns (visitor, output building)
+- 5-10 handlers working
 
-**Scope:**
-- Parse Ruby source using `ruby-prism` crate
-- Convert minimal subset: literals, assignments, binary operations
-- Output: `x = 1 + 2` → `let x = 1 + 2`
+**Days 3-5: Remaining Handlers**
+- Patterns established, mostly copy-adapt-test
+- Similar handlers come in clusters (all assignments, all literals, all control flow)
+- LLM assists with drafting implementations from Ruby/JS reference
 
-**Deliverable:** Working Rust binary that transpiles basic expressions.
+**Deliverable:** CLI that converts Ruby to JS (no filters), ~60 handlers.
 
-**Effort:** 1-2 days
+### Week 2: WASM + FFI Proof of Concept
 
-### Phase 1: Core Converter
+**Goal:** Prove the integration story before investing in filters.
 
-**Goal:** Implement the most common AST node handlers.
+**WASM binding:**
+```javascript
+import { convert } from 'ruby2js-wasm';
+console.log(convert('x = 1'));  // "let x = 1"
+```
 
-**Scope (priority order):**
-1. `send` — Method calls, operators (highest frequency)
-2. `lvasgn`, `ivasgn`, `cvasgn`, `gvasgn` — Variable assignments
-3. `def`, `defs` — Method definitions
-4. `class`, `module` — Class/module definitions
-5. `if`, `case`, `while`, `for` — Control flow
-6. `array`, `hash` — Data structures
-7. `block`, `lambda` — Blocks and lambdas
-8. `str`, `dstr`, `sym`, `dsym` — Strings and symbols
-9. `const`, `casgn` — Constants
-10. Remaining handlers
+**CRuby FFI binding:**
+```ruby
+require 'ruby2js_sys'
+puts Ruby2JS.convert('x = 1')  # "let x = 1"
+```
 
-**Deliverable:** Rust converter that handles ~80% of real-world Ruby code.
+**Why early:** De-risks integration. Any surprises surface before writing 23 filters.
 
-**Effort:** 1-2 months
+**Tools:** `wasm-bindgen` + `wasm-pack` (WASM), `magnus` or `rb-sys` (CRuby FFI). Both well-trodden paths.
 
-### Phase 2: Filters
+### Weeks 3-4: Filters
 
-**Goal:** Implement the filter system and key filters.
-
-**Scope (priority order):**
+**Same translation pattern as converters:**
 1. Filter architecture (chain, options, state)
 2. `functions` filter — Ruby method → JS equivalent mappings
 3. `esm` filter — ES6 module imports/exports
 4. `camelCase` filter — Naming convention conversion
 5. `return` filter — Implicit return handling
-6. Remaining filters as needed for Juntos
+6. Remaining filters as needed for Juntos (~23 total)
 
-**Deliverable:** Filter chain matching Ruby implementation behavior.
+**Deliverable:** Full filter chain matching Ruby/JS implementation behavior.
 
-**Effort:** 1-2 months
+### Week 5+: Parity and Polish
 
-### Phase 3: Bindings and Integration
+**This is where uncertainty lives.**
 
-**Goal:** Make the Rust implementation usable from JavaScript and as a CLI.
+Optimistic scenario:
+- Tests pass, edge cases are minor
+- Ready for cutover decision
 
-**Scope:**
-1. **WASM compilation** — `wasm-pack` build for browser/Node.js
-2. **JavaScript wrapper** — Thin JS API matching current selfhost
-3. **CLI binary** — Native `ruby2js` command
-4. **Vite plugin compatibility** — Drop-in replacement for selfhost
-
-**Deliverable:** `ruby2js.wasm` + JS wrapper that passes existing integration tests.
-
-**Effort:** 2-4 weeks
-
-### Phase 4: Parity and Validation
-
-**Goal:** Achieve full compatibility with Ruby implementation.
+Pessimistic scenario:
+- Subtle semantic mismatches surface
+- Obscure Ruby syntax needs investigation
+- Output formatting differences require iteration
 
 **Scope:**
 1. Run full test suite against Rust implementation
@@ -202,38 +262,42 @@ The hardest part of any transpiler—parsing—is already solved:
 3. Benchmark performance comparison
 4. Document any intentional differences
 
-**Deliverable:** Rust implementation passes all tests, documented performance characteristics.
-
-**Effort:** 1 month
-
-### Phase 5: Rolldown Native Plugin
+### Future: Rolldown Native Plugin
 
 **Goal:** Native Rust plugin for Vite's Rolldown bundler.
 
-**Scope:**
-- Implement Rolldown's Rust plugin API
-- Direct Rust-to-Rust integration, no WASM overhead
-- Benchmark vs WASM approach
-
 **Status (Jan 2026):** Rolldown is in RC, internal Vite plugins have been converted to native Rust, but external Rust plugin API documentation is not yet available. The Rollup-compatible JS plugin API works now.
 
-**Timing:** Begin when Rust plugin documentation is available for external developers. WASM approach (Phase 3) provides a working solution in the interim.
+**Timing:** Begin when Rust plugin documentation is available for external developers. WASM approach provides a working solution in the interim.
 
 ---
 
 ## Effort Estimate
 
-| Phase | Effort | Cumulative |
-|-------|--------|------------|
-| Phase 0: PoC | 1-2 days | 1-2 days |
-| Phase 1: Core converter | 1-2 months | 1-2 months |
-| Phase 2: Filters | 1-2 months | 2-4 months |
-| Phase 3: Bindings | 2-4 weeks | 3-5 months |
-| Phase 4: Parity | 1 month | 4-6 months |
+### Revised Timeline (January 2026)
 
-**Total: 3-6 months** focused effort, or **6-9 months** part-time.
+| Week | Milestone | Confidence |
+|------|-----------|------------|
+| 1 | Full converter (60 handlers), CLI works | High |
+| 2 | WASM + FFI proof of concept | High |
+| 3-4 | Filters (23 filters) | High |
+| 5+ | Parity testing, edge cases, polish | Variable |
 
-This is bounded: "more than a week, less than a year."
+**Weeks 1-4** are mechanical translation work with reference implementations. These should go quickly—the patterns are established, the work is bounded, and LLMs accelerate the repetitive parts.
+
+**Week 5+** is where outcomes diverge:
+- **Best case:** Tests pass, minor edge cases, ready for cutover decision
+- **Worst case:** Subtle semantic issues, output formatting differences, extended iteration
+
+### Conservative Estimate
+
+| Scenario | Total Effort |
+|----------|--------------|
+| Optimistic | 4-5 weeks |
+| Realistic | 6-8 weeks |
+| Pessimistic | 10-12 weeks |
+
+This is significantly tighter than the original 3-6 month estimate, based on the insight that this is translation (two reference implementations exist) rather than invention.
 
 ---
 
@@ -253,6 +317,31 @@ The current JS selfhost implementation continues to work regardless—Rolldown's
 
 ---
 
+## Key Hesitation: Dual Maintenance
+
+**The primary reason not to start now:** Until the decision is made to fully cut over to Rust, there will be dual maintenance burden.
+
+| Scenario | Maintenance Load |
+|----------|------------------|
+| Ruby/JS only (current) | Single implementation |
+| During Rust development | Three implementations (Ruby, JS, Rust) |
+| After Rust cutover | Single implementation (Rust) |
+
+**Implications:**
+- Bug fixes need to be applied to multiple implementations during transition
+- New features should wait until cutover, or be implemented in all versions
+- The transition period should be as short as practical
+
+**Mitigation strategies:**
+1. **Feature freeze during transition** — No new features until Rust is ready
+2. **Fast iteration** — Compress weeks 1-4, make cutover decision quickly
+3. **Clear cutover criteria** — Define exactly what "ready" means (test pass rate, performance benchmarks)
+4. **Deprecation timeline** — Once Rust is primary, set sunset date for Ruby/JS
+
+**When to commit:** Start only when prepared to see the transition through to cutover. The 4-5 week timeline makes this more tractable than a 3-6 month timeline would.
+
+---
+
 ## Risks and Mitigations
 
 ### Risk: Rust learning curve limits contributions
@@ -269,12 +358,14 @@ The current JS selfhost implementation continues to work regardless—Rolldown's
 - Phase 0 PoC validates feasibility before committing
 - Can ship incrementally (Phase 1 alone is useful)
 
-### Risk: Two implementations drift during transition
+### Risk: Dual maintenance during transition
 
 **Mitigation:**
-- Same test suite for both implementations
-- Can run comparison tool during development
-- Once Rust passes all tests, Ruby version becomes reference-only
+- Compressed timeline (4-5 weeks realistic) minimizes dual maintenance window
+- Feature freeze during transition—no new features until cutover
+- Same test suite for all implementations
+- Clear cutover criteria defined upfront
+- Once Rust passes all tests, Ruby/JS versions become reference-only
 
 ### Risk: Rolldown Rust plugin API not available or changes
 
@@ -309,6 +400,21 @@ These low-effort tasks make the future transition easier:
 
 ## Decision Record
 
+### 2026-01-25: Revised Timeline Analysis
+
+**Context:** Deeper analysis of implementation approach revealed this is translation work, not greenfield development.
+
+**Key insight:** Two reference implementations (Ruby, JS) exist with comprehensive tests. The work is mechanical: read existing code, write Rust equivalent, verify output matches. No architectural decisions or edge case discovery needed.
+
+**Revised timeline:**
+- Weeks 1-4: Full converter + filters (high confidence)
+- Week 5+: Parity testing (variable, could go either way)
+- Total: 4-12 weeks depending on edge cases
+
+**Hesitation:** Dual maintenance burden during transition. Starting means committing to see it through to cutover.
+
+**Decision:** Plan documented with revised timeline. Start when prepared to commit to full transition.
+
 ### 2026-01-24: Initial Analysis
 
 **Context:** Discussed feasibility and timing of Rust rewrite.
@@ -319,19 +425,21 @@ These low-effort tasks make the future transition easier:
 - No immediate forcing function
 - Current implementation delivers value
 - Ecosystem direction (Vite → Rolldown) validates long-term strategy
-- Bounded effort (3-6 months) is acceptable when timing is right
+- Bounded effort is acceptable when timing is right
 
-**Ecosystem status update:** Discovered Rolldown is further along than expected—RC status, powering Vite 8 Beta (Dec 2025). This shortens the timeline from "2-3 year horizon" to "re-evaluate when Vite 8 stable releases and Rust plugin documentation is available" (likely mid-2026).
+**Ecosystem status update:** Discovered Rolldown is further along than expected—RC status, powering Vite 8 Beta (Dec 2025). Re-evaluate when Vite 8 stable releases and Rust plugin documentation is available (likely mid-2026).
 
 ---
 
 ## References
 
 ### Internal
+- `crates/` — Rust implementation (to be created)
 - `demo/selfhost/` — Current JavaScript selfhost implementation
-- `lib/ruby2js/converter/` — Converter handlers to port
-- `lib/ruby2js/filter/` — Filters to port
+- `lib/ruby2js/converter/` — Converter handlers to port (~60 files)
+- `lib/ruby2js/filter/` — Filters to port (~23 files)
 - `spec/` — Test suite (becomes specification for Rust implementation)
+- `bin/compare` — Comparison tool for verifying output matches
 
 ### External
 - [ruby-prism crate](https://crates.io/crates/ruby-prism) — Rust bindings for Prism parser
