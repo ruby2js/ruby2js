@@ -37,8 +37,8 @@ describe Ruby2JS::Filter::Rails::Migration do
     end
   end
 
-  describe "imports" do
-    it "imports DDL functions from active_record.mjs" do
+  describe "adapter parameter" do
+    it "receives adapter as parameter instead of importing DDL functions" do
       result = to_js(<<~RUBY)
         class CreateArticles < ActiveRecord::Migration[7.1]
           def change
@@ -48,8 +48,9 @@ describe Ruby2JS::Filter::Rails::Migration do
           end
         end
       RUBY
-      assert_includes result, 'import { createTable, addIndex, addColumn, removeColumn, dropTable }'
-      assert_includes result, 'juntos:active-record'
+      # Migrations receive adapter as parameter, no imports needed
+      assert_includes result, 'up: async adapter =>'
+      refute_includes result, 'import { createTable'
     end
   end
 
@@ -65,7 +66,7 @@ describe Ruby2JS::Filter::Rails::Migration do
           end
         end
       RUBY
-      assert_includes result, 'await createTable("articles"'
+      assert_includes result, 'await adapter.createTable("articles"'
       assert_includes result, 'name: "id"'
       assert_includes result, 'name: "title"'
       assert_includes result, 'type: "string"'
@@ -203,7 +204,7 @@ describe Ruby2JS::Filter::Rails::Migration do
           end
         end
       RUBY
-      assert_includes result, 'await addIndex("articles", ["status"])'
+      assert_includes result, 'await adapter.addIndex("articles", ["status"])'
     end
 
     it "handles multi-column index" do
@@ -225,7 +226,7 @@ describe Ruby2JS::Filter::Rails::Migration do
           end
         end
       RUBY
-      assert_includes result, 'addIndex("users", ["email"]'
+      assert_includes result, 'adapter.addIndex("users", ["email"]'
       assert_includes result, 'unique: true'
     end
 
@@ -250,7 +251,7 @@ describe Ruby2JS::Filter::Rails::Migration do
           end
         end
       RUBY
-      assert_includes result, 'await addColumn("articles", "slug", "string")'
+      assert_includes result, 'await adapter.addColumn("articles", "slug", "string")'
     end
   end
 
@@ -263,7 +264,7 @@ describe Ruby2JS::Filter::Rails::Migration do
           end
         end
       RUBY
-      assert_includes result, 'await removeColumn("articles", "slug")'
+      assert_includes result, 'await adapter.removeColumn("articles", "slug")'
     end
   end
 
@@ -276,7 +277,7 @@ describe Ruby2JS::Filter::Rails::Migration do
           end
         end
       RUBY
-      assert_includes result, 'await dropTable("old_articles")'
+      assert_includes result, 'await adapter.dropTable("old_articles")'
     end
   end
 
@@ -339,7 +340,7 @@ describe Ruby2JS::Filter::Rails::Migration do
         end
       RUBY
       assert_includes result, 'export const migration'
-      assert_includes result, 'up: async () =>'
+      assert_includes result, 'up: async adapter =>'
     end
   end
 
@@ -357,8 +358,8 @@ describe Ruby2JS::Filter::Rails::Migration do
           end
         end
       RUBY
-      assert_includes result, 'await createTable("articles"'
-      assert_includes result, 'await addIndex("articles", ["status"])'
+      assert_includes result, 'await adapter.createTable("articles"'
+      assert_includes result, 'await adapter.addIndex("articles", ["status"])'
     end
   end
 end
