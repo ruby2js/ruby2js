@@ -112,7 +112,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'ArticleViews.index({$context: context, articles})'
+      _(result).must_include 'renderView(ArticleViews.index, {$context: context, articles})'
     end
   end
 
@@ -345,7 +345,7 @@ describe Ruby2JS::Filter::Rails::Controller do
 
       result = to_js(source)
       # The article ivar from set_article should be passed to view
-      _(result).must_include 'ArticleViews.show({$context: context, article})'
+      _(result).must_include 'renderView(ArticleViews.show, {$context: context, article})'
     end
   end
 
@@ -376,7 +376,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'return ArticleViews.index'
+      _(result).must_include 'return renderView(ArticleViews.index'
     end
 
     it "adds return to redirect hashes" do
