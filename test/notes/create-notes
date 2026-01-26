@@ -159,7 +159,7 @@ mkdir -p app/views/notes
 cat > app/views/notes/Index.jsx.rb << 'RBX'
 # React is auto-imported when JSX is used (React 17+ style)
 import [useState, useEffect], from: 'react'
-import [notes_path, note_path], from: '../../../config/paths.js'
+import [notes_path, note_path], from: 'config/routes.rb'
 import JsonStreamProvider, [useJsonStream], from: 'ruby2js-rails/components/JsonStreamProvider'
 
 # SearchField component
@@ -383,7 +383,7 @@ RBX
 # Create Show view
 cat > app/views/notes/Show.jsx.rb << 'RBX'
 # React is auto-imported when JSX is used (React 17+ style)
-import [note_path, notes_path], from: '../../../config/paths.js'
+import [note_path, notes_path], from: 'config/routes.rb'
 
 # Show component for a single note
 export default def Show(note:)
