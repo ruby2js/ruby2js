@@ -427,7 +427,7 @@ export function generatePackageJsonForEject(appName, config = {}) {
       'react-dom': '^18.0.0'
     },
     devDependencies: {
-      'vite': '^6.0.0',
+      'vite': '^7.0.0',
       'vitest': '^2.0.0'
     }
   };
