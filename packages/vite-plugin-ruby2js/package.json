@@ -32,6 +32,6 @@
     "ruby2js": "*"
   },
   "peerDependencies": {
-    "vite": "^5.0.0 || ^6.0.0"
+    "vite": "^7.0.0"
   }
 }

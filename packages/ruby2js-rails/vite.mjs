@@ -19,6 +19,7 @@
 
 import path from 'node:path';
 import fs from 'node:fs';
+import { execSync } from 'node:child_process';
 import yaml from 'js-yaml';
 
 // Import React filter for .jsx.rb files
@@ -333,6 +334,72 @@ export function juntos(options = {}) {
     // HMR support for Stimulus controllers
     ...(hmr ? [createHmrPlugin()] : [])
   ];
+}
+
+/**
+ * Create plugins for client bundle build.
+ * This is a minimal set of plugins for hydration builds:
+ * - Virtual plugin for RPC adapter and browser runtime
+ * - Ruby transform plugin for .rb files
+ * - JSX.rb plugin for React components
+ * - ERB plugin for view templates
+ *
+ * Does NOT include browser entry plugin (no .browser/ directory needed)
+ */
+export function createClientPlugins(options = {}) {
+  const appRoot = options.appRoot || process.cwd();
+
+  // Client always uses RPC adapter and browser runtime
+  const config = {
+    database: 'rpc',
+    target: 'browser',
+    eslevel: options.eslevel || 2022
+  };
+
+  const plugins = [];
+
+  // Only include virtual plugin if not skipped (caller provides their own)
+  if (!options.skipVirtual) {
+    plugins.push(createClientVirtualPlugin());
+  }
+
+  // JSX.rb file handling (Ruby + JSX)
+  plugins.push(createJsxRbPlugin(config, appRoot));
+
+  // ERB file handling
+  plugins.push(createErbPlugin(config, appRoot));
+
+  // On-the-fly Ruby transformation
+  plugins.push(createRubyTransformPlugin(config, appRoot));
+
+  return plugins;
+}
+
+/**
+ * Virtual plugin for client builds.
+ * Always routes to RPC adapter and browser runtime.
+ */
+function createClientVirtualPlugin() {
+  return {
+    name: 'juntos-client-virtual',
+    enforce: 'pre',
+
+    resolveId(id) {
+      if (id === 'juntos:active-record') return '\0juntos:active-record:rpc';
+      if (id === 'juntos:rails') return '\0juntos:rails:browser';
+      return null;
+    },
+
+    load(id) {
+      if (id === '\0juntos:active-record:rpc') {
+        return `export * from 'ruby2js-rails/adapters/active_record_rpc.mjs';`;
+      }
+      if (id === '\0juntos:rails:browser') {
+        return `export * from 'ruby2js-rails/targets/browser/rails.js';`;
+      }
+      return null;
+    }
+  };
 }
 
 /**
@@ -1324,8 +1391,9 @@ function detectAppName(appRoot) {
  * 3. Adds client entry to Vite build inputs
  */
 function createDualBundlePlugin(config, appRoot) {
-  // Only relevant for server targets
-  if (!isServerTarget(config.target)) {
+  // Only relevant for server targets (not browser/client)
+  // Also skip if database is 'rpc' - that means we're already building the client bundle
+  if (!isServerTarget(config.target) || config.database === 'rpc') {
     return { name: 'juntos-dual-bundle-noop' };
   }
 
@@ -1341,15 +1409,15 @@ function createDualBundlePlugin(config, appRoot) {
   return {
     name: 'juntos-dual-bundle',
 
-    // Modify config to add client entry if RPC detected
+    // Log RPC detection during config (don't add client to this build)
     config(userConfig, { command }) {
       if (!needsDualBundle) return;
 
-      console.log('[juntos] RPC imports detected - enabling dual bundle mode');
+      console.log('[juntos] RPC imports detected - will build client bundle separately');
       const relativeRpcFiles = rpcFiles.map(f => path.relative(appRoot, f));
       console.log('[juntos] RPC files:', relativeRpcFiles);
 
-      // Generate client entry file synchronously (needed for config)
+      // Generate client entry file (will be built separately after server build)
       const clientDir = path.join(appRoot, '.client');
       const mainPath = path.join(clientDir, 'main.js');
 
@@ -1362,27 +1430,119 @@ function createDualBundlePlugin(config, appRoot) {
       fs.writeFileSync(mainPath, clientEntry);
       console.log('[juntos] Generated .client/main.js for hydration');
 
-      // Add client entry to rollup inputs
-      // Note: __JUNTOS_HYDRATION__ define is set in createConfigPlugin
-      // based on rpcState.dualBundleEnabled
-      return {
-        build: {
-          rollupOptions: {
-            input: {
-              ...userConfig?.build?.rollupOptions?.input,
-              client: '.client/main.js'
-            }
-          }
-        }
-      };
+      // Don't add client entry here - it will be built separately
+      // This ensures module resolution doesn't get shared between server and client
     },
 
-    // Log completion
-    closeBundle() {
+    // After server build completes, trigger separate client build
+    async closeBundle() {
       if (!needsDualBundle) return;
+      console.log('[juntos] Server build complete, starting client build...');
+
+      // Build client bundle separately with RPC adapter
+      await buildClientBundle(appRoot, config);
+
       console.log('[juntos] Dual bundle build complete (index.js + client.js)');
     }
   };
+}
+
+/**
+ * Build client bundle separately from server bundle.
+ * This ensures module resolution doesn't get shared - client always uses RPC adapter.
+ */
+async function buildClientBundle(appRoot, config) {
+  // Write a temporary Vite config for the client build
+  // Use vite.client.config.js in the root to avoid path issues
+  const clientConfigPath = path.join(appRoot, 'vite.client.config.js');
+
+  // Inline the minimal plugins needed for client build
+  // Can't use createClientPlugins() because it imports from the package context
+  const clientConfigContent = `
+import path from 'node:path';
+
+// Minimal virtual plugin for client - RPC adapter and browser runtime
+const clientVirtualPlugin = {
+  name: 'juntos-client-virtual',
+  enforce: 'pre',
+  resolveId(id) {
+    if (id === 'juntos:active-record') return '\\0juntos:active-record:rpc';
+    if (id === 'juntos:rails') return '\\0juntos:rails:browser';
+    return null;
+  },
+  load(id) {
+    if (id === '\\0juntos:active-record:rpc') {
+      return "export * from 'ruby2js-rails/adapters/active_record_rpc.mjs';";
+    }
+    if (id === '\\0juntos:rails:browser') {
+      return "export * from 'ruby2js-rails/targets/browser/rails.js';";
+    }
+    return null;
+  }
+};
+
+// Import the actual transform plugins from the package
+import { createClientPlugins } from 'ruby2js-rails/vite';
+
+export default {
+  plugins: [
+    clientVirtualPlugin,
+    ...createClientPlugins({ skipVirtual: true })
+  ],
+  build: {
+    outDir: 'dist',
+    emptyOutDir: false,  // Don't clear server output
+    rollupOptions: {
+      input: {
+        client: '.client/main.js'
+      },
+      output: {
+        entryFileNames: '[name].js',
+        chunkFileNames: 'assets/client-[name]-[hash].js'
+      }
+    }
+  },
+  resolve: {
+    alias: {
+      'components': path.resolve('app/components'),
+      '@models': path.resolve('app/models'),
+      '@views': path.resolve('app/views')
+    },
+    // Include .jsx.rb extension for Ruby+JSX files
+    extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.jsx.rb', '.rb'],
+    // Ensure React is resolved from project's node_modules, not linked package's
+    dedupe: ['react', 'react-dom']
+  },
+  // Dedupe React to prevent multiple instances
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-dom/client']
+  },
+  logLevel: 'warn'
+};
+`;
+
+  fs.writeFileSync(clientConfigPath, clientConfigContent);
+
+  try {
+    // Run Vite build with the client config
+    // Override env vars to force RPC adapter and browser target
+    execSync('npx vite build --config vite.client.config.js', {
+      cwd: appRoot,
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        JUNTOS_DATABASE: 'rpc',
+        JUNTOS_TARGET: 'browser'
+      }
+    });
+  } finally {
+    // Clean up the temporary config
+    try {
+      fs.unlinkSync(clientConfigPath);
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+  }
 }
 
 /**
@@ -1402,19 +1562,59 @@ function createDualBundlePlugin(config, appRoot) {
  * @param {string[]} rpcFiles - Files that triggered RPC detection (JSX views with model imports)
  */
 function generateClientEntryForHydration(appRoot, config, rpcFiles = []) {
-  // For now, generate a minimal client that:
-  // 1. Sets up client-side navigation
-  // 2. Dynamically loads browser-only components
-  // 3. Uses RPC for data fetching
-  //
-  // Full view hydration would require separate bundling or
-  // a way to resolve models to RPC stubs in the client.
+  // Generate imports for JSX views that triggered RPC detection.
+  // These views import models, which will be routed to RPC adapter
+  // by the virtual plugin (since this file is in .client/).
+
+  // Filter to only JSX views (not ERB views which don't need hydration)
+  const jsxViews = rpcFiles.filter(f => f.endsWith('.jsx.rb'));
+
+  // Generate import statements for each JSX view
+  // Use relative paths from .client/ directory
+  const viewImports = jsxViews.map((file, i) => {
+    // file is relative to appRoot, e.g., 'app/views/workflows/Show.jsx.rb'
+    return `import View${i} from '../${file}';`;
+  }).join('\n');
+
+  // Generate a map of paths to views for routing
+  // Extract the route pattern from the view path
+  // e.g., 'app/views/workflows/Show.jsx.rb' -> '/workflows/:id'
+  const viewMap = jsxViews.map((file, i) => {
+    // Parse: app/views/{resource}/{Action}.jsx.rb
+    const match = file.match(/app\/views\/([^/]+)\/(\w+)\.jsx\.rb$/);
+    if (match) {
+      const [, resource, action] = match;
+      // Map action to route pattern
+      let pattern;
+      switch (action.toLowerCase()) {
+        case 'index': pattern = `/${resource}`; break;
+        case 'show': pattern = `/${resource}/:id`; break;
+        case 'new': pattern = `/${resource}/new`; break;
+        case 'edit': pattern = `/${resource}/:id/edit`; break;
+        default: pattern = `/${resource}/${action.toLowerCase()}`;
+      }
+      return `  '${pattern}': View${i}`;
+    }
+    return null;
+  }).filter(Boolean).join(',\n');
 
   return `// Auto-generated client entry for hydration
 // Generated by juntos dual-bundle mode
 //
-// This file runs in the browser after SSR content is rendered.
-// It sets up client-side interactivity without importing server dependencies.
+// This file imports JSX views for React hydration.
+// Model imports are routed to RPC adapter (not database) because
+// this file is in .client/ and tracked as a client bundle path.
+
+import React from 'react';
+import { hydrateRoot } from 'react-dom/client';
+
+// Import JSX views (models will use RPC adapter)
+${viewImports}
+
+// Map routes to view components
+const views = {
+${viewMap}
+};
 
 console.log('[juntos] Client bundle loaded');
 
@@ -1433,16 +1633,66 @@ async function init() {
   const props = propsEl ? JSON.parse(propsEl.textContent) : {};
   console.log('[juntos] Server props:', props);
 
+  // Find the content element to hydrate
+  const content = document.getElementById('content');
+  if (!content) {
+    console.warn('[juntos] No #content element found for hydration');
+    return;
+  }
+
+  // Match current path to a view
+  const path = window.location.pathname;
+  const { view: ViewComponent, params } = matchRoute(path, views);
+
+  if (ViewComponent) {
+    console.log('[juntos] Hydrating view for path:', path);
+    try {
+      // Merge route params with server props
+      const viewProps = { ...props, ...params };
+      hydrateRoot(content, React.createElement(ViewComponent, viewProps));
+      console.log('[juntos] Hydration complete');
+    } catch (err) {
+      console.error('[juntos] Hydration error:', err);
+    }
+  } else {
+    console.log('[juntos] No matching view for path:', path, '- skipping hydration');
+  }
+
   // Set up form handlers for Turbo-style form submission
   setupFormHandlers();
 
   // Set up link handlers for client-side navigation
   setupLinkHandlers();
 
-  // Load any browser-only components that were placeholdered during SSR
-  await loadBrowserComponents();
-
   console.log('[juntos] Client initialization complete');
+}
+
+// Simple route matching
+function matchRoute(path, views) {
+  for (const [pattern, view] of Object.entries(views)) {
+    const params = matchPattern(pattern, path);
+    if (params !== null) {
+      return { view, params };
+    }
+  }
+  return { view: null, params: {} };
+}
+
+function matchPattern(pattern, path) {
+  const patternParts = pattern.split('/').filter(Boolean);
+  const pathParts = path.split('/').filter(Boolean);
+
+  if (patternParts.length !== pathParts.length) return null;
+
+  const params = {};
+  for (let i = 0; i < patternParts.length; i++) {
+    if (patternParts[i].startsWith(':')) {
+      params[patternParts[i].slice(1)] = pathParts[i];
+    } else if (patternParts[i] !== pathParts[i]) {
+      return null;
+    }
+  }
+  return params;
 }
 
 // Handle form submissions via fetch (Turbo-style)
@@ -1795,7 +2045,8 @@ function createVirtualPlugin(config, appRoot) {
     'd1': 'active_record_d1.mjs',
     'sqljs': 'active_record_sqljs.mjs',
     'pglite': 'active_record_pglite.mjs',
-    'supabase': 'active_record_supabase.mjs'
+    'supabase': 'active_record_supabase.mjs',
+    'rpc': 'active_record_rpc.mjs'  // RPC adapter for client-side model access
   };
 
   const targetDir = TARGET_DIR_MAP[config.target] || 'browser';
