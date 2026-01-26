@@ -350,6 +350,7 @@ def Show(workflow_id:)
       setNodes(w.nodes)
       setEdges(w.edges)
     end
+    return  # useEffect must not return Promise
   }, [workflow_id])
 
   # Show loading state while fetching

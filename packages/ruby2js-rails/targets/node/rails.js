@@ -149,8 +149,9 @@ export class Router extends RouterServer {
       delete params.authenticity_token;
     }
 
-    // Create request context
+    // Create request context with CSRF token for views
     const context = this.createContextNode(req, params);
+    context.authenticityToken = await getCSRF().generateToken();
 
     console.log(`Started ${method} "${path}"`);
     if (Object.keys(params).length > 0) {
