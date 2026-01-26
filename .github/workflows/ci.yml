@@ -494,6 +494,10 @@ jobs:
             # Must install all three: ruby2js (transpiler), ruby2js-rails (runtime), vite-plugin-ruby2js (build plugin)
             # Also install browser runtime dependencies: dexie (IndexedDB), turbo/stimulus (Rails UJS), react (ERB rendering)
             (cd "artifacts/$demo" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/ruby2js-rails-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz dexie @hotwired/turbo @hotwired/stimulus react react-dom)
+            # Demo-specific dependencies
+            if [ "$demo" = "workflow" ]; then
+              (cd "artifacts/$demo" && npm install reactflow)
+            fi
             # Build from demo root - pure JavaScript via Vite
             (cd "artifacts/$demo" && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
           done
