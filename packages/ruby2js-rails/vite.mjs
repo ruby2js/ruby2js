@@ -233,34 +233,14 @@ export function juntos(options = {}) {
  * JSX.rb plugin for Ruby + JSX files.
  */
 function createJsxRbPlugin(config) {
-  // Import convert function dynamically
-  let convert, initPrism;
-  let prismReady = false;
-
   return {
     name: 'juntos-jsx-rb',
-
-    async buildStart() {
-      // Lazy import ruby2js
-      if (!convert) {
-        const ruby2jsModule = await import('ruby2js');
-        convert = ruby2jsModule.convert;
-        initPrism = ruby2jsModule.initPrism;
-      }
-      if (!prismReady) {
-        await initPrism();
-        prismReady = true;
-      }
-    },
 
     async transform(code, id) {
       if (!id.endsWith('.jsx.rb')) return null;
 
-      // Ensure Prism is ready
-      if (!prismReady && initPrism) {
-        await initPrism();
-        prismReady = true;
-      }
+      // Use shared initialization (loads all filters including React)
+      const { convert } = await ensureRuby2jsReady();
 
       try {
         const result = convert(code, {
@@ -633,8 +613,8 @@ export { application };
 `;
       }
 
-      // Transform Ruby source files
-      if (!id.endsWith('.rb')) return null;
+      // Transform Ruby source files (but not .jsx.rb - that's handled by juntos-jsx-rb)
+      if (!id.endsWith('.rb') || id.endsWith('.jsx.rb')) return null;
       if (id.includes('/node_modules/')) return null;
 
       // Skip base classes that don't need transformation
