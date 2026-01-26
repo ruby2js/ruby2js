@@ -244,33 +244,25 @@ export function fixImports(js, fromFile) {
 }
 
 /**
- * Fix imports for ejected code - rewrites to concrete file paths.
- * Unlike fixImports(), this generates paths relative to the ejected structure.
+ * Fix imports for ejected code - rewrites to use ruby2js-rails package.
+ * Ejected code depends on the juntos runtime, not copied local files.
  */
 export function fixImportsForEject(js, fromFile) {
-  // Runtime modules → lib/
-  js = js.replace(/from ['"]\.\.\/lib\/rails\.js['"]/g, "from '../lib/rails.js'");
-  js = js.replace(/from ['"]\.\.\/\.\.\/lib\/rails\.js['"]/g, "from '../../lib/rails.js'");
-  js = js.replace(/from ['"]\.\.\/\.\.\/\.\.\/lib\/rails\.js['"]/g, "from '../../../lib/rails.js'");
-  js = js.replace(/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, "from '../lib/active_record.mjs'");
-  js = js.replace(/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, "from '../../lib/active_record.mjs'");
+  // Runtime modules → ruby2js-rails package
+  js = js.replace(/from ['"]\.\.\/lib\/rails\.js['"]/g, "from 'ruby2js-rails/rails_base.js'");
+  js = js.replace(/from ['"]\.\.\/\.\.\/lib\/rails\.js['"]/g, "from 'ruby2js-rails/rails_base.js'");
+  js = js.replace(/from ['"]\.\.\/\.\.\/\.\.\/lib\/rails\.js['"]/g, "from 'ruby2js-rails/rails_base.js'");
+  js = js.replace(/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, "from 'ruby2js-rails/adapters/active_record.mjs'");
+  js = js.replace(/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, "from 'ruby2js-rails/adapters/active_record.mjs'");
 
-  // ApplicationRecord → concrete file
+  // ApplicationRecord → local file (generated separately)
   js = js.replace(/from ['"]\.\/application_record\.js['"]/g, "from './application_record.js'");
 
-  // Model imports: keep .js extension for ejected files
-  // (models are transpiled to .js in ejected output)
+  // Model imports: .js extension for ejected files
+  js = js.replace(/from ['"]\.\/(\w+)\.js['"]/g, "from './$1.js'");
 
-  // Views: ../views/*.js stays the same (concrete view modules)
-  // Individual view files: keep as .js
-
-  // Config: paths are inlined in routes.js
-
-  // Migrations: ../db/migrate/index.js stays the same (concrete index file)
-
-  // Seeds: ../db/seeds.js stays the same (concrete file)
-
-  // Models index: stays as index.js
+  // Path helper → ruby2js-rails package
+  js = js.replace(/from ['"]ruby2js-rails\/path_helper\.mjs['"]/g, "from 'ruby2js-rails/path_helper.mjs'");
 
   return js;
 }
@@ -303,7 +295,7 @@ export { ${classNames.join(', ')} };
 
 /**
  * Generate content for juntos:models for ejected output.
- * Uses concrete file paths instead of virtual modules.
+ * Uses ruby2js-rails package for runtime, local paths for app code.
  */
 export function generateModelsModuleForEject(appRoot) {
   const models = findModels(appRoot);
@@ -315,12 +307,71 @@ export function generateModelsModuleForEject(appRoot) {
     m.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('')
   );
   return `${imports.join('\n')}
-import { Application } from '../lib/rails.js';
-import { modelRegistry } from '../lib/active_record.mjs';
+import { Application } from 'ruby2js-rails/rails_base.js';
+import { modelRegistry } from 'ruby2js-rails/adapters/active_record.mjs';
 const models = { ${classNames.join(', ')} };
 Application.registerModels(models);
 Object.assign(modelRegistry, models);
 export { ${classNames.join(', ')} };
+`;
+}
+
+/**
+ * Generate application_record.js for ejected output.
+ * This provides the base class for all models.
+ */
+export function generateApplicationRecordForEject() {
+  return `import { ApplicationRecord as Base, CollectionProxy } from 'ruby2js-rails/adapters/active_record.mjs';
+
+export class ApplicationRecord extends Base {
+  static primaryAbstractClass = true;
+}
+
+export { CollectionProxy };
+`;
+}
+
+/**
+ * Generate package.json for ejected output.
+ */
+export function generatePackageJsonForEject(appName) {
+  return JSON.stringify({
+    name: appName,
+    type: 'module',
+    scripts: {
+      dev: 'vite',
+      build: 'vite build',
+      preview: 'vite preview'
+    },
+    dependencies: {
+      'ruby2js-rails': '*',
+      'react': '^18.0.0',
+      'react-dom': '^18.0.0'
+    },
+    devDependencies: {
+      'vite': '^6.0.0'
+    }
+  }, null, 2) + '\n';
+}
+
+/**
+ * Generate vite.config.js for ejected output.
+ * This is a plain Vite config - no ruby2js plugins needed since code is already JS.
+ */
+export function generateViteConfigForEject() {
+  return `import { defineConfig } from 'vite';
+
+export default defineConfig({
+  // Ejected JavaScript - no ruby2js transformation needed
+  resolve: {
+    alias: {
+      // Map app paths for cleaner imports
+      'app/': './app/',
+      'config/': './config/',
+      'db/': './db/'
+    }
+  }
+});
 `;
 }
 

@@ -28,6 +28,9 @@ import {
   generateModelsModuleForEject,
   generateMigrationsModuleForEject,
   generateViewsModuleForEject,
+  generateApplicationRecordForEject,
+  generatePackageJsonForEject,
+  generateViteConfigForEject,
   ensureRuby2jsReady,
   transformRuby,
   transformErb,
@@ -674,8 +677,7 @@ async function runEject(options) {
     join(outDir, 'app/controllers'),
     join(outDir, 'app/javascript/controllers'),
     join(outDir, 'config'),
-    join(outDir, 'db/migrate'),
-    join(outDir, 'lib')
+    join(outDir, 'db/migrate')
   ];
 
   for (const dir of dirs) {
@@ -843,30 +845,26 @@ async function runEject(options) {
     }
   }
 
-  // Copy runtime library files
-  console.log('  Copying runtime libraries...');
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  const libFiles = [
-    { src: 'rails_base.js', dest: 'lib/rails.js' },
-    { src: 'adapters/active_record.mjs', dest: 'lib/active_record.mjs' }
-  ];
+  // Generate application_record.js
+  console.log('  Generating project files...');
+  writeFileSync(join(outDir, 'app/models/application_record.js'), generateApplicationRecordForEject());
+  fileCount++;
 
-  for (const { src, dest } of libFiles) {
-    const srcPath = join(__dirname, src);
-    if (existsSync(srcPath)) {
-      const destPath = join(outDir, dest);
-      const destDir = dirname(destPath);
-      if (!existsSync(destDir)) {
-        mkdirSync(destDir, { recursive: true });
-      }
-      copyFileSync(srcPath, destPath);
-      fileCount++;
-    }
-  }
+  // Generate package.json
+  const appName = basename(APP_ROOT) + '-ejected';
+  writeFileSync(join(outDir, 'package.json'), generatePackageJsonForEject(appName));
+  fileCount++;
+
+  // Generate vite.config.js
+  writeFileSync(join(outDir, 'vite.config.js'), generateViteConfigForEject());
+  fileCount++;
 
   console.log(`\nEjected ${fileCount} files to ${relative(APP_ROOT, outDir) || outDir}/`);
-  console.log('\nThe ejected files are standalone JavaScript that can be used without Ruby2JS.');
-  console.log('You can modify these files directly and use standard JavaScript tooling.');
+  console.log('\nThe ejected project depends on ruby2js-rails for runtime support.');
+  console.log('To use:');
+  console.log('  cd ' + (relative(APP_ROOT, outDir) || outDir));
+  console.log('  npm install');
+  console.log('  npm run dev');
 }
 
 // ============================================
