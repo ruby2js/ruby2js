@@ -58,6 +58,106 @@ import {
 } from './transform.mjs';
 
 // ============================================================
+// Dual Bundle Support (SSR + Hydration)
+// ============================================================
+
+/**
+ * Shared state for tracking RPC usage across plugins.
+ * When JSX components import from app/models/*.rb or config/routes.rb,
+ * we need to generate both server and client bundles.
+ */
+const rpcState = {
+  // Set of files that import models or routes (RPC triggers)
+  rpcImporters: new Set(),
+  // Whether dual bundle mode is enabled (detected or configured)
+  dualBundleEnabled: false,
+  // Reset state for new builds
+  reset() {
+    this.rpcImporters.clear();
+    this.dualBundleEnabled = false;
+  }
+};
+
+/**
+ * Pre-scan source files to detect RPC imports BEFORE build starts.
+ * This is called during config() so we can set up the right inputs.
+ *
+ * Scans .jsx.rb files for:
+ * - import [Model], from: 'app/models/*.rb'
+ * - import [...], from: 'config/routes.rb'
+ */
+function preScanForRpcImports(appRoot) {
+  const rpcFiles = [];
+
+  // Patterns to detect in Ruby source (before transpilation)
+  // Ruby import syntax: import [Foo], from: 'app/models/foo.rb'
+  const modelImportPattern = /from:\s*['"]app\/models\/[^'"]+\.rb['"]/;
+  const routesImportPattern = /from:\s*['"]config\/routes\.rb['"]/;
+
+  // Scan app/components/*.jsx.rb
+  const componentsDir = path.join(appRoot, 'app/components');
+  if (fs.existsSync(componentsDir)) {
+    const files = fs.readdirSync(componentsDir).filter(f => f.endsWith('.jsx.rb'));
+    for (const file of files) {
+      const content = fs.readFileSync(path.join(componentsDir, file), 'utf8');
+      if (modelImportPattern.test(content) || routesImportPattern.test(content)) {
+        rpcFiles.push(path.join(componentsDir, file));
+      }
+    }
+  }
+
+  // Scan app/views/**/*.jsx.rb
+  const viewsDir = path.join(appRoot, 'app/views');
+  if (fs.existsSync(viewsDir)) {
+    const scanDir = (dir) => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          scanDir(fullPath);
+        } else if (entry.name.endsWith('.jsx.rb')) {
+          const content = fs.readFileSync(fullPath, 'utf8');
+          if (modelImportPattern.test(content) || routesImportPattern.test(content)) {
+            rpcFiles.push(fullPath);
+          }
+        }
+      }
+    };
+    scanDir(viewsDir);
+  }
+
+  return rpcFiles;
+}
+
+/**
+ * Detect RPC imports in transformed JavaScript code.
+ * Returns true if the code imports from models or routes.
+ */
+function detectRpcImports(jsCode, filePath) {
+  // Check for model imports: from 'app/models/*.rb' or from "app/models/*.rb"
+  const modelImportPattern = /from\s+['"]app\/models\/[^'"]+\.rb['"]/;
+  // Check for routes import (path helpers): from 'config/routes.rb' or from "config/routes.rb"
+  const routesImportPattern = /from\s+['"]config\/routes\.rb['"]/;
+
+  if (modelImportPattern.test(jsCode) || routesImportPattern.test(jsCode)) {
+    rpcState.rpcImporters.add(filePath);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Check if dual bundle mode should be enabled.
+ * Called after all files are transformed.
+ */
+function shouldEnableDualBundle(config) {
+  // Only for server targets
+  if (!isServerTarget(config.target)) return false;
+  // Enable if any JSX files import models or routes
+  return rpcState.rpcImporters.size > 0;
+}
+
+// ============================================================
 // Configuration loading (vite-specific, uses yaml)
 // ============================================================
 
@@ -212,10 +312,14 @@ export function juntos(options = {}) {
     createVirtualPlugin(config, appRoot),
 
     // JSX.rb file handling (Ruby + JSX)
-    createJsxRbPlugin(config),
+    // Also detects RPC imports for dual bundle mode
+    createJsxRbPlugin(config, appRoot),
 
     // ERB file handling (server-rendered templates as JS modules)
     createErbPlugin(config),
+
+    // Dual bundle support (generates client.js for hydration when RPC detected)
+    createDualBundlePlugin(config, appRoot),
 
     // On-the-fly Ruby transformation (models, controllers, routes, migrations, seeds)
     createRubyTransformPlugin(config, appRoot),
@@ -233,8 +337,9 @@ export function juntos(options = {}) {
 
 /**
  * JSX.rb plugin for Ruby + JSX files.
+ * Also detects RPC imports for dual bundle mode.
  */
-function createJsxRbPlugin(config) {
+function createJsxRbPlugin(config, appRoot) {
   return {
     name: 'juntos-jsx-rb',
 
@@ -253,6 +358,11 @@ function createJsxRbPlugin(config) {
 
         const js = result.toString();
         const map = result.sourcemap;
+
+        // Detect RPC imports for dual bundle mode
+        if (isServerTarget(config.target)) {
+          detectRpcImports(js, id);
+        }
 
         if (map) {
           map.sources = [id];
@@ -844,6 +954,12 @@ function createConfigPlugin(config, appRoot) {
 
       // Vite-native structure: config at root, output to dist/
       return {
+        // Define compile-time constants
+        // globalThis.JUNTOS_HYDRATION tells rails_server.js whether client.js exists
+        // This is set to true by createDualBundlePlugin when RPC is detected
+        define: {
+          'globalThis.JUNTOS_HYDRATION': rpcState.dualBundleEnabled ? 'true' : 'false'
+        },
         build: {
           target: buildTarget,
           outDir: 'dist',
@@ -1022,6 +1138,8 @@ function getRollupOptions(target, database) {
         input: {
           index: 'node_modules/ruby2js-rails/server.mjs',
           'config/routes': 'config/routes.rb'
+          // Note: client entry is added dynamically by createDualBundlePlugin
+          // if RPC imports are detected during pre-scan
         },
         external: getNativeModules(database),
         output: {
@@ -1193,6 +1311,140 @@ function detectAppName(appRoot) {
 }
 
 /**
+ * Dual Bundle Plugin - generates client.js for hydration when RPC is detected.
+ *
+ * When server-side rendered apps use RPC (model imports or path helpers in JSX),
+ * we need both:
+ * - Server bundle: SSR + API endpoints (index.js)
+ * - Client bundle: Hydration + RPC client calls (client.js)
+ *
+ * This plugin:
+ * 1. Pre-scans files during config() to detect RPC usage
+ * 2. Generates .client/main.js entry point
+ * 3. Adds client entry to Vite build inputs
+ */
+function createDualBundlePlugin(config, appRoot) {
+  // Only relevant for server targets
+  if (!isServerTarget(config.target)) {
+    return { name: 'juntos-dual-bundle-noop' };
+  }
+
+  // Pre-scan for RPC imports before build
+  const rpcFiles = preScanForRpcImports(appRoot);
+  const needsDualBundle = rpcFiles.length > 0;
+
+  if (needsDualBundle) {
+    rpcState.dualBundleEnabled = true;
+    rpcFiles.forEach(f => rpcState.rpcImporters.add(f));
+  }
+
+  return {
+    name: 'juntos-dual-bundle',
+
+    // Modify config to add client entry if RPC detected
+    config(userConfig, { command }) {
+      if (!needsDualBundle) return;
+
+      console.log('[juntos] RPC imports detected - enabling dual bundle mode');
+      console.log('[juntos] RPC files:', rpcFiles.map(f => path.relative(appRoot, f)));
+
+      // Generate client entry file synchronously (needed for config)
+      const clientDir = path.join(appRoot, '.client');
+      const mainPath = path.join(clientDir, 'main.js');
+
+      if (!fs.existsSync(clientDir)) {
+        fs.mkdirSync(clientDir, { recursive: true });
+      }
+
+      const clientEntry = generateClientEntryForHydration(appRoot, config);
+      fs.writeFileSync(mainPath, clientEntry);
+      console.log('[juntos] Generated .client/main.js for hydration');
+
+      // Add client entry to rollup inputs
+      // Note: __JUNTOS_HYDRATION__ define is set in createConfigPlugin
+      // based on rpcState.dualBundleEnabled
+      return {
+        build: {
+          rollupOptions: {
+            input: {
+              ...userConfig?.build?.rollupOptions?.input,
+              client: '.client/main.js'
+            }
+          }
+        }
+      };
+    },
+
+    // Log completion
+    closeBundle() {
+      if (!needsDualBundle) return;
+      console.log('[juntos] Dual bundle build complete (index.js + client.js)');
+    }
+  };
+}
+
+/**
+ * Generate the client entry point for hydration.
+ * This is the entry point for the client bundle that hydrates SSR content.
+ *
+ * When imported from .client/, the virtual module plugin automatically
+ * resolves juntos:rails to browser runtime instead of server runtime.
+ */
+function generateClientEntryForHydration(appRoot, config) {
+  return `// Auto-generated client entry for hydration
+// Generated by juntos dual-bundle mode
+//
+// This file runs in the browser to hydrate server-rendered React content.
+// The virtual module plugin automatically uses browser runtime for imports
+// from .client/ paths, so juntos:rails resolves to browser/rails.js.
+
+// Import routes - this registers routes with the Router
+// Since this import originates from .client/, juntos:rails will resolve
+// to the browser runtime, giving us client-side Router and Application.
+import { Router, Application } from '../config/routes.rb';
+
+// Hydrate when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', hydrate);
+} else {
+  hydrate();
+}
+
+async function hydrate() {
+  // Use the content container, not root (matches server layout)
+  const content = document.getElementById('content');
+  if (!content) {
+    console.warn('[juntos] No #content element found for hydration');
+    return;
+  }
+
+  // Get initial props from server-rendered script tag
+  const propsEl = document.getElementById('__JUNTOS_PROPS__');
+  const initialProps = propsEl ? JSON.parse(propsEl.textContent) : {};
+
+  // Get the current path for routing
+  const path = window.location.pathname;
+
+  // Hydrate the server-rendered content
+  console.log('[juntos] Hydrating at', path);
+
+  try {
+    await Router.hydrateAt(content, path, initialProps);
+
+    // Set up client-side navigation after hydration
+    window.addEventListener('popstate', async () => {
+      await Router.dispatch(location.pathname);
+    });
+
+    console.log('[juntos] Client-side routing active');
+  } catch (e) {
+    console.error('[juntos] Hydration failed:', e);
+  }
+}
+`;
+}
+
+/**
  * HMR plugin for Stimulus controllers, views, and structural changes.
  *
  * HMR behavior:
@@ -1344,6 +1596,9 @@ if (import.meta.hot) {
  * Virtual modules:
  * - juntos:rails - Re-exports from target-specific runtime
  * - juntos:active-record - Injects DB_CONFIG and re-exports from adapter
+ *
+ * When dual bundle mode is active (RPC detected), imports from the .client/
+ * directory are resolved to browser runtime instead of server runtime.
  */
 function createVirtualPlugin(config, appRoot) {
   // Map targets/runtimes to target directory names
@@ -1386,27 +1641,70 @@ function createVirtualPlugin(config, appRoot) {
   const dbConfig = loadDatabaseConfig(appRoot, { quiet: true }) || {};
   if (config.database) dbConfig.adapter = config.database;
 
+  // Track which modules are part of the client bundle
+  // This is needed because the client bundle needs browser runtime, not server runtime
+  const clientModulePaths = new Set();
+
+  // Helper to check if a path is part of the client bundle
+  function isClientBundlePath(filePath) {
+    if (!filePath) return false;
+    // Direct .client/ path
+    if (filePath.includes('/.client/') || filePath.includes('\\.client\\')) return true;
+    // Already tracked as part of client bundle
+    if (clientModulePaths.has(filePath)) return true;
+    return false;
+  }
+
   return {
     name: 'juntos-virtual',
     enforce: 'pre',
 
-    resolveId(id) {
-      if (id === 'juntos:rails') return '\0juntos:rails';
-      if (id === 'juntos:active-record') return '\0juntos:active-record';
+    // Track modules imported from .client/ entry
+    resolveId(id, importer) {
+      // Track client bundle module paths for transitive imports
+      if (importer && isClientBundlePath(importer)) {
+        // This module is being imported from the client bundle
+        // Track it so we can use browser runtime for its imports too
+        if (id.startsWith('.')) {
+          // Relative path - resolve to absolute
+          const resolvedPath = path.resolve(path.dirname(importer), id);
+          clientModulePaths.add(resolvedPath);
+        } else if (!id.startsWith('\0') && !id.includes(':')) {
+          // Non-virtual, non-relative - could be a source file
+          const absPath = path.join(appRoot, id);
+          if (fs.existsSync(absPath)) {
+            clientModulePaths.add(absPath);
+          }
+        }
+      }
+
+      // For virtual modules, add suffix to distinguish client vs server versions
+      if (id === 'juntos:rails') {
+        // Check if this import is from the client bundle
+        const isClient = isClientBundlePath(importer);
+        return isClient ? '\0juntos:rails:client' : '\0juntos:rails';
+      }
+      if (id === 'juntos:active-record') {
+        const isClient = isClientBundlePath(importer);
+        return isClient ? '\0juntos:active-record:client' : '\0juntos:active-record';
+      }
       if (id === 'juntos:active-record-client') return '\0juntos:active-record-client';
       return null;
     },
 
     load(id) {
+      // Server version of juntos:rails
       if (id === '\0juntos:rails') {
-        // Re-export from target-specific runtime
         return `export * from 'ruby2js-rails/targets/${targetDir}/rails.js';`;
       }
 
+      // Client version of juntos:rails - always use browser runtime
+      if (id === '\0juntos:rails:client') {
+        return `export * from 'ruby2js-rails/targets/browser/rails.js';`;
+      }
+
+      // Server version of juntos:active-record
       if (id === '\0juntos:active-record') {
-        // Inject DB_CONFIG and re-export from adapter
-        // The adapter expects DB_CONFIG to be defined, but for most databases
-        // it prefers runtime environment variables (DATABASE_URL, etc.)
         return `
 // Database configuration injected at build time
 // Runtime environment variables take precedence
@@ -1416,8 +1714,13 @@ export * from 'ruby2js-rails/adapters/${adapterFile}';
 `;
       }
 
+      // Client version of juntos:active-record - use RPC adapter for client
+      if (id === '\0juntos:active-record:client') {
+        return `export * from 'ruby2js-rails/adapters/active_record_rpc.mjs';`;
+      }
+
       if (id === '\0juntos:active-record-client') {
-        // RPC adapter for browser in server-target builds
+        // Legacy alias for RPC adapter
         return `export * from 'ruby2js-rails/adapters/active_record_rpc.mjs';`;
       }
 

@@ -454,7 +454,14 @@ export class Router extends RouterBase {
   // Handles both sync and async views, and both string and React element returns
   static async htmlResponse(context, content, status = 200) {
     const html = await resolveContent(content);
-    const fullHtml = Application.wrapInLayout(context, html);
+    let fullHtml = Application.wrapInLayout(context, html);
+
+    // Inject client hydration script if dual bundle mode is active
+    // The client.js file is generated when RPC imports are detected
+    if (Application.enableHydration) {
+      fullHtml = injectHydrationScript(fullHtml, context);
+    }
+
     const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
     // Clear flash cookie after it's been consumed
@@ -470,8 +477,37 @@ export class Router extends RouterBase {
   }
 }
 
+/**
+ * Inject hydration script into HTML response.
+ * Adds:
+ * - <script type="module" src="/client.js"></script> before </body>
+ * - <script id="__JUNTOS_PROPS__"> with serialized props for hydration
+ */
+function injectHydrationScript(html, context) {
+  // Serialize props for hydration (basic context data)
+  const hydrationProps = {
+    path: context.request?.path || '/',
+    params: context.params || {}
+  };
+
+  const propsScript = `<script id="__JUNTOS_PROPS__" type="application/json">${JSON.stringify(hydrationProps)}</script>`;
+  const clientScript = `<script type="module" src="/client.js"></script>`;
+
+  // Inject before </body> if present, otherwise append
+  if (html.includes('</body>')) {
+    return html.replace('</body>', `${propsScript}\n${clientScript}\n</body>`);
+  }
+  return html + propsScript + clientScript;
+}
+
 // Server Application base class
 export class Application extends ApplicationBase {
+  // Enable client-side hydration (set by dual bundle build)
+  // JUNTOS_HYDRATION is set on globalThis by Vite's define:
+  // - true when RPC imports detected (dual bundle mode)
+  // - false/undefined otherwise
+  static enableHydration = globalThis.JUNTOS_HYDRATION ?? false;
+
   // Server targets can override this to customize startup
   static async start(port = 3000) {
     throw new Error('Application.start() must be implemented by runtime-specific target');

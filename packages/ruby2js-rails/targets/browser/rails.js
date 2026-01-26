@@ -149,6 +149,79 @@ export class Router extends RouterBase {
     // Create new context for dispatch (will read flash from cookie)
     await this.dispatch(path);
   }
+
+  // Client-side hydration entry point
+  // Called by generated client.js to hydrate server-rendered React content
+  // This attaches React event handlers to existing DOM without re-rendering
+  static async hydrateAt(rootElement, path, initialProps = {}) {
+    console.log(`[juntos] Hydrating at ${path}`);
+
+    // Create context with initial props from server
+    const context = createContext(initialProps.params || {});
+
+    // Match the route for this path
+    const result = this.match(path, 'GET');
+
+    if (!result) {
+      console.warn('[juntos] No route matched for hydration:', path);
+      return;
+    }
+
+    const { route, match } = result;
+    const { controller, controllerName, action } = route;
+    const actionMethod = action === 'new' ? '$new' : action;
+
+    console.log(`[juntos] Hydrating ${controllerName}#${action}`);
+
+    try {
+      let content;
+      if (route.nested) {
+        const parentId = parseInt(match[1]);
+        const id = match[2] ? parseInt(match[2]) : null;
+        content = id
+          ? await controller[actionMethod](context, parentId, id)
+          : await controller[actionMethod](context, parentId);
+      } else {
+        const id = match[1] ? parseInt(match[1]) : null;
+        content = id
+          ? await controller[actionMethod](context, id)
+          : await controller[actionMethod](context);
+      }
+
+      // Await if content is a promise
+      const resolved = await Promise.resolve(content);
+
+      // Check if content is a React element (has $$typeof Symbol)
+      if (resolved && typeof resolved === 'object' && resolved.$$typeof) {
+        // React element - use hydrateRoot for initial hydration
+        const wrappedContent = Application.wrapInLayout(context, resolved);
+        const { hydrateRoot } = await import('react-dom/client');
+
+        // Clear any existing React root from previous renders
+        if (rootElement._reactRoot) {
+          rootElement._reactRoot.unmount();
+        }
+
+        // Hydrate the server-rendered content
+        const root = hydrateRoot(rootElement, wrappedContent);
+        rootElement._reactRoot = root;
+
+        console.log(`[juntos] Hydration complete for ${controllerName}#${action}`);
+      } else {
+        // HTML string - can't hydrate, just set innerHTML
+        console.warn('[juntos] Cannot hydrate HTML string content, using innerHTML');
+        const fullHtml = Application.wrapInLayout(context, resolved);
+        rootElement.innerHTML = fullHtml;
+      }
+
+      // Clear flash cookie after hydration
+      context.flash.writeToCookie();
+    } catch (e) {
+      console.error('[juntos] Hydration error:', e);
+      // Fall back to normal client-side rendering
+      await this.dispatch(path);
+    }
+  }
 }
 
 // Form submission handlers

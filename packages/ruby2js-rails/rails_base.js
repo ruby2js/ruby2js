@@ -120,6 +120,13 @@ export class RouterBase {
     }
     return null;
   }
+
+  // Client-side hydration entry point
+  // Called by generated client.js to hydrate server-rendered React content
+  // This is a stub in the base class - overridden by browser/client runtimes
+  static hydrateAt(root, path, initialProps = {}) {
+    console.log('[juntos] Hydration stub called - override in client runtime');
+  }
 }
 
 // Base Application class with shared configuration
