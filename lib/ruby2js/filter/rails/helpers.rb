@@ -22,6 +22,7 @@ module Ruby2JS
           @erb_partials = []     # Track partial usage for imports
           @erb_view_modules = [] # Track view module imports (PhotoViews, etc.)
           @rails_helpers_needed = [] # Track Rails helpers that need importing from juntos:rails
+          @erb_asset_imports = [] # Track asset imports (images, videos, etc.) for Vite
         end
 
         # Check if layout mode is enabled (options are set after initialize)
@@ -116,6 +117,26 @@ module Ruby2JS
           unless @rails_helpers_needed.empty?
             helpers = @rails_helpers_needed.uniq.sort.map { |name| s(:const, nil, name) }
             self.prepend_list << s(:import, 'juntos:rails', helpers)
+          end
+
+          # Add imports for assets (images, videos, etc.)
+          # Vite will process these and provide fingerprinted URLs
+          # import _asset_logo_png from '../../../assets/images/logo.png';
+          unless @erb_asset_imports.empty?
+            @erb_asset_imports.uniq { |a| a[:var_name] }.each do |asset_info|
+              var_name = asset_info[:var_name]
+              import_path = asset_info[:import_path]
+
+              # Path is relative from app/views/<resource>/ to app/assets/
+              # e.g., ../../../assets/images/logo.png
+              full_import_path = "../../../assets/#{import_path}"
+
+              # Default import: import _asset_logo_png from '...';
+              self.prepend_list << s(:import,
+                [s(:pair, s(:sym, :default), s(:const, nil, var_name.to_sym)),
+                 s(:pair, s(:sym, :from), s(:str, full_import_path))],
+                nil)
+            end
           end
         end
 
@@ -225,6 +246,38 @@ module Ruby2JS
             # Rails convention 'application' would map to application.css but we use Tailwind
             @rails_helpers_needed << :stylesheetLinkTag
             return s(:send, nil, :stylesheetLinkTag, s(:str, 'tailwind.css'))
+          end
+
+          # Handle image_tag - import asset and generate <img> tag
+          # image_tag "logo.png", alt: "Logo" -> <img src="${_asset_logo_png}" alt="Logo">
+          if method == :image_tag && target.nil? && args.first
+            return process_asset_tag(:image_tag, args)
+          end
+
+          # Handle asset_path - import asset and return URL
+          # asset_path "file.pdf" -> ${_asset_file_pdf}
+          if method == :asset_path && target.nil? && args.first
+            return process_asset_tag(:asset_path, args)
+          end
+
+          # Handle image_path - alias for asset_path for images
+          if method == :image_path && target.nil? && args.first
+            return process_asset_tag(:asset_path, args)
+          end
+
+          # Handle video_tag - import asset and generate <video> tag
+          if method == :video_tag && target.nil? && args.first
+            return process_asset_tag(:video_tag, args)
+          end
+
+          # Handle audio_tag - import asset and generate <audio> tag
+          if method == :audio_tag && target.nil? && args.first
+            return process_asset_tag(:audio_tag, args)
+          end
+
+          # Handle favicon_link_tag - import asset and generate <link> tag
+          if method == :favicon_link_tag && target.nil? && args.first
+            return process_asset_tag(:favicon_link_tag, args)
           end
 
           # Handle javascript_importmap_tags - stub for demo
@@ -1147,6 +1200,115 @@ module Ruby2JS
             s(:or,
               s(:attr, s(:attr, context_ref, :contentFor), key_name),
               s(:str, ''))
+          end
+        end
+
+        # Process asset tags (image_tag, video_tag, audio_tag, asset_path, etc.)
+        # These generate Vite imports for fingerprinted asset URLs
+        #
+        # image_tag "logo.png", alt: "Logo"
+        #   -> import _asset_logo_png from '../../assets/images/logo.png';
+        #   -> `<img src="${_asset_logo_png}" alt="Logo">`
+        #
+        # asset_path "file.pdf"
+        #   -> import _asset_file_pdf from '../../assets/file.pdf';
+        #   -> _asset_file_pdf
+        def process_asset_tag(tag_type, args)
+          first_arg = args[0]
+
+          # Only handle string literals for now
+          return nil unless first_arg&.type == :str
+
+          asset_path = first_arg.children[0]
+
+          # Generate a valid JS variable name from the asset path
+          # "photos/hero.jpg" -> "_asset_photos_hero_jpg"
+          var_name = "_asset_#{asset_path.gsub(/[^a-zA-Z0-9]/, '_')}"
+
+          # Determine the asset directory based on tag type
+          asset_dir = case tag_type
+          when :image_tag, :image_path
+            'images'
+          when :video_tag
+            'videos'
+          when :audio_tag
+            'audio'
+          when :favicon_link_tag
+            'images'
+          else
+            nil # asset_path uses no subdirectory
+          end
+
+          # Build the import path relative to app/assets/
+          import_path = asset_dir ? "#{asset_dir}/#{asset_path}" : asset_path
+
+          # Track this asset for import generation
+          @erb_asset_imports << { var_name: var_name, import_path: import_path }
+
+          # Extract HTML attributes from remaining args (hash argument)
+          attrs = {}
+          if args[1]&.type == :hash
+            args[1].children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              if key.type == :sym && value.type == :str
+                attrs[key.children[0]] = value.children[0]
+              elsif key.type == :sym && value.type == :true
+                attrs[key.children[0]] = true
+              elsif key.type == :sym && value.type == :false
+                attrs[key.children[0]] = false
+              end
+            end
+          end
+
+          # Generate the appropriate output based on tag type
+          case tag_type
+          when :asset_path
+            # Just return the variable reference
+            s(:lvar, var_name.to_sym)
+
+          when :image_tag
+            # Generate: `<img src="${var_name}" alt="..." ...>`
+            attr_str = attrs.map { |k, v|
+              v == true ? k.to_s : "#{k}=\"#{v}\""
+            }.join(' ')
+            attr_part = attr_str.empty? ? '' : " #{attr_str}"
+            s(:dstr,
+              s(:str, '<img src="'),
+              s(:begin, s(:lvar, var_name.to_sym)),
+              s(:str, "\"#{attr_part}>"))
+
+          when :video_tag
+            # Generate: `<video src="${var_name}" ...></video>`
+            attr_str = attrs.map { |k, v|
+              v == true ? k.to_s : "#{k}=\"#{v}\""
+            }.join(' ')
+            attr_part = attr_str.empty? ? '' : " #{attr_str}"
+            s(:dstr,
+              s(:str, '<video src="'),
+              s(:begin, s(:lvar, var_name.to_sym)),
+              s(:str, "\"#{attr_part}></video>"))
+
+          when :audio_tag
+            # Generate: `<audio src="${var_name}" ...></audio>`
+            attr_str = attrs.map { |k, v|
+              v == true ? k.to_s : "#{k}=\"#{v}\""
+            }.join(' ')
+            attr_part = attr_str.empty? ? '' : " #{attr_str}"
+            s(:dstr,
+              s(:str, '<audio src="'),
+              s(:begin, s(:lvar, var_name.to_sym)),
+              s(:str, "\"#{attr_part}></audio>"))
+
+          when :favicon_link_tag
+            # Generate: `<link rel="icon" href="${var_name}">`
+            s(:dstr,
+              s(:str, '<link rel="icon" href="'),
+              s(:begin, s(:lvar, var_name.to_sym)),
+              s(:str, '">'))
+
+          else
+            nil
           end
         end
 
