@@ -104,7 +104,7 @@ export function getBuildOptions(section, target) {
       return {
         ...baseOptions,
         autoexports: true,
-        filters: ['Rails_Controller', 'Functions', 'ESM', 'Return'],
+        filters: ['Pragma', 'Rails_Controller', 'Functions', 'ESM', 'Return'],
         target
       };
 
@@ -112,7 +112,7 @@ export function getBuildOptions(section, target) {
       return {
         ...baseOptions,
         autoexports: 'default',
-        filters: ['React', 'Functions', 'ESM', 'Return'],
+        filters: ['Pragma', 'React', 'Functions', 'ESM', 'Return'],
         target
       };
 
@@ -121,7 +121,7 @@ export function getBuildOptions(section, target) {
       return {
         ...baseOptions,
         autoexports: true,
-        filters: ['Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', 'Functions', 'ESM', 'Return'],
+        filters: ['Pragma', 'Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', 'Functions', 'ESM', 'Return'],
         target
       };
   }
