@@ -25,6 +25,8 @@ module Ruby2JS
           @rails_path_helpers = Set.new  # Track which path helpers are used
           @rails_needs_views = false
           @rails_needs_turbo_stream_views = false
+          @rails_needs_react = false
+          @rails_needs_render_view = false
           @rails_current_action = nil
           # Model associations for preloading - set lazily from options in model_associations method
           @rails_model_associations = nil
@@ -97,6 +99,8 @@ module Ruby2JS
           @rails_path_helpers = Set.new
           @rails_needs_views = false
           @rails_needs_turbo_stream_views = false
+          @rails_needs_react = false
+          @rails_needs_render_view = false
 
           result
         end
@@ -316,7 +320,8 @@ module Ruby2JS
             body_statements.push(*preloads) if preloads.any?
           end
 
-          body_statements.push(view_call) if view_call
+          # view_call returns an array of statements (viewProps assignment + view rendering)
+          body_statements.push(*view_call) if view_call
 
           # Wrap in autoreturn for implicit return behavior
           final_body = if body_statements.empty?
@@ -999,17 +1004,31 @@ module Ruby2JS
                         else action_name
                         end
 
-          # Build unified props hash: { $context: context, articles }
+          # Build props hash for view: { $context: context, articles }
           pairs = [s(:pair, s(:sym, :"$context"), s(:lvar, :context))]
           ivars.each do |ivar|
             pairs << s(:pair, s(:sym, ivar), s(:lvar, ivar))
           end
 
-          # Pass single props object with $context and locals
-          s(:send,
-            s(:const, nil, view_module.to_sym),
-            view_action,
-            s(:hash, *pairs))
+          # Build viewProps hash (without $context) for hydration serialization
+          view_props_pairs = ivars.map do |ivar|
+            s(:pair, s(:sym, ivar), s(:lvar, ivar))
+          end
+
+          # Return array of two statements: store viewProps, then render view
+          # context.viewProps = { workflow_id };
+          # return renderView(View, { $context, workflow_id })
+          # renderView detects ERB (async, returns string) vs JSX (React component needing createElement)
+          @rails_needs_render_view = true
+          [
+            s(:send,
+              s(:lvar, :context),
+              :viewProps=,
+              s(:hash, *view_props_pairs)),
+            s(:send, nil, :renderView,
+              s(:attr, s(:const, nil, view_module.to_sym), view_action),
+              s(:hash, *pairs))
+          ]
         end
 
         def collect_model_references(node)
@@ -1030,6 +1049,31 @@ module Ruby2JS
 
         def generate_imports
           imports = []
+
+          # Import React if views use React.createElement (for hooks support during SSR)
+          if @rails_needs_react || @rails_needs_render_view
+            imports << s(:send, nil, :import,
+              s(:const, nil, :React),
+              s(:str, "react"))
+          end
+
+          # Add renderView helper if needed - detects ERB (async) vs JSX (React component)
+          # ERB views are async functions returning strings; JSX views are React components needing createElement
+          if @rails_needs_render_view
+            # function renderView(View, props) {
+            #   return View.constructor.name === 'AsyncFunction' ? View(props) : React.createElement(View, props);
+            # }
+            # Use :attr for property access (View.constructor.name, not View.constructor().name())
+            imports << s(:def, :renderView,
+              s(:args, s(:arg, :View), s(:arg, :props)),
+              s(:if,
+                s(:send,
+                  s(:attr, s(:attr, s(:lvar, :View), :constructor), :name),
+                  :===,
+                  s(:str, "AsyncFunction")),
+                s(:send, s(:lvar, :View), nil, s(:lvar, :props)),
+                s(:send, s(:const, nil, :React), :createElement, s(:lvar, :View), s(:lvar, :props))))
+          end
 
           # Import each referenced model
           [*@rails_model_refs].sort.each do |model|

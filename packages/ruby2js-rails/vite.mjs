@@ -1649,8 +1649,14 @@ async function init() {
     if (ViewComponent) {
       console.log('[juntos] Hydrating view for path:', path);
       try {
-        // Merge route params with server props
-        const viewProps = { ...props, ...params };
+        // Get serialized props from data attribute (set by server)
+        const propsJson = target.getAttribute('data-juntos-props');
+        const serializedProps = propsJson ? JSON.parse(propsJson) : {};
+
+        // Merge: serialized props from server + route params + global props
+        const viewProps = { ...props, ...serializedProps, ...params };
+        console.log('[juntos] View props:', viewProps);
+
         hydrateRoot(target, React.createElement(ViewComponent, viewProps));
         console.log('[juntos] Hydration complete for:', path);
       } catch (err) {

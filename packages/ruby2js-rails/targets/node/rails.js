@@ -343,10 +343,11 @@ export class Router extends RouterServer {
   // Send HTML response with proper headers, wrapped in layout
   // Includes hydration script injection when Application.enableHydration is true
   static async sendHtml(context, res, content, status = 200) {
-    // When hydration is enabled, pass the path so React content gets wrapped
-    // in <div data-juntos-view="/path"> for client-side hydration
+    // When hydration is enabled, pass the path and view props so React content
+    // gets wrapped in <div data-juntos-view="/path" data-juntos-props="...">
     const hydrationPath = Application.enableHydration ? (context.request?.path || '/') : null;
-    const html = await resolveContent(content, hydrationPath);
+    const viewProps = Application.enableHydration ? context.viewProps : null;
+    const html = await resolveContent(content, hydrationPath, viewProps);
     let fullHtml = Application.wrapInLayout(context, html);
 
     // Inject hydration script for dual bundle mode (SSR + client hydration)

@@ -121,7 +121,7 @@ class WorkflowsController < ApplicationController
   end
 
   def show
-    @workflow = Workflow.includes(:nodes, :edges).find(params[:id])
+    @workflow_id = params[:id]
   end
 
   def new
@@ -326,18 +326,34 @@ FORM
 # Uses model operations directly (Node.create, Edge.create) instead of fetch()
 # This makes the view target-agnostic: works with both browser (Dexie) and Node (RPC) targets
 # JsonStreamProvider handles real-time updates via BroadcastChannel (browser) or WebSocket (node)
+# Uses workflow_id prop for hydration compatibility - fetches data on mount
 cat > app/views/workflows/Show.jsx.rb << 'RBX'
 import React from 'react'
+import [useState, useEffect], from: 'react'
 import WorkflowCanvas from 'components/WorkflowCanvas'
 import JsonStreamProvider from 'ruby2js-rails/components/JsonStreamProvider.js'
+import [Workflow], from: 'app/models/workflow.rb'
 import [Node], from: 'app/models/node.rb'
 import [Edge], from: 'app/models/edge.rb'
 
 export default
-def Show(workflow:)
-  # Get nodes and edges from workflow (preloaded by controller)
-  nodes = workflow.nodes
-  edges = workflow.edges
+def Show(workflow_id:)
+  # State for workflow data (loaded async)
+  workflow, setWorkflow = useState(nil)
+  nodes, setNodes = useState([])
+  edges, setEdges = useState([])
+
+  # Load workflow on mount and when ID changes
+  useEffect(-> {
+    Workflow.includes(:nodes, :edges).find(workflow_id).then do |w|
+      setWorkflow(w)
+      setNodes(w.nodes)
+      setEdges(w.edges)
+    end
+  }, [workflow_id])
+
+  # Show loading state while fetching
+  return %x{<div className="container mx-auto px-4 py-8"><p>Loading...</p></div>} unless workflow
 
   # Convert Rails nodes to React Flow format
   flow_nodes = nodes.map do |node|

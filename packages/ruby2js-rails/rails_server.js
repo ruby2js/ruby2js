@@ -96,8 +96,9 @@ async function getReactDOMServer() {
 // Exported for use by target-specific htmlResponse overrides
 //
 // When hydrationPath is provided and content is a React element,
-// wraps the output in <div data-juntos-view="/path"> for client hydration.
-export async function resolveContent(content, hydrationPath = null) {
+// wraps the output in <div data-juntos-view="/path" data-juntos-props="...">
+// for client hydration.
+export async function resolveContent(content, hydrationPath = null, viewProps = null) {
   // Await if content is a promise (async ERB or async React component)
   const resolved = await Promise.resolve(content);
 
@@ -111,10 +112,23 @@ export async function resolveContent(content, hydrationPath = null) {
 
     // Wrap in hydration marker if path provided (for client-side hydration)
     if (hydrationPath) {
-      return `<div data-juntos-view="${hydrationPath}">${html}</div>`;
+      // Serialize props for hydration (escape for HTML attribute)
+      const propsAttr = viewProps
+        ? ` data-juntos-props="${escapeHtmlAttr(JSON.stringify(viewProps))}"`
+        : '';
+      return `<div data-juntos-view="${hydrationPath}"${propsAttr}>${html}</div>`;
     }
     return html;
   }
+}
+
+// Escape string for use in HTML attribute
+function escapeHtmlAttr(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 // Re-export base helpers
