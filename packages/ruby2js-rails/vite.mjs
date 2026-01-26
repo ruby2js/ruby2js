@@ -767,15 +767,8 @@ function createStructurePlugin(config, appRoot) {
         console.warn('[juntos] Could not create node_modules symlink:', e.message);
       }
 
-      // Copy CSS files for server-side rendering
-      // Check for Rails' pre-built tailwind.css
-      const tailwindSrc = path.join(appRoot, 'app/assets/builds/tailwind.css');
-      if (fs.existsSync(tailwindSrc)) {
-        const assetsDir = path.join(distDir, 'assets');
-        await fs.promises.mkdir(assetsDir, { recursive: true });
-        await fs.promises.copyFile(tailwindSrc, path.join(assetsDir, 'tailwind.css'));
-        console.log('[juntos] Copied tailwind.css to dist/assets/');
-      }
+      // CSS is now added as a Vite input (see createConfigPlugin)
+      // so it gets fingerprinted and added to the manifest
     }
   };
 }
@@ -822,6 +815,15 @@ function createConfigPlugin(config, appRoot) {
       const rollupOptions = getRollupOptions(config.target, config.database);
       const buildTarget = getBuildTarget(config.target);
 
+      // Add CSS to inputs for server targets so Vite fingerprints it
+      const serverTargets = ['node', 'bun', 'deno', 'fly', 'vercel-node'];
+      if (serverTargets.includes(config.target) && rollupOptions.input) {
+        const tailwindPath = path.join(appRoot, 'app/assets/builds/tailwind.css');
+        if (fs.existsSync(tailwindPath)) {
+          rollupOptions.input['tailwind'] = tailwindPath;
+        }
+      }
+
       // Add external patterns from config (e.g., from ruby2js.yml)
       // Merge with any user-provided external function
       if (config.external && config.external.length > 0) {
@@ -849,6 +851,7 @@ function createConfigPlugin(config, appRoot) {
           emptyOutDir: true, // Clean dist/ on each build
           minify: false, // Disable minification for debugging
           sourcemap: true, // Enable sourcemaps for debugging
+          manifest: true, // Generate manifest.json for asset fingerprinting
           rollupOptions
         },
         resolve: {

@@ -26,7 +26,9 @@ import {
   TurboBroadcast,
   turbo_stream_from,
   resolveContent,
-  getCSRF
+  getCSRF,
+  stylesheetLinkTag,
+  getAssetPath
 } from 'ruby2js-rails/rails_server.js';
 
 import { createRPCHandler, getRegistry, csrfMetaTag } from 'ruby2js-rails/rpc/server.mjs';
@@ -35,7 +37,7 @@ import { createRPCHandler, getRegistry, csrfMetaTag } from 'ruby2js-rails/rpc/se
 let rpcHandler = null;
 
 // Re-export everything from server module
-export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from };
+export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from, stylesheetLinkTag, getAssetPath };
 
 // Re-export RPC utilities for layout integration
 export { csrfMetaTag, getRegistry as getRPCRegistry };

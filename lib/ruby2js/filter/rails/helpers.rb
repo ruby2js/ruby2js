@@ -21,6 +21,7 @@ module Ruby2JS
           @erb_view_helpers = [] # Track view helper usage (truncate, etc.) for imports
           @erb_partials = []     # Track partial usage for imports
           @erb_view_modules = [] # Track view module imports (PhotoViews, etc.)
+          @rails_helpers_needed = [] # Track Rails helpers that need importing from juntos:rails
         end
 
         # Check if layout mode is enabled (options are set after initialize)
@@ -108,6 +109,13 @@ module Ruby2JS
               self.prepend_list << s(:import, "../#{resource}.js",
                 [s(:const, nil, module_name.to_sym)])
             end
+          end
+
+          # Add imports for Rails helpers from juntos:rails
+          # e.g., stylesheetLinkTag for fingerprinted CSS paths
+          unless @rails_helpers_needed.empty?
+            helpers = @rails_helpers_needed.uniq.sort.map { |name| s(:const, nil, name) }
+            self.prepend_list << s(:import, 'juntos:rails', helpers)
           end
         end
 
@@ -208,10 +216,15 @@ module Ruby2JS
             return s(:str, '')
           end
 
-          # Handle stylesheet_link_tag - output link to tailwind.css
-          # The vite plugin copies app/assets/builds/tailwind.css to dist/assets/
+          # Handle stylesheet_link_tag - call runtime helper for fingerprinted path
+          # The helper reads the Vite manifest to get the fingerprinted asset path
           if method == :stylesheet_link_tag && target.nil?
-            return s(:str, '<link rel="stylesheet" href="/assets/tailwind.css">')
+            # Generate: stylesheetLinkTag('tailwind.css')
+            # The function is imported from juntos:rails
+            # Note: We always use 'tailwind.css' as that's where Tailwind outputs
+            # Rails convention 'application' would map to application.css but we use Tailwind
+            @rails_helpers_needed << :stylesheetLinkTag
+            return s(:send, nil, :stylesheetLinkTag, s(:str, 'tailwind.css'))
           end
 
           # Handle javascript_importmap_tags - stub for demo

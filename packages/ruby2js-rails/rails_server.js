@@ -19,6 +19,68 @@ import {
 import { getCSRF } from './rpc/server.mjs';
 export { getCSRF };
 
+// Import fs/path for manifest reading (server-only module)
+import fs from 'node:fs';
+import path from 'node:path';
+
+// Vite manifest for asset fingerprinting
+let viteManifest = null;
+let manifestLoaded = false;
+
+function loadManifest() {
+  if (manifestLoaded) return;
+  manifestLoaded = true;
+
+  try {
+    const searchPaths = [
+      path.join(process.cwd(), 'dist', '.vite', 'manifest.json'),
+      path.join(process.cwd(), '.vite', 'manifest.json')
+    ];
+
+    for (const manifestPath of searchPaths) {
+      try {
+        if (fs.existsSync(manifestPath)) {
+          viteManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+          break;
+        }
+      } catch {
+        // Continue to next path
+      }
+    }
+  } catch {
+    // Manifest not available (e.g., in dev mode)
+  }
+}
+
+// Get fingerprinted asset path from Vite manifest
+export function getAssetPath(name) {
+  loadManifest();
+
+  if (viteManifest) {
+    // Try exact match first, then common variations
+    const candidates = [
+      name,
+      `app/assets/builds/${name}`,
+      `assets/${name}`
+    ];
+
+    for (const key of candidates) {
+      if (viteManifest[key] && viteManifest[key].file) {
+        return '/' + viteManifest[key].file;
+      }
+    }
+  }
+
+  // Fallback to non-fingerprinted path
+  return `/assets/${name}`;
+}
+
+// Generate stylesheet link tag with fingerprinted path
+export function stylesheetLinkTag(name = 'tailwind.css') {
+  const href = getAssetPath(name);
+  return `<link rel="stylesheet" href="${href}">`;
+}
+
 // Lazy-loaded ReactDOMServer for rendering React elements
 // Only imported when needed (apps with RBX/JSX views)
 let ReactDOMServer = null;
