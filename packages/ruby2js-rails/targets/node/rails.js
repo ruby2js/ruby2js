@@ -341,9 +341,16 @@ export class Router extends RouterServer {
   }
 
   // Send HTML response with proper headers, wrapped in layout
+  // Includes hydration script injection when Application.enableHydration is true
   static async sendHtml(context, res, content, status = 200) {
     const html = await resolveContent(content);
-    const fullHtml = Application.wrapInLayout(context, html);
+    let fullHtml = Application.wrapInLayout(context, html);
+
+    // Inject hydration script for dual bundle mode (SSR + client hydration)
+    if (Application.enableHydration) {
+      fullHtml = this.injectHydrationScript(fullHtml, context);
+    }
+
     const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
     // Clear flash cookie after it's been consumed
@@ -354,6 +361,21 @@ export class Router extends RouterServer {
 
     res.writeHead(status, headers);
     res.end(fullHtml);
+  }
+
+  // Inject hydration scripts into HTML for client-side React hydration
+  static injectHydrationScript(html, context) {
+    const hydrationProps = {
+      path: context.request?.path || '/',
+      params: context.params || {}
+    };
+    const propsScript = `<script id="__JUNTOS_PROPS__" type="application/json">${JSON.stringify(hydrationProps)}</script>`;
+    const clientScript = `<script type="module" src="/client.js"></script>`;
+
+    if (html.includes('</body>')) {
+      return html.replace('</body>', `${propsScript}\n${clientScript}\n</body>`);
+    }
+    return html + propsScript + clientScript;
   }
 
   // Send JSON response
