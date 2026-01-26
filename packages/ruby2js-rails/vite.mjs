@@ -681,6 +681,7 @@ export class ApplicationRecord extends ActiveRecord {}
 
       // Virtual module: juntos:models (registry of all models)
       // Registers models with both Application and the adapter's modelRegistry
+      // Also registers for RPC when dual bundle mode is enabled (hydration needs RPC)
       if (id === '\0juntos:models') {
         const models = findModels(appRoot);
         const imports = models.map(m => {
@@ -690,11 +691,15 @@ export class ApplicationRecord extends ActiveRecord {}
         const classNames = models.map(m =>
           m.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('')
         );
+        // Register for RPC if dual bundle mode (client needs to call server for model ops)
+        const rpcRegistration = rpcState.dualBundleEnabled
+          ? `\nApplication.registerModelsForRPC(models);`
+          : '';
         return `${imports.join('\n')}
 import { Application } from 'juntos:rails';
 import { modelRegistry } from 'juntos:active-record';
 const models = { ${classNames.join(', ')} };
-Application.registerModels(models);
+Application.registerModels(models);${rpcRegistration}
 Object.assign(modelRegistry, models);
 export { ${classNames.join(', ')} };
 `;
