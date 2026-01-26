@@ -305,7 +305,7 @@ function runInit(options) {
       existing.dependencies['vite-plugin-ruby2js'] = `${RELEASES_URL}/vite-plugin-ruby2js-beta.tgz`;
     }
     if (!existing.devDependencies['vite']) {
-      existing.devDependencies['vite'] = '^6.0.0';
+      existing.devDependencies['vite'] = '^7.0.0';
     }
     if (!existing.devDependencies['vitest']) {
       existing.devDependencies['vitest'] = '^2.0.0';
