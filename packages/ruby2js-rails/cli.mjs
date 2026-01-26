@@ -15,7 +15,7 @@
  */
 
 import { spawn, spawnSync, execSync } from 'child_process';
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, chmodSync, readdirSync, copyFileSync, cpSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, chmodSync, readdirSync, copyFileSync, cpSync, statSync } from 'fs';
 import { join, basename, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -34,6 +34,8 @@ import {
   generateTestSetupForEject,
   generateMainJsForEject,
   generateVitestConfigForEject,
+  generateBrowserIndexHtml,
+  generateBrowserMainJs,
   ensureRuby2jsReady,
   transformRuby,
   transformErb,
@@ -845,21 +847,28 @@ async function runEject(options) {
   const controllersDir = join(APP_ROOT, 'app/javascript/controllers');
   if (existsSync(controllersDir)) {
     console.log('  Transforming Stimulus controllers...');
-    const controllers = findControllers(APP_ROOT);
-    for (const c of controllers) {
-      if (c.file.endsWith('.rb')) {
-        const source = readFileSync(join(controllersDir, c.file), 'utf-8');
-        const result = await transformRuby(source, join(controllersDir, c.file), 'stimulus', config, APP_ROOT);
+
+    // Get all files in the controllers directory
+    const allFiles = readdirSync(controllersDir).filter(f => !f.startsWith('._') && !f.startsWith('.'));
+
+    for (const file of allFiles) {
+      const inFile = join(controllersDir, file);
+      // Skip directories
+      if (!statSync(inFile).isFile()) continue;
+
+      if (file.endsWith('.rb')) {
+        // Transform Ruby files
+        const source = readFileSync(inFile, 'utf-8');
+        const result = await transformRuby(source, inFile, 'stimulus', config, APP_ROOT);
         // Pass relative output path for correct import resolution
-        const relativeOutPath = `app/javascript/controllers/${c.file.replace('.rb', '.js')}`;
+        const relativeOutPath = `app/javascript/controllers/${file.replace('.rb', '.js')}`;
         let code = fixImportsForEject(result.code, relativeOutPath, config);
-        const outFile = join(outDir, 'app/javascript/controllers', c.file.replace('.rb', '.js'));
+        const outFile = join(outDir, 'app/javascript/controllers', file.replace('.rb', '.js'));
         writeFileSync(outFile, code);
         fileCount++;
-      } else {
+      } else if (file.endsWith('.js') || file.endsWith('.mjs')) {
         // Copy JS files as-is
-        const inFile = join(controllersDir, c.file);
-        const outFile = join(outDir, 'app/javascript/controllers', c.file);
+        const outFile = join(outDir, 'app/javascript/controllers', file);
         copyFileSync(inFile, outFile);
         fileCount++;
       }
@@ -916,7 +925,7 @@ async function runEject(options) {
   fileCount++;
 
   // Generate vite.config.js
-  writeFileSync(join(outDir, 'vite.config.js'), generateViteConfigForEject());
+  writeFileSync(join(outDir, 'vite.config.js'), generateViteConfigForEject(config));
   fileCount++;
 
   // Generate vitest.config.js
@@ -931,17 +940,34 @@ async function runEject(options) {
   writeFileSync(join(outTestDir, 'setup.mjs'), generateTestSetupForEject(config));
   fileCount++;
 
-  // Generate main.js entry point
-  writeFileSync(join(outDir, 'main.js'), generateMainJsForEject(config));
-  fileCount++;
+  // Generate entry point(s) based on target
+  const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
+  const isBrowserTarget = browserTargets.includes(config.target);
+
+  if (isBrowserTarget) {
+    // Browser targets: generate index.html and browser main.js
+    writeFileSync(join(outDir, 'index.html'), generateBrowserIndexHtml(appName, './main.js'));
+    fileCount++;
+    writeFileSync(join(outDir, 'main.js'), generateBrowserMainJs('./config/routes.js', './app/javascript/controllers/index.js'));
+    fileCount++;
+  } else {
+    // Server targets: generate Node.js server entry
+    writeFileSync(join(outDir, 'main.js'), generateMainJsForEject(config));
+    fileCount++;
+  }
 
   console.log(`\nEjected ${fileCount} files to ${relative(APP_ROOT, outDir) || outDir}/`);
   console.log('\nThe ejected project depends on ruby2js-rails for runtime support.');
   console.log('To use:');
   console.log('  cd ' + (relative(APP_ROOT, outDir) || outDir));
   console.log('  npm install');
-  console.log('  npm test        # run tests');
-  console.log('  npm start       # start server');
+  if (isBrowserTarget) {
+    console.log('  npm run dev     # start dev server');
+    console.log('  npm run build   # build for production');
+  } else {
+    console.log('  npm test        # run tests');
+    console.log('  npm start       # start server');
+  }
 }
 
 // ============================================

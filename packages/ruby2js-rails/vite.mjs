@@ -51,6 +51,8 @@ import {
   findViewResources,
   fixImports,
   generateViewsModule,
+  generateBrowserIndexHtml,
+  generateBrowserMainJs,
   ensureRuby2jsReady,
   ErbCompiler
 } from './transform.mjs';
@@ -1143,14 +1145,16 @@ function createBrowserEntryPlugin(config, appRoot) {
       // Generate index.html if it doesn't exist
       if (!fs.existsSync(indexPath)) {
         const appName = detectAppName(appRoot);
-        const indexContent = generateIndexHtml(appName);
+        // Vite serves from .browser/, so path is /.browser/main.js
+        const indexContent = generateBrowserIndexHtml(appName, '/.browser/main.js');
         await fs.promises.writeFile(indexPath, indexContent);
         console.log('[juntos] Generated .browser/index.html');
       }
 
       // Generate main.js if it doesn't exist
       if (!fs.existsSync(mainPath)) {
-        const mainContent = generateMainJs();
+        // Paths are relative from .browser/ directory, importing .rb files for Vite to transform
+        const mainContent = generateBrowserMainJs('../config/routes.rb', '../app/javascript/controllers/index.js');
         await fs.promises.writeFile(mainPath, mainContent);
         console.log('[juntos] Generated .browser/main.js');
       }
@@ -1174,44 +1178,6 @@ function detectAppName(appRoot) {
   // Fall back to directory name, capitalize first letter
   const dirName = path.basename(appRoot);
   return dirName.charAt(0).toUpperCase() + dirName.slice(1);
-}
-
-/**
- * Generate index.html content for browser builds.
- */
-function generateIndexHtml(appName) {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${appName}</title>
-  <link rel="icon" href="data:,">
-  <link href="/app/assets/builds/tailwind.css" rel="stylesheet">
-</head>
-<body>
-  <div id="loading">Loading...</div>
-  <div id="app" style="display:none">
-    <main class="container mx-auto mt-28 px-5" id="content"></main>
-  </div>
-  <script type="module" src="/.browser/main.js"></script>
-</body>
-</html>
-`;
-}
-
-/**
- * Generate main.js content for browser builds.
- * Paths are relative from .browser/ directory.
- */
-function generateMainJs() {
-  return `// Main entry point for Vite bundling
-import * as Turbo from '@hotwired/turbo';
-import { Application } from '../config/routes.rb';
-import '../app/javascript/controllers/index.js';
-window.Turbo = Turbo;
-Application.start();
-`;
 }
 
 /**

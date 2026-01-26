@@ -400,16 +400,26 @@ export { CollectionProxy };
 export function generatePackageJsonForEject(appName, config = {}) {
   const RELEASES_BASE = 'https://ruby2js.github.io/ruby2js/releases';
 
+  // Determine if this is a browser target
+  const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
+  const isBrowserTarget = browserTargets.includes(config.target);
+
+  const scripts = {
+    dev: 'vite',
+    build: 'vite build',
+    preview: 'vite preview',
+    test: 'vitest run'
+  };
+
+  // Only add start script for server targets
+  if (!isBrowserTarget) {
+    scripts.start = 'node main.js';
+  }
+
   const pkg = {
     name: appName,
     type: 'module',
-    scripts: {
-      dev: 'vite',
-      build: 'vite build',
-      preview: 'vite preview',
-      test: 'vitest run',
-      start: 'node main.js'
-    },
+    scripts,
     dependencies: {
       'ruby2js': `${RELEASES_BASE}/ruby2js-beta.tgz`,
       'ruby2js-rails': `${RELEASES_BASE}/ruby2js-rails-beta.tgz`,
@@ -421,6 +431,12 @@ export function generatePackageJsonForEject(appName, config = {}) {
       'vitest': '^2.0.0'
     }
   };
+
+  // Add browser dependencies
+  if (isBrowserTarget) {
+    pkg.dependencies['@hotwired/turbo'] = '^8.0.0';
+    pkg.dependencies['@hotwired/stimulus'] = '^3.2.0';
+  }
 
   // Add database adapter dependency based on config
   if (config.database === 'sqlite3' || config.database === 'sqlite' || config.database === 'better_sqlite3') {
@@ -588,20 +604,78 @@ export default defineConfig({${externalConfig}
  * Generate vite.config.js for ejected output.
  * This is a plain Vite config - no ruby2js plugins needed since code is already JS.
  */
-export function generateViteConfigForEject() {
+export function generateViteConfigForEject(config = {}) {
+  const adapterFile = getActiveRecordAdapterFile(config.database);
+
+  // Determine if this is a browser target
+  const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
+  const isBrowserTarget = browserTargets.includes(config.target);
+
+  // Build aliases - always include app paths
+  const aliases = [
+    `      'app/': './app/'`,
+    `      'config/': './config/'`,
+    `      'db/': './db/'`
+  ];
+
+  // Add virtual module aliases for browser targets
+  if (isBrowserTarget) {
+    aliases.push(`      'juntos:active-record': 'ruby2js-rails/adapters/${adapterFile}'`);
+  }
+
   return `import { defineConfig } from 'vite';
 
 export default defineConfig({
   // Ejected JavaScript - no ruby2js transformation needed
   resolve: {
     alias: {
-      // Map app paths for cleaner imports
-      'app/': './app/',
-      'config/': './config/',
-      'db/': './db/'
+${aliases.join(',\n')}
     }
   }
 });
+`;
+}
+
+/**
+ * Generate index.html for browser builds.
+ * Used by both Vite plugin (dev) and eject command (standalone).
+ * @param {string} appName - Application name for the title
+ * @param {string} mainJsPath - Path to main.js (e.g., '/.browser/main.js' or './main.js')
+ */
+export function generateBrowserIndexHtml(appName, mainJsPath = './main.js') {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${appName}</title>
+  <link rel="icon" href="data:,">
+  <link href="/app/assets/builds/tailwind.css" rel="stylesheet">
+</head>
+<body>
+  <div id="loading">Loading...</div>
+  <div id="app" style="display:none">
+    <main class="container mx-auto mt-28 px-5" id="content"></main>
+  </div>
+  <script type="module" src="${mainJsPath}"></script>
+</body>
+</html>
+`;
+}
+
+/**
+ * Generate main.js entry point for browser builds.
+ * Used by both Vite plugin (dev) and eject command (standalone).
+ * @param {string} routesPath - Import path for routes (e.g., '../config/routes.rb' or './config/routes.js')
+ * @param {string} controllersPath - Import path for controllers (e.g., '../app/javascript/controllers/index.js')
+ */
+export function generateBrowserMainJs(routesPath = './config/routes.js', controllersPath = './app/javascript/controllers/index.js') {
+  return `// Main entry point for browser
+import * as Turbo from '@hotwired/turbo';
+import { Application } from '${routesPath}';
+import '${controllersPath}';
+window.Turbo = Turbo;
+Application.start();
 `;
 }
 
