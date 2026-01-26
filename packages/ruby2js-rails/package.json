@@ -93,7 +93,7 @@
   },
   "peerDependencies": {
     "ruby2js": "*",
-    "vite": "^5.0.0 || ^6.0.0",
+    "vite": "^7.0.0",
     "vite-plugin-ruby2js": "*"
   },
   "peerDependenciesMeta": {
