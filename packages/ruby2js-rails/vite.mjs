@@ -466,6 +466,7 @@ function createErbPlugin(config) {
       // Import ERB filters AFTER ruby2js module to ensure they register correctly
       await import('ruby2js/filters/erb.js');
       await import('ruby2js/filters/rails/helpers.js');
+      await import('ruby2js/filters/active_support.js');
     }
     if (!prismReady && initPrism) {
       await initPrism();
@@ -497,8 +498,9 @@ function createErbPlugin(config) {
 
     // Step 2: Convert Ruby to JavaScript with ERB filters
     // Note: Rails_Helpers must come before Erb for method overrides
+    // ActiveSupport provides .present?, .blank?, etc. for Rails idioms
     const options = {
-      filters: ['Rails_Helpers', 'Erb', 'Functions', 'Return'],
+      filters: ['Rails_Helpers', 'ActiveSupport', 'Erb', 'Functions', 'Return'],
       eslevel: config.eslevel,
       include: ['class', 'call'],
       database: config.database,
