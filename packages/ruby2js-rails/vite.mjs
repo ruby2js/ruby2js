@@ -39,42 +39,25 @@ import 'ruby2js/filters/esm.js';
 // Import Return filter for implicit returns
 import 'ruby2js/filters/return.js';
 
+// Import shared transformation logic
+import {
+  DEFAULT_TARGETS,
+  RESERVED,
+  capitalize,
+  singularize,
+  getBuildOptions,
+  findModels,
+  findMigrations,
+  findViewResources,
+  fixImports,
+  generateViewsModule,
+  ensureRuby2jsReady,
+  ErbCompiler
+} from './transform.mjs';
+
 // ============================================================
-// Configuration constants (previously from SelfhostBuilder)
+// Configuration loading (vite-specific, uses yaml)
 // ============================================================
-
-/**
- * Default target for each database adapter (used when target not specified).
- */
-const DEFAULT_TARGETS = Object.freeze({
-  // Browser-only databases
-  dexie: 'browser',
-  indexeddb: 'browser',
-  sqljs: 'browser',
-  'sql.js': 'browser',
-  pglite: 'browser',
-
-  // TCP-based server databases
-  better_sqlite3: 'node',
-  sqlite3: 'node',
-  sqlite: 'node',
-  pg: 'node',
-  postgres: 'node',
-  postgresql: 'node',
-  mysql2: 'node',
-  mysql: 'node',
-
-  // Platform-specific databases
-  d1: 'cloudflare',
-  mpg: 'fly',
-
-  // HTTP-based edge databases
-  neon: 'vercel',
-  turso: 'vercel',
-  libsql: 'vercel',
-  planetscale: 'vercel',
-  supabase: 'vercel'
-});
 
 /**
  * Load database configuration from environment or config/database.yml.
@@ -110,55 +93,6 @@ function loadDatabaseConfig(appRoot, { quiet = false } = {}) {
   }
 
   return dbConfig;
-}
-
-/**
- * Get Ruby2JS transpilation options for a given section.
- * Uses filter names as strings (resolved by ruby2js).
- */
-function getBuildOptions(section, target) {
-  const baseOptions = {
-    eslevel: 2022,
-    include: ['class', 'call']
-  };
-
-  switch (section) {
-    case 'stimulus':
-      return {
-        ...baseOptions,
-        autoexports: 'default',
-        filters: ['Pragma', 'Stimulus', 'Functions', 'ESM', 'Return'],
-        target
-      };
-
-    case 'controllers':
-      return {
-        ...baseOptions,
-        autoexports: true,
-        filters: ['Rails_Controller', 'Functions', 'ESM', 'Return'],
-        target
-      };
-
-    default:
-      // Models, routes, seeds, migrations
-      return {
-        ...baseOptions,
-        autoexports: true,
-        filters: ['Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', 'Functions', 'ESM', 'Return'],
-        target
-      };
-  }
-}
-
-// Import ERB compiler for .erb files
-import { ErbCompiler } from './lib/erb_compiler.js';
-
-// Import inflector for singularization
-import { singularize } from 'ruby2js-rails/adapters/inflector.mjs';
-
-// Helper function for capitalizing resource names
-function capitalize(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 /**
@@ -526,66 +460,14 @@ function createErbPlugin(config) {
  * - juntos:application-record → ApplicationRecord base class
  */
 function createRubyTransformPlugin(config, appRoot) {
-  // Ruby2JS converter and initialization
-  let convert, initPrism;
-  let prismReady = false;
-
-  async function ensureReady() {
-    if (!convert) {
-      const ruby2jsModule = await import('ruby2js');
-      convert = ruby2jsModule.convert;
-      initPrism = ruby2jsModule.initPrism;
-
-      // Import Rails filters
-      await import('ruby2js/filters/rails/model.js');
-      await import('ruby2js/filters/rails/controller.js');
-      await import('ruby2js/filters/rails/routes.js');
-      await import('ruby2js/filters/rails/seeds.js');
-      await import('ruby2js/filters/rails/migration.js');
-      await import('ruby2js/filters/functions.js');
-      await import('ruby2js/filters/esm.js');
-      await import('ruby2js/filters/return.js');
-    }
-    if (!prismReady && initPrism) {
-      await initPrism();
-      prismReady = true;
-    }
-  }
+  // ensureRuby2jsReady() from transform.mjs handles all filter loading
 
   // Cache for transformed files
   const transformCache = new Map();
 
-  // Find all model files
-  function findModels() {
-    const modelsDir = path.join(appRoot, 'app/models');
-    if (!fs.existsSync(modelsDir)) return [];
-    return fs.readdirSync(modelsDir)
-      .filter(f => f.endsWith('.rb') && f !== 'application_record.rb' && !f.startsWith('._'))
-      .map(f => f.replace('.rb', ''));
-  }
-
-  // Find all migration files
-  function findMigrations() {
-    const migrateDir = path.join(appRoot, 'db/migrate');
-    if (!fs.existsSync(migrateDir)) return [];
-    return fs.readdirSync(migrateDir)
-      .filter(f => f.endsWith('.rb') && !f.startsWith('._'))
-      .sort()
-      .map(f => ({ file: f, name: f.replace('.rb', '') }));
-  }
-
-  // Find all view directories (for unified view modules)
-  function findViewResources() {
-    const viewsDir = path.join(appRoot, 'app/views');
-    if (!fs.existsSync(viewsDir)) return [];
-    return fs.readdirSync(viewsDir, { withFileTypes: true })
-      .filter(d => d.isDirectory() && d.name !== 'layouts' && !d.name.startsWith('.'))
-      .map(d => d.name);
-  }
-
-  // Transform Ruby source to JS
-  async function transformRuby(source, filePath, section = null) {
-    await ensureReady();
+  // Local wrapper for transformRuby that uses closure's config/appRoot
+  async function transformRubyLocal(source, filePath, section = null) {
+    const { convert } = await ensureRuby2jsReady();
     const options = {
       ...getBuildOptions(section, config.target),
       file: path.relative(appRoot, filePath),
@@ -593,59 +475,6 @@ function createRubyTransformPlugin(config, appRoot) {
       target: config.target
     };
     return convert(source, options);
-  }
-
-  // Fix imports in transpiled code to use virtual modules and source files
-  function fixImports(js, fromFile) {
-    // Virtual modules for runtime
-    js = js.replace(/from ['"]\.\.\/lib\/rails\.js['"]/g, "from 'juntos:rails'");
-    js = js.replace(/from ['"]\.\.\/\.\.\/lib\/rails\.js['"]/g, "from 'juntos:rails'");
-    js = js.replace(/from ['"]\.\.\/\.\.\/\.\.\/lib\/rails\.js['"]/g, "from 'juntos:rails'");
-    js = js.replace(/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, "from 'juntos:active-record'");
-    js = js.replace(/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, "from 'juntos:active-record'");
-
-    // ApplicationRecord → virtual module
-    js = js.replace(/from ['"]\.\/application_record\.js['"]/g, "from 'juntos:application-record'");
-
-    // Model imports: .js → .rb (same directory)
-    js = js.replace(/from ['"]\.\/(\w+)\.js['"]/g, (match, name) => {
-      if (name === 'application_record') return "from 'juntos:application-record'";
-      return `from './${name}.rb'`;
-    });
-
-    // Model imports from controllers: ../models/*.js → ../models/*.rb
-    js = js.replace(/from ['"]\.\.\/models\/(\w+)\.js['"]/g, "from '../models/$1.rb'");
-
-    // Views: ../views/*.js → juntos:views/*
-    js = js.replace(/from ['"]\.\.\/views\/(\w+)\.js['"]/g, "from 'juntos:views/$1'");
-    js = js.replace(/from ['"]\.\.\/views\/(\w+)\/([\w_]+)\.js['"]/g, "from 'app/views/$1/$2.html.erb'");
-
-    // Config: ../../config/paths.js → juntos:paths (inline in routes)
-    js = js.replace(/from ['"]\.\.\/\.\.\/config\/paths\.js['"]/g, "from 'config/routes.rb'");
-    js = js.replace(/from ['"]\.\/paths\.js['"]/g, "from 'config/routes.rb'");
-
-    // Controllers: ../app/controllers/*.js → app/controllers/*.rb
-    js = js.replace(/from ['"]\.\.\/app\/controllers\/(\w+)\.js['"]/g, "from 'app/controllers/$1.rb'");
-
-    // Migrations: ../db/migrate/index.js → juntos:migrations
-    js = js.replace(/from ['"]\.\.\/db\/migrate\/index\.js['"]/g, "from 'juntos:migrations'");
-
-    // Seeds: ../db/seeds.js → db/seeds.rb
-    js = js.replace(/from ['"]\.\.\/db\/seeds\.js['"]/g, "from 'db/seeds.rb'");
-
-    // Models index: ../app/models/index.js → juntos:models
-    js = js.replace(/from ['"]\.\.\/app\/models\/index\.js['"]/g, "from 'juntos:models'");
-    js = js.replace(/from ['"]\.\/index\.js['"]/g, (match) => {
-      // Only apply if we're in models directory
-      if (fromFile.includes('/models/')) return "from 'juntos:models'";
-      return match;
-    });
-
-    // Layout: ../app/views/layouts/application.js → app/views/layouts/application.html.erb
-    js = js.replace(/from ['"]\.\.\/app\/views\/layouts\/application\.js['"]/g,
-      "from 'app/views/layouts/application.html.erb'");
-
-    return js;
   }
 
   return {
@@ -695,7 +524,7 @@ export class ApplicationRecord extends ActiveRecord {}
       // Virtual module: juntos:models (registry of all models)
       // Registers models with both Application and the adapter's modelRegistry
       if (id === '\0juntos:models') {
-        const models = findModels();
+        const models = findModels(appRoot);
         const imports = models.map(m => {
           const className = m.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('');
           return `import { ${className} } from 'app/models/${m}.rb';`;
@@ -716,7 +545,7 @@ export { ${classNames.join(', ')} };
       // Virtual module: juntos:migrations (registry of all migrations)
       // Migration filter transforms class to { up: async () => {...}, tableSchemas: {...} }
       if (id === '\0juntos:migrations') {
-        const migrations = findMigrations();
+        const migrations = findMigrations(appRoot);
         // Import the migration object from each file (filter exports 'migration' constant)
         const imports = migrations.map((m, i) =>
           `import { migration as migration${i} } from 'db/migrate/${m.file}';`
@@ -732,11 +561,9 @@ export const migrations = [${exports.join(', ')}];
 
       // Virtual module: juntos:views/* (unified view modules)
       // Exports a namespace object like `ArticleViews` with methods for each view
+      // Uses shared generateViewsModule from transform.mjs
       if (id.startsWith('\0juntos:views/')) {
         const resource = id.replace('\0juntos:views/', '');
-
-        // JS reserved words that can't be used as identifiers
-        const RESERVED = new Set(['new', 'delete', 'class', 'function', 'return', 'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'break', 'continue', 'default', 'var', 'let', 'const', 'import', 'export', 'try', 'catch', 'finally', 'throw', 'typeof', 'instanceof', 'in', 'of', 'with', 'yield', 'await', 'async', 'static', 'super', 'this', 'null', 'true', 'false', 'void']);
 
         // Handle Turbo Streams: juntos:views/messages_turbo_streams
         // These aggregate *.turbo_stream.erb files from app/views/messages/
@@ -775,34 +602,8 @@ export const ${className} = { ${members.join(', ')} };
 `;
         }
 
-        // Regular views: juntos:views/articles
-        const viewsDir = path.join(appRoot, 'app/views', resource);
-        if (!fs.existsSync(viewsDir)) return `export const ${capitalize(resource)}Views = {};`;
-
-        const views = fs.readdirSync(viewsDir)
-          .filter(f => f.endsWith('.html.erb') && !f.startsWith('._'))
-          .map(f => {
-            const name = f.replace('.html.erb', '');
-            const isPartial = name.startsWith('_');
-            let exportName = isPartial ? name.slice(1) : name;
-            // Escape reserved words by adding $ prefix (matches Ruby2JS convention)
-            if (RESERVED.has(exportName)) exportName = '$' + exportName;
-            return { file: f, name, exportName, isPartial };
-          });
-
-        const imports = views.map(v =>
-          `import { render as ${v.exportName} } from 'app/views/${resource}/${v.file}';`
-        );
-
-        // Create namespace object: ArticleViews = { index, show, new_, edit, ... }
-        // Use singularized form to match controller filter (ArticleViews, not ArticlesViews)
-        const className = capitalize(singularize(resource)) + 'Views';
-        const members = views.map(v => v.exportName);
-
-        return `${imports.join('\n')}
-export const ${className} = { ${members.join(', ')} };
-export { ${members.join(', ')} };
-`;
+        // Regular views: use shared generateViewsModule
+        return generateViewsModule(appRoot, resource);
       }
 
       // Intercept app/javascript/controllers/index.js - generate Vite-compatible controller loading
@@ -867,7 +668,7 @@ export { application };
         // Special handling for routes.rb - include paths inline
         let result;
         if (id.endsWith('/routes.rb')) {
-          await ensureReady();
+          const { convert } = await ensureRuby2jsReady();
           const options = {
             ...getBuildOptions(null, config.target),
             file: path.relative(appRoot, id),
@@ -878,7 +679,7 @@ export { application };
           };
           result = convert(source, options);
         } else {
-          result = await transformRuby(source, id, section);
+          result = await transformRubyLocal(source, id, section);
         }
 
         let js = result.toString();

@@ -68,7 +68,8 @@
     "vite.mjs",
     "vite-models.mjs",
     "vite-ssr-dev.mjs",
-    "testing.mjs"
+    "testing.mjs",
+    "transform.mjs"
   ],
   "keywords": [
     "ruby2js",

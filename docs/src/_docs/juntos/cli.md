@@ -146,6 +146,63 @@ npx juntos build --sourcemap             # Include source maps
 
 Creates the `dist/` directory containing the built application. Production builds (`-e production`) are bundled, tree-shaken, minified, and fingerprinted by Vite.
 
+## juntos eject
+
+Write transpiled JavaScript files to disk. Useful for debugging transformation issues or migrating away from Ruby source.
+
+```bash
+npx juntos eject [options]
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--output, --out DIR` | Output directory (default: `ejected/`) |
+| `-d, --database ADAPTER` | Database adapter |
+| `-t, --target TARGET` | Build target |
+| `--base PATH` | Base public path |
+| `-h, --help` | Show help |
+
+**Examples:**
+
+```bash
+npx juntos eject                      # Output to ejected/
+npx juntos eject --output dist/js     # Custom output directory
+npx juntos eject -d sqlite -t node    # Eject for Node.js target
+```
+
+**What it does:**
+
+1. Transforms all Ruby source files (models, controllers, views, routes, migrations, seeds)
+2. Writes individual JavaScript files to the output directory
+3. Copies runtime libraries needed to run the ejected code
+
+**Output structure:**
+
+```
+ejected/
+  app/
+    models/         # Transpiled models + index.js
+    views/          # Transpiled ERB templates
+    controllers/    # Transpiled Rails controllers
+    javascript/
+      controllers/  # Transpiled Stimulus controllers
+  config/
+    routes.js       # Transpiled routes
+  db/
+    migrate/        # Transpiled migrations + index.js
+    seeds.js        # Transpiled seeds
+  lib/
+    rails.js        # Runtime library
+    active_record.mjs
+```
+
+Unlike `juntos build`, which produces bundled output optimized for deployment, `eject` produces unbundled individual files that mirror the source structure. This makes it useful for:
+
+- **Debugging:** Inspect exactly what the Vite plugin produces
+- **Migration:** Use the JavaScript output as a new codebase, leaving Ruby behind
+
 ## juntos up
 
 Build and run locally. Combines `build` and `server` in one command.

@@ -6,6 +6,7 @@
  * Commands:
  *   dev       Start development server with hot reload
  *   build     Build for deployment
+ *   eject     Write transpiled JavaScript files to disk
  *   up        Build and run locally
  *   test      Run tests with Vitest
  *   db        Database commands (migrate, seed, prepare, reset, create, drop)
@@ -14,9 +15,25 @@
  */
 
 import { spawn, spawnSync, execSync } from 'child_process';
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, chmodSync } from 'fs';
-import { join, basename, dirname } from 'path';
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, chmodSync, readdirSync, copyFileSync, cpSync } from 'fs';
+import { join, basename, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
+
+// Import shared transformation logic
+import {
+  findModels,
+  findMigrations,
+  findViewResources,
+  findControllers,
+  generateModelsModuleForEject,
+  generateMigrationsModuleForEject,
+  generateViewsModuleForEject,
+  ensureRuby2jsReady,
+  transformRuby,
+  transformErb,
+  transformJsxRb,
+  fixImportsForEject
+} from './transform.mjs';
 
 // Try to load js-yaml, fall back to naive parsing if not available
 // (js-yaml may not be available when CLI is run standalone from tarball)
@@ -52,7 +69,8 @@ function parseCommonArgs(args) {
     base: null,
     open: false,
     skipBuild: false,
-    force: false
+    force: false,
+    outDir: null
   };
 
   const remaining = [];
@@ -97,6 +115,12 @@ function parseCommonArgs(args) {
       options.skipBuild = true;
     } else if (arg === '-f' || arg === '--force') {
       options.force = true;
+    } else if (arg === '--output' || arg === '--out') {
+      options.outDir = args[++i];
+    } else if (arg.startsWith('--output=')) {
+      options.outDir = arg.slice(9);
+    } else if (arg.startsWith('--out=')) {
+      options.outDir = arg.slice(6);
     } else if (arg === '--base') {
       options.base = args[++i];
     } else if (arg.startsWith('--base=')) {
@@ -617,6 +641,232 @@ function runBuild(options) {
       process.exit(code);
     }
   });
+}
+
+// ============================================
+// Command: eject
+// ============================================
+
+async function runEject(options) {
+  validateRailsApp();
+  loadDatabaseConfig(options);
+  applyEnvOptions(options);
+
+  const outDir = options.outDir || join(APP_ROOT, 'ejected');
+  const config = {
+    target: options.target || 'browser',
+    database: options.database || 'dexie',
+    base: options.base || '/',
+    eslevel: 2022
+  };
+
+  console.log(`Ejecting transpiled files to ${relative(APP_ROOT, outDir) || outDir}/\n`);
+
+  // Ensure ruby2js is ready
+  await ensureRuby2jsReady();
+
+  // Create output directory structure
+  const dirs = [
+    outDir,
+    join(outDir, 'app/models'),
+    join(outDir, 'app/views'),
+    join(outDir, 'app/views/layouts'),
+    join(outDir, 'app/controllers'),
+    join(outDir, 'app/javascript/controllers'),
+    join(outDir, 'config'),
+    join(outDir, 'db/migrate'),
+    join(outDir, 'lib')
+  ];
+
+  for (const dir of dirs) {
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+  }
+
+  let fileCount = 0;
+
+  // Transform models
+  const modelsDir = join(APP_ROOT, 'app/models');
+  if (existsSync(modelsDir)) {
+    console.log('  Transforming models...');
+    const modelFiles = readdirSync(modelsDir).filter(f => f.endsWith('.rb') && !f.startsWith('._'));
+    for (const file of modelFiles) {
+      const source = readFileSync(join(modelsDir, file), 'utf-8');
+      const result = await transformRuby(source, join(modelsDir, file), null, config, APP_ROOT);
+      let code = fixImportsForEject(result.code, join(modelsDir, file));
+      const outFile = join(outDir, 'app/models', file.replace('.rb', '.js'));
+      writeFileSync(outFile, code);
+      fileCount++;
+    }
+
+    // Generate models index
+    const modelsIndex = generateModelsModuleForEject(APP_ROOT);
+    writeFileSync(join(outDir, 'app/models/index.js'), modelsIndex);
+    fileCount++;
+  }
+
+  // Transform migrations
+  const migrateDir = join(APP_ROOT, 'db/migrate');
+  if (existsSync(migrateDir)) {
+    console.log('  Transforming migrations...');
+    const migrations = findMigrations(APP_ROOT);
+    for (const m of migrations) {
+      const source = readFileSync(join(migrateDir, m.file), 'utf-8');
+      const result = await transformRuby(source, join(migrateDir, m.file), null, config, APP_ROOT);
+      let code = fixImportsForEject(result.code, join(migrateDir, m.file));
+      const outFile = join(outDir, 'db/migrate', m.name + '.js');
+      writeFileSync(outFile, code);
+      fileCount++;
+    }
+
+    // Generate migrations index
+    const migrationsIndex = generateMigrationsModuleForEject(APP_ROOT);
+    writeFileSync(join(outDir, 'db/migrate/index.js'), migrationsIndex);
+    fileCount++;
+  }
+
+  // Transform seeds
+  const seedsFile = join(APP_ROOT, 'db/seeds.rb');
+  if (existsSync(seedsFile)) {
+    console.log('  Transforming seeds...');
+    const source = readFileSync(seedsFile, 'utf-8');
+    const result = await transformRuby(source, seedsFile, null, config, APP_ROOT);
+    let code = fixImportsForEject(result.code, seedsFile);
+    writeFileSync(join(outDir, 'db/seeds.js'), code);
+    fileCount++;
+  }
+
+  // Transform routes
+  const routesFile = join(APP_ROOT, 'config/routes.rb');
+  if (existsSync(routesFile)) {
+    console.log('  Transforming routes...');
+    const source = readFileSync(routesFile, 'utf-8');
+    const result = await transformRuby(source, routesFile, null, config, APP_ROOT);
+    let code = fixImportsForEject(result.code, routesFile);
+    writeFileSync(join(outDir, 'config/routes.js'), code);
+    fileCount++;
+  }
+
+  // Transform views
+  const viewsDir = join(APP_ROOT, 'app/views');
+  if (existsSync(viewsDir)) {
+    console.log('  Transforming views...');
+    const resources = findViewResources(APP_ROOT);
+
+    for (const resource of resources) {
+      const resourceDir = join(viewsDir, resource);
+      const outResourceDir = join(outDir, 'app/views', resource);
+      if (!existsSync(outResourceDir)) {
+        mkdirSync(outResourceDir, { recursive: true });
+      }
+
+      const files = readdirSync(resourceDir);
+
+      // Transform ERB files
+      for (const file of files.filter(f => f.endsWith('.html.erb') && !f.startsWith('._'))) {
+        const source = readFileSync(join(resourceDir, file), 'utf-8');
+        const result = await transformErb(source, join(resourceDir, file), false, config);
+        const outFile = join(outResourceDir, file.replace('.html.erb', '.js'));
+        writeFileSync(outFile, result.code);
+        fileCount++;
+      }
+
+      // Transform JSX.rb files
+      for (const file of files.filter(f => f.endsWith('.jsx.rb') && !f.startsWith('._'))) {
+        const source = readFileSync(join(resourceDir, file), 'utf-8');
+        const result = await transformJsxRb(source, join(resourceDir, file), config);
+        let code = fixImportsForEject(result.code, join(resourceDir, file));
+        const outFile = join(outResourceDir, file.replace('.jsx.rb', '.js'));
+        writeFileSync(outFile, code);
+        fileCount++;
+      }
+    }
+
+    // Generate view index modules for each resource
+    for (const resource of resources) {
+      const viewsIndex = generateViewsModuleForEject(APP_ROOT, resource);
+      writeFileSync(join(outDir, 'app/views', resource + '.js'), viewsIndex);
+      fileCount++;
+    }
+
+    // Transform layouts
+    const layoutsDir = join(viewsDir, 'layouts');
+    if (existsSync(layoutsDir)) {
+      const layoutFiles = readdirSync(layoutsDir).filter(f => f.endsWith('.html.erb') && !f.startsWith('._'));
+      for (const file of layoutFiles) {
+        const source = readFileSync(join(layoutsDir, file), 'utf-8');
+        const result = await transformErb(source, join(layoutsDir, file), true, config);
+        const outFile = join(outDir, 'app/views/layouts', file.replace('.html.erb', '.js'));
+        writeFileSync(outFile, result.code);
+        fileCount++;
+      }
+    }
+  }
+
+  // Transform Stimulus controllers
+  const controllersDir = join(APP_ROOT, 'app/javascript/controllers');
+  if (existsSync(controllersDir)) {
+    console.log('  Transforming Stimulus controllers...');
+    const controllers = findControllers(APP_ROOT);
+    for (const c of controllers) {
+      if (c.file.endsWith('.rb')) {
+        const source = readFileSync(join(controllersDir, c.file), 'utf-8');
+        const result = await transformRuby(source, join(controllersDir, c.file), 'stimulus', config, APP_ROOT);
+        let code = fixImportsForEject(result.code, join(controllersDir, c.file));
+        const outFile = join(outDir, 'app/javascript/controllers', c.file.replace('.rb', '.js'));
+        writeFileSync(outFile, code);
+        fileCount++;
+      } else {
+        // Copy JS files as-is
+        const inFile = join(controllersDir, c.file);
+        const outFile = join(outDir, 'app/javascript/controllers', c.file);
+        copyFileSync(inFile, outFile);
+        fileCount++;
+      }
+    }
+  }
+
+  // Transform Rails controllers
+  const appControllersDir = join(APP_ROOT, 'app/controllers');
+  if (existsSync(appControllersDir)) {
+    console.log('  Transforming Rails controllers...');
+    const controllerFiles = readdirSync(appControllersDir)
+      .filter(f => f.endsWith('.rb') && !f.startsWith('._'));
+    for (const file of controllerFiles) {
+      const source = readFileSync(join(appControllersDir, file), 'utf-8');
+      const result = await transformRuby(source, join(appControllersDir, file), 'controllers', config, APP_ROOT);
+      let code = fixImportsForEject(result.code, join(appControllersDir, file));
+      const outFile = join(outDir, 'app/controllers', file.replace('.rb', '.js'));
+      writeFileSync(outFile, code);
+      fileCount++;
+    }
+  }
+
+  // Copy runtime library files
+  console.log('  Copying runtime libraries...');
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const libFiles = [
+    { src: 'rails_base.js', dest: 'lib/rails.js' },
+    { src: 'adapters/active_record.mjs', dest: 'lib/active_record.mjs' }
+  ];
+
+  for (const { src, dest } of libFiles) {
+    const srcPath = join(__dirname, src);
+    if (existsSync(srcPath)) {
+      const destPath = join(outDir, dest);
+      const destDir = dirname(destPath);
+      if (!existsSync(destDir)) {
+        mkdirSync(destDir, { recursive: true });
+      }
+      copyFileSync(srcPath, destPath);
+      fileCount++;
+    }
+  }
+
+  console.log(`\nEjected ${fileCount} files to ${relative(APP_ROOT, outDir) || outDir}/`);
+  console.log('\nThe ejected files are standalone JavaScript that can be used without Ruby2JS.');
+  console.log('You can modify these files directly and use standard JavaScript tooling.');
 }
 
 // ============================================
@@ -1683,6 +1933,7 @@ Commands:
   init      Initialize Juntos in a project
   dev       Start development server with hot reload
   build     Build for deployment
+  eject     Write transpiled JavaScript files to disk (for debugging/migration)
   test      Run tests with Vitest
   server    Start production server (requires prior build)
   deploy    Build and deploy to serverless platform
@@ -1774,6 +2025,24 @@ switch (command) {
       process.exit(0);
     }
     runBuild(options);
+    break;
+
+  case 'eject':
+    if (options.help) {
+      console.log('Usage: juntos eject [options]\n\nWrite transpiled JavaScript files to disk.\n');
+      console.log('This is useful for debugging or migrating away from Ruby source.\n');
+      console.log('Options:');
+      console.log('  --output, --out DIR      Output directory (default: ejected/)');
+      console.log('  -d, --database ADAPTER   Database adapter');
+      console.log('  -t, --target TARGET      Build target');
+      console.log('  --base PATH              Base public path');
+      process.exit(0);
+    }
+    runEject(options).catch(err => {
+      console.error('Eject failed:', err.message);
+      if (options.verbose) console.error(err.stack);
+      process.exit(1);
+    });
     break;
 
   case 'up':
