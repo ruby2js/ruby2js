@@ -2063,8 +2063,27 @@ function createVirtualPlugin(config, appRoot) {
     'rpc': 'active_record_rpc.mjs'  // RPC adapter for client-side model access
   };
 
+  // Map targets to Active Storage adapter file names
+  // Browser targets use IndexedDB, server targets use disk (development) or S3 (production)
+  const STORAGE_ADAPTER_MAP = {
+    'browser': 'active_storage_indexeddb.mjs',
+    'capacitor': 'active_storage_indexeddb.mjs',
+    'electron': 'active_storage_indexeddb.mjs',
+    'tauri': 'active_storage_indexeddb.mjs',
+    'pwa': 'active_storage_indexeddb.mjs',
+    'node': 'active_storage_disk.mjs',
+    'bun': 'active_storage_disk.mjs',
+    'deno': 'active_storage_disk.mjs',
+    'fly': 'active_storage_disk.mjs',  // TODO: use S3 in production
+    'cloudflare': 'active_storage_indexeddb.mjs',  // TODO: use R2
+    'vercel-edge': 'active_storage_indexeddb.mjs',
+    'vercel-node': 'active_storage_disk.mjs',
+    'deno-deploy': 'active_storage_indexeddb.mjs'
+  };
+
   const targetDir = TARGET_DIR_MAP[config.target] || 'browser';
   const adapterFile = ADAPTER_FILE_MAP[config.database] || 'active_record_dexie.mjs';
+  const storageAdapterFile = STORAGE_ADAPTER_MAP[config.target] || 'active_storage_indexeddb.mjs';
 
   // Load database config for injection
   const dbConfig = loadDatabaseConfig(appRoot, { quiet: true }) || {};
@@ -2133,6 +2152,10 @@ function createVirtualPlugin(config, appRoot) {
         return isClient ? '\0juntos:active-record:client' : '\0juntos:active-record';
       }
       if (id === 'juntos:active-record-client') return '\0juntos:active-record-client';
+      if (id === 'juntos:active-storage') {
+        const isClient = isClientBundlePath(importer);
+        return isClient ? '\0juntos:active-storage:client' : '\0juntos:active-storage';
+      }
       return null;
     },
 
@@ -2166,6 +2189,16 @@ export * from 'ruby2js-rails/adapters/${adapterFile}';
       if (id === '\0juntos:active-record-client') {
         // Legacy alias for RPC adapter
         return `export * from 'ruby2js-rails/adapters/active_record_rpc.mjs';`;
+      }
+
+      // Server version of juntos:active-storage
+      if (id === '\0juntos:active-storage') {
+        return `export * from 'ruby2js-rails/adapters/${storageAdapterFile}';`;
+      }
+
+      // Client version of juntos:active-storage - always use IndexedDB
+      if (id === '\0juntos:active-storage:client') {
+        return `export * from 'ruby2js-rails/adapters/active_storage_indexeddb.mjs';`;
       }
 
       return null;

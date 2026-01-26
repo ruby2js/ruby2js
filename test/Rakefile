@@ -18,7 +18,7 @@ ARTIFACTS = File.join(ROOT, 'artifacts')
 TARBALLS = File.join(ARTIFACTS, 'tarballs')
 
 # Demos that can be tested
-DEMOS = %w[blog chat notes photo_gallery workflow]
+DEMOS = %w[blog chat notes photo_gallery dictaphone workflow]
 
 # ============================================
 # Helper methods

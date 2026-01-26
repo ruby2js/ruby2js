@@ -141,6 +141,37 @@ jobs:
           path: artifacts/demo-photo-gallery.tar.gz
           retention-days: 7
 
+  create-dictaphone:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Rails
+        run: gem install rails
+
+      - name: Create dictaphone demo
+        run: |
+          test/dictaphone/create-dictaphone artifacts/dictaphone
+          tar --exclude='node_modules' -czf artifacts/demo-dictaphone.tar.gz -C artifacts dictaphone
+
+      - name: Upload dictaphone demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-dictaphone
+          path: artifacts/demo-dictaphone.tar.gz
+          retention-days: 7
+
   create-workflow:
     runs-on: ubuntu-latest
     steps:
@@ -405,12 +436,12 @@ jobs:
         run: node test/smoke-test.mjs artifacts/chat --database ${{ matrix.database }}
 
   integration-test:
-    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-astro-blog, create-ssg-blog]
+    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-dictaphone, create-astro-blog, create-ssg-blog]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        demo: [blog, chat, photo_gallery, astro_blog, ssg_blog]
+        demo: [blog, chat, photo_gallery, dictaphone, astro_blog, ssg_blog]
     steps:
       - uses: actions/checkout@v4
 
@@ -450,6 +481,7 @@ jobs:
           if [ "$TEST_FILE" = "blog" ]; then TEST_FILE="juntos-blog"; fi
           if [ "$TEST_FILE" = "chat" ]; then TEST_FILE="juntos-chat"; fi
           if [ "$TEST_FILE" = "photo-gallery" ]; then TEST_FILE="juntos-photo-gallery"; fi
+          if [ "$TEST_FILE" = "dictaphone" ]; then TEST_FILE="juntos-dictaphone"; fi
           npm test -- "./${TEST_FILE}.test.mjs"
 
   # ===========================================================================
@@ -457,7 +489,7 @@ jobs:
   # ===========================================================================
 
   build-site:
-    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow, create-notes, create-astro-blog, create-ssg-blog]
+    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-dictaphone, create-workflow, create-notes, create-astro-blog, create-ssg-blog]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -485,7 +517,7 @@ jobs:
 
       - name: Build browser demos
         run: |
-          for demo in blog chat photo_gallery workflow notes; do
+          for demo in blog chat photo_gallery dictaphone workflow notes; do
             echo "Building $demo for browser..."
             base_path="/ruby2js/${demo//_/-}/"
             # Initialize Juntos config (package.json, vite.config.js, bin/juntos)
@@ -497,6 +529,9 @@ jobs:
             # Demo-specific dependencies
             if [ "$demo" = "workflow" ]; then
               (cd "artifacts/$demo" && npm install reactflow)
+            fi
+            if [ "$demo" = "dictaphone" ]; then
+              (cd "artifacts/$demo" && npm install @xenova/transformers)
             fi
             # Build from demo root - pure JavaScript via Vite
             (cd "artifacts/$demo" && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
@@ -576,6 +611,7 @@ jobs:
                 <li><a href="demo-chat.tar.gz">demo-chat.tar.gz</a> - Chat demo (Turbo Streams)</li>
                 <li><a href="demo-notes.tar.gz">demo-notes.tar.gz</a> - Notes demo (JSON API)</li>
                 <li><a href="demo-photo-gallery.tar.gz">demo-photo-gallery.tar.gz</a> - Photo gallery demo</li>
+                <li><a href="demo-dictaphone.tar.gz">demo-dictaphone.tar.gz</a> - Dictaphone demo (Active Storage, Whisper)</li>
                 <li><a href="demo-workflow.tar.gz">demo-workflow.tar.gz</a> - Workflow builder demo</li>
               </ul>
             </div>
@@ -589,6 +625,7 @@ jobs:
           cp -r artifacts/chat/dist _site/chat
           cp -r artifacts/notes/dist _site/notes
           cp -r artifacts/photo_gallery/dist _site/photo-gallery
+          cp -r artifacts/dictaphone/dist _site/dictaphone
           cp -r artifacts/workflow/dist _site/workflow
           cp -r artifacts/astro-blog/dist _site/astro-blog
           cp -r artifacts/ssg-blog/_site _site/ssg-blog
@@ -657,6 +694,10 @@ jobs:
                 <p>Device APIs: camera, Capacitor, Electron.</p>
               </div>
               <div class="demo">
+                <h3><a href="dictaphone/">Dictaphone</a></h3>
+                <p>Active Storage, Whisper AI speech-to-text.</p>
+              </div>
+              <div class="demo">
                 <h3><a href="workflow/">Workflow Builder</a></h3>
                 <p>Third-party React libraries: React Flow.</p>
               </div>
@@ -684,7 +725,7 @@ jobs:
               // GitHub Pages SPA redirect for direct URL access
               // Detects which demo the path belongs to and redirects there
               const path = location.pathname;
-              const demos = ['ssg-blog', 'astro-blog', 'blog', 'chat', 'notes', 'photo-gallery', 'workflow'];
+              const demos = ['ssg-blog', 'astro-blog', 'blog', 'chat', 'notes', 'photo-gallery', 'dictaphone', 'workflow'];
               const base = '/ruby2js/';
 
               // Find which demo this path belongs to

@@ -57,6 +57,7 @@ module Ruby2JS
           @rails_callbacks = {}
           @rails_scopes = []
           @rails_broadcasts_to = []  # broadcasts_to declarations
+          @rails_attachments = []    # Active Storage attachments
           @rails_model_private_methods = {}
           @rails_model_refs = Set.new
           @in_callback_block = false  # Track when processing callback body
@@ -151,6 +152,16 @@ module Ruby2JS
             end
           end
 
+          # Check if model uses Active Storage (for hasOneAttached/hasManyAttached import)
+          if @rails_attachments.any?
+            active_storage_import = s(:send, nil, :import,
+              s(:array,
+                s(:const, nil, :hasOneAttached),
+                s(:const, nil, :hasManyAttached)),
+              s(:str, "juntos:active-storage"))
+            model_import_nodes.push(active_storage_import)
+          end
+
           # Add Model.renderPartial = render assignment so broadcast_replace_to
           # can use the partial at runtime when called from other models
           render_partial_assignment = nil
@@ -180,6 +191,7 @@ module Ruby2JS
           @rails_callbacks = {}
           @rails_scopes = []
           @rails_broadcasts_to = []
+          @rails_attachments = []
           @rails_model_private_methods = {}
           @rails_model_refs = Set.new
 
@@ -599,6 +611,10 @@ module Ruby2JS
               collect_association(:has_one, args) if method_name == :has_one
             when :belongs_to
               collect_association(:belongs_to, args)
+            when :has_one_attached
+              collect_attachment(:has_one_attached, args)
+            when :has_many_attached
+              collect_attachment(:has_many_attached, args)
             when :validates
               collect_validation(args)
             when :scope
@@ -609,6 +625,33 @@ module Ruby2JS
               collect_callback(method_name, args)
             end
           end
+        end
+
+        # Collect Active Storage attachments
+        def collect_attachment(type, args)
+          return if args.empty?
+
+          name = args.first.children[0] if args.first.type == :sym
+          return unless name
+
+          options = {}
+          args[1..-1].each do |arg|
+            next unless arg.type == :hash
+            arg.children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              if key.type == :sym
+                options[key.children[0]] = extract_value(value)
+              end
+            end
+          end
+
+          # Note: use push instead of << for JS compatibility
+          @rails_attachments.push({
+            type: type,
+            name: name,
+            options: options
+          })
         end
 
         def collect_association(type, args)
@@ -789,7 +832,7 @@ module Ruby2JS
             # Skip DSL declarations (already collected)
             if child.type == :send && child.children[0].nil?
               method = child.children[1]
-              next if %i[has_many has_one belongs_to validates scope broadcasts_to].include?(method)
+              next if %i[has_many has_one belongs_to validates scope broadcasts_to has_one_attached has_many_attached].include?(method)
               next if CALLBACKS.include?(method)
             end
 
@@ -834,6 +877,11 @@ module Ruby2JS
               s(:pair, s(:sym, assoc[:name]), s(:hash, *props))
             end
             transformed << s(:send, s(:self), :associations=, s(:hash, *assoc_pairs))
+          end
+
+          # Generate Active Storage attachment methods
+          @rails_attachments.each do |attachment|
+            transformed << generate_attachment_method(attachment)
           end
 
           # Generate destroy method if any dependent: :destroy associations
@@ -893,6 +941,32 @@ module Ruby2JS
             generate_has_one_method(assoc)
           when :belongs_to
             generate_belongs_to_method(assoc)
+          end
+        end
+
+        # Generate Active Storage attachment getter
+        # has_one_attached :audio -> get audio() { return hasOneAttached(this, 'audio') }
+        # has_many_attached :images -> get images() { return hasManyAttached(this, 'images') }
+        def generate_attachment_method(attachment)
+          name = attachment[:name]
+          type = attachment[:type]
+
+          if type == :has_one_attached
+            # get audio() { return hasOneAttached(this, 'audio') }
+            s(:defget, name,
+              s(:args),
+              s(:autoreturn,
+                s(:send, nil, :hasOneAttached,
+                  s(:self),
+                  s(:str, name.to_s))))
+          else
+            # get images() { return hasManyAttached(this, 'images') }
+            s(:defget, name,
+              s(:args),
+              s(:autoreturn,
+                s(:send, nil, :hasManyAttached,
+                  s(:self),
+                  s(:str, name.to_s))))
           end
         end
 
