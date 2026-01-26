@@ -751,7 +751,7 @@ function createStructurePlugin(config, appRoot) {
       console.log(`[juntos] Watching source files in ${appRoot}`);
     },
 
-    // For server builds, symlink node_modules for runtime resolution
+    // For server builds, symlink node_modules and copy CSS for runtime resolution
     async closeBundle() {
       if (!isServerTarget(config.target)) return;
 
@@ -765,6 +765,16 @@ function createStructurePlugin(config, appRoot) {
         console.log('[juntos] Linked node_modules to dist/');
       } catch (e) {
         console.warn('[juntos] Could not create node_modules symlink:', e.message);
+      }
+
+      // Copy CSS files for server-side rendering
+      // Check for Rails' pre-built tailwind.css
+      const tailwindSrc = path.join(appRoot, 'app/assets/builds/tailwind.css');
+      if (fs.existsSync(tailwindSrc)) {
+        const assetsDir = path.join(distDir, 'assets');
+        await fs.promises.mkdir(assetsDir, { recursive: true });
+        await fs.promises.copyFile(tailwindSrc, path.join(assetsDir, 'tailwind.css'));
+        console.log('[juntos] Copied tailwind.css to dist/assets/');
       }
     }
   };

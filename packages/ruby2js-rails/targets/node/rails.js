@@ -71,23 +71,30 @@ export class Router extends RouterServer {
       return false;
     }
 
-    try {
-      const content = await readFile(join(process.cwd(), path));
-      res.writeHead(200, { 'Content-Type': contentType });
-      res.end(content);
-      return true;
-    } catch (err) {
-      // Try public/ subdirectory (Rails convention for static assets)
+    // Try multiple locations for static files:
+    // 1. dist/ directory (server runs from project root, assets in dist/)
+    // 2. Current directory (when running directly from dist/)
+    // 3. public/ subdirectory (Rails convention)
+    const searchPaths = [
+      join(process.cwd(), 'dist', path),
+      join(process.cwd(), path),
+      join(process.cwd(), 'dist', 'public', path),
+      join(process.cwd(), 'public', path)
+    ];
+
+    for (const filePath of searchPaths) {
       try {
-        const content = await readFile(join(process.cwd(), 'public', path));
+        const content = await readFile(filePath);
         res.writeHead(200, { 'Content-Type': contentType });
         res.end(content);
         return true;
       } catch {
-        // File not found, let routing handle it
-        return false;
+        // Continue to next path
       }
     }
+
+    // File not found in any location
+    return false;
   }
 
   // Create context from Node.js request

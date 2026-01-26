@@ -33,13 +33,26 @@ export class Router extends RouterServer {
   static async dispatch(req) {
     const fileInfo = this.getStaticFileInfo(req);
     if (fileInfo) {
-      try {
-        const content = await Deno.readFile(join(Deno.cwd(), fileInfo.path));
-        return new Response(content, {
-          headers: { 'Content-Type': fileInfo.contentType }
-        });
-      } catch (err) {
-        // File not found, fall through to routing
+      // Try multiple locations for static files:
+      // 1. dist/ directory (server runs from project root, assets in dist/)
+      // 2. Current directory (when running directly from dist/)
+      // 3. public/ subdirectory (Rails convention)
+      const searchPaths = [
+        join(Deno.cwd(), 'dist', fileInfo.path),
+        join(Deno.cwd(), fileInfo.path),
+        join(Deno.cwd(), 'dist', 'public', fileInfo.path),
+        join(Deno.cwd(), 'public', fileInfo.path)
+      ];
+
+      for (const filePath of searchPaths) {
+        try {
+          const content = await Deno.readFile(filePath);
+          return new Response(content, {
+            headers: { 'Content-Type': fileInfo.contentType }
+          });
+        } catch {
+          // Continue to next path
+        }
       }
     }
     return super.dispatch(req);

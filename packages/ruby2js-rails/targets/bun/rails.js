@@ -33,15 +33,28 @@ export class Router extends RouterServer {
   static async dispatch(req) {
     const fileInfo = this.getStaticFileInfo(req);
     if (fileInfo) {
-      try {
-        const file = Bun.file(join(process.cwd(), fileInfo.path));
-        if (await file.exists()) {
-          return new Response(file, {
-            headers: { 'Content-Type': fileInfo.contentType }
-          });
+      // Try multiple locations for static files:
+      // 1. dist/ directory (server runs from project root, assets in dist/)
+      // 2. Current directory (when running directly from dist/)
+      // 3. public/ subdirectory (Rails convention)
+      const searchPaths = [
+        join(process.cwd(), 'dist', fileInfo.path),
+        join(process.cwd(), fileInfo.path),
+        join(process.cwd(), 'dist', 'public', fileInfo.path),
+        join(process.cwd(), 'public', fileInfo.path)
+      ];
+
+      for (const filePath of searchPaths) {
+        try {
+          const file = Bun.file(filePath);
+          if (await file.exists()) {
+            return new Response(file, {
+              headers: { 'Content-Type': fileInfo.contentType }
+            });
+          }
+        } catch {
+          // Continue to next path
         }
-      } catch (err) {
-        // File not found, fall through to routing
       }
     }
     return super.dispatch(req);

@@ -208,9 +208,10 @@ module Ruby2JS
             return s(:str, '')
           end
 
-          # Handle stylesheet_link_tag - stub for demo
+          # Handle stylesheet_link_tag - output link to tailwind.css
+          # The vite plugin copies app/assets/builds/tailwind.css to dist/assets/
           if method == :stylesheet_link_tag && target.nil?
-            return s(:str, '')
+            return s(:str, '<link rel="stylesheet" href="/assets/tailwind.css">')
           end
 
           # Handle javascript_importmap_tags - stub for demo
