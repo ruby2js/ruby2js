@@ -246,9 +246,8 @@ function createJsxRbPlugin(config) {
 
       try {
         const result = convert(code, {
-          filters: ['React', 'Functions', 'ESM', 'Return'],
+          ...getBuildOptions('jsx', config.target),
           eslevel: config.eslevel,
-          autoexports: 'default',
           file: id
         });
 
