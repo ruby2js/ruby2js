@@ -31,7 +31,8 @@ else
 fi
 
 # Create Astro project (minimal template, no git, skip prompts)
-npm create astro@latest "$APP_NAME" -- --template minimal --no-git --skip-houston --yes
+# Use Astro 6 beta which supports Vite 7
+npm create astro@6.0.0-beta.3 "$APP_NAME" -- --template minimal --no-git --skip-houston --yes
 
 cd "$APP_DIR"
 
