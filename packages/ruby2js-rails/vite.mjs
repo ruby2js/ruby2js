@@ -1396,12 +1396,15 @@ function generateClientEntryForHydration(appRoot, config) {
 //
 // This file runs in the browser to hydrate server-rendered React content.
 // The virtual module plugin automatically uses browser runtime for imports
-// from .client/ paths, so juntos:rails resolves to browser/rails.js.
+// from .client/ paths.
 
-// Import routes - this registers routes with the Router
-// Since this import originates from .client/, juntos:rails will resolve
-// to the browser runtime, giving us client-side Router and Application.
-import { Router, Application } from '../config/routes.rb';
+// Import Router and Application from browser runtime directly
+// (routes.rb doesn't export Router, only Application and path helpers)
+import { Router, Application } from 'ruby2js-rails/targets/browser/rails.js';
+
+// Import routes to register them with the Router
+// This also imports controllers and views
+import '../config/routes.rb';
 
 // Hydrate when DOM is ready
 if (document.readyState === 'loading') {
@@ -1646,12 +1649,20 @@ function createVirtualPlugin(config, appRoot) {
   const clientModulePaths = new Set();
 
   // Helper to check if a path is part of the client bundle
+  // Layouts and server-only files should always use server runtime
   function isClientBundlePath(filePath) {
     if (!filePath) return false;
+
+    // Layouts are server-side only - never use client runtime
+    // They use server-only helpers like stylesheetLinkTag, getAssetPath, etc.
+    if (filePath.includes('/layouts/') || filePath.includes('\\layouts\\')) return false;
+
     // Direct .client/ path
     if (filePath.includes('/.client/') || filePath.includes('\\.client\\')) return true;
+
     // Already tracked as part of client bundle
     if (clientModulePaths.has(filePath)) return true;
+
     return false;
   }
 
@@ -1662,18 +1673,25 @@ function createVirtualPlugin(config, appRoot) {
     // Track modules imported from .client/ entry
     resolveId(id, importer) {
       // Track client bundle module paths for transitive imports
+      // But exclude server-only modules like layouts
       if (importer && isClientBundlePath(importer)) {
         // This module is being imported from the client bundle
         // Track it so we can use browser runtime for its imports too
         if (id.startsWith('.')) {
           // Relative path - resolve to absolute
           const resolvedPath = path.resolve(path.dirname(importer), id);
-          clientModulePaths.add(resolvedPath);
+          // Don't track layouts - they're server-only
+          if (!resolvedPath.includes('/layouts/') && !resolvedPath.includes('\\layouts\\')) {
+            clientModulePaths.add(resolvedPath);
+          }
         } else if (!id.startsWith('\0') && !id.includes(':')) {
           // Non-virtual, non-relative - could be a source file
           const absPath = path.join(appRoot, id);
-          if (fs.existsSync(absPath)) {
-            clientModulePaths.add(absPath);
+          // Don't track layouts
+          if (!absPath.includes('/layouts/') && !absPath.includes('\\layouts\\')) {
+            if (fs.existsSync(absPath)) {
+              clientModulePaths.add(absPath);
+            }
           }
         }
       }
