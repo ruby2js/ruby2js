@@ -145,9 +145,14 @@ task :integration, [:demo] do |t, args|
     # Run tests
     puts "\nRunning tests..."
     # Test files use hyphens to avoid vitest substring matching
-    # blog -> juntos-blog (to avoid matching astro-blog, ssg-blog)
+    # Some demos use juntos- prefix to avoid matching similarly named demos
     test_name = demo.tr('_', '-')
-    test_name = 'juntos-blog' if test_name == 'blog'
+    case test_name
+    when 'blog' then test_name = 'juntos-blog'
+    when 'chat' then test_name = 'juntos-chat'
+    when 'photo-gallery' then test_name = 'juntos-photo-gallery'
+    when 'dictaphone' then test_name = 'juntos-dictaphone'
+    end
     test_file = "./#{test_name}.test.mjs"
 
     unless File.exist?(test_file)

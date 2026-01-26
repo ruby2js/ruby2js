@@ -119,6 +119,7 @@ export class DiskStorage extends StorageService {
   }
 
   // Retrieve data by key
+  // Returns a Blob for API consistency with IndexedDB adapter
   async download(key) {
     await this.initialize();
 
@@ -126,7 +127,8 @@ export class DiskStorage extends StorageService {
 
     try {
       const buffer = await fs.readFile(filePath);
-      return buffer;
+      // Wrap in Blob for consistent API across adapters
+      return new Blob([buffer]);
     } catch (e) {
       if (e.code === 'ENOENT') return null;
       throw e;
