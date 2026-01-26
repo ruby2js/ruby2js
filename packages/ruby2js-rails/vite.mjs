@@ -1633,29 +1633,32 @@ async function init() {
   const props = propsEl ? JSON.parse(propsEl.textContent) : {};
   console.log('[juntos] Server props:', props);
 
-  // Find the content element to hydrate
-  const content = document.getElementById('content');
-  if (!content) {
-    console.warn('[juntos] No #content element found for hydration');
+  // Find elements marked for hydration by the server
+  // Server wraps React content in <div data-juntos-view="/path">
+  const hydrationTargets = document.querySelectorAll('[data-juntos-view]');
+  if (hydrationTargets.length === 0) {
+    console.log('[juntos] No hydration targets found (no React views on this page)');
     return;
   }
 
-  // Match current path to a view
-  const path = window.location.pathname;
-  const { view: ViewComponent, params } = matchRoute(path, views);
+  // Hydrate each target
+  for (const target of hydrationTargets) {
+    const path = target.getAttribute('data-juntos-view');
+    const { view: ViewComponent, params } = matchRoute(path, views);
 
-  if (ViewComponent) {
-    console.log('[juntos] Hydrating view for path:', path);
-    try {
-      // Merge route params with server props
-      const viewProps = { ...props, ...params };
-      hydrateRoot(content, React.createElement(ViewComponent, viewProps));
-      console.log('[juntos] Hydration complete');
-    } catch (err) {
-      console.error('[juntos] Hydration error:', err);
+    if (ViewComponent) {
+      console.log('[juntos] Hydrating view for path:', path);
+      try {
+        // Merge route params with server props
+        const viewProps = { ...props, ...params };
+        hydrateRoot(target, React.createElement(ViewComponent, viewProps));
+        console.log('[juntos] Hydration complete for:', path);
+      } catch (err) {
+        console.error('[juntos] Hydration error for', path, ':', err);
+      }
+    } else {
+      console.log('[juntos] No matching view for path:', path, '- skipping hydration');
     }
-  } else {
-    console.log('[juntos] No matching view for path:', path, '- skipping hydration');
   }
 
   // Set up form handlers for Turbo-style form submission

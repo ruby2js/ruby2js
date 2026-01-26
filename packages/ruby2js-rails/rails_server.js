@@ -94,7 +94,10 @@ async function getReactDOMServer() {
 // Resolve view content to HTML string
 // Handles: strings, Promises, and React elements
 // Exported for use by target-specific htmlResponse overrides
-export async function resolveContent(content) {
+//
+// When hydrationPath is provided and content is a React element,
+// wraps the output in <div data-juntos-view="/path"> for client hydration.
+export async function resolveContent(content, hydrationPath = null) {
   // Await if content is a promise (async ERB or async React component)
   const resolved = await Promise.resolve(content);
 
@@ -104,7 +107,13 @@ export async function resolveContent(content) {
   } else {
     // React element - render to string
     const ReactDOMServer = await getReactDOMServer();
-    return ReactDOMServer.renderToString(resolved);
+    const html = ReactDOMServer.renderToString(resolved);
+
+    // Wrap in hydration marker if path provided (for client-side hydration)
+    if (hydrationPath) {
+      return `<div data-juntos-view="${hydrationPath}">${html}</div>`;
+    }
+    return html;
   }
 }
 
