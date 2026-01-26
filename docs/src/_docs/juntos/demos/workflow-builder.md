@@ -241,6 +241,49 @@ The key insight: React Context handles subscription management, while the provid
 
 Use Turbo Streams for ERB views. Use JSON broadcasting for React components.
 
+## Dual Bundle Mode (Server Targets)
+
+When building for server targets (node, bun, etc.), this demo automatically enables **dual bundle mode** because the view imports models directly:
+
+```ruby
+# app/views/workflows/Show.jsx.rb
+import [Node], from: 'app/models/node.rb'
+import [Edge], from: 'app/models/edge.rb'
+```
+
+These imports trigger RPC detection, which generates two bundles:
+
+| Bundle | Purpose | Contents |
+|--------|---------|----------|
+| `index.js` | Server (SSR + API) | Full app, server database adapter, excludes `# Pragma: browser` imports |
+| `client.js` | Browser (Hydration) | Routes + views, RPC adapter, includes browser-only imports |
+
+### How It Works
+
+1. **Server renders HTML** — React components render server-side, but `# Pragma: browser` imports (React Flow) are excluded
+2. **Placeholder renders** — The `unless defined?(ReactFlow)` block renders on the server
+3. **Client hydrates** — Browser loads `client.js`, hydrates the React tree
+4. **React Flow loads** — Browser-only imports load, replacing the placeholder
+
+The `unless defined?(ReactFlow)` pattern works naturally with this:
+
+```ruby
+# Server: ReactFlow is undefined, renders placeholder
+# Client: ReactFlow loads, renders canvas
+unless defined?(ReactFlow)
+  return %x{<div>Workflow canvas requires browser environment</div>}
+end
+```
+
+### Automatic Detection
+
+You don't need to configure dual bundle mode. It activates automatically when JSX views (`*.jsx.rb`) import from:
+
+- `app/models/*.rb` — Active Record models (RPC)
+- `config/routes.rb` — Path helpers (RPC)
+
+If your views only use path helpers (like the [Notes demo](/docs/juntos/demos/notes)), dual bundle mode is not triggered—path helpers work via HTTP fetch instead.
+
 ## Multi-Target Support
 
 The `JsonStreamProvider` automatically selects the right transport:
