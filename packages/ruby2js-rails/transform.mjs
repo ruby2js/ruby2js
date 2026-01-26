@@ -244,16 +244,69 @@ export function fixImports(js, fromFile) {
 }
 
 /**
+ * Fix imports in test files for ejected code.
+ * Rewrites virtual module imports to concrete paths.
+ */
+export function fixTestImportsForEject(js) {
+  // Virtual modules → concrete paths
+  js = js.replace(/from ['"]juntos:models['"]/g, "from '../app/models/index.js'");
+  js = js.replace(/await import\(['"]juntos:models['"]\)/g, "await import('../app/models/index.js')");
+
+  js = js.replace(/from ['"]juntos:rails['"]/g, "from 'ruby2js-rails/rails_base.js'");
+  js = js.replace(/await import\(['"]juntos:rails['"]\)/g, "await import('ruby2js-rails/rails_base.js')");
+
+  js = js.replace(/from ['"]juntos:migrations['"]/g, "from '../db/migrate/index.js'");
+  js = js.replace(/await import\(['"]juntos:migrations['"]\)/g, "await import('../db/migrate/index.js')");
+
+  js = js.replace(/from ['"]juntos:active-record['"]/g, "from 'ruby2js-rails/adapters/active_record.mjs'");
+  js = js.replace(/await import\(['"]juntos:active-record['"]\)/g, "await import('ruby2js-rails/adapters/active_record.mjs')");
+
+  // Controller imports: .rb → .js
+  js = js.replace(/from ['"]\.\.\/app\/controllers\/(\w+)\.rb['"]/g, "from '../app/controllers/$1.js'");
+  js = js.replace(/await import\(['"]\.\.\/app\/controllers\/(\w+)\.rb['"]\)/g, "await import('../app/controllers/$1.js')");
+
+  return js;
+}
+
+/**
  * Fix imports for ejected code - rewrites to use ruby2js-rails package.
  * Ejected code depends on the juntos runtime, not copied local files.
+ * @param {string} js - The JavaScript code to fix
+ * @param {string} fromFile - Relative output path of the file (e.g., 'app/models/article.js')
+ * @param {object} config - Configuration with target/database info
  */
-export function fixImportsForEject(js, fromFile) {
-  // Runtime modules → ruby2js-rails package
-  js = js.replace(/from ['"]\.\.\/lib\/rails\.js['"]/g, "from 'ruby2js-rails/rails_base.js'");
-  js = js.replace(/from ['"]\.\.\/\.\.\/lib\/rails\.js['"]/g, "from 'ruby2js-rails/rails_base.js'");
-  js = js.replace(/from ['"]\.\.\/\.\.\/\.\.\/lib\/rails\.js['"]/g, "from 'ruby2js-rails/rails_base.js'");
+export function fixImportsForEject(js, fromFile, config = {}) {
+  // Determine the target runtime based on config
+  // Default to 'node' for sqlite3/better_sqlite3, 'browser' for dexie
+  let target = config.target || 'node';
+  if (!config.target && config.database === 'dexie') {
+    target = 'browser';
+  }
+
+  const railsModule = `ruby2js-rails/targets/${target}/rails.js`;
+
+  // Runtime modules → target-specific rails.js
+  js = js.replace(/from ['"]\.\.\/lib\/rails\.js['"]/g, `from '${railsModule}'`);
+  js = js.replace(/from ['"]\.\.\/\.\.\/lib\/rails\.js['"]/g, `from '${railsModule}'`);
+  js = js.replace(/from ['"]\.\.\/\.\.\/\.\.\/lib\/rails\.js['"]/g, `from '${railsModule}'`);
+  js = js.replace(/from ['"]lib\/rails\.js['"]/g, `from '${railsModule}'`);
+  js = js.replace(/from ['"]ruby2js-rails\/rails_base\.js['"]/g, `from '${railsModule}'`);
   js = js.replace(/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, "from 'ruby2js-rails/adapters/active_record.mjs'");
   js = js.replace(/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, "from 'ruby2js-rails/adapters/active_record.mjs'");
+
+  // Virtual module @config/paths.js → config/routes.js with correct relative path
+  if (fromFile) {
+    // Calculate relative path from the file to config/routes.js
+    const depth = fromFile.split('/').length - 1;
+    const prefix = '../'.repeat(depth);
+    js = js.replace(/from ['"]@config\/paths\.js['"]/g, `from '${prefix}config/routes.js'`);
+  } else {
+    // Fallback: assume we're one level deep
+    js = js.replace(/from ['"]@config\/paths\.js['"]/g, "from '../config/routes.js'");
+  }
+
+  // Also handle relative paths to config/paths.js → config/routes.js
+  js = js.replace(/config\/paths\.js/g, 'config/routes.js');
 
   // ApplicationRecord → local file (generated separately)
   js = js.replace(/from ['"]\.\/application_record\.js['"]/g, "from './application_record.js'");
@@ -297,8 +350,17 @@ export { ${classNames.join(', ')} };
  * Generate content for juntos:models for ejected output.
  * Uses ruby2js-rails package for runtime, local paths for app code.
  */
-export function generateModelsModuleForEject(appRoot) {
+export function generateModelsModuleForEject(appRoot, config = {}) {
   const models = findModels(appRoot);
+  const adapterFile = getActiveRecordAdapterFile(config.database);
+
+  // Determine target for importing Application
+  let target = config.target || 'node';
+  if (!config.target && config.database === 'dexie') {
+    target = 'browser';
+  }
+  const railsModule = `ruby2js-rails/targets/${target}/rails.js`;
+
   const imports = models.map(m => {
     const className = m.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('');
     return `import { ${className} } from './${m}.js';`;
@@ -307,8 +369,8 @@ export function generateModelsModuleForEject(appRoot) {
     m.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('')
   );
   return `${imports.join('\n')}
-import { Application } from 'ruby2js-rails/rails_base.js';
-import { modelRegistry } from 'ruby2js-rails/adapters/active_record.mjs';
+import { Application } from '${railsModule}';
+import { modelRegistry } from 'ruby2js-rails/adapters/${adapterFile}';
 const models = { ${classNames.join(', ')} };
 Application.registerModels(models);
 Object.assign(modelRegistry, models);
@@ -320,8 +382,9 @@ export { ${classNames.join(', ')} };
  * Generate application_record.js for ejected output.
  * This provides the base class for all models.
  */
-export function generateApplicationRecordForEject() {
-  return `import { ApplicationRecord as Base, CollectionProxy } from 'ruby2js-rails/adapters/active_record.mjs';
+export function generateApplicationRecordForEject(config = {}) {
+  const adapterFile = getActiveRecordAdapterFile(config.database);
+  return `import { ActiveRecord as Base, CollectionProxy } from 'ruby2js-rails/adapters/${adapterFile}';
 
 export class ApplicationRecord extends Base {
   static primaryAbstractClass = true;
@@ -334,24 +397,191 @@ export { CollectionProxy };
 /**
  * Generate package.json for ejected output.
  */
-export function generatePackageJsonForEject(appName) {
-  return JSON.stringify({
+export function generatePackageJsonForEject(appName, config = {}) {
+  const RELEASES_BASE = 'https://ruby2js.github.io/ruby2js/releases';
+
+  const pkg = {
     name: appName,
     type: 'module',
     scripts: {
       dev: 'vite',
       build: 'vite build',
-      preview: 'vite preview'
+      preview: 'vite preview',
+      test: 'vitest run',
+      start: 'node main.js'
     },
     dependencies: {
-      'ruby2js-rails': '*',
+      'ruby2js': `${RELEASES_BASE}/ruby2js-beta.tgz`,
+      'ruby2js-rails': `${RELEASES_BASE}/ruby2js-rails-beta.tgz`,
       'react': '^18.0.0',
       'react-dom': '^18.0.0'
     },
     devDependencies: {
-      'vite': '^6.0.0'
+      'vite': '^6.0.0',
+      'vitest': '^2.0.0'
     }
-  }, null, 2) + '\n';
+  };
+
+  // Add database adapter dependency based on config
+  if (config.database === 'sqlite3' || config.database === 'sqlite' || config.database === 'better_sqlite3') {
+    pkg.dependencies['better-sqlite3'] = '^11.10.0';
+  } else if (config.database === 'dexie') {
+    pkg.dependencies['dexie'] = '^4.0.0';
+  }
+
+  return JSON.stringify(pkg, null, 2) + '\n';
+}
+
+/**
+ * Generate test/setup.mjs for ejected output.
+ */
+export function generateTestSetupForEject(config = {}) {
+  const adapterFile = getActiveRecordAdapterFile(config.database);
+
+  // Determine target for importing Application
+  let target = config.target || 'node';
+  if (!config.target && config.database === 'dexie') {
+    target = 'browser';
+  }
+  const railsModule = `ruby2js-rails/targets/${target}/rails.js`;
+
+  return `// Test setup for Vitest - ejected version
+import { beforeAll, beforeEach } from 'vitest';
+
+beforeAll(async () => {
+  // Import models (registers them with Application and modelRegistry)
+  await import('../app/models/index.js');
+
+  // Configure migrations
+  const { Application } = await import('${railsModule}');
+  const { migrations } = await import('../db/migrate/index.js');
+  Application.configure({ migrations });
+});
+
+beforeEach(async () => {
+  // Fresh in-memory database for each test
+  const activeRecord = await import('ruby2js-rails/adapters/${adapterFile}');
+  await activeRecord.initDatabase({ database: ':memory:' });
+
+  const { Application } = await import('${railsModule}');
+  await Application.runMigrations(activeRecord);
+});
+`;
+}
+
+/**
+ * Get the active record adapter filename for a database.
+ */
+function getActiveRecordAdapterFile(database) {
+  const adapterMap = {
+    'sqlite': 'active_record_better_sqlite3.mjs',
+    'sqlite3': 'active_record_better_sqlite3.mjs',
+    'better_sqlite3': 'active_record_better_sqlite3.mjs',
+    'dexie': 'active_record_dexie.mjs',
+    'pg': 'active_record_pg.mjs',
+    'postgres': 'active_record_pg.mjs',
+    'neon': 'active_record_neon.mjs',
+    'd1': 'active_record_d1.mjs',
+    'turso': 'active_record_turso.mjs',
+    'pglite': 'active_record_pglite.mjs',
+    'sqljs': 'active_record_sqljs.mjs',
+    'mysql': 'active_record_mysql2.mjs',
+    'mysql2': 'active_record_mysql2.mjs'
+  };
+  return adapterMap[database] || 'active_record_dexie.mjs';
+}
+
+/**
+ * Generate main.js entry point for ejected Node.js server.
+ */
+export function generateMainJsForEject(config = {}) {
+  const adapterFile = getActiveRecordAdapterFile(config.database);
+  const dbConfig = config.database === 'sqlite' || config.database === 'sqlite3' || config.database === 'better_sqlite3'
+    ? `{ adapter: 'better_sqlite3', database: './db/development.sqlite3' }`
+    : `{ adapter: '${config.database || 'dexie'}', database: 'app_dev' }`;
+
+  // Determine target for importing Application
+  let target = config.target || 'node';
+  if (!config.target && config.database === 'dexie') {
+    target = 'browser';
+  }
+  const railsModule = `ruby2js-rails/targets/${target}/rails.js`;
+
+  return `// Main entry point for ejected Node.js server
+import { Application, Router } from '${railsModule}';
+import * as activeRecord from 'ruby2js-rails/adapters/${adapterFile}';
+
+// Import models (registers them)
+import './app/models/index.js';
+
+// Import migrations and seeds
+import { migrations } from './db/migrate/index.js';
+import { Seeds } from './db/seeds.js';
+
+// Import routes (sets up the router)
+import './config/routes.js';
+
+async function main() {
+  // Configure application
+  Application.configure({ migrations });
+
+  // Initialize database
+  console.log('Initializing database...');
+  await activeRecord.initDatabase(${dbConfig});
+
+  // Run migrations
+  console.log('Running migrations...');
+  await Application.runMigrations(activeRecord);
+
+  // Run seeds if database is fresh
+  if (Seeds && typeof Seeds.run === 'function') {
+    console.log('Running seeds...');
+    await Seeds.run();
+  }
+
+  // Start server
+  const port = process.env.PORT || 3000;
+  console.log(\`Starting server on http://localhost:\${port}\`);
+
+  // Create HTTP server with Router dispatch
+  const { createServer } = await import('http');
+  const server = createServer(async (req, res) => {
+    await Router.dispatch(req, res);
+  });
+
+  server.listen(port);
+}
+
+main().catch(console.error);
+`;
+}
+
+/**
+ * Generate vitest.config.js for ejected output.
+ */
+export function generateVitestConfigForEject(config = {}) {
+  const externals = [];
+
+  // Native modules need to be externalized
+  if (config.database === 'sqlite3') {
+    externals.push('better-sqlite3');
+  }
+
+  const externalConfig = externals.length > 0
+    ? `\n  server: {\n    deps: {\n      external: ${JSON.stringify(externals)}\n    }\n  },`
+    : '';
+
+  return `import { defineConfig } from 'vitest/config';
+
+export default defineConfig({${externalConfig}
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
+    setupFiles: ['./test/setup.mjs']
+  }
+});
+`;
 }
 
 /**

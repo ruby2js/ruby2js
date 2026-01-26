@@ -31,11 +31,15 @@ import {
   generateApplicationRecordForEject,
   generatePackageJsonForEject,
   generateViteConfigForEject,
+  generateTestSetupForEject,
+  generateMainJsForEject,
+  generateVitestConfigForEject,
   ensureRuby2jsReady,
   transformRuby,
   transformErb,
   transformJsxRb,
-  fixImportsForEject
+  fixImportsForEject,
+  fixTestImportsForEject
 } from './transform.mjs';
 
 // Try to load js-yaml, fall back to naive parsing if not available
@@ -656,9 +660,26 @@ async function runEject(options) {
   applyEnvOptions(options);
 
   const outDir = options.outDir || join(APP_ROOT, 'ejected');
+
+  // Determine database (command line takes precedence over config file)
+  const database = options.database || 'dexie';
+
+  // Determine target: explicit option > infer from database > default to browser
+  let target = options.target;
+  if (!target) {
+    // Infer target from database type
+    if (database === 'dexie') {
+      target = 'browser';
+    } else if (['sqlite3', 'sqlite', 'better_sqlite3'].includes(database)) {
+      target = 'node';
+    } else {
+      target = 'browser';
+    }
+  }
+
   const config = {
-    target: options.target || 'browser',
-    database: options.database || 'dexie',
+    target,
+    database,
     base: options.base || '/',
     eslevel: 2022
   };
@@ -696,14 +717,16 @@ async function runEject(options) {
     for (const file of modelFiles) {
       const source = readFileSync(join(modelsDir, file), 'utf-8');
       const result = await transformRuby(source, join(modelsDir, file), null, config, APP_ROOT);
-      let code = fixImportsForEject(result.code, join(modelsDir, file));
+      // Pass relative output path for correct import resolution
+      const relativeOutPath = `app/models/${file.replace('.rb', '.js')}`;
+      let code = fixImportsForEject(result.code, relativeOutPath, config);
       const outFile = join(outDir, 'app/models', file.replace('.rb', '.js'));
       writeFileSync(outFile, code);
       fileCount++;
     }
 
     // Generate models index
-    const modelsIndex = generateModelsModuleForEject(APP_ROOT);
+    const modelsIndex = generateModelsModuleForEject(APP_ROOT, config);
     writeFileSync(join(outDir, 'app/models/index.js'), modelsIndex);
     fileCount++;
   }
@@ -716,7 +739,9 @@ async function runEject(options) {
     for (const m of migrations) {
       const source = readFileSync(join(migrateDir, m.file), 'utf-8');
       const result = await transformRuby(source, join(migrateDir, m.file), null, config, APP_ROOT);
-      let code = fixImportsForEject(result.code, join(migrateDir, m.file));
+      // Pass relative output path for correct import resolution
+      const relativeOutPath = `db/migrate/${m.name}.js`;
+      let code = fixImportsForEject(result.code, relativeOutPath, config);
       const outFile = join(outDir, 'db/migrate', m.name + '.js');
       writeFileSync(outFile, code);
       fileCount++;
@@ -734,7 +759,8 @@ async function runEject(options) {
     console.log('  Transforming seeds...');
     const source = readFileSync(seedsFile, 'utf-8');
     const result = await transformRuby(source, seedsFile, null, config, APP_ROOT);
-    let code = fixImportsForEject(result.code, seedsFile);
+    // Pass relative output path for correct import resolution
+    let code = fixImportsForEject(result.code, 'db/seeds.js', config);
     writeFileSync(join(outDir, 'db/seeds.js'), code);
     fileCount++;
   }
@@ -745,7 +771,8 @@ async function runEject(options) {
     console.log('  Transforming routes...');
     const source = readFileSync(routesFile, 'utf-8');
     const result = await transformRuby(source, routesFile, null, config, APP_ROOT);
-    let code = fixImportsForEject(result.code, routesFile);
+    // Pass relative output path for correct import resolution
+    let code = fixImportsForEject(result.code, 'config/routes.js', config);
     writeFileSync(join(outDir, 'config/routes.js'), code);
     fileCount++;
   }
@@ -769,8 +796,11 @@ async function runEject(options) {
       for (const file of files.filter(f => f.endsWith('.html.erb') && !f.startsWith('._'))) {
         const source = readFileSync(join(resourceDir, file), 'utf-8');
         const result = await transformErb(source, join(resourceDir, file), false, config);
+        // Pass relative output path for correct import resolution
+        const relativeOutPath = `app/views/${resource}/${file.replace('.html.erb', '.js')}`;
+        let code = fixImportsForEject(result.code, relativeOutPath, config);
         const outFile = join(outResourceDir, file.replace('.html.erb', '.js'));
-        writeFileSync(outFile, result.code);
+        writeFileSync(outFile, code);
         fileCount++;
       }
 
@@ -778,7 +808,9 @@ async function runEject(options) {
       for (const file of files.filter(f => f.endsWith('.jsx.rb') && !f.startsWith('._'))) {
         const source = readFileSync(join(resourceDir, file), 'utf-8');
         const result = await transformJsxRb(source, join(resourceDir, file), config);
-        let code = fixImportsForEject(result.code, join(resourceDir, file));
+        // Pass relative output path for correct import resolution
+        const relativeOutPath = `app/views/${resource}/${file.replace('.jsx.rb', '.js')}`;
+        let code = fixImportsForEject(result.code, relativeOutPath, config);
         const outFile = join(outResourceDir, file.replace('.jsx.rb', '.js'));
         writeFileSync(outFile, code);
         fileCount++;
@@ -799,8 +831,11 @@ async function runEject(options) {
       for (const file of layoutFiles) {
         const source = readFileSync(join(layoutsDir, file), 'utf-8');
         const result = await transformErb(source, join(layoutsDir, file), true, config);
+        // Pass relative output path for correct import resolution
+        const relativeOutPath = `app/views/layouts/${file.replace('.html.erb', '.js')}`;
+        let code = fixImportsForEject(result.code, relativeOutPath, config);
         const outFile = join(outDir, 'app/views/layouts', file.replace('.html.erb', '.js'));
-        writeFileSync(outFile, result.code);
+        writeFileSync(outFile, code);
         fileCount++;
       }
     }
@@ -815,7 +850,9 @@ async function runEject(options) {
       if (c.file.endsWith('.rb')) {
         const source = readFileSync(join(controllersDir, c.file), 'utf-8');
         const result = await transformRuby(source, join(controllersDir, c.file), 'stimulus', config, APP_ROOT);
-        let code = fixImportsForEject(result.code, join(controllersDir, c.file));
+        // Pass relative output path for correct import resolution
+        const relativeOutPath = `app/javascript/controllers/${c.file.replace('.rb', '.js')}`;
+        let code = fixImportsForEject(result.code, relativeOutPath, config);
         const outFile = join(outDir, 'app/javascript/controllers', c.file.replace('.rb', '.js'));
         writeFileSync(outFile, code);
         fileCount++;
@@ -838,25 +875,64 @@ async function runEject(options) {
     for (const file of controllerFiles) {
       const source = readFileSync(join(appControllersDir, file), 'utf-8');
       const result = await transformRuby(source, join(appControllersDir, file), 'controllers', config, APP_ROOT);
-      let code = fixImportsForEject(result.code, join(appControllersDir, file));
+      // Pass relative output path for correct import resolution
+      const relativeOutPath = `app/controllers/${file.replace('.rb', '.js')}`;
+      let code = fixImportsForEject(result.code, relativeOutPath, config);
       const outFile = join(outDir, 'app/controllers', file.replace('.rb', '.js'));
       writeFileSync(outFile, code);
       fileCount++;
     }
   }
 
+  // Copy and transform test files
+  const testDir = join(APP_ROOT, 'test');
+  if (existsSync(testDir)) {
+    console.log('  Copying test files...');
+    const outTestDir = join(outDir, 'test');
+    if (!existsSync(outTestDir)) {
+      mkdirSync(outTestDir, { recursive: true });
+    }
+
+    // Copy .mjs and .js test files with import fixes
+    const testFiles = readdirSync(testDir).filter(f =>
+      (f.endsWith('.test.mjs') || f.endsWith('.test.js')) && !f.startsWith('._')
+    );
+    for (const file of testFiles) {
+      let content = readFileSync(join(testDir, file), 'utf-8');
+      content = fixTestImportsForEject(content);
+      writeFileSync(join(outTestDir, file), content);
+      fileCount++;
+    }
+  }
+
   // Generate application_record.js
   console.log('  Generating project files...');
-  writeFileSync(join(outDir, 'app/models/application_record.js'), generateApplicationRecordForEject());
+  writeFileSync(join(outDir, 'app/models/application_record.js'), generateApplicationRecordForEject(config));
   fileCount++;
 
-  // Generate package.json
+  // Generate package.json with database config
   const appName = basename(APP_ROOT) + '-ejected';
-  writeFileSync(join(outDir, 'package.json'), generatePackageJsonForEject(appName));
+  writeFileSync(join(outDir, 'package.json'), generatePackageJsonForEject(appName, config));
   fileCount++;
 
   // Generate vite.config.js
   writeFileSync(join(outDir, 'vite.config.js'), generateViteConfigForEject());
+  fileCount++;
+
+  // Generate vitest.config.js
+  writeFileSync(join(outDir, 'vitest.config.js'), generateVitestConfigForEject(config));
+  fileCount++;
+
+  // Generate test/setup.mjs
+  const outTestDir = join(outDir, 'test');
+  if (!existsSync(outTestDir)) {
+    mkdirSync(outTestDir, { recursive: true });
+  }
+  writeFileSync(join(outTestDir, 'setup.mjs'), generateTestSetupForEject(config));
+  fileCount++;
+
+  // Generate main.js entry point
+  writeFileSync(join(outDir, 'main.js'), generateMainJsForEject(config));
   fileCount++;
 
   console.log(`\nEjected ${fileCount} files to ${relative(APP_ROOT, outDir) || outDir}/`);
@@ -864,7 +940,8 @@ async function runEject(options) {
   console.log('To use:');
   console.log('  cd ' + (relative(APP_ROOT, outDir) || outDir));
   console.log('  npm install');
-  console.log('  npm run dev');
+  console.log('  npm test        # run tests');
+  console.log('  npm start       # start server');
 }
 
 // ============================================
