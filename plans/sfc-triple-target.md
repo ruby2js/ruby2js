@@ -824,6 +824,133 @@ Instead of hand-written TypeScript models and custom adapters:
 - [ ] Vue blog (needed before `-f vue` transpiler target)
 - [ ] Svelte blog (needed before `-f svelte` transpiler target)
 
+---
+
+## New Insight: Pluggable View Rendering (Jan 2026)
+
+### Discovery: Views Can Declare Their Rendering Strategy
+
+While implementing SSR hydration for React views, we discovered that different view types need different rendering approaches. This led to a `renderView` helper that detects view type at runtime:
+
+```javascript
+function renderView(View, props) {
+  return View.constructor.name === "AsyncFunction"
+    ? View(props)                              // ERB: async, returns string
+    : React.createElement(View, props);        // React: needs createElement for hooks
+}
+```
+
+### Why This Matters for SFC Targets
+
+The same pattern applies to framework targets:
+
+| View Type | Detection | Rendering |
+|-----------|-----------|-----------|
+| ERB | `AsyncFunction` | Call directly → string |
+| React/JSX | Regular function | `React.createElement()` |
+| Astro | `View._astro` or convention | Call directly → string (SSR) |
+| Vue | `View._vue` or `<template>` | `createApp()` or SSR render |
+| Svelte | `View._svelte` | `render()` or SSR |
+
+### Self-Describing Views
+
+Instead of the framework guessing view types, views could declare their rendering strategy:
+
+```javascript
+// View declares its own strategy
+function Show({ workflow_id }) { /* ... */ }
+Show.renderStrategy = 'react';
+
+async function render$1({ workflows }) { /* ... */ }
+render$1.renderStrategy = 'string';
+
+// Astro component
+export function ArticleCard({ article }) { /* ... */ }
+ArticleCard.renderStrategy = 'astro';
+```
+
+The `renderView` dispatcher becomes extensible:
+
+```javascript
+const strategies = {
+  string: (View, props) => View(props),
+  react: (View, props) => React.createElement(View, props),
+  astro: (View, props) => renderAstroComponent(View, props),
+  vue: (View, props) => renderVueComponent(View, props),
+  svelte: (View, props) => renderSvelteComponent(View, props),
+  stream: (View, props) => renderToStream(View, props),
+};
+
+function renderView(View, props) {
+  const strategy = View.renderStrategy || detectStrategy(View);
+  return strategies[strategy](View, props);
+}
+```
+
+### Implications for Stage 1
+
+When converting Rails to Astro/Vue/Svelte:
+
+1. **Views get tagged with their strategy** during transpilation
+2. **Mixed views are possible** - same app could have ERB partials and React islands
+3. **New frameworks can be added** without modifying core rendering logic
+4. **Runtime detection as fallback** - `AsyncFunction` check, template inspection, etc.
+
+### Integration with Hydration
+
+The recent hydration work (`data-juntos-view`, `data-juntos-props`) also applies:
+
+| Framework | SSR Output | Hydration Target |
+|-----------|------------|------------------|
+| React | `<div data-juntos-view="/path">...</div>` | `hydrateRoot()` |
+| Astro | Native `<astro-island>` | Astro's hydration |
+| Vue | `<div data-v-app>...</div>` | `createSSRApp().mount()` |
+| Svelte | Component markup | `hydrate()` |
+
+**Key learning**: Only serializable props can be passed for hydration. Views should accept IDs and fetch data, not receive full model objects.
+
+---
+
+## Updated Feasibility Assessment (Jan 2026)
+
+### What's More Feasible Than Expected
+
+1. **Pluggable rendering** - The `renderView` pattern makes multi-framework support cleaner than anticipated
+2. **Hydration props** - Serializing primitive props (IDs) and fetching data works well
+3. **Dual bundle support** - SSR + client hydration now working for Node target
+4. **ERB/JSX coexistence** - Same controller can render both view types
+
+### What's Harder Than Expected
+
+1. **React hooks in SSR** - Required `React.createElement()` wrapper, not direct function calls
+2. **Circular references** - ActiveRecord objects can't be serialized; must pass IDs
+3. **Async view detection** - ERB views are async (for partials), React views are sync
+4. **Framework-specific hydration** - Each framework has different hydration APIs
+
+### Revised Approach Recommendations
+
+1. **Start with rendering strategy tags** - Add `renderStrategy` property during transpilation before tackling full SFC conversion
+
+2. **Unify hydration wrapper pattern** - The `data-juntos-*` attributes could become framework-agnostic, with framework-specific hydration code
+
+3. **Views fetch their own data** - Rather than controllers preloading everything, views should accept minimal props (IDs) and fetch asynchronously. This:
+   - Avoids serialization issues
+   - Works consistently across SSR and client
+   - Matches modern patterns (React Server Components, Astro islands)
+
+4. **ERB as universal partial format** - ERB templates compile to async string functions that work anywhere. They could be the "lowest common denominator" for shared partials across frameworks.
+
+---
+
+## Deferred Items (Lower Priority)
+
+- [ ] Add seed data for initial testing (currently starts empty)
+- [ ] Verify real-time broadcasts work (BroadcastChannel API)
+- [ ] Vue blog (needed before `-f vue` transpiler target)
+- [ ] Svelte blog (needed before `-f svelte` transpiler target)
+
+---
+
 **Now: Stage 1 - Astro Transpiler**
 
 Goal: `bin/juntos build -f astro` produces the same output as hand-crafted `test/astro-blog-v3/`
@@ -834,3 +961,5 @@ The transpiler converts:
 3. **Views (ERB)** - Convert to Astro templates
 4. **Routes** - Map to file-based routing structure
 5. **Layout** - Convert to `src/layouts/Layout.astro`
+
+**New consideration**: Add `renderStrategy` tags to generated views for future multi-framework coexistence.
