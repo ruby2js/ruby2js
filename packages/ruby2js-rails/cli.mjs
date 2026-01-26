@@ -343,6 +343,35 @@ function runInit(options) {
     writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + '\n');
   }
 
+  // Read ruby2js.yml for additional dependencies
+  const ruby2jsYmlPath = join(destDir, 'config/ruby2js.yml');
+  if (existsSync(ruby2jsYmlPath)) {
+    let ruby2jsConfig = {};
+    if (yaml) {
+      try {
+        ruby2jsConfig = yaml.load(readFileSync(ruby2jsYmlPath, 'utf8')) || {};
+      } catch (e) {
+        if (!quiet) console.warn(`  Warning: Failed to parse ruby2js.yml: ${e.message}`);
+      }
+    }
+
+    // Add dependencies from ruby2js.yml to package.json
+    if (ruby2jsConfig.dependencies) {
+      const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
+      let added = false;
+      for (const [name, version] of Object.entries(ruby2jsConfig.dependencies)) {
+        if (!pkg.dependencies[name]) {
+          pkg.dependencies[name] = version;
+          added = true;
+        }
+      }
+      if (added) {
+        if (!quiet) console.log('  Adding dependencies from ruby2js.yml...');
+        writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + '\n');
+      }
+    }
+  }
+
   // Create vite.config.js
   const viteConfigPath = join(destDir, 'vite.config.js');
   if (!existsSync(viteConfigPath)) {

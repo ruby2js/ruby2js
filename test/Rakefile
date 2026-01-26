@@ -276,14 +276,16 @@ def generate_system_test_dockerfile(path, demo, database, target)
     # Extract demo
     RUN tar -xzf /tarballs/demo-#{demo_hyphen}.tar.gz --strip-components=1 -C /app
 
-    # Initialize Juntos config and remove stale lock file
-    RUN tar -xzf /tarballs/ruby2js-rails-beta.tgz -C /tmp && \\
-        node /tmp/package/cli.mjs init --no-install && \\
-        rm -rf /tmp/package && \\
-        rm -f package-lock.json
+    # Install ruby2js-rails first (includes js-yaml dependency)
+    # Then run init which can now read ruby2js.yml
+    RUN npm install /tarballs/ruby2js-rails-beta.tgz && \\
+        rm -f package-lock.json && \\
+        npx juntos init --no-install
 
-    # Install from local tarballs#{db_packages.empty? ? '' : " + #{db_packages}"}
-    RUN npm install /tarballs/ruby2js-beta.tgz /tarballs/ruby2js-rails-beta.tgz /tarballs/vite-plugin-ruby2js-beta.tgz#{db_packages.empty? ? '' : " #{db_packages}"}
+    # Install all dependencies from package.json (including ruby2js.yml dependencies)
+    # Then install remaining tarballs#{db_packages.empty? ? '' : " + #{db_packages}"}
+    RUN npm install && \\
+        npm install /tarballs/ruby2js-beta.tgz /tarballs/vite-plugin-ruby2js-beta.tgz#{db_packages.empty? ? '' : " #{db_packages}"}
 
     # Build
     RUN npx juntos build --verbose
