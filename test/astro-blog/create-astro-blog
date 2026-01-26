@@ -31,10 +31,12 @@ else
 fi
 
 # Create Astro project (minimal template, no git, skip prompts)
-# Use create-astro 5.0.0-beta which creates Astro 6 projects (supports Vite 7)
-npm create astro@5.0.0-beta.2 "$APP_NAME" -- --template minimal --no-git --skip-houston --yes
+npm create astro@latest "$APP_NAME" -- --template minimal --no-git --skip-houston --yes
 
 cd "$APP_DIR"
+
+# Upgrade to Astro 6 beta (requires Vite 7, which our vite-plugin needs)
+npm install astro@6.0.0-beta.3
 
 # Install dependencies
 # In CI, these will be replaced with the actual tarball paths
@@ -115,7 +117,7 @@ ABOUT
 # ============================================
 
 cat > src/layouts/Layout.astro.rb << 'LAYOUT'
-import ['ViewTransitions'], from: 'astro:transitions'
+import ['ClientRouter'], from: 'astro:transitions'
 
 # Support both direct props (Astro pages) and frontmatter (markdown pages)
 @title = Astro.props[:title] || Astro.props[:frontmatter]&.[](:title) || "Astro Blog"
@@ -126,7 +128,7 @@ __END__
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{title}</title>
-  <ViewTransitions />
+  <ClientRouter />
   <style>
     :root {
       --color-bg: #f8fafc;

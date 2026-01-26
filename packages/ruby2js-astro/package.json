@@ -28,6 +28,6 @@
     "ruby2js": "*"
   },
   "peerDependencies": {
-    "astro": "^4.0.0 || ^5.0.0"
+    "astro": "^6.0.0-beta.0"
   }
 }
