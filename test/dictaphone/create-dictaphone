@@ -42,6 +42,8 @@ class Clip < ApplicationRecord
   has_one_attached :audio
 
   validates :name, presence: true
+
+  broadcasts_to -> { "clips" }, inserts_by: :prepend
 end
 MODEL
 
@@ -504,8 +506,8 @@ class DictaphoneController < Stimulus::Controller
 
       console.log("Clip saved with audio attachment:", clip.id)
 
-      # Broadcast to prepend the clip to the list (renders ERB partial with button_to)
-      await clip.broadcast_prepend_to("clips")
+      # Replace the initially-broadcast clip (which had no audio) with the full version
+      await clip.broadcast_replace_to("clips")
 
       resetUI()
 

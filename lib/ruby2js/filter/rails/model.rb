@@ -123,31 +123,33 @@ module Ruby2JS
               s(:array, s(:const, nil, :BroadcastChannel)),
               s(:str, "../../lib/rails.js"))
             model_import_nodes.push(broadcast_import)
-          end
 
-          # Import model partial for renderPartial (used by broadcast methods)
-          # Collect explicit broadcast partials and add inferred partial by convention
-          partials = uses_broadcast ? collect_broadcast_partials(body) : []
+            # Collect and import broadcast partials
+            # Includes both explicit broadcast_*_to partials and inferred broadcasts_to partial
+            partials = collect_broadcast_partials(body)
 
-          # Add inferred partial from model name convention
-          # Clip -> clips/clip, Article -> articles/article
-          model_name_lower = @rails_model_name.downcase
-          model_partial = "#{Ruby2JS::Inflector.pluralize(model_name_lower)}/#{model_name_lower}"
-          partials << model_partial unless partials.include?(model_partial)
+            # Add inferred partial from broadcasts_to (model name -> model partial)
+            # Article with broadcasts_to -> articles/article partial
+            if @rails_broadcasts_to.any?
+              model_name_lower = @rails_model_name.downcase
+              model_partial = "#{Ruby2JS::Inflector.pluralize(model_name_lower)}/#{model_name_lower}"
+              partials << model_partial unless partials.include?(model_partial)
+            end
 
-          if partials.length > 0
-            partial_path = partials.first
-            # Build path: messages/message -> ../views/messages/_message.js
-            parts = partial_path.split('/')
-            partial_file = "_#{parts.last}.js"
-            partial_dir = parts[0..-2].join('/')
-            import_path = "../views/#{partial_dir}/#{partial_file}"
+            if partials.length > 0
+              partial_path = partials.first
+              # Build path: messages/message -> ../views/messages/_message.js
+              parts = partial_path.split('/')
+              partial_file = "_#{parts.last}.js"
+              partial_dir = parts[0..-2].join('/')
+              import_path = "../views/#{partial_dir}/#{partial_file}"
 
-            # Import { render } from "..."
-            partial_import = s(:send, nil, :import,
-              s(:array, s(:const, nil, :render)),
-              s(:str, import_path))
-            model_import_nodes.push(partial_import)
+              # Import { render } from "..."
+              partial_import = s(:send, nil, :import,
+                s(:array, s(:const, nil, :render)),
+                s(:str, import_path))
+              model_import_nodes.push(partial_import)
+            end
           end
 
           # Check if model uses Active Storage (for hasOneAttached/hasManyAttached import)
@@ -160,15 +162,21 @@ module Ruby2JS
             model_import_nodes.push(active_storage_import)
           end
 
-          # Add Model.renderPartial = render assignment so broadcast methods
-          # can use the partial at runtime. Always set this since broadcast_*_to
-          # may be called externally (e.g., from controllers or Stimulus).
-          render_partial_assignment = s(:send,
-            s(:const, nil, @rails_model_name.to_sym),
-            :renderPartial=,
-            s(:lvar, :render))
+          # Add Model.renderPartial = render assignment so broadcast_replace_to
+          # can use the partial at runtime when called from other models
+          render_partial_assignment = nil
+          if @rails_broadcasts_to.any?
+            render_partial_assignment = s(:send,
+              s(:const, nil, @rails_model_name.to_sym),
+              :renderPartial=,
+              s(:lvar, :render))
+          end
 
-          begin_node = s(:begin, import_node, *model_import_nodes, exported_class, render_partial_assignment)
+          begin_node = if render_partial_assignment
+            s(:begin, import_node, *model_import_nodes, exported_class, render_partial_assignment)
+          else
+            s(:begin, import_node, *model_import_nodes, exported_class)
+          end
           result = process(begin_node)
           # Set empty comments on processed begin node to prevent first-location lookup
           # from incorrectly inheriting comments from child nodes
