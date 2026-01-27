@@ -359,9 +359,9 @@
 
       // Step 6: Start dev server
       status.textContent = 'Starting dev server...';
-      log('Starting: npx juntos dev -d dexie --port 3000', 'info');
+      log('Starting: node node_modules/.bin/juntos dev -d dexie --port 3000', 'info');
 
-      const serverProcess = await container.spawn('npx', ['juntos', 'dev', '-d', 'dexie', '--port', '3000']);
+      const serverProcess = await container.spawn('node', ['node_modules/.bin/juntos', 'dev', '-d', 'dexie', '--port', '3000']);
 
       serverProcess.output.pipeTo(new WritableStream({
         write(chunk) { log(chunk); }
