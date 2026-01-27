@@ -321,6 +321,16 @@ module Ruby2JS
             end
           end
 
+          # Handle Active Storage attachment async methods in ERB
+          # clip.audio.url -> await clip.audio.url
+          # clip.audio.attached? -> await clip.audio.attached()
+          # clip.audio.content_type -> await clip.audio.content_type
+          if @erb_bufvar && attachment_method?(method) && attachment_access?(target)
+            self.erb_mark_async!()
+            return s(:send, nil, :await,
+              s(:send, process(target), method))
+          end
+
           super
         end
 
@@ -2175,6 +2185,31 @@ module Ruby2JS
           method_str = method.to_s
           singular = Ruby2JS::Inflector.singularize(method_str)
           method_str != singular
+        end
+
+        # Check if method is an async Active Storage attachment method
+        # These methods on Attachment objects return Promises
+        def attachment_method?(method)
+          [:url, :attached, :attached?, :content_type, :download,
+           :filename, :byte_size, :blob].include?(method)
+        end
+
+        # Check if a node represents an attachment access (e.g., clip.audio)
+        # Attachment access is a singular method on a model instance (has_one_attached)
+        def attachment_access?(node)
+          return false unless node&.type == :send
+          receiver = node.children[0]
+          method = node.children[1]
+
+          # Receiver must be a model instance (lvar or ivar that's been converted to lvar)
+          return false unless receiver
+          return false unless [:lvar, :ivar, :send].include?(receiver.type)
+
+          # Method name should be singular (convention for has_one_attached)
+          # This is a heuristic - singular method names on model instances may be attachments
+          method_str = method.to_s
+          singular = Ruby2JS::Inflector.singularize(method_str)
+          method_str == singular
         end
 
         # Check if targeting browser (vs server-side rendering)
