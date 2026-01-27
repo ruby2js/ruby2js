@@ -1511,7 +1511,8 @@ const clientVirtualPlugin = {
       return "export * from 'ruby2js-rails/targets/browser/rails.js';";
     }
     if (id === '\\0juntos:active-storage:client') {
-      return "export * from 'ruby2js-rails/adapters/active_storage_indexeddb.mjs';";
+      // No-op: client bundle is for RPC hydration, not Active Storage
+      return "export function initActiveStorage() {}";
     }
     return null;
   }
