@@ -1500,6 +1500,7 @@ const clientVirtualPlugin = {
   resolveId(id) {
     if (id === 'juntos:active-record') return '\\0juntos:active-record:rpc';
     if (id === 'juntos:rails') return '\\0juntos:rails:browser';
+    if (id === 'juntos:active-storage') return '\\0juntos:active-storage:client';
     return null;
   },
   load(id) {
@@ -1508,6 +1509,9 @@ const clientVirtualPlugin = {
     }
     if (id === '\\0juntos:rails:browser') {
       return "export * from 'ruby2js-rails/targets/browser/rails.js';";
+    }
+    if (id === '\\0juntos:active-storage:client') {
+      return "export * from 'ruby2js-rails/adapters/active_storage_indexeddb.mjs';";
     }
     return null;
   }
