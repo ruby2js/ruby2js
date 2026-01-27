@@ -1025,6 +1025,15 @@ module Ruby2JS
         elsif method == :round and args.length == 0
           process S(:send, s(:const, nil, :Math), :round, target)
 
+        elsif method == :round and args.length == 1
+          # round(n) -> Math.round(x * 10**n) / 10**n
+          arg = process args.first
+          target = process target
+          multiplier = S(:send, s(:int, 10), :**, arg)
+          scaled = S(:send, target, :*, multiplier)
+          rounded = S(:send, s(:const, nil, :Math), :round, scaled)
+          S(:send, rounded, :/, multiplier)
+
         elsif method == :ceil and args.length == 0
           process S(:send, s(:const, nil, :Math), :ceil, target)
 
