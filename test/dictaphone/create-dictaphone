@@ -42,9 +42,6 @@ class Clip < ApplicationRecord
   has_one_attached :audio
 
   validates :name, presence: true
-
-  # Broadcast changes to all connected users
-  broadcasts_to -> { "clips" }, inserts_by: :prepend
 end
 MODEL
 
@@ -88,6 +85,7 @@ class ClipsController < ApplicationController
 
   def destroy
     @clip = Clip.find(params[:id])
+    @clip.audio.purge if @clip.audio.attached?
     @clip.destroy
 
     respond_to do |format|
@@ -196,12 +194,11 @@ cat > app/views/clips/index.html.erb << 'VIEW'
     </div>
   </div>
 
-  <!-- Clips list (managed by clips-list controller for client-side mode) -->
-  <div data-controller="clips-list">
+  <!-- Clips list -->
+  <div>
     <h2 class="text-xl font-semibold mb-4">Your Clips</h2>
-    <div data-clips-list-target="clips" id="clips" class="space-y-4">
-      <%# Server-rendered clips for Rails mode; client-side will repopulate %>
-      <%= render @clips if defined?(@clips) %>
+    <div id="clips" class="space-y-4">
+      <%= render @clips %>
       <p id="empty-message" class="text-gray-500 text-center py-12 hidden only:block">
         No clips yet. Record something to get started!
       </p>
@@ -223,7 +220,7 @@ cat > app/views/clips/_clip.html.erb << 'PARTIAL'
         <% end %>
       </span>
     </div>
-    <%= button_to clips_path(clip), method: :delete,
+    <%= button_to clip_path(clip), method: :delete,
         class: "text-gray-400 hover:text-red-600",
         data: { turbo_confirm: "Delete this clip?" } do %>
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -507,8 +504,8 @@ class DictaphoneController < Stimulus::Controller
 
       console.log("Clip saved with audio attachment:", clip.id)
 
-      # Dispatch custom event so the page can update (e.g., re-render clip list)
-      element.dispatchEvent(CustomEvent.new('clip:created', detail: { clip: clip }, bubbles: true))
+      # Broadcast to prepend the clip to the list (renders ERB partial with button_to)
+      await clip.broadcast_prepend_to("clips")
 
       resetUI()
 
@@ -546,130 +543,6 @@ class DictaphoneController < Stimulus::Controller
     statusTarget.textContent = "Ready to record"
     statusTarget.classList.remove('bg-red-50', 'text-red-800')
     statusTarget.classList.add('bg-green-50', 'text-green-800')
-  end
-end
-STIMULUS
-
-# Create Stimulus clips list controller (Ruby)
-cat > app/javascript/controllers/clips_list_controller.rb << 'STIMULUS'
-# Manages the clips list UI
-import ["Clip"], from: 'juntos:models'
-
-class ClipsListController < Stimulus::Controller
-  def connect
-    # Listen for new clip creation
-    element.addEventListener('clip:created', ->(e) { addClip(e.detail.clip) })
-
-    # Load existing clips on mount
-    loadClips()
-  end
-
-  async def loadClips
-    clips = await Clip.all()
-    clips.sort { |a, b| (b.created_at || 0) - (a.created_at || 0) }
-
-    # Remove existing clip elements but keep the empty message
-    clipsTarget.querySelectorAll('[data-clip-id]').each { |el| el.remove() }
-
-    # Render clips (empty message auto-hides via CSS only:block when clips exist)
-    clips.each { |clip| renderClip(clip) }
-  end
-
-  async def addClip(clip)
-    # Just render the clip - CSS only:block handles hiding empty message
-    renderClip(clip, prepend: true)
-  end
-
-  async def renderClip(clip, prepend: false)
-    # Get audio URL if available
-    audioUrl = nil
-    audioType = nil
-    if await clip.audio.attached()
-      audioUrl = await clip.audio.url()
-      blob = await clip.audio.blob()
-      audioType = blob&.content_type
-    end
-
-    html = clipTemplate(clip, audioUrl, audioType)
-
-    if prepend
-      clipsTarget.insertAdjacentHTML('afterbegin', html)
-    else
-      clipsTarget.insertAdjacentHTML('beforeend', html)
-    end
-  end
-
-  def clipTemplate(clip, audioUrl, audioType)
-    createdAt = clip.created_at ? Date.new(clip.created_at) : Date.new
-    dateStr = createdAt.toLocaleDateString('en-US', month: 'short', day: 'numeric', year: 'numeric')
-    timeStr = createdAt.toLocaleTimeString('en-US', hour: '2-digit', minute: '2-digit')
-
-    durationStr = clip.duration ? "#{clip.duration.toFixed(1)}s" : ""
-
-    audioHtml = audioUrl ? %{
-      <audio controls class="w-full mb-3">
-        <source src="#{audioUrl}" type="#{audioType || 'audio/webm'}">
-      </audio>
-    } : ""
-
-    transcriptHtml = clip.transcript ? %{
-      <div class="bg-gray-50 rounded p-3">
-        <p class="text-gray-700 text-sm">#{escapeHtml(clip.transcript)}</p>
-      </div>
-    } : %{
-      <p class="text-gray-400 text-sm italic">No transcript available</p>
-    }
-
-    %{
-      <div id="clip_#{clip.id}" class="bg-white rounded-lg shadow-md p-4" data-clip-id="#{clip.id}">
-        <div class="flex justify-between items-start mb-3">
-          <div>
-            <h3 class="font-semibold text-lg">#{escapeHtml(clip.name)}</h3>
-            <span class="text-gray-500 text-sm">
-              #{dateStr} at #{timeStr}
-              #{durationStr.length > 0 ? "&middot; #{durationStr}" : ""}
-            </span>
-          </div>
-          <button type="button"
-                  data-action="click->clips-list#deleteClip"
-                  data-clip-id="#{clip.id}"
-                  class="text-gray-400 hover:text-red-600">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
-        #{audioHtml}
-        #{transcriptHtml}
-      </div>
-    }
-  end
-
-  async def deleteClip(event)
-    return unless confirm("Delete this clip?")
-
-    clipId = event.currentTarget.dataset.clipId
-    clip = await Clip.find(clipId)
-
-    if clip
-      # Purge the audio attachment first
-      await clip.audio.purge() if await clip.audio.attached()
-      # Then destroy the clip record
-      await clip.destroy()
-    end
-
-    # Remove from DOM (empty message auto-shows via CSS only:block when no clips)
-    clipElement = element.querySelector("[data-clip-id='#{clipId}']")
-    clipElement&.remove()
-  end
-
-  def escapeHtml(text)
-    return "" unless text
-    text.toString()
-      .gsub(/&/, '&amp;')
-      .gsub(/</, '&lt;')
-      .gsub(/>/, '&gt;')
-      .gsub(/"/, '&quot;')
   end
 end
 STIMULUS

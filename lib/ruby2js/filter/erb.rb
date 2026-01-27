@@ -249,14 +249,16 @@ module Ruby2JS
       # Hook for subclasses to handle block helpers (form_for, etc.)
       # Returns nil if not handled, or processed AST if handled
       def process_erb_block_append(block_node)
-        nil  # Base implementation doesn't handle any block helpers
+        # Delegate to filter chain (e.g., Rails::Helpers) via super
+        # Returns nil if no filter handles this block helper
+        defined?(super) ? super : nil
       end
 
       # Hook for subclasses to handle send expressions that produce buffer operations
       # (e.g., turbo_stream.prepend "photos", @photo)
       # Return processed AST or nil to fall through to default handling
       def process_erb_send_append(send_node)
-        nil  # Base implementation doesn't handle any send helpers
+        defined?(super) ? super : nil
       end
 
       # Handle block expressions - subclasses can override for specific helpers
@@ -284,7 +286,7 @@ module Ruby2JS
 
       # Hook for subclasses to handle block helpers
       def process_erb_block_helper(helper_call, block_args, block_body)
-        nil  # Base implementation doesn't handle any block helpers
+        return super if defined?(super)
       end
 
       # Convert final buffer reference to return statement

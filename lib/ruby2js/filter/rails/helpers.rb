@@ -372,7 +372,9 @@ module Ruby2JS
               return process_turbo_stream_action(action, target_arg, block_body)
             end
 
-            if helper_name == :form_for
+            if helper_name == :button_to
+              return process_button_to_block(block_send, block_args, block_body)
+            elsif helper_name == :form_for
               return process_form_for(block_send, block_args, block_body)
             elsif helper_name == :form_with
               return process_form_with(block_send, block_args, block_body)
@@ -390,7 +392,9 @@ module Ruby2JS
         def process_erb_block_helper(helper_call, block_args, block_body)
           helper_name = helper_call.children[1]
 
-          if helper_name == :form_for
+          if helper_name == :button_to
+            return process_button_to_block(helper_call, block_args, block_body)
+          elsif helper_name == :form_for
             return process_form_for(helper_call, block_args, block_body)
           elsif helper_name == :form_with
             return process_form_with(helper_call, block_args, block_body)
@@ -906,6 +910,140 @@ module Ruby2JS
             s(:str, "\"><button#{btn_class_attr} type=\"submit\">#{text_str}</button><input type=\"hidden\" name=\"authenticity_token\" value=\""),
             s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
             s(:str, "\"></form>"))
+        end
+
+        # Process button_to block form
+        # button_to path, options do ... end
+        # Block provides the button content (e.g., SVG icon) instead of text
+        def process_button_to_block(block_send, block_args, block_body)
+          # block_send is: send(nil, :button_to, path, options_hash)
+          args = block_send.children[2..-1] || []
+          return nil if args.empty?
+
+          path_node = args[0]
+          options = args[1]
+
+          # Extract options (same as non-block form)
+          http_method = :post
+          confirm_msg = nil
+          css_class = nil
+          form_class = nil
+
+          if options&.type == :hash
+            options.children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              if key.type == :sym
+                case key.children[0]
+                when :method
+                  http_method = value.children[0] if value.type == :sym
+                when :class
+                  css_class = extract_class_value(value)
+                when :form_class
+                  form_class = extract_class_value(value)
+                when :data
+                  if value.type == :hash
+                    value.children.each do |data_pair|
+                      data_key = data_pair.children[0]
+                      data_value = data_pair.children[1]
+                      if data_key.type == :sym &&
+                         [:confirm, :turbo_confirm].include?(data_key.children[0])
+                        confirm_msg = data_value if data_value.type == :str
+                      end
+                    end
+                  end
+                end
+              end
+            end
+          end
+
+          confirm_str = confirm_msg ? confirm_msg.children[0] : nil
+
+          # Extract block body content (static HTML strings appended to _buf)
+          # Block body nodes are: (send (lvar :_buf) :<< (send (dstr ...) :freeze))
+          block_content = ""
+          if block_body
+            children = block_body.type == :begin ? block_body.children : [block_body]
+            children.each do |child|
+              next unless child.type == :send
+              ct, cm, carg = child.children
+              next unless ct&.type == :lvar && cm == :<<
+              # Strip .freeze wrapper
+              str_node = (carg&.type == :send && carg.children[1] == :freeze) ? carg.children[0] : carg
+              if str_node&.type == :str
+                block_content += str_node.children[0]
+              elsif str_node&.type == :dstr
+                str_node.children.each do |part|
+                  block_content += part.children[0] if part.type == :str
+                end
+              end
+            end
+          end
+          block_content = block_content.strip
+
+          # Build the button_to form using the same path resolution as non-block form
+          btn_class_attr = css_class ? " class=\"#{css_class}\"" : ""
+          form_class_attr = " class=\"#{form_class || 'button_to'}\""
+          turbo_confirm = confirm_str ? " data-turbo-confirm=\"#{confirm_str}\"" : ""
+
+          # Resolve path expression (reuse logic from build_delete_button)
+          path_expr = resolve_button_path(path_node)
+
+          if http_method == :delete
+            # Form with hidden _method field for DELETE
+            form_html = s(:dstr,
+              s(:str, "<form#{form_class_attr} method=\"post\" action=\""),
+              s(:begin, path_expr),
+              s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button#{btn_class_attr}#{turbo_confirm} type=\"submit\">#{block_content}</button><input type=\"hidden\" name=\"authenticity_token\" value=\""),
+              s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
+              s(:str, "\"></form>"))
+          else
+            actual_method = (http_method == :get || http_method == :post) ? http_method : :post
+            needs_method_field = ![:get, :post].include?(http_method)
+            method_field = needs_method_field ? "<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\">" : ""
+
+            form_html = s(:dstr,
+              s(:str, "<form#{form_class_attr} method=\"#{actual_method}\" action=\""),
+              s(:begin, path_expr),
+              s(:str, "\">#{method_field}<button#{btn_class_attr}#{turbo_confirm} type=\"submit\">#{block_content}</button><input type=\"hidden\" name=\"authenticity_token\" value=\""),
+              s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
+              s(:str, "\"></form>"))
+          end
+
+          # Append form HTML to outer buffer
+          s(:op_asgn, s(:lvasgn, @erb_bufvar), :+, form_html)
+        end
+
+        # Resolve path expression for button_to (shared logic)
+        def resolve_button_path(path_node)
+          if path_node&.type == :lvar
+            model_name = path_node.children.first.to_s
+            path_helper = "#{model_name}_path".to_sym
+            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+            s(:send, nil, path_helper, path_node)
+          elsif path_node&.type == :ivar
+            model_name = path_node.children.first.to_s.sub(/^@/, '')
+            path_helper = "#{model_name}_path".to_sym
+            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+            s(:lvar, model_name.to_sym)
+          elsif path_node&.type == :send && path_node.children[0].nil?
+            method_name = path_node.children[1].to_s
+            if method_name.end_with?('_path', '_url')
+              path_helper = method_name.to_sym
+              @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+              if path_node.children.length > 2
+                # Path helper with args: clips_path(clip)
+                processed_args = path_node.children[2..-1].map { |a| process(a) }
+                s(:send, nil, path_helper, *processed_args)
+              else
+                s(:send, nil, path_helper)
+              end
+            else
+              process(path_node)
+            end
+          else
+            process(path_node)
+          end
         end
 
         # Process truncate helper

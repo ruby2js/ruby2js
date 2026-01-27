@@ -294,13 +294,40 @@ export class ActiveRecordBase {
   }
 
   // Broadcast Turbo Stream append for ERB views
-  broadcast_append_to(channel, options = {}) {
+  async broadcast_append_to(channel, options = {}) {
     const Broadcaster = globalThis.TurboBroadcast;
     if (!Broadcaster?.broadcast) return;
 
     const target = options.target || this.constructor.tableName;
-    const html = options.html || this.toHTML();
+    let html = options.html;
+    if (!html && this.constructor.renderPartial) {
+      const modelName = this.constructor.name.toLowerCase();
+      html = await this.constructor.renderPartial({
+        $context: { authenticityToken: '', flash: {}, contentFor: {} },
+        [modelName]: this
+      });
+    }
+    if (!html) html = this.toHTML();
     const stream = `<turbo-stream action="append" target="${target}"><template>${html}</template></turbo-stream>`;
+    Broadcaster.broadcast(channel, stream);
+  }
+
+  // Broadcast Turbo Stream prepend for ERB views
+  async broadcast_prepend_to(channel, options = {}) {
+    const Broadcaster = globalThis.TurboBroadcast;
+    if (!Broadcaster?.broadcast) return;
+
+    const target = options.target || this.constructor.tableName;
+    let html = options.html;
+    if (!html && this.constructor.renderPartial) {
+      const modelName = this.constructor.name.toLowerCase();
+      html = await this.constructor.renderPartial({
+        $context: { authenticityToken: '', flash: {}, contentFor: {} },
+        [modelName]: this
+      });
+    }
+    if (!html) html = this.toHTML();
+    const stream = `<turbo-stream action="prepend" target="${target}"><template>${html}</template></turbo-stream>`;
     Broadcaster.broadcast(channel, stream);
   }
 
