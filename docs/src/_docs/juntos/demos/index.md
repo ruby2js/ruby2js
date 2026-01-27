@@ -25,6 +25,7 @@ category: juntos-demos
 | Demo | What It Shows |
 |------|---------------|
 | **[Photo Gallery](/docs/juntos/demos/photo-gallery)** | Device APIs via Capacitor and Electron. |
+| **[Dictaphone](/docs/juntos/demos/dictaphone)** | Audio recording with AI transcription and Active Storage. |
 | **[Workflow Builder](/docs/juntos/demos/workflow-builder)** | Third-party React libraries with JSON broadcasting. |
 
 ## Try Them

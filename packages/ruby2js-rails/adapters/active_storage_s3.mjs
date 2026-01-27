@@ -4,14 +4,12 @@
 // Works in edge runtimes (Cloudflare Workers, Vercel Edge, Deno Deploy)
 // Metadata stored in the configured database (not in S3)
 //
-// Configuration via config/storage.yml:
-//   amazon:
-//     service: S3
-//     access_key_id: <%= ENV['AWS_ACCESS_KEY_ID'] %>
-//     secret_access_key: <%= ENV['AWS_SECRET_ACCESS_KEY'] %>
-//     region: us-east-1
-//     bucket: my-bucket
-//     endpoint: https://... (optional, for R2/MinIO)
+// Configuration via environment variables:
+//   S3_BUCKET or AWS_S3_BUCKET - Bucket name (required)
+//   AWS_ACCESS_KEY_ID          - AWS access key (auto-read by AWS SDK)
+//   AWS_SECRET_ACCESS_KEY      - AWS secret key (auto-read by AWS SDK)
+//   AWS_REGION                 - AWS region (default: us-east-1)
+//   AWS_ENDPOINT_URL           - Custom endpoint for R2, MinIO, etc. (optional)
 
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -225,9 +223,12 @@ let attachmentStoreInstance = null;
 export class S3Storage extends StorageService {
   constructor(options = {}) {
     super(options);
-    this.bucket = options.bucket;
-    this.region = options.region || 'us-east-1';
-    this.endpoint = options.endpoint;  // For R2, MinIO, etc.
+    // Bucket from options or environment (S3_BUCKET takes precedence)
+    this.bucket = options.bucket || process.env.S3_BUCKET || process.env.AWS_S3_BUCKET;
+    // Region from options or environment (AWS SDK also reads AWS_REGION)
+    this.region = options.region || process.env.AWS_REGION || 'us-east-1';
+    // Custom endpoint for S3-compatible services (R2, MinIO, etc.)
+    this.endpoint = options.endpoint || process.env.AWS_ENDPOINT_URL;
     this.client = null;
     this.initialized = false;
   }
@@ -235,21 +236,15 @@ export class S3Storage extends StorageService {
   async initialize() {
     if (this.initialized) return;
 
+    if (!this.bucket) {
+      throw new Error('[ActiveStorage] S3 bucket not configured. Set S3_BUCKET or AWS_S3_BUCKET environment variable.');
+    }
+
     // Build S3 client configuration
+    // AWS SDK automatically reads AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
     const clientConfig = {
       region: this.region
     };
-
-    // Credentials from options or environment
-    const accessKeyId = this.options.access_key_id || process.env.AWS_ACCESS_KEY_ID;
-    const secretAccessKey = this.options.secret_access_key || process.env.AWS_SECRET_ACCESS_KEY;
-
-    if (accessKeyId && secretAccessKey) {
-      clientConfig.credentials = {
-        accessKeyId,
-        secretAccessKey
-      };
-    }
 
     // Custom endpoint for S3-compatible services (R2, MinIO, etc.)
     if (this.endpoint) {
@@ -446,7 +441,7 @@ export async function initActiveStorage(options = {}) {
   storageInstance = storage;
 
   const dbStatus = db ? 'database-backed' : 'in-memory';
-  console.log(`[ActiveStorage] Initialized with S3 backend: ${options.bucket} (${dbStatus})`);
+  console.log(`[ActiveStorage] Initialized with S3 backend: ${storage.bucket} (${dbStatus})`);
   return storage;
 }
 

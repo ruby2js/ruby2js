@@ -71,6 +71,28 @@ Native app support is now available. See the [Photo Gallery demo](/docs/juntos/d
 
 See the [Workflow Builder demo](/docs/juntos/demos/workflow-builder) for React integration with JSON broadcasting.
 
+### Active Storage
+
+File attachments work across all deployment targets:
+
+```ruby
+# What you write
+class Clip < ApplicationRecord
+  has_one_attached :audio
+end
+
+clip.audio.attach(file)
+clip.audio.url
+```
+
+**Storage adapters by target:**
+
+- **Browser** — IndexedDB blob storage via Dexie
+- **Node.js** — Local filesystem with database-backed metadata
+- **Edge (Fly, Cloudflare, Vercel Edge, Deno)** — S3-compatible storage (AWS S3, Cloudflare R2, MinIO)
+
+See the [Dictaphone demo](/docs/juntos/demos/dictaphone) for Active Storage with audio files and AI transcription.
+
 ## Planned
 
 ### Vite Integration
@@ -99,21 +121,6 @@ export default defineConfig({
 Hot Module Replacement means editing a view re-renders without losing your current article, form inputs, or scroll position.
 
 **Beyond Juntos:** The same plugin architecture supports Ruby inside [Vue](https://vuejs.org/), [Svelte](https://svelte.dev/), and [Astro](https://astro.build/) components. Write a Juntos backend with Vue or Svelte for interactive parts—all in Ruby. Phlex components become portable across frameworks via ES module imports.
-
-### Active Storage
-
-Transform attachment APIs into cloud storage operations:
-
-```ruby
-# What you write
-@article.image.attach(params[:image])
-@article.image.url
-
-# Browser target: IndexedDB blob storage
-# Node target: Local filesystem or S3
-# Vercel target: Vercel Blob
-# Cloudflare target: R2
-```
 
 ### Action Cable
 

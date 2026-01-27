@@ -2066,7 +2066,7 @@ function createVirtualPlugin(config, appRoot) {
   };
 
   // Map targets to Active Storage adapter file names
-  // Browser targets use IndexedDB, server targets use disk (development) or S3 (production)
+  // Browser targets use IndexedDB, server targets use disk, edge targets use S3
   const STORAGE_ADAPTER_MAP = {
     'browser': 'active_storage_indexeddb.mjs',
     'capacitor': 'active_storage_indexeddb.mjs',
@@ -2076,11 +2076,11 @@ function createVirtualPlugin(config, appRoot) {
     'node': 'active_storage_disk.mjs',
     'bun': 'active_storage_disk.mjs',
     'deno': 'active_storage_disk.mjs',
-    'fly': 'active_storage_disk.mjs',  // TODO: use S3 in production
-    'cloudflare': 'active_storage_indexeddb.mjs',  // TODO: use R2
-    'vercel-edge': 'active_storage_indexeddb.mjs',
+    'fly': 'active_storage_s3.mjs',        // Edge/serverless - use S3
+    'cloudflare': 'active_storage_s3.mjs', // Cloudflare Workers - use R2 via S3 API
+    'vercel-edge': 'active_storage_s3.mjs',
     'vercel-node': 'active_storage_disk.mjs',
-    'deno-deploy': 'active_storage_indexeddb.mjs'
+    'deno-deploy': 'active_storage_s3.mjs'
   };
 
   const targetDir = TARGET_DIR_MAP[config.target] || 'browser';
