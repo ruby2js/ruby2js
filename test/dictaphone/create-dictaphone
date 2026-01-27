@@ -30,6 +30,9 @@ cd "$APP_NAME"
 # - audio: Active Storage attachment (not a column)
 rails generate model Clip name:string transcript:text duration:float
 
+# Install Active Storage (creates migrations for blobs and attachments tables)
+bin/rails active_storage:install
+
 # Create database
 rails db:create
 
