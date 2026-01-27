@@ -359,9 +359,14 @@
 
       // Step 6: Start dev server
       status.textContent = 'Starting dev server...';
-      log('Starting: node node_modules/ruby2js-rails/cli.mjs dev -d dexie --port 3000', 'info');
+      log('Starting Vite dev server...', 'info');
 
-      const serverProcess = await container.spawn('node', ['node_modules/ruby2js-rails/cli.mjs', 'dev', '-d', 'dexie', '--port', '3000']);
+      // Run vite directly — the CLI just calls `npx vite` after validation,
+      // but npx doesn't resolve local bins in WebContainers. The snapshot
+      // already has everything configured, so we can skip the CLI wrapper.
+      const serverProcess = await container.spawn('node', ['node_modules/vite/bin/vite.js', '--port', '3000'], {
+        env: { JUNTOS_DATABASE: 'dexie' }
+      });
 
       serverProcess.output.pipeTo(new WritableStream({
         write(chunk) { log(chunk); }
