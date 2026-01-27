@@ -558,8 +558,6 @@ cat > app/javascript/controllers/clip_audio_controller.rb << 'STIMULUS'
 import ["Clip"], from: 'juntos:models'
 
 class ClipAudioController < Stimulus::Controller
-  targets [:audioContainer, :player]
-
   async def connect
     clipId = element.dataset.clipId
     return unless clipId
