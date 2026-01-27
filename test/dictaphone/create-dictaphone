@@ -262,11 +262,11 @@ TURBO
 mkdir -p app/javascript/controllers
 cat > app/javascript/controllers/dictaphone_controller.rb << 'STIMULUS'
 # Whisper speech-to-text via Transformers.js
-import { pipeline }, from: '@xenova/transformers'
+import ["pipeline"], from: '@xenova/transformers'
 # Active Storage for audio file persistence
-import { initActiveStorage }, from: 'juntos:active-storage'
+import ["initActiveStorage"], from: 'juntos:active-storage'
 # Clip model for client-side persistence
-import { Clip }, from: 'juntos:models'
+import ["Clip"], from: 'juntos:models'
 
 class DictaphoneController < Stimulus::Controller
   def connect
@@ -492,7 +492,7 @@ class DictaphoneController < Stimulus::Controller
       # Attach audio via Active Storage
       extension = @audioBlob.type.include?('webm') ? 'webm' : 'm4a'
       await clip.audio.attach(@audioBlob,
-        filename: "#{clip.name.replace(/[^a-z0-9]/gi, '_')}.#{extension}",
+        filename: "#{clip.name.gsub(/[^a-z0-9]/i, '_')}.#{extension}",
         content_type: @audioBlob.type
       )
 
@@ -544,7 +544,7 @@ STIMULUS
 # Create Stimulus clips list controller (Ruby)
 cat > app/javascript/controllers/clips_list_controller.rb << 'STIMULUS'
 # Manages the clips list UI
-import { Clip }, from: 'juntos:models'
+import ["Clip"], from: 'juntos:models'
 
 class ClipsListController < Stimulus::Controller
   def connect
@@ -670,10 +670,10 @@ class ClipsListController < Stimulus::Controller
   def escapeHtml(text)
     return "" unless text
     text.toString()
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
+      .gsub(/&/, '&amp;')
+      .gsub(/</, '&lt;')
+      .gsub(/>/, '&gt;')
+      .gsub(/"/, '&quot;')
   end
 end
 STIMULUS
