@@ -47,6 +47,7 @@ export class SQLiteDialect extends ActiveRecordSQL {
   // Format value for binding (SQLite needs booleans as 0/1)
   static _formatValue(val) {
     if (typeof val === 'boolean') return val ? 1 : 0;
+    if (val instanceof Date) return val.toISOString();
     return val;
   }
 
