@@ -255,10 +255,20 @@ export class Attachment {
     return this._blob?.content_type;
   }
 
+  // Snake_case alias for Ruby compatibility (clip.audio.content_type)
+  async content_type() {
+    return this.contentType();
+  }
+
   // Get byte size
   async byteSize() {
     await this._ensureLoaded();
     return this._blob?.byte_size;
+  }
+
+  // Snake_case alias for Ruby compatibility (clip.audio.byte_size)
+  async byte_size() {
+    return this.byteSize();
   }
 
   // Delete the attachment
