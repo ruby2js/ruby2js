@@ -29,36 +29,163 @@ export {
   BlobMetadata
 };
 
-// In-memory stores for metadata (in production, use the database)
-let blobMetadataStore = new Map();
-let attachmentRecordStore = new Map();
+// Database connection - set during initialization
+let db = null;
 
-// Simple store interface that mimics Dexie's API
-class MapStore {
-  constructor(map) {
-    this._map = map;
-  }
-
+// Database-backed store for blobs table
+class BlobStore {
   async get(key) {
-    return this._map.get(key);
+    if (!db) return null;
+    const row = db.prepare('SELECT * FROM active_storage_blobs WHERE key = ?').get(key);
+    if (!row) return null;
+    return {
+      id: row.key,  // Use key as id for compatibility with base adapter
+      key: row.key,
+      filename: row.filename,
+      content_type: row.content_type,
+      metadata: row.metadata ? JSON.parse(row.metadata) : null,
+      service_name: row.service_name,
+      byte_size: row.byte_size,
+      checksum: row.checksum,
+      created_at: row.created_at
+    };
   }
 
   async put(record) {
-    this._map.set(record.id, record);
+    if (!db) return;
+    const existing = db.prepare('SELECT id FROM active_storage_blobs WHERE key = ?').get(record.key || record.id);
+    if (existing) {
+      db.prepare(`
+        UPDATE active_storage_blobs
+        SET filename = ?, content_type = ?, metadata = ?, service_name = ?, byte_size = ?, checksum = ?
+        WHERE key = ?
+      `).run(
+        record.filename,
+        record.content_type,
+        record.metadata ? JSON.stringify(record.metadata) : null,
+        record.service_name || 'disk',
+        record.byte_size,
+        record.checksum,
+        record.key || record.id
+      );
+    } else {
+      db.prepare(`
+        INSERT INTO active_storage_blobs (key, filename, content_type, metadata, service_name, byte_size, checksum, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        record.key || record.id,
+        record.filename,
+        record.content_type,
+        record.metadata ? JSON.stringify(record.metadata) : null,
+        record.service_name || 'disk',
+        record.byte_size,
+        record.checksum,
+        record.created_at || new Date().toISOString()
+      );
+    }
   }
 
   async delete(key) {
-    this._map.delete(key);
+    if (!db) return;
+    db.prepare('DELETE FROM active_storage_blobs WHERE key = ?').run(key);
   }
 
   async toArray() {
-    return Array.from(this._map.values());
+    if (!db) return [];
+    const rows = db.prepare('SELECT * FROM active_storage_blobs').all();
+    return rows.map(row => ({
+      id: row.key,
+      key: row.key,
+      filename: row.filename,
+      content_type: row.content_type,
+      metadata: row.metadata ? JSON.parse(row.metadata) : null,
+      service_name: row.service_name,
+      byte_size: row.byte_size,
+      checksum: row.checksum,
+      created_at: row.created_at
+    }));
   }
 
   async clear() {
-    this._map.clear();
+    if (!db) return;
+    db.prepare('DELETE FROM active_storage_blobs').run();
   }
 }
+
+// Database-backed store for attachments table
+class AttachmentStore {
+  async get(id) {
+    if (!db) return null;
+    const row = db.prepare('SELECT * FROM active_storage_attachments WHERE id = ?').get(id);
+    if (!row) return null;
+    return {
+      id: row.id,
+      name: row.name,
+      record_type: row.record_type,
+      record_id: row.record_id,
+      blob_id: row.blob_id,
+      created_at: row.created_at
+    };
+  }
+
+  async put(record) {
+    if (!db) return;
+    if (record.id) {
+      const existing = db.prepare('SELECT id FROM active_storage_attachments WHERE id = ?').get(record.id);
+      if (existing) {
+        db.prepare(`
+          UPDATE active_storage_attachments
+          SET name = ?, record_type = ?, record_id = ?, blob_id = ?
+          WHERE id = ?
+        `).run(record.name, record.record_type, record.record_id, record.blob_id, record.id);
+        return;
+      }
+    }
+    const result = db.prepare(`
+      INSERT INTO active_storage_attachments (name, record_type, record_id, blob_id, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      record.name,
+      record.record_type,
+      record.record_id,
+      record.blob_id,
+      record.created_at || new Date().toISOString()
+    );
+    record.id = result.lastInsertRowid;
+  }
+
+  async delete(id) {
+    if (!db) return;
+    db.prepare('DELETE FROM active_storage_attachments WHERE id = ?').run(id);
+  }
+
+  async toArray() {
+    if (!db) return [];
+    return db.prepare('SELECT * FROM active_storage_attachments').all();
+  }
+
+  async clear() {
+    if (!db) return;
+    db.prepare('DELETE FROM active_storage_attachments').run();
+  }
+
+  // Find attachments by record
+  async findByRecord(recordType, recordId, name) {
+    if (!db) return [];
+    if (name) {
+      return db.prepare(
+        'SELECT * FROM active_storage_attachments WHERE record_type = ? AND record_id = ? AND name = ?'
+      ).all(recordType, recordId, name);
+    }
+    return db.prepare(
+      'SELECT * FROM active_storage_attachments WHERE record_type = ? AND record_id = ?'
+    ).all(recordType, recordId);
+  }
+}
+
+// Singleton stores - created once when database is available
+let blobStoreInstance = null;
+let attachmentStoreInstance = null;
 
 // Disk storage service
 export class DiskStorage extends StorageService {
@@ -75,6 +202,24 @@ export class DiskStorage extends StorageService {
     // Create storage directory if it doesn't exist
     if (!existsSync(this.root)) {
       mkdirSync(this.root, { recursive: true });
+    }
+
+    // Get database connection from juntos:active-record if available
+    try {
+      const activeRecord = await import('juntos:active-record');
+      if (activeRecord.getDatabase) {
+        db = activeRecord.getDatabase();
+      }
+    } catch (e) {
+      // Database not available - will be set later
+    }
+
+    // Create store instances
+    if (!blobStoreInstance) {
+      blobStoreInstance = new BlobStore();
+    }
+    if (!attachmentStoreInstance) {
+      attachmentStoreInstance = new AttachmentStore();
     }
 
     this.initialized = true;
@@ -179,22 +324,32 @@ export class DiskStorage extends StorageService {
     }
   }
 
-  // Get the blobs store (in-memory for dev)
+  // Get the blobs store (database-backed)
   get blobStore() {
-    return new MapStore(blobMetadataStore);
+    return blobStoreInstance || new BlobStore();
   }
 
-  // Get the attachments store (in-memory for dev)
+  // Get the attachments store (database-backed)
   get attachmentStore() {
-    return new MapStore(attachmentRecordStore);
+    return attachmentStoreInstance || new AttachmentStore();
   }
 }
 
 // Singleton storage instance
 let storageInstance = null;
 
+// Set database connection explicitly (called by juntos runtime)
+export function setDatabase(database) {
+  db = database;
+}
+
 // Initialize Active Storage with disk backend
 export async function initActiveStorage(options = {}) {
+  // If database passed in options, use it
+  if (options.database) {
+    db = options.database;
+  }
+
   const storage = new DiskStorage(options);
   await storage.initialize();
 
@@ -207,7 +362,8 @@ export async function initActiveStorage(options = {}) {
 
   storageInstance = storage;
 
-  console.log(`[ActiveStorage] Initialized with disk backend at ${storage.root}`);
+  const dbStatus = db ? 'database-backed' : 'in-memory';
+  console.log(`[ActiveStorage] Initialized with disk backend at ${storage.root} (${dbStatus})`);
   return storage;
 }
 
@@ -228,9 +384,13 @@ export async function purgeActiveStorage() {
 
   await storageInstance.initialize();
 
-  // Clear in-memory stores
-  blobMetadataStore.clear();
-  attachmentRecordStore.clear();
+  // Clear database tables
+  if (blobStoreInstance) {
+    await blobStoreInstance.clear();
+  }
+  if (attachmentStoreInstance) {
+    await attachmentStoreInstance.clear();
+  }
 
   // Optionally delete files (be careful!)
   // For now, we only clear metadata
