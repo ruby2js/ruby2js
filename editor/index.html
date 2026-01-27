@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ruby2JS Editor</title>
+  <script src="coi-serviceworker.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/editor/editor.main.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; font-family: system-ui, sans-serif; background: #1e1e1e; color: #ccc; }
+    #app { display: grid; grid-template-columns: 220px 1fr 1fr; grid-template-rows: 1fr 180px; height: 100vh; }
+    #file-tree { grid-row: 1 / 2; overflow-y: auto; background: #252526; border-right: 1px solid #333; padding: 8px 0; font-size: 13px; }
+    #editor-container { grid-row: 1 / 2; min-width: 0; }
+    #preview-pane { grid-row: 1 / 2; border-left: 1px solid #333; display: flex; flex-direction: column; }
+    #preview-pane iframe { flex: 1; border: none; background: #fff; }
+    #preview-header { padding: 4px 8px; background: #252526; border-bottom: 1px solid #333; font-size: 12px; color: #999; }
+    #terminal { grid-column: 1 / -1; grid-row: 2 / 3; background: #1a1a1a; border-top: 1px solid #333; overflow-y: auto; padding: 8px; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+    #terminal .info { color: #569cd6; }
+    #terminal .error { color: #f44747; }
+    #terminal .success { color: #6a9955; }
+    #terminal .warn { color: #d7ba7d; }
+
+    .tree-item { padding: 2px 8px 2px 0; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tree-item:hover { background: #2a2d2e; }
+    .tree-item.active { background: #37373d; color: #fff; }
+    .tree-item.dir { color: #999; }
+    .tree-item.file { color: #ccc; }
+    .tree-dir-children { display: none; }
+    .tree-dir-children.open { display: block; }
+
+    #loading-overlay { position: fixed; inset: 0; background: #1e1e1e; display: flex; align-items: center; justify-content: center; z-index: 1000; flex-direction: column; gap: 16px; }
+    #loading-overlay .spinner { width: 40px; height: 40px; border: 3px solid #333; border-top-color: #569cd6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-overlay .status { font-size: 14px; color: #999; }
+  </style>
+</head>
+<body>
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="status" id="loading-status">Initializing...</div>
+  </div>
+  <div id="app">
+    <div id="file-tree"></div>
+    <div id="editor-container"></div>
+    <div id="preview-pane">
+      <div id="preview-header">Preview</div>
+      <iframe id="preview-iframe" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+    </div>
+    <div id="terminal"></div>
+  </div>
+
+  <script>
+    // Determine demo from URL params
+    const params = new URLSearchParams(location.search);
+    const demo = params.get('demo') || 'blog';
+    document.title = `Ruby2JS Editor — ${demo}`;
+
+    const term = document.getElementById('terminal');
+    function log(msg, cls = '') {
+      const el = document.createElement('div');
+      el.className = cls;
+      el.textContent = msg;
+      term.appendChild(el);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    // Editable file extensions
+    const EDITABLE_EXT = /\.(rb|erb|html|css|js|json|yml|yaml|rake|ru|gemfile)$/i;
+    const EDITABLE_DIRS = ['app/', 'config/', 'db/', 'test/', 'Gemfile', 'Rakefile'];
+
+    function shouldShow(path) {
+      if (path.startsWith('node_modules/') || path.startsWith('.git/') ||
+          path.startsWith('dist/') || path.startsWith('tmp/') ||
+          path.startsWith('log/') || path.startsWith('storage/')) return false;
+      for (const d of EDITABLE_DIRS) {
+        if (path.startsWith(d) || path === d.replace(/\/$/, '')) return true;
+      }
+      // Show top-level config files
+      if (!path.includes('/') && EDITABLE_EXT.test(path)) return true;
+      return false;
+    }
+
+    // Tar parser: extract files from an uncompressed tar ArrayBuffer
+    function parseTar(buffer) {
+      const files = {};
+      const view = new Uint8Array(buffer);
+      let offset = 0;
+
+      while (offset < view.length - 512) {
+        // Read file name
+        const nameBytes = view.slice(offset, offset + 100);
+        let name = new TextDecoder().decode(nameBytes).replace(/\0+$/, '');
+        if (!name) break;
+
+        // Remove leading ./ if present
+        if (name.startsWith('./')) name = name.slice(2);
+        if (!name) { offset += 512; continue; }
+
+        // File type (byte 156)
+        const typeFlag = String.fromCharCode(view[offset + 156]);
+
+        // File size (octal, bytes 124-135)
+        const sizeStr = new TextDecoder().decode(view.slice(offset + 124, offset + 136)).replace(/\0+$/, '').trim();
+        const size = parseInt(sizeStr, 8) || 0;
+
+        // Move past header
+        offset += 512;
+
+        if (typeFlag === '0' || typeFlag === '\0' || typeFlag === '') {
+          // Regular file
+          const content = view.slice(offset, offset + size);
+          files[name] = content;
+        }
+
+        // Advance past file data (rounded up to 512-byte blocks)
+        offset += Math.ceil(size / 512) * 512;
+      }
+      return files;
+    }
+
+    // Convert flat file map to WebContainer mount tree
+    function buildMountTree(files) {
+      const tree = {};
+      for (const [path, content] of Object.entries(files)) {
+        const parts = path.split('/');
+        let node = tree;
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (!node[parts[i]]) node[parts[i]] = { directory: {} };
+          node = node[parts[i]].directory;
+        }
+        const fileName = parts[parts.length - 1];
+        // Try to decode as UTF-8 text; fall back to binary
+        try {
+          const text = new TextDecoder('utf-8', { fatal: true }).decode(content);
+          node[fileName] = { file: { contents: text } };
+        } catch {
+          node[fileName] = { file: { contents: content } };
+        }
+      }
+      return tree;
+    }
+
+    // Build file tree UI
+    function buildFileTreeUI(files, container, onFileClick) {
+      const paths = Object.keys(files).filter(shouldShow).sort();
+      const dirTree = {};
+
+      for (const p of paths) {
+        const parts = p.split('/');
+        let node = dirTree;
+        for (let i = 0; i < parts.length; i++) {
+          const key = parts[i];
+          if (i === parts.length - 1) {
+            node[key] = p; // leaf = full path
+          } else {
+            if (!node[key] || typeof node[key] === 'string') node[key] = {};
+            node = node[key];
+          }
+        }
+      }
+
+      function renderTree(obj, parent, depth) {
+        const entries = Object.entries(obj).sort(([a, va], [b, vb]) => {
+          const aDir = typeof va === 'object';
+          const bDir = typeof vb === 'object';
+          if (aDir !== bDir) return aDir ? -1 : 1;
+          return a.localeCompare(b);
+        });
+
+        for (const [name, value] of entries) {
+          if (typeof value === 'object') {
+            const dirEl = document.createElement('div');
+            dirEl.className = 'tree-item dir';
+            dirEl.style.paddingLeft = (depth * 12 + 8) + 'px';
+            dirEl.textContent = '▸ ' + name;
+            parent.appendChild(dirEl);
+
+            const children = document.createElement('div');
+            children.className = 'tree-dir-children';
+            parent.appendChild(children);
+
+            dirEl.addEventListener('click', () => {
+              const open = children.classList.toggle('open');
+              dirEl.textContent = (open ? '▾ ' : '▸ ') + name;
+            });
+
+            renderTree(value, children, depth + 1);
+          } else {
+            const fileEl = document.createElement('div');
+            fileEl.className = 'tree-item file';
+            fileEl.style.paddingLeft = (depth * 12 + 8) + 'px';
+            fileEl.textContent = name;
+            fileEl.dataset.path = value;
+            fileEl.addEventListener('click', () => onFileClick(value, fileEl));
+            parent.appendChild(fileEl);
+          }
+        }
+      }
+
+      renderTree(dirTree, container, 0);
+    }
+
+    // Language detection for Monaco
+    function langForPath(path) {
+      if (path.endsWith('.rb')) return 'ruby';
+      if (path.endsWith('.erb')) return 'html';
+      if (path.endsWith('.js')) return 'javascript';
+      if (path.endsWith('.json')) return 'json';
+      if (path.endsWith('.css')) return 'css';
+      if (path.endsWith('.html')) return 'html';
+      if (path.endsWith('.yml') || path.endsWith('.yaml')) return 'yaml';
+      return 'plaintext';
+    }
+
+    // Main boot sequence
+    async function boot() {
+      const status = document.getElementById('loading-status');
+
+      // Step 1: Fetch snapshot
+      status.textContent = `Fetching ${demo} snapshot...`;
+      log(`Fetching snapshot for "${demo}"...`, 'info');
+
+      const basePath = document.baseURI.includes('/editor/')
+        ? document.baseURI.replace(/\/editor\/.*$/, '')
+        : '/ruby2js';
+      const snapshotUrl = `${basePath}/editor/snapshots/${demo}.tar.gz`;
+      let response;
+      try {
+        response = await fetch(snapshotUrl);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      } catch (err) {
+        log(`Failed to fetch snapshot: ${err.message}`, 'error');
+        log(`URL: ${snapshotUrl}`, 'error');
+        status.textContent = 'Failed to load snapshot';
+        return;
+      }
+      log('Snapshot downloaded.', 'success');
+
+      // Step 2: Decompress
+      status.textContent = 'Decompressing...';
+      log('Decompressing tar.gz...', 'info');
+      const ds = new DecompressionStream('gzip');
+      const decompressed = response.body.pipeThrough(ds);
+      const tarBuffer = await new Response(decompressed).arrayBuffer();
+      const files = parseTar(tarBuffer);
+      const fileCount = Object.keys(files).length;
+      log(`Extracted ${fileCount} files.`, 'success');
+
+      // Step 3: Boot WebContainer
+      status.textContent = 'Booting WebContainer...';
+      log('Booting WebContainer...', 'info');
+
+      const { WebContainer } = await import('https://unpkg.com/@webcontainer/api@1.5.1/dist/index.js');
+      let container;
+      try {
+        container = await WebContainer.boot();
+      } catch (err) {
+        log(`WebContainer boot failed: ${err.message}`, 'error');
+        if (!window.crossOriginIsolated) {
+          log('Cross-Origin-Isolation is not enabled. The COI service worker may need a page reload.', 'warn');
+          log('Reloading in 2 seconds...', 'warn');
+          setTimeout(() => location.reload(), 2000);
+        }
+        status.textContent = 'WebContainer boot failed';
+        return;
+      }
+      log('WebContainer booted.', 'success');
+
+      // Step 4: Mount files
+      status.textContent = 'Mounting file system...';
+      log('Mounting file system...', 'info');
+      const mountTree = buildMountTree(files);
+      await container.mount(mountTree);
+      log('File system mounted.', 'success');
+
+      // Step 5: Load Monaco
+      status.textContent = 'Loading editor...';
+      log('Loading Monaco editor...', 'info');
+
+      await new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js';
+        script.onload = () => {
+          require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs' } });
+          require(['vs/editor/editor.main'], resolve);
+        };
+        document.head.appendChild(script);
+      });
+
+      const editor = monaco.editor.create(document.getElementById('editor-container'), {
+        value: '// Select a file from the tree on the left',
+        language: 'plaintext',
+        theme: 'vs-dark',
+        minimap: { enabled: false },
+        fontSize: 13,
+        automaticLayout: true,
+      });
+
+      // File text cache (decoded strings for editable files)
+      const textCache = {};
+      for (const [path, content] of Object.entries(files)) {
+        try {
+          textCache[path] = new TextDecoder('utf-8', { fatal: true }).decode(content);
+        } catch { /* binary file, skip */ }
+      }
+
+      let currentPath = null;
+      let activeTreeItem = null;
+      let writeTimeout = null;
+
+      function openFile(path, treeEl) {
+        if (activeTreeItem) activeTreeItem.classList.remove('active');
+        if (treeEl) { treeEl.classList.add('active'); activeTreeItem = treeEl; }
+        currentPath = path;
+        const text = textCache[path] || '';
+        const model = monaco.editor.createModel(text, langForPath(path));
+        editor.setModel(model);
+      }
+
+      // Debounced write-back
+      editor.onDidChangeModelContent(() => {
+        if (!currentPath) return;
+        const value = editor.getValue();
+        textCache[currentPath] = value;
+        clearTimeout(writeTimeout);
+        writeTimeout = setTimeout(() => {
+          container.fs.writeFile(currentPath, value);
+        }, 300);
+      });
+
+      // Build tree UI
+      const treeEl = document.getElementById('file-tree');
+      buildFileTreeUI(files, treeEl, openFile);
+
+      // Auto-expand app/ and open a default file
+      const appDir = treeEl.querySelector('.tree-item.dir');
+      if (appDir) appDir.click();
+
+      const defaultFile = 'app/models/article.rb';
+      if (textCache[defaultFile]) {
+        const fileEl = treeEl.querySelector(`[data-path="${defaultFile}"]`);
+        if (fileEl) {
+          // Expand parent dirs
+          let parent = fileEl.parentElement;
+          while (parent && parent !== treeEl) {
+            if (parent.classList.contains('tree-dir-children')) {
+              parent.classList.add('open');
+              const dirItem = parent.previousElementSibling;
+              if (dirItem) dirItem.textContent = dirItem.textContent.replace('▸', '▾');
+            }
+            parent = parent.parentElement;
+          }
+          openFile(defaultFile, fileEl);
+        }
+      }
+
+      log('Editor ready.', 'success');
+
+      // Step 6: Start dev server
+      status.textContent = 'Starting dev server...';
+      log('Starting: npx juntos dev -d dexie --port 3000', 'info');
+
+      const serverProcess = await container.spawn('npx', ['juntos', 'dev', '-d', 'dexie', '--port', '3000']);
+
+      serverProcess.output.pipeTo(new WritableStream({
+        write(chunk) { log(chunk); }
+      }));
+
+      // Listen for server-ready
+      container.on('server-ready', (port, url) => {
+        log(`Server ready on port ${port}: ${url}`, 'success');
+        document.getElementById('preview-header').textContent = `Preview — ${url}`;
+        document.getElementById('preview-iframe').src = url;
+        document.getElementById('loading-overlay').style.display = 'none';
+      });
+
+      // Fallback: hide overlay after 60s even if no server-ready
+      setTimeout(() => {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay.style.display !== 'none') {
+          overlay.style.display = 'none';
+          log('Timeout waiting for server-ready event. Check terminal output above.', 'warn');
+        }
+      }, 60000);
+    }
+
+    boot().catch(err => {
+      log(`Fatal error: ${err.message}`, 'error');
+      console.error(err);
+    });
+  </script>
+</body>
+</html>

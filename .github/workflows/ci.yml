@@ -538,6 +538,14 @@ jobs:
             (cd "artifacts/$demo" && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
           done
 
+      - name: Package editor snapshots
+        run: |
+          mkdir -p _site/editor/snapshots
+          for demo in blog chat photo_gallery dictaphone workflow notes; do
+            echo "Packaging $demo snapshot for editor..."
+            (cd "artifacts/$demo" && rm -rf dist tmp log storage .git && tar -czf "../../_site/editor/snapshots/${demo}.tar.gz" .)
+          done
+
       - name: Build Astro demo
         run: |
           echo "Building astro-blog for GitHub Pages..."
@@ -634,6 +642,11 @@ jobs:
           </html>
           EOF
 
+          # Copy editor page
+          mkdir -p _site/editor
+          cp editor/index.html _site/editor/
+          cp editor/coi-serviceworker.js _site/editor/
+
           # Copy browser demos
           cp -r artifacts/blog/dist _site/blog
           cp -r artifacts/chat/dist _site/chat
@@ -714,6 +727,14 @@ jobs:
               <div class="demo">
                 <h3><a href="workflow/">Workflow Builder</a></h3>
                 <p>Third-party React libraries: React Flow.</p>
+              </div>
+            </div>
+
+            <h2 class="section">Interactive Editor</h2>
+            <div class="demos">
+              <div class="demo">
+                <h3><a href="editor/?demo=blog">Editor (Blog)</a></h3>
+                <p>Edit Ruby source files in-browser with live preview via WebContainers.</p>
               </div>
             </div>
 
