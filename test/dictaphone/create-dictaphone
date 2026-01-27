@@ -262,7 +262,7 @@ TURBO
 mkdir -p app/javascript/controllers
 cat > app/javascript/controllers/dictaphone_controller.rb << 'STIMULUS'
 # Whisper speech-to-text via Transformers.js
-import ["pipeline"], from: '@xenova/transformers'
+import ["pipeline", "read_audio"], from: '@xenova/transformers'
 # Active Storage for audio file persistence
 import ["initActiveStorage"], from: 'juntos:active-storage'
 # Clip model for client-side persistence
@@ -459,11 +459,17 @@ class DictaphoneController < Stimulus::Controller
     transcriptTarget.placeholder = "Transcribing..."
 
     begin
-      # Convert blob to array buffer for Whisper
-      arrayBuffer = await blob.arrayBuffer()
+      # Create object URL for read_audio
+      audioUrl = URL.createObjectURL(blob)
+
+      # Convert audio to Float32Array at 16kHz (Whisper's expected format)
+      audioData = await read_audio(audioUrl, 16000)
+
+      # Clean up object URL
+      URL.revokeObjectURL(audioUrl)
 
       # Transcribe
-      result = await @transcriber.call(arrayBuffer)
+      result = await @transcriber.call(audioData)
 
       transcriptTarget.value = result.text.strip()
       transcriptTarget.placeholder = "Transcription will appear here..."
