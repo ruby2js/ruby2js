@@ -157,8 +157,7 @@ SEEDS
 mkdir -p app/views/notes
 
 cat > app/views/notes/Index.jsx.rb << 'RBX'
-# React is auto-imported when JSX is used (React 17+ style)
-import [useState, useEffect], from: 'react'
+import React, [useState, useEffect], from: 'react'
 import [notes_path, note_path], from: 'config/routes.rb'
 import JsonStreamProvider, [useJsonStream], from: 'ruby2js-rails/components/JsonStreamProvider'
 
@@ -382,7 +381,7 @@ RBX
 
 # Create Show view
 cat > app/views/notes/Show.jsx.rb << 'RBX'
-# React is auto-imported when JSX is used (React 17+ style)
+import React from 'react'
 import [note_path, notes_path], from: 'config/routes.rb'
 
 # Show component for a single note
@@ -417,13 +416,101 @@ rm -f app/views/notes/edit.html.erb
 rm -f app/views/notes/_form.html.erb
 rm -f app/views/notes/_note.html.erb
 
-# Configure ruby2js for the notes demo
-cat > config/ruby2js.yml << 'CONFIG'
-# React ecosystem dependencies for RBX files
-dependencies:
-  react: "^18.2.0"
-  react-dom: "^18.2.0"
-CONFIG
+# Update fixtures with valid data
+mkdir -p test/fixtures
+
+cat > test/fixtures/notes.yml << 'FIXTURES'
+one:
+  title: Welcome to Notes
+  body: This is a demo of Ruby2JS path helper RPC with React components.
+
+two:
+  title: Path Helper Methods
+  body: Path helpers now have HTTP methods for CRUD operations on resources.
+FIXTURES
+
+# Create integration test for notes (demo-specific)
+cat > test/notes.test.mjs << 'TEST'
+import { describe, it, expect } from 'vitest';
+
+describe('Note Model', () => {
+  it('creates a note with valid attributes', async () => {
+    const { Note } = await import('juntos:models');
+
+    const note = await Note.create({
+      title: 'Test Note',
+      body: 'This is the body of the test note with enough content.'
+    });
+
+    expect(note.id).toBeDefined();
+    expect(note.title).toBe('Test Note');
+  });
+
+  it('validates title presence', async () => {
+    const { Note } = await import('juntos:models');
+
+    const note = new Note({ title: '', body: 'Valid body content here.' });
+    const saved = await note.save();
+
+    expect(saved).toBe(false);
+    expect(note.errors.title).toBeDefined();
+  });
+
+  it('validates body presence', async () => {
+    const { Note } = await import('juntos:models');
+
+    const note = new Note({ title: 'Valid Title', body: '' });
+    const saved = await note.save();
+
+    expect(saved).toBe(false);
+    expect(note.errors.body).toBeDefined();
+  });
+
+  it('lists all notes', async () => {
+    const { Note } = await import('juntos:models');
+
+    await Note.create({ title: 'Note A', body: 'Body of note A for listing test.' });
+    await Note.create({ title: 'Note B', body: 'Body of note B for listing test.' });
+
+    const notes = await Note.all;
+    expect(notes.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('updates a note', async () => {
+    const { Note } = await import('juntos:models');
+
+    const note = await Note.create({
+      title: 'Original Title',
+      body: 'Original body content here.'
+    });
+
+    note.title = 'Updated Title';
+    await note.save();
+
+    const found = await Note.find(note.id);
+    expect(found.title).toBe('Updated Title');
+  });
+
+  it('deletes a note', async () => {
+    const { Note } = await import('juntos:models');
+
+    const note = await Note.create({
+      title: 'To Delete',
+      body: 'This note will be deleted.'
+    });
+
+    const id = note.id;
+    await note.destroy();
+
+    try {
+      await Note.find(id);
+      expect(true).toBe(false); // should not reach here
+    } catch (e) {
+      expect(e).toBeDefined();
+    }
+  });
+});
+TEST
 
 # Rebuild Tailwind CSS
 bin/rails tailwindcss:build
