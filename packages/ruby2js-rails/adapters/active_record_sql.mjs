@@ -630,6 +630,7 @@ export class ActiveRecordSQL extends ActiveRecordBase {
 
   // Format a value for binding (override in dialect for booleans)
   static _formatValue(val) {
+    if (val instanceof Date) return val.toISOString();
     return val;
   }
 
