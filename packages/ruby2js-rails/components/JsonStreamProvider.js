@@ -42,7 +42,7 @@ export default function JsonStreamProvider({ stream, endpoint = "/cable", childr
       setConnected(true);
 
       channel.onmessage = (event) => {
-        setLastMessage(event.data);
+        try { setLastMessage(JSON.parse(event.data)); } catch {}
       };
 
       return () => {

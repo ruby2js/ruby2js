@@ -686,7 +686,7 @@ export class TurboBroadcast {
     this.identifiers.delete(ws);
   }
 
-  // Broadcast a turbo-stream message to all subscribers of a channel
+  // Broadcast a message to all subscribers of a channel
   // Called by model broadcast_*_to methods
   // Uses Action Cable message format for compatibility with @hotwired/turbo-rails
   static broadcast(channel, html) {

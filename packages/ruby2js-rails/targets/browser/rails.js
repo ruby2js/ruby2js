@@ -796,14 +796,14 @@ export class TurboBroadcast {
     return this.channels.get(name);
   }
 
-  // Broadcast a turbo-stream message to all subscribers
-  // Called by model broadcast_*_to methods
+  // Broadcast a message to all subscribers
+  // Called by model broadcast_*_to and broadcast_json_to methods
   static broadcast(channelName, html) {
     console.log(`  [Broadcast] ${channelName}:`, html.substring(0, 100) + (html.length > 100 ? '...' : ''));
     const channel = this.getChannel(channelName);
     channel.postMessage(html);
-    // Also apply locally via Turbo
-    if (typeof Turbo !== 'undefined' && Turbo.renderStreamMessage) {
+    // Only render via Turbo for Turbo Stream content (not JSON broadcasts)
+    if (html.startsWith('<turbo-stream') && typeof Turbo !== 'undefined' && Turbo.renderStreamMessage) {
       Turbo.renderStreamMessage(html);
     }
   }
@@ -816,8 +816,8 @@ export class TurboBroadcast {
     const channel = this.getChannel(channelName);
     channel.onmessage = (event) => {
       console.log(`  [Received] ${channelName}:`, event.data.substring(0, 100) + (event.data.length > 100 ? '...' : ''));
-      // Render the turbo-stream via Turbo
-      if (typeof Turbo !== 'undefined' && Turbo.renderStreamMessage) {
+      // Only render via Turbo for Turbo Stream content (not JSON broadcasts)
+      if (event.data.startsWith('<turbo-stream') && typeof Turbo !== 'undefined' && Turbo.renderStreamMessage) {
         Turbo.renderStreamMessage(event.data);
       }
       // Also call custom callback if provided
