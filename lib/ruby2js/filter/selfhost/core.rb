@@ -86,6 +86,29 @@ module Ruby2JS
           dynamic_super_call(method_name, args)
         end
 
+        # Transform defined?(super) to check _parent prototype
+        # Ruby: defined?(super) -> "super" or nil
+        # JS selfhost: typeof this._parent?.methodName !== 'undefined'
+        #
+        # Must intercept before on_zsuper transforms the inner super node
+        # into a _parent.method.call() which would invoke the method.
+        def on_defined?(node)
+          var = node.children[0]
+          if [:super, :zsuper].include?(var.type)
+            method_info = @selfhost_method_stack&.last
+            if method_info
+              method_name = method_info[0]
+              # Replace the super node with a property access (no .call())
+              # so the defined? handler emits typeof check, not invocation.
+              # Use (attr (attr (self) :_parent) :methodName) which the
+              # converter will emit as this._parent.methodName
+              return s(:defined?,
+                s(:attr, s(:attr, s(:self), :_parent), method_name))
+            end
+          end
+          super
+        end
+
         # Convert Ruby2JS.ast_node?(x) to ast_node(x)
         # Convert Ruby2JS.convert(...) to convert(...)
         # These functions are imported from ruby2js.js, not methods on Ruby2JS module
