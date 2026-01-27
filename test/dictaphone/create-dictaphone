@@ -202,10 +202,10 @@ cat > app/views/clips/index.html.erb << 'VIEW'
     <div data-clips-list-target="clips" id="clips" class="space-y-4">
       <%# Server-rendered clips for Rails mode; client-side will repopulate %>
       <%= render @clips if defined?(@clips) %>
+      <p id="empty-message" class="text-gray-500 text-center py-12 hidden only:block">
+        No clips yet. Record something to get started!
+      </p>
     </div>
-    <p data-clips-list-target="empty" id="empty-message" class="text-gray-500 text-center py-12 hidden">
-      No clips yet. Record something to get started!
-    </p>
   </div>
 </div>
 VIEW
@@ -568,17 +568,15 @@ class ClipsListController < Stimulus::Controller
     clips = await Clip.all()
     clips.sort { |a, b| (b.created_at || 0) - (a.created_at || 0) }
 
-    clipsTarget.innerHTML = ""
+    # Remove existing clip elements but keep the empty message
+    clipsTarget.querySelectorAll('[data-clip-id]').each { |el| el.remove() }
 
-    if clips.length == 0
-      showEmptyMessage()
-    else
-      clips.each { |clip| renderClip(clip) }
-    end
+    # Render clips (empty message auto-hides via CSS only:block when clips exist)
+    clips.each { |clip| renderClip(clip) }
   end
 
   async def addClip(clip)
-    hideEmptyMessage()
+    # Just render the clip - CSS only:block handles hiding empty message
     renderClip(clip, prepend: true)
   end
 
@@ -660,20 +658,9 @@ class ClipsListController < Stimulus::Controller
       await clip.destroy()
     end
 
-    # Remove from DOM
+    # Remove from DOM (empty message auto-shows via CSS only:block when no clips)
     clipElement = element.querySelector("[data-clip-id='#{clipId}']")
     clipElement&.remove()
-
-    # Show empty message if no clips left
-    showEmptyMessage() if clipsTarget.children.length == 0
-  end
-
-  def showEmptyMessage
-    emptyTarget.classList.remove('hidden')
-  end
-
-  def hideEmptyMessage
-    emptyTarget.classList.add('hidden')
   end
 
   def escapeHtml(text)
