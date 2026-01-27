@@ -153,6 +153,9 @@ let storageInstance = null;
 
 // Initialize Active Storage with IndexedDB backend
 export async function initActiveStorage(options = {}) {
+  // Skip if already initialized (may be called from both Application.start and Stimulus)
+  if (storageInstance) return storageInstance;
+
   const storage = new IndexedDBStorage(options);
   await storage.initialize();
 

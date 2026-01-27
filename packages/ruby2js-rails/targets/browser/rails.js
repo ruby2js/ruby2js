@@ -406,6 +406,17 @@ export class Application extends ApplicationBase {
     // Make DB available globally for sql.js compatibility
     window.DB = adapter.getDatabase();
 
+    // Initialize Active Storage if available (must happen before views render
+    // so that attachment checks like clip.audio.attached?() can load from IndexedDB)
+    try {
+      const storage = await import('juntos:active-storage');
+      if (storage.initActiveStorage) {
+        await storage.initActiveStorage();
+      }
+    } catch (e) {
+      // Active Storage not available - no-op
+    }
+
     // Run migrations and check if this is a fresh database
     const { wasFresh } = await this.runMigrations(adapter);
 
