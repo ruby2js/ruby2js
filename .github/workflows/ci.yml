@@ -516,14 +516,6 @@ jobs:
           mkdir -p artifacts/cli
           tar -xzf artifacts/tarballs/ruby2js-rails-beta.tgz -C artifacts/cli
 
-      - name: Package editor snapshots
-        run: |
-          mkdir -p _site/editor/snapshots
-          for demo in blog chat photo_gallery dictaphone workflow notes; do
-            echo "Packaging $demo snapshot for editor..."
-            (cd "artifacts/$demo" && rm -rf tmp log storage .git && tar -czf "../../_site/editor/snapshots/${demo}.tar.gz" .)
-          done
-
       - name: Build browser demos
         run: |
           for demo in blog chat photo_gallery dictaphone workflow notes; do
@@ -544,6 +536,14 @@ jobs:
             fi
             # Build from demo root - pure JavaScript via Vite
             (cd "artifacts/$demo" && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
+          done
+
+      - name: Package editor snapshots
+        run: |
+          mkdir -p _site/editor/snapshots
+          for demo in blog chat photo_gallery dictaphone workflow notes; do
+            echo "Packaging $demo snapshot for editor..."
+            (cd "artifacts/$demo" && tar --exclude='./dist' --exclude='./tmp' --exclude='./log' --exclude='./storage' --exclude='./.git' -czf "../../_site/editor/snapshots/${demo}.tar.gz" .)
           done
 
       - name: Build Astro demo
