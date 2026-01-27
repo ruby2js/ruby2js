@@ -12,8 +12,12 @@ A notes app demonstrating Server Functions-style path helpers. Path helpers retu
 
 ## Create the App
 
+[**Try it live**](https://ruby2js.github.io/ruby2js/notes/) — no install required.
+
+To run locally:
+
 ```bash
-curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/notes/create-notes | bash -s notes
+npx github:ruby2js/juntos --demo notes
 cd notes
 ```
 

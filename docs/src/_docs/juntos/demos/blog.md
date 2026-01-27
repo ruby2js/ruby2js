@@ -12,8 +12,12 @@ A Rails blog with articles, comments, and real-time updates. The same code runs 
 
 ## Create the App
 
+[**Try it live**](https://ruby2js.github.io/ruby2js/blog/) — no install required.
+
+To run locally:
+
 ```bash
-curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/blog/create-blog | bash -s blog
+npx github:ruby2js/juntos --demo blog
 cd blog
 ```
 

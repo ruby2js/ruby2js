@@ -12,8 +12,12 @@ A camera-enabled photo gallery showcasing native device integration. The same co
 
 ## Create the App
 
+[**Try it live**](https://ruby2js.github.io/ruby2js/photo-gallery/) — no install required.
+
+To run locally:
+
 ```bash
-curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/photo_gallery/create-photo-gallery | bash -s photo_gallery
+npx github:ruby2js/juntos --demo photo_gallery
 cd photo_gallery
 ```
 

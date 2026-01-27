@@ -30,17 +30,17 @@ category: juntos-demos
 
 ## Try Them
 
-Each demo runs live - click to try without installing anything.
+[**Try the live demos**](https://ruby2js.github.io/ruby2js/) — each runs in your browser without installing anything. That page also has [downloads](https://ruby2js.github.io/ruby2js/releases/) including NPM packages, demo app tarballs, and create scripts.
 
-To run locally:
+To run locally, use the [Juntos quickstart](https://github.com/ruby2js/juntos):
 
 ```bash
-# Content demos
-curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/ssg-blog/create-ssg-blog | bash -s myapp
-
-# Application demos (blog, chat, notes, photo_gallery, workflow)
-curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/blog/create-blog | bash -s myapp
+npx github:ruby2js/juntos --demo blog
+cd blog
+npx juntos dev -d dexie
 ```
+
+Replace `blog` with any demo name: `chat`, `notes`, `photo_gallery`, `ssg-blog`, `astro-blog`, `workflow`.
 
 ---
 

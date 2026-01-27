@@ -12,8 +12,12 @@ A voice recording app with AI transcription. Record audio clips, get automatic t
 
 ## Create the App
 
+[**Try it live**](https://ruby2js.github.io/ruby2js/dictaphone/) — no install required.
+
+To run locally:
+
 ```bash
-curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/dictaphone/create-dictaphone | bash -s dictaphone
+npx github:ruby2js/juntos --demo dictaphone
 cd dictaphone
 ```
 

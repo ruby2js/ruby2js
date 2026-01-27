@@ -12,8 +12,12 @@ A real-time chat room demonstrating Hotwire patterns—Turbo Streams broadcastin
 
 ## Create the App
 
+[**Try it live**](https://ruby2js.github.io/ruby2js/chat/) — no install required.
+
+To run locally:
+
 ```bash
-curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/chat/create-chat | bash -s chat
+npx github:ruby2js/juntos --demo chat
 cd chat
 ```
 

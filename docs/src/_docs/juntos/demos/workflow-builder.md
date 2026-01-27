@@ -10,6 +10,17 @@ A visual workflow editor demonstrating React component integration with Rails pa
 
 {% toc %}
 
+## Create the App
+
+[**Try it live**](https://ruby2js.github.io/ruby2js/workflow/) — no install required.
+
+To run locally:
+
+```bash
+npx github:ruby2js/juntos --demo workflow
+cd workflow
+```
+
 ## Overview
 
 This demo shows how to integrate third-party React libraries (React Flow) with Juntos while maintaining Rails-like patterns:

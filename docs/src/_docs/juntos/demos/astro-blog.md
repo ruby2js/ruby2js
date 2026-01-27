@@ -12,8 +12,12 @@ A static blog built with Astro and Ruby2JS. Demonstrates `.astro.rb` pages, Prea
 
 ## Create the App
 
+[**Try it live**](https://ruby2js.github.io/ruby2js/astro-blog/) — no install required.
+
+To run locally:
+
 ```bash
-curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/astro-blog/create-astro-blog | bash -s astro-blog
+npx github:ruby2js/juntos --demo astro-blog
 cd astro-blog
 ```
 

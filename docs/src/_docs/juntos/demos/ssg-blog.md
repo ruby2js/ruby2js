@@ -25,8 +25,12 @@ No React. No islands. No ISR caching. Just content and queries.
 
 ## Create the App
 
+[**Try it live**](https://ruby2js.github.io/ruby2js/ssg-blog/) — no install required.
+
+To run locally:
+
 ```bash
-curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/ssg-blog/create-ssg-blog | bash -s ssg-blog
+npx github:ruby2js/juntos --demo ssg-blog
 cd ssg-blog
 ```
 
