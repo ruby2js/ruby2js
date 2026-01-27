@@ -186,9 +186,12 @@ function loadDatabaseConfig(options) {
         const envConfig = config[env];
 
         if (envConfig) {
-          if (envConfig.adapter) options.database = options.database || envConfig.adapter;
-          if (envConfig.database) options.dbName = options.dbName || envConfig.database;
-          if (envConfig.target) options.target = options.target || envConfig.target;
+          // Rails 7+ multi-database format nests configs under named keys
+          // (primary, cache, queue, cable). Use "primary" when present.
+          const primaryConfig = (!envConfig.adapter && envConfig.primary) ? envConfig.primary : envConfig;
+          if (primaryConfig.adapter) options.database = options.database || primaryConfig.adapter;
+          if (primaryConfig.database) options.dbName = options.dbName || primaryConfig.database;
+          if (primaryConfig.target) options.target = options.target || primaryConfig.target;
         }
       } else {
         // Fallback: naive parsing (doesn't handle YAML anchors)

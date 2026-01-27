@@ -177,6 +177,11 @@ function loadDatabaseConfig(appRoot, { quiet = false } = {}) {
       if (config && config[env]) {
         if (!quiet) console.log(`  Using config/database.yml [${env}]`);
         dbConfig = config[env];
+        // Rails 7+ multi-database format nests configs under named keys
+        // (primary, cache, queue, cable). Use "primary" when present.
+        if (dbConfig && !dbConfig.adapter && dbConfig.primary) {
+          dbConfig = dbConfig.primary;
+        }
       }
     } catch (e) {
       if (!quiet) console.warn(`  Warning: Failed to parse database.yml: ${e.message}`);
@@ -184,7 +189,14 @@ function loadDatabaseConfig(appRoot, { quiet = false } = {}) {
   }
 
   // Default config if database.yml not found or empty
-  dbConfig = dbConfig || { adapter: 'dexie', database: 'ruby2js_rails' };
+  const appName = path.basename(appRoot);
+  const defaultDbName = `${appName}_${env}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  dbConfig = dbConfig || { adapter: 'dexie', database: defaultDbName };
+
+  // Handle multi-database configs (Rails 7+ production format with nested keys)
+  if (!dbConfig.database) {
+    dbConfig.database = defaultDbName;
+  }
 
   // JUNTOS_DATABASE or DATABASE env var overrides adapter only
   const dbEnv = process.env.JUNTOS_DATABASE || process.env.DATABASE;
