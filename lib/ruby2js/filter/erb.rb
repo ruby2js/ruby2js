@@ -250,7 +250,6 @@ module Ruby2JS
       # Returns nil if not handled, or processed AST if handled
       def process_erb_block_append(block_node)
         # Delegate to filter chain (e.g., Rails::Helpers) via super
-        # Returns nil if no filter handles this block helper
         defined?(super) ? super : nil
       end
 
@@ -287,6 +286,7 @@ module Ruby2JS
       # Hook for subclasses to handle block helpers
       def process_erb_block_helper(helper_call, block_args, block_body)
         return super if defined?(super)
+        nil
       end
 
       # Convert final buffer reference to return statement

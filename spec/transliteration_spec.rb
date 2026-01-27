@@ -1082,6 +1082,11 @@ describe Ruby2JS do
       to_js( '!defined? x' ).must_equal "typeof x === 'undefined'"
     end
 
+    it "should handle defined?(super)" do
+      to_js( 'class A < B; def foo; defined?(super) ? super : nil; end; end' ).
+        must_include "typeof super.foo !== 'undefined'"
+    end
+
     it "should handle undef" do
       to_js( 'undef x' ).must_equal "delete x"
     end

@@ -9,7 +9,20 @@ module Ruby2JS
 
     handle :defined?, :undefined? do |var|
       op = (@ast.type == :defined? ? :"!==" : :===)
-      put "typeof "; parse var; put " #{ op } 'undefined'"
+
+      if [:super, :zsuper].include?(var.type)
+        # defined?(super) checks if parent defines the current method
+        method = @instance_method || @class_method
+        if method
+          method_name = method.children[0]
+          put "typeof super.#{method_name} #{op} 'undefined'"
+        else
+          # Outside a method: always undefined
+          put(@ast.type == :defined? ? 'false' : 'true')
+        end
+      else
+        put "typeof "; parse var; put " #{ op } 'undefined'"
+      end
     end
   end
 end
