@@ -472,7 +472,7 @@ describe('Note Model', () => {
     await Note.create({ title: 'Note A', body: 'Body of note A for listing test.' });
     await Note.create({ title: 'Note B', body: 'Body of note B for listing test.' });
 
-    const notes = await Note.all;
+    const notes = await Note.all();
     expect(notes.length).toBeGreaterThanOrEqual(2);
   });
 

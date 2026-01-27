@@ -711,10 +711,23 @@ export class ApplicationRecord extends ActiveRecord {}
           : '';
         return `${imports.join('\n')}
 import { Application } from 'juntos:rails';
-import { modelRegistry } from 'juntos:active-record';
+import { modelRegistry, attr_accessor } from 'juntos:active-record';
+import { migrations } from 'juntos:migrations';
 const models = { ${classNames.join(', ')} };
 Application.registerModels(models);${rpcRegistration}
 Object.assign(modelRegistry, models);
+
+// Define attribute accessors from migration schema (like Rails schema.rb)
+for (const migration of migrations) {
+  if (!migration.tableSchemas) continue;
+  for (const [table, schema] of Object.entries(migration.tableSchemas)) {
+    const model = Object.values(models).find(m => m.tableName === table);
+    if (!model) continue;
+    const columns = schema.split(', ').map(c => c.replace(/^[+&]*/g, '')).filter(c => c !== 'id');
+    attr_accessor(model, ...columns);
+  }
+}
+
 export { ${classNames.join(', ')} };
 `;
       }
@@ -2063,6 +2076,7 @@ function createVirtualPlugin(config, appRoot) {
   const ADAPTER_FILE_MAP = {
     'dexie': 'active_record_dexie.mjs',
     'sqlite': 'active_record_better_sqlite3.mjs',
+    'sqlite3': 'active_record_better_sqlite3.mjs',
     'better_sqlite3': 'active_record_better_sqlite3.mjs',
     'pg': 'active_record_pg.mjs',
     'postgres': 'active_record_pg.mjs',

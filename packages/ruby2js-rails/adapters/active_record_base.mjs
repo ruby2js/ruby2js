@@ -41,10 +41,12 @@ export class ActiveRecordBase {
     this.attributes = {};
     for (const [key, value] of Object.entries(attributes)) {
       const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(this), key);
-      if (descriptor?.set) {
+      if (descriptor?.get?._isAttrAccessor) {
+        // Column attribute with attr_accessor - use setter (writes to this.attributes)
+        this[key] = value;
+      } else if (descriptor?.set) {
+        // Association setter - only call with model instances
         // Don't copy to attributes - the setter will handle storing the FK
-        // But only call setter if value is a model instance (has .id getter)
-        // Skip if it's a plain object from DB reconstruction
         if (value && typeof value === 'object' && 'id' in value && typeof value.id !== 'undefined') {
           this[key] = value;
         }
@@ -388,13 +390,16 @@ export class ActiveRecordBase {
 // Helper to define attribute accessors on a class
 export function attr_accessor(klass, ...attrs) {
   for (const attr of attrs) {
+    const getter = function() { return this.attributes[attr]; };
+    getter._isAttrAccessor = true;
     Object.defineProperty(klass.prototype, attr, {
-      get() { return this.attributes[attr]; },
+      get: getter,
       set(value) {
         this.attributes[attr] = value;
         this._changes[attr] = value;
       },
-      enumerable: true
+      enumerable: true,
+      configurable: true
     });
   }
 }
