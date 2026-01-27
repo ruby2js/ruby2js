@@ -610,9 +610,22 @@ jobs:
                 <li><a href="demo-blog.tar.gz">demo-blog.tar.gz</a> - Blog demo (Rails, CRUD)</li>
                 <li><a href="demo-chat.tar.gz">demo-chat.tar.gz</a> - Chat demo (Turbo Streams)</li>
                 <li><a href="demo-notes.tar.gz">demo-notes.tar.gz</a> - Notes demo (JSON API)</li>
-                <li><a href="demo-photo-gallery.tar.gz">demo-photo-gallery.tar.gz</a> - Photo gallery demo</li>
+                <li><a href="demo-photo-gallery.tar.gz">demo-photo-gallery.tar.gz</a> - Photo gallery demo (Camera, Capacitor, Electron)</li>
                 <li><a href="demo-dictaphone.tar.gz">demo-dictaphone.tar.gz</a> - Dictaphone demo (Active Storage, Whisper)</li>
-                <li><a href="demo-workflow.tar.gz">demo-workflow.tar.gz</a> - Workflow builder demo</li>
+                <li><a href="demo-workflow.tar.gz">demo-workflow.tar.gz</a> - Workflow builder demo (React Flow, RPC)</li>
+              </ul>
+            </div>
+            <div class="section">
+              <h2>Create Scripts</h2>
+              <ul>
+                <li><a href="https://github.com/ruby2js/ruby2js/blob/master/test/ssg-blog/create-ssg-blog">create-ssg-blog</a> - SSG blog</li>
+                <li><a href="https://github.com/ruby2js/ruby2js/blob/master/test/astro-blog/create-astro-blog">create-astro-blog</a> - Astro blog</li>
+                <li><a href="https://github.com/ruby2js/ruby2js/blob/master/test/blog/create-blog">create-blog</a> - Blog</li>
+                <li><a href="https://github.com/ruby2js/ruby2js/blob/master/test/chat/create-chat">create-chat</a> - Chat</li>
+                <li><a href="https://github.com/ruby2js/ruby2js/blob/master/test/notes/create-notes">create-notes</a> - Notes</li>
+                <li><a href="https://github.com/ruby2js/ruby2js/blob/master/test/photo_gallery/create-photo-gallery">create-photo-gallery</a> - Photo gallery</li>
+                <li><a href="https://github.com/ruby2js/ruby2js/blob/master/test/dictaphone/create-dictaphone">create-dictaphone</a> - Dictaphone</li>
+                <li><a href="https://github.com/ruby2js/ruby2js/blob/master/test/workflow/create-workflow">create-workflow</a> - Workflow builder</li>
               </ul>
             </div>
             <p class="back"><a href="../">← Back to demos</a></p>

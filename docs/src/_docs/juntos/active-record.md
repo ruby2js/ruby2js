@@ -494,7 +494,7 @@ Article.where(status: "published")
     ◀── { result: [...] }           ◀── Query results
 ```
 
-See [Architecture](/docs/juntos/architecture) for details on the RPC transport.
+See [Architecture](/docs/juntos/architecture) for details on the RPC transport, or the [Workflow Builder demo](/docs/juntos/demos/workflow-builder) for a working example.
 
 ## Next Steps
 
