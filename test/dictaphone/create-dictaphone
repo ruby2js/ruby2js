@@ -212,14 +212,14 @@ VIEW
 
 # Create clip partial
 cat > app/views/clips/_clip.html.erb << 'PARTIAL'
-<div id="<%= dom_id(clip) %>" class="bg-white rounded-lg shadow-md p-4">
+<div id="<%= dom_id(clip) %>" class="bg-white rounded-lg shadow-md p-4" data-controller="clip-audio" data-clip-id="<%= clip.id %>">
   <div class="flex justify-between items-start mb-3">
     <div>
       <h3 class="font-semibold text-lg"><%= clip.name %></h3>
       <span class="text-gray-500 text-sm">
         <%= clip.created_at.strftime("%b %d, %Y at %H:%M") %>
         <% if clip.duration %>
-          &middot; <%= "%.1f" % clip.duration %>s
+          &middot; <%= clip.duration.round(1) %>s
         <% end %>
       </span>
     </div>
@@ -232,11 +232,13 @@ cat > app/views/clips/_clip.html.erb << 'PARTIAL'
     <% end %>
   </div>
 
-  <% if clip.audio.attached? %>
-    <audio controls class="w-full mb-3">
-      <source src="<%= clip.audio.url %>" type="<%= clip.audio.content_type %>">
-    </audio>
-  <% end %>
+  <div data-clip-audio-target="audioContainer">
+    <% if clip.audio.attached? %>
+      <audio controls class="w-full mb-3" data-clip-audio-target="player">
+        <source src="<%= clip.audio.url %>" type="<%= clip.audio.content_type %>">
+      </audio>
+    <% end %>
+  </div>
 
   <% if clip.transcript.present? %>
     <div class="bg-gray-50 rounded p-3">
@@ -546,6 +548,49 @@ class DictaphoneController < Stimulus::Controller
     statusTarget.textContent = "Ready to record"
     statusTarget.classList.remove('bg-red-50', 'text-red-800')
     statusTarget.classList.add('bg-green-50', 'text-green-800')
+  end
+end
+STIMULUS
+
+# Create Stimulus clip audio controller (Ruby)
+# Handles async audio URL loading for clips rendered via ERB/Turbo
+cat > app/javascript/controllers/clip_audio_controller.rb << 'STIMULUS'
+import ["Clip"], from: 'juntos:models'
+
+class ClipAudioController < Stimulus::Controller
+  targets [:audioContainer, :player]
+
+  async def connect
+    clipId = element.dataset.clipId
+    return unless clipId
+
+    # Check if audio player exists and has invalid source (async function stringified)
+    if hasPlayerTarget
+      source = playerTarget.querySelector('source')
+      if source && source.src.includes('async')
+        # Source is invalid, need to reload
+        await loadAudioUrl(clipId)
+      end
+    else
+      # No player yet, try to load audio
+      await loadAudioUrl(clipId)
+    end
+  end
+
+  async def loadAudioUrl(clipId)
+    clip = await Clip.find(clipId)
+    return unless clip&.audio&.attached?
+
+    audioUrl = await clip.audio.url
+    audioType = clip.audio.content_type || 'audio/webm'
+
+    return unless audioUrl
+
+    audioContainerTarget.innerHTML = %{
+      <audio controls class="w-full mb-3" data-clip-audio-target="player">
+        <source src="#{audioUrl}" type="#{audioType}">
+      </audio>
+    }
   end
 end
 STIMULUS
