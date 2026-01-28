@@ -1389,11 +1389,11 @@ function createBrowserEntryPlugin(config, appRoot) {
     return indexHtmlContent;
   }
 
-  function getMainJs() {
-    if (!mainJsContent) {
-      mainJsContent = generateBrowserMainJs('../config/routes.rb', '../app/javascript/controllers/index.js');
-    }
-    return mainJsContent;
+  function getMainJs(isVirtual = false) {
+    // Virtual modules resolve from project root, real files from .browser/
+    const routesPath = isVirtual ? '/config/routes.rb' : '../config/routes.rb';
+    const controllersPath = isVirtual ? '/app/javascript/controllers/index.js' : '../app/javascript/controllers/index.js';
+    return generateBrowserMainJs(routesPath, controllersPath);
   }
 
   return {
@@ -1415,8 +1415,8 @@ function createBrowserEntryPlugin(config, appRoot) {
       // Generate index.html
       fs.writeFileSync(indexPath, getIndexHtml());
 
-      // Generate main.js
-      fs.writeFileSync(mainPath, getMainJs());
+      // Generate main.js (real file, uses relative paths from .browser/)
+      fs.writeFileSync(mainPath, getMainJs(false));
 
       console.log('[juntos] Generated .browser/ entry files for build');
     },
@@ -1433,7 +1433,7 @@ function createBrowserEntryPlugin(config, appRoot) {
     // For dev mode: load virtual main.js content
     load(id) {
       if (id === VIRTUAL_MAIN_ID) {
-        return getMainJs();
+        return getMainJs(true); // Virtual module uses root-relative paths
       }
       return null;
     }
