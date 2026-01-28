@@ -545,7 +545,16 @@ export class Application extends ApplicationBase {
           if (override) method = override.toUpperCase();
         }
 
-        const path = url.pathname;
+        // Strip format extension (.json, .html, .turbo_stream) for route matching
+        // Path helpers add .json by default, but routes are defined without extensions
+        let path = url.pathname;
+        let format = null;
+        const formatMatch = path.match(/\.(json|html|turbo_stream)$/);
+        if (formatMatch) {
+          format = formatMatch[1];
+          path = path.slice(0, -formatMatch[0].length);
+        }
+
         const result = Router.match(path, method);
 
         if (!result) {
@@ -625,6 +634,55 @@ export class Application extends ApplicationBase {
               : await controllerAction.call(route.controller, context, params);
             await FormHandler.handleResult(context, response, route.controllerName, route.action, route.controller, id);
           }
+        } else if (method === 'GET' && format === 'json') {
+          // JSON API request (e.g., notes_path().get() for React data fetching)
+          // Call the controller action and return JSON data
+          const { controller, action } = route;
+          const actionMethod = action === 'new' ? '$new' : action;
+
+          try {
+            let data;
+            if (route.nested) {
+              const parentId = parseInt(match[1]);
+              const id = match[2] ? parseInt(match[2]) : null;
+              data = id
+                ? await controller[actionMethod](context, parentId, id)
+                : await controller[actionMethod](context, parentId);
+            } else {
+              const id = match[1] ? parseInt(match[1]) : null;
+              data = id
+                ? await controller[actionMethod](context, id)
+                : await controller[actionMethod](context);
+            }
+
+            // If controller returns raw data (array/object), that's the JSON response
+            // If it returns { json: data }, extract the data
+            // If it returns rendered HTML, we can't convert that to JSON
+            let jsonData = data;
+            if (data && typeof data === 'object' && 'json' in data) {
+              jsonData = data.json;
+            }
+
+            // Create a mock Response object for PathHelperPromise
+            const responseBody = JSON.stringify(jsonData);
+            const mockResponse = new Response(responseBody, {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            });
+
+            // Resolve the fetch promise with our mock response
+            // This works because we prevented the default fetch
+            event.detail.resume?.(mockResponse);
+          } catch (e) {
+            console.error(`[juntos] JSON API error for ${path}:`, e);
+            // Return error as JSON
+            const errorResponse = new Response(JSON.stringify({ error: e.message }), {
+              status: 500,
+              headers: { 'Content-Type': 'application/json' }
+            });
+            event.detail.resume?.(errorResponse);
+          }
+          return; // Don't dispatch turbo:submit-end for GET requests
         }
 
         // Dispatch turbo:submit-end to maintain compatibility with Stimulus actions

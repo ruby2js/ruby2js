@@ -2248,10 +2248,22 @@ function createVirtualPlugin(config, appRoot) {
         const isClient = isClientBundlePath(importer);
         return isClient ? '\0juntos:active-storage:client' : '\0juntos:active-storage';
       }
+
+      // For browser targets, use browser-specific path helper that invokes controllers directly
+      // instead of making fetch() calls (which require a server)
+      if (id === 'ruby2js-rails/path_helper.mjs' && targetDir === 'browser') {
+        return '\0juntos:path-helper:browser';
+      }
+
       return null;
     },
 
     load(id) {
+      // Browser path helper - routes through controllers instead of fetch()
+      if (id === '\0juntos:path-helper:browser') {
+        return `export * from 'ruby2js-rails/path_helper_browser.mjs';`;
+      }
+
       // Server version of juntos:rails
       if (id === '\0juntos:rails') {
         return `export * from 'ruby2js-rails/targets/${targetDir}/rails.js';`;

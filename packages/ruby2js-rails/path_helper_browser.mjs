@@ -97,11 +97,24 @@ class PathHelperPromise {
 // Make PathHelperPromise thenable (works with await)
 PathHelperPromise.prototype[Symbol.toStringTag] = 'PathHelperPromise';
 
-// Router reference - set by initPathHelpers()
+// Lazy import Router to avoid circular dependency issues
+// Router is imported on first use, after all modules are loaded
 let Router = null;
+let RouterPromise = null;
+
+async function getRouter() {
+  if (Router) return Router;
+  if (!RouterPromise) {
+    RouterPromise = import('ruby2js-rails/targets/browser/rails.js').then(mod => {
+      Router = mod.Router;
+      return Router;
+    });
+  }
+  return RouterPromise;
+}
 
 /**
- * Initialize path helpers with Router reference
+ * Initialize path helpers with Router reference (legacy API)
  * Called during application setup
  * @param {Object} router - Router class with match() and route dispatch
  */
@@ -160,12 +173,14 @@ function syntheticResponse(result, format = 'json', status = 200) {
  * @returns {Promise<Response-like>} Synthetic response
  */
 async function invokeController(method, path, format, params) {
-  if (!Router) {
-    throw new Error('Path helpers not initialized. Call initPathHelpers(Router) first.');
+  // Lazy load Router on first use
+  const router = await getRouter();
+  if (!router) {
+    throw new Error('Router not available. Ensure browser/rails.js is loaded.');
   }
 
   // Match the route
-  const result = Router.match(path, method);
+  const result = router.match(path, method);
 
   if (!result) {
     return syntheticResponse({ error: 'Not Found' }, format, 404);
