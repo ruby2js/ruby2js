@@ -1550,12 +1550,24 @@ async function buildClientBundle(appRoot, config) {
   // Use vite.client.config.js in the root to avoid path issues
   const clientConfigPath = path.join(appRoot, 'vite.client.config.js');
 
+  // Pre-generate the juntos:paths content for the client bundle
+  // This must be done here because we need async Ruby2JS conversion
+  const pathsContent = await generatePathsModule(appRoot, { ...config, target: 'browser' });
+  // Escape for embedding in a template string
+  const escapedPathsContent = pathsContent
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$');
+
   // Inline the minimal plugins needed for client build
   // Can't use createClientPlugins() because it imports from the package context
   const clientConfigContent = `
 import path from 'node:path';
 
-// Minimal virtual plugin for client - RPC adapter and browser runtime
+// Pre-generated juntos:paths content (path helpers for routes)
+const PATHS_MODULE_CONTENT = \`${escapedPathsContent}\`;
+
+// Minimal virtual plugin for client - RPC adapter, browser runtime, and paths
 const clientVirtualPlugin = {
   name: 'juntos-client-virtual',
   enforce: 'pre',
@@ -1563,6 +1575,7 @@ const clientVirtualPlugin = {
     if (id === 'juntos:active-record') return '\\0juntos:active-record:rpc';
     if (id === 'juntos:rails') return '\\0juntos:rails:browser';
     if (id === 'juntos:active-storage') return '\\0juntos:active-storage:client';
+    if (id === 'juntos:paths') return '\\0juntos:paths';
     return null;
   },
   load(id) {
@@ -1575,6 +1588,9 @@ const clientVirtualPlugin = {
     if (id === '\\0juntos:active-storage:client') {
       // No-op: client bundle is for RPC hydration, not Active Storage
       return "export function initActiveStorage() {}";
+    }
+    if (id === '\\0juntos:paths') {
+      return PATHS_MODULE_CONTENT;
     }
     return null;
   }
@@ -1605,7 +1621,9 @@ export default {
     alias: {
       'components': path.resolve('app/components'),
       '@models': path.resolve('app/models'),
-      '@views': path.resolve('app/views')
+      '@views': path.resolve('app/views'),
+      // Path helpers - use virtual module to avoid circular dependency
+      '@config/paths.js': 'juntos:paths'
     },
     // Include .jsx.rb extension for Ruby+JSX files
     extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.jsx.rb', '.rb'],
