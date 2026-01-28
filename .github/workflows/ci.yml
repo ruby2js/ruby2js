@@ -672,11 +672,15 @@ jobs:
               h2.section { margin-top: 2rem; margin-bottom: 0.5rem; font-size: 1.1rem; color: #4a5568; }
               .tagline { font-weight: bold; color: #2d3748; margin-bottom: 0.5rem; }
               .demos { display: grid; gap: 1rem; margin-top: 1rem; }
-              .demo { padding: 1.5rem; background: #f7fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
+              .demo { padding: 1.5rem; background: #f7fafc; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-start; }
+              .demo-content { flex: 1; }
               .demo h3 { margin: 0 0 0.5rem 0; }
               .demo h3 a { color: #2563eb; text-decoration: none; }
               .demo h3 a:hover { text-decoration: underline; }
               .demo p { margin: 0; color: #4a5568; }
+              .demo-links { display: flex; flex-direction: column; gap: 0.25rem; margin-left: 1rem; font-size: 0.875rem; }
+              .demo-links a { color: #2563eb; text-decoration: none; white-space: nowrap; }
+              .demo-links a:hover { text-decoration: underline; }
               .releases { margin-top: 2rem; padding: 1rem; background: #edf2f7; border-radius: 8px; }
               .releases h2 { margin: 0 0 0.5rem 0; font-size: 1rem; }
               .releases a { color: #2563eb; }
@@ -687,55 +691,93 @@ jobs:
             <p class="tagline">Start anywhere. Go anywhere. Same patterns throughout.</p>
             <p>Whether you're publishing content or building an application, the same ActiveRecord patterns work everywhere.</p>
 
-            <h2 class="section">Starting from Content</h2>
-            <div class="demos">
-              <div class="demo">
-                <h3><a href="ssg-blog/">SSG Blog</a></h3>
-                <p>Pure static. Markdown → HTML. Zero JavaScript. (11ty)</p>
-              </div>
-              <div class="demo">
-                <h3><a href="astro-blog/">Astro Blog</a></h3>
-                <p>Content + islands. Client-side CRUD when needed. (Astro)</p>
-              </div>
-            </div>
-
             <h2 class="section">Starting from Application</h2>
             <div class="demos">
               <div class="demo">
-                <h3><a href="blog/">Blog</a></h3>
-                <p>Full CRUD. Deploy to browser, Node, or Edge. (Rails)</p>
+                <div class="demo-content">
+                  <h3><a href="blog/">Blog</a></h3>
+                  <p>Full CRUD. Deploy to browser, Node, or Edge. (Rails)</p>
+                </div>
+                <div class="demo-links">
+                  <a href="editor/?demo=blog">Editor</a>
+                  <a href="releases/demo-blog.tar.gz">Tarball</a>
+                </div>
               </div>
               <div class="demo">
-                <h3><a href="chat/">Chat</a></h3>
-                <p>Real-time Turbo Streams, Stimulus controllers. (Rails)</p>
+                <div class="demo-content">
+                  <h3><a href="chat/">Chat</a></h3>
+                  <p>Real-time Turbo Streams, Stimulus controllers. (Rails)</p>
+                </div>
+                <div class="demo-links">
+                  <a href="editor/?demo=chat">Editor</a>
+                  <a href="releases/demo-chat.tar.gz">Tarball</a>
+                </div>
               </div>
               <div class="demo">
-                <h3><a href="notes/">Notes</a></h3>
-                <p>JSON API, path helper RPC. (Rails + React)</p>
+                <div class="demo-content">
+                  <h3><a href="notes/">Notes</a></h3>
+                  <p>JSON API, path helper RPC. (Rails + React)</p>
+                </div>
+                <div class="demo-links">
+                  <a href="editor/?demo=notes">Editor</a>
+                  <a href="releases/demo-notes.tar.gz">Tarball</a>
+                </div>
+              </div>
+            </div>
+
+            <h2 class="section">Starting from Content</h2>
+            <div class="demos">
+              <div class="demo">
+                <div class="demo-content">
+                  <h3><a href="ssg-blog/">SSG Blog</a></h3>
+                  <p>Pure static. Markdown → HTML. Zero JavaScript. (11ty)</p>
+                </div>
+                <div class="demo-links">
+                  <a href="releases/demo-ssg-blog.tar.gz">Tarball</a>
+                </div>
+              </div>
+              <div class="demo">
+                <div class="demo-content">
+                  <h3><a href="astro-blog/">Astro Blog</a></h3>
+                  <p>Content + islands. Client-side CRUD when needed. (Astro)</p>
+                </div>
+                <div class="demo-links">
+                  <a href="releases/demo-astro-blog.tar.gz">Tarball</a>
+                </div>
               </div>
             </div>
 
             <h2 class="section">Adding Capabilities</h2>
             <div class="demos">
               <div class="demo">
-                <h3><a href="photo-gallery/">Photo Gallery</a></h3>
-                <p>Device APIs: camera, Capacitor, Electron.</p>
+                <div class="demo-content">
+                  <h3><a href="photo-gallery/">Photo Gallery</a></h3>
+                  <p>Device APIs: camera, Capacitor, Electron.</p>
+                </div>
+                <div class="demo-links">
+                  <a href="editor/?demo=photo_gallery">Editor</a>
+                  <a href="releases/demo-photo-gallery.tar.gz">Tarball</a>
+                </div>
               </div>
               <div class="demo">
-                <h3><a href="dictaphone/">Dictaphone</a></h3>
-                <p>Active Storage, Whisper AI speech-to-text.</p>
+                <div class="demo-content">
+                  <h3><a href="dictaphone/">Dictaphone</a></h3>
+                  <p>Active Storage, Whisper AI speech-to-text.</p>
+                </div>
+                <div class="demo-links">
+                  <a href="editor/?demo=dictaphone">Editor</a>
+                  <a href="releases/demo-dictaphone.tar.gz">Tarball</a>
+                </div>
               </div>
               <div class="demo">
-                <h3><a href="workflow/">Workflow Builder</a></h3>
-                <p>Third-party React libraries: React Flow.</p>
-              </div>
-            </div>
-
-            <h2 class="section">Interactive Editor</h2>
-            <div class="demos">
-              <div class="demo">
-                <h3><a href="editor/?demo=blog">Editor (Blog)</a></h3>
-                <p>Edit Ruby source files in-browser with live preview via WebContainers.</p>
+                <div class="demo-content">
+                  <h3><a href="workflow/">Workflow Builder</a></h3>
+                  <p>Third-party React libraries: React Flow.</p>
+                </div>
+                <div class="demo-links">
+                  <a href="editor/?demo=workflow">Editor</a>
+                  <a href="releases/demo-workflow.tar.gz">Tarball</a>
+                </div>
               </div>
             </div>
 
