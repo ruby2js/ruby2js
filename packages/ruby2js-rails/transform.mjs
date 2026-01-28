@@ -112,7 +112,7 @@ export function getBuildOptions(section, target) {
       return {
         ...baseOptions,
         autoexports: 'default',
-        filters: ['Pragma', 'React', 'Functions', 'ESM', 'Return'],
+        filters: ['Pragma', 'Rails_Helpers', 'React', 'Functions', 'ESM', 'Return'],
         target
       };
 

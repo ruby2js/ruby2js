@@ -25,6 +25,11 @@ module Ruby2JS
           @erb_asset_imports = [] # Track asset imports (images, videos, etc.) for Vite
         end
 
+        # No-op when used without ERB filter (ERB filter overrides this)
+        def erb_mark_async!
+          # Stub - ERB filter provides the real implementation
+        end
+
         # Check if layout mode is enabled (options are set after initialize)
         def erb_layout_mode?
           @options && @options[:layout]
@@ -331,7 +336,27 @@ module Ruby2JS
               s(:send, process(target), method))
           end
 
+          # Transform path_helper.get(...) to path_helper().get(...)
+          # Path helpers are functions that return objects with HTTP methods,
+          # so they must be called before accessing .get(), .post(), etc.
+          if target&.type == :send && path_helper_http_method?(method)
+            recv_receiver, recv_method, *recv_args = target.children
+            # Only transform zero-arg path helpers (path helpers with args already have parens)
+            if recv_receiver.nil? && recv_method.to_s.end_with?('_path') && recv_args.empty?
+              # Use :send! to force parentheses on zero-arg method call
+              forced_call = target.updated(:send!)
+              return process(s(:send, forced_call, method, *args))
+            end
+          end
+
           super
+        end
+
+        # HTTP methods that path helpers support
+        PATH_HELPER_HTTP_METHODS = %i[get post put patch delete].freeze
+
+        def path_helper_http_method?(method)
+          PATH_HELPER_HTTP_METHODS.include?(method)
         end
 
         # Override Erb's hook to handle send expressions that produce buffer operations

@@ -899,6 +899,34 @@ module Ruby2JS
           database = database.to_s.downcase
           !BROWSER_DATABASES.include?(database)
         end
+
+        # HTTP methods that path helpers support
+        PATH_HELPER_METHODS = %i[get post put patch delete].freeze
+
+        # Transform path_helper.get(...) to path_helper().get(...)
+        # Path helpers are functions that return objects with HTTP methods,
+        # so they must be called before accessing .get(), .post(), etc.
+        def on_send(node)
+          receiver, method, *args = node.children
+
+          # Check if this is a call to an HTTP method on a path helper
+          return super unless PATH_HELPER_METHODS.include?(method)
+          return super unless receiver
+
+          # Check if receiver is a path helper call (send with no receiver, name ends in _path)
+          if receiver.type == :send
+            recv_receiver, recv_method, *recv_args = receiver.children
+            if recv_receiver.nil? && recv_method.to_s.end_with?('_path')
+              # Transform: notes_path.get(...) => notes_path().get(...)
+              # Use :send! to force parentheses on zero-arg method call
+              # (send! forces interpretation as a method call even with zero parameters)
+              forced_call = receiver.updated(:send!)
+              return process(s(:send, forced_call, method, *args))
+            end
+          end
+
+          super
+        end
       end
     end
 
