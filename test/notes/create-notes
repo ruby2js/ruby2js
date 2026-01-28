@@ -56,7 +56,7 @@ class NotesController < ApplicationController
   before_action :set_note, only: [:show, :edit, :update, :destroy]
 
   def index
-    @notes = Note.order(updated_at: :desc)
+    @notes = Note.order(updated_at: :desc).all
 
     respond_to do |format|
       format.html
@@ -202,6 +202,7 @@ def Editor(note:, onUpdate:, onDelete:)
   useEffect(-> {
     setNoteTitle(note.title)
     setNoteBody(note.body)
+    nil  # useEffect must not return a value
   }, [note.id])
 
   handleTitleChange = ->(e) { setNoteTitle(e.target.value) }
@@ -269,6 +270,7 @@ def NotesApp()
       setNotes(notes.filter { |n| n.id != stream.lastMessage.data.id })
       setSelectedId(nil) if selectedId == stream.lastMessage.data.id
     end
+    nil  # useEffect must not return a value
   }, [stream.lastMessage])
 
   # Load notes on mount and when search changes
@@ -281,6 +283,7 @@ def NotesApp()
       setNotes(data)
       setLoading(false)
     end
+    nil  # useEffect must not return a value (the .json call returns a Promise)
   }, [searchQuery])
 
   selectedNote = notes.find { |n| n.id == selectedId }
