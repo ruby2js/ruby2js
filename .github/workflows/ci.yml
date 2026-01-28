@@ -645,6 +645,7 @@ jobs:
           # Copy editor page
           mkdir -p _site/editor
           cp editor/index.html _site/editor/
+          cp editor/explore.html _site/editor/
           cp editor/coi-serviceworker.js _site/editor/
 
           # Copy browser demos
