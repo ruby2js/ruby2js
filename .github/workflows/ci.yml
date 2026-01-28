@@ -541,7 +541,7 @@ jobs:
       - name: Package editor snapshots
         run: |
           mkdir -p _site/editor/snapshots
-          for demo in blog chat photo_gallery dictaphone workflow notes; do
+          for demo in blog chat photo_gallery dictaphone workflow notes ssg-blog astro-blog; do
             echo "Packaging $demo snapshot for editor..."
             (cd "artifacts/$demo" && tar --exclude='./dist' --exclude='./tmp' --exclude='./log' --exclude='./storage' --exclude='./.git' -czf "../../_site/editor/snapshots/${demo}.tar.gz" .)
           done
@@ -700,6 +700,7 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=blog">Editor</a>
+                  <a href="https://github.com/ruby2js/ruby2js/blob/master/test/blog/create-blog">Create</a>
                   <a href="releases/demo-blog.tar.gz">Tarball</a>
                 </div>
               </div>
@@ -710,6 +711,7 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=chat">Editor</a>
+                  <a href="https://github.com/ruby2js/ruby2js/blob/master/test/chat/create-chat">Create</a>
                   <a href="releases/demo-chat.tar.gz">Tarball</a>
                 </div>
               </div>
@@ -720,6 +722,7 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=notes">Editor</a>
+                  <a href="https://github.com/ruby2js/ruby2js/blob/master/test/notes/create-notes">Create</a>
                   <a href="releases/demo-notes.tar.gz">Tarball</a>
                 </div>
               </div>
@@ -733,6 +736,8 @@ jobs:
                   <p>Pure static. Markdown → HTML. Zero JavaScript. (11ty)</p>
                 </div>
                 <div class="demo-links">
+                  <a href="editor/?demo=ssg-blog">Editor</a>
+                  <a href="https://github.com/ruby2js/ruby2js/blob/master/test/ssg-blog/create-ssg-blog">Create</a>
                   <a href="releases/demo-ssg-blog.tar.gz">Tarball</a>
                 </div>
               </div>
@@ -742,6 +747,8 @@ jobs:
                   <p>Content + islands. Client-side CRUD when needed. (Astro)</p>
                 </div>
                 <div class="demo-links">
+                  <a href="editor/?demo=astro-blog">Editor</a>
+                  <a href="https://github.com/ruby2js/ruby2js/blob/master/test/astro-blog/create-astro-blog">Create</a>
                   <a href="releases/demo-astro-blog.tar.gz">Tarball</a>
                 </div>
               </div>
@@ -756,6 +763,7 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=photo_gallery">Editor</a>
+                  <a href="https://github.com/ruby2js/ruby2js/blob/master/test/photo_gallery/create-photo-gallery">Create</a>
                   <a href="releases/demo-photo-gallery.tar.gz">Tarball</a>
                 </div>
               </div>
@@ -766,6 +774,7 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=dictaphone">Editor</a>
+                  <a href="https://github.com/ruby2js/ruby2js/blob/master/test/dictaphone/create-dictaphone">Create</a>
                   <a href="releases/demo-dictaphone.tar.gz">Tarball</a>
                 </div>
               </div>
@@ -776,6 +785,7 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=workflow">Editor</a>
+                  <a href="https://github.com/ruby2js/ruby2js/blob/master/test/workflow/create-workflow">Create</a>
                   <a href="releases/demo-workflow.tar.gz">Tarball</a>
                 </div>
               </div>
