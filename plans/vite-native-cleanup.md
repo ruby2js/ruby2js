@@ -689,6 +689,25 @@ The system test builds and runs correctly:
 6. **View module reserved word handling** - The view module was exporting `new_` but controllers expected `$new`.
    - **Fixed:** Changed vite.mjs to use `$` prefix (Ruby2JS convention) instead of `_` suffix for reserved words like `new`, `delete`, etc.
 
+**WebContainers Support (January 2026):**
+
+Added support for running Juntos demos in WebContainers (browser-based Node.js):
+
+1. **Virtual browser entry** - In dev mode, `.browser/index.html` and `main.js` are served virtually (no files created). Files only generated at build time. This fixes WebContainers compatibility where Vite's dependency scanner would fail trying to resolve non-existent files.
+
+2. **SPA fallback middleware** - Virtual HTML served for all routes without file extensions, not just `/`. Enables client-side routing to work after HMR reloads.
+
+3. **Root-relative imports for virtual modules** - Virtual `main.js` uses `/config/routes.rb` (root-relative) instead of `../config/routes.rb` (relative from non-existent `.browser/` directory).
+
+4. **Interactive editor** - `editor/index.html` provides Monaco editor + terminal + preview, all running in WebContainers. Users can edit Ruby source and see live updates via Vite.
+
+**Benefits:**
+- Zero-install development experience (no Node, no Ruby, just a browser)
+- Demonstrates "Rails in browser" capabilities interactively
+- `.browser/` added to `.gitignore` by `juntos init` (only created at build time)
+
+**Limitation:** Currently triggers full page refresh on changes, not true HMR. See Phase 6 for Turbo 8 morphing exploration.
+
 **Pending work:**
 
 - Restore chat, notes, photo_gallery, workflow integration tests with Vite-native updates
