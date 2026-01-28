@@ -1123,12 +1123,22 @@ export { application };`,
       const appName = detectAppName(appRoot);
       const indexHtml = generateBrowserIndexHtml(appName, '/.browser/main.js');
 
-      // Middleware to serve virtual index.html for root requests
+      // Middleware to serve virtual index.html for HTML requests (SPA fallback)
       server.middlewares.use(async (req, res, next) => {
-        if (req.url === '/' || req.url === '/index.html') {
+        const url = req.url || '/';
+        const pathname = url.split('?')[0];
+
+        // Serve virtual HTML for:
+        // - Root path (/)
+        // - Paths without file extensions (SPA routes like /articles/new)
+        // - Explicit /index.html
+        const hasExtension = pathname.includes('.') && !pathname.endsWith('.html');
+        const isApiOrAsset = pathname.startsWith('/@') || pathname.startsWith('/node_modules/');
+
+        if (!hasExtension && !isApiOrAsset) {
           try {
             // Transform HTML through Vite's pipeline (handles HMR injection, etc.)
-            const transformedHtml = await server.transformIndexHtml(req.url, indexHtml);
+            const transformedHtml = await server.transformIndexHtml(url, indexHtml);
             res.setHeader('Content-Type', 'text/html');
             res.end(transformedHtml);
           } catch (err) {
