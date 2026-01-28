@@ -291,7 +291,9 @@ module Ruby2JS
           end
 
           # Handle render partial calls
-          if method == :render && target.nil? && args.any?
+          # Skip in JSX context - React filter converts JSX to "render Component.new"
+          # which should be handled by React, not as ERB partials
+          if method == :render && target.nil? && args.any? && !@jsx_content
             result = process_render_partial(args)
             return result if result
           end
