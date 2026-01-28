@@ -6,20 +6,19 @@
   <title>Ruby2JS Editor</title>
   <script src="coi-serviceworker.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/editor/editor.main.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; font-family: system-ui, sans-serif; background: #1e1e1e; color: #ccc; }
-    #app { display: grid; grid-template-columns: 220px 1fr 1fr; grid-template-rows: 1fr 180px; height: 100vh; }
+    #app { display: grid; grid-template-columns: 220px 1fr 1fr; grid-template-rows: 1fr 220px; height: 100vh; }
     #file-tree { grid-row: 1 / 2; overflow-y: auto; background: #252526; border-right: 1px solid #333; padding: 8px 0; font-size: 13px; }
     #editor-container { grid-row: 1 / 2; min-width: 0; }
     #preview-pane { grid-row: 1 / 2; border-left: 1px solid #333; display: flex; flex-direction: column; }
     #preview-pane iframe { flex: 1; border: none; background: #fff; }
     #preview-header { padding: 4px 8px; background: #252526; border-bottom: 1px solid #333; font-size: 12px; color: #999; }
-    #terminal { grid-column: 1 / -1; grid-row: 2 / 3; background: #1a1a1a; border-top: 1px solid #333; overflow-y: auto; padding: 8px; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
-    #terminal .info { color: #569cd6; }
-    #terminal .error { color: #f44747; }
-    #terminal .success { color: #6a9955; }
-    #terminal .warn { color: #d7ba7d; }
+    #terminal-pane { grid-column: 1 / -1; grid-row: 2 / 3; border-top: 1px solid #333; display: flex; flex-direction: column; }
+    #terminal-header { padding: 4px 8px; background: #252526; border-bottom: 1px solid #333; font-size: 12px; color: #999; }
+    #terminal { flex: 1; }
 
     .tree-item { padding: 2px 8px 2px 0; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tree-item:hover { background: #2a2d2e; }
@@ -47,23 +46,20 @@
       <div id="preview-header">Preview</div>
       <iframe id="preview-iframe" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
     </div>
-    <div id="terminal"></div>
+    <div id="terminal-pane">
+      <div id="terminal-header">Terminal</div>
+      <div id="terminal"></div>
+    </div>
   </div>
 
-  <script>
+  <script type="module">
+    import { Terminal } from 'https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/+esm';
+    import { FitAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/+esm';
+
     // Determine demo from URL params
     const params = new URLSearchParams(location.search);
     const demo = params.get('demo') || 'blog';
     document.title = `Ruby2JS Editor — ${demo}`;
-
-    const term = document.getElementById('terminal');
-    function log(msg, cls = '') {
-      const el = document.createElement('div');
-      el.className = cls;
-      el.textContent = msg;
-      term.appendChild(el);
-      term.scrollTop = term.scrollHeight;
-    }
 
     // Editable file extensions
     const EDITABLE_EXT = /\.(rb|erb|html|css|js|json|yml|yaml|rake|ru|gemfile)$/i;
@@ -76,73 +72,12 @@
       for (const d of EDITABLE_DIRS) {
         if (path.startsWith(d) || path === d.replace(/\/$/, '')) return true;
       }
-      // Show top-level config files
       if (!path.includes('/') && EDITABLE_EXT.test(path)) return true;
       return false;
     }
 
-    // Tar parser: extract files from an uncompressed tar ArrayBuffer
-    function parseTar(buffer) {
-      const files = {};
-      const view = new Uint8Array(buffer);
-      let offset = 0;
-
-      while (offset < view.length - 512) {
-        // Read file name
-        const nameBytes = view.slice(offset, offset + 100);
-        let name = new TextDecoder().decode(nameBytes).replace(/\0+$/, '');
-        if (!name) break;
-
-        // Remove leading ./ if present
-        if (name.startsWith('./')) name = name.slice(2);
-        if (!name) { offset += 512; continue; }
-
-        // File type (byte 156)
-        const typeFlag = String.fromCharCode(view[offset + 156]);
-
-        // File size (octal, bytes 124-135)
-        const sizeStr = new TextDecoder().decode(view.slice(offset + 124, offset + 136)).replace(/\0+$/, '').trim();
-        const size = parseInt(sizeStr, 8) || 0;
-
-        // Move past header
-        offset += 512;
-
-        if (typeFlag === '0' || typeFlag === '\0' || typeFlag === '') {
-          // Regular file
-          const content = view.slice(offset, offset + size);
-          files[name] = content;
-        }
-
-        // Advance past file data (rounded up to 512-byte blocks)
-        offset += Math.ceil(size / 512) * 512;
-      }
-      return files;
-    }
-
-    // Convert flat file map to WebContainer mount tree
-    function buildMountTree(files) {
-      const tree = {};
-      for (const [path, content] of Object.entries(files)) {
-        const parts = path.split('/');
-        let node = tree;
-        for (let i = 0; i < parts.length - 1; i++) {
-          if (!node[parts[i]]) node[parts[i]] = { directory: {} };
-          node = node[parts[i]].directory;
-        }
-        const fileName = parts[parts.length - 1];
-        // Try to decode as UTF-8 text; fall back to binary
-        try {
-          const text = new TextDecoder('utf-8', { fatal: true }).decode(content);
-          node[fileName] = { file: { contents: text } };
-        } catch {
-          node[fileName] = { file: { contents: content } };
-        }
-      }
-      return tree;
-    }
-
     // Build file tree UI
-    function buildFileTreeUI(files, container, onFileClick) {
+    function buildFileTreeUI(files, containerEl, onFileClick) {
       const paths = Object.keys(files).filter(shouldShow).sort();
       const dirTree = {};
 
@@ -152,7 +87,7 @@
         for (let i = 0; i < parts.length; i++) {
           const key = parts[i];
           if (i === parts.length - 1) {
-            node[key] = p; // leaf = full path
+            node[key] = p;
           } else {
             if (!node[key] || typeof node[key] === 'string') node[key] = {};
             node = node[key];
@@ -173,7 +108,7 @@
             const dirEl = document.createElement('div');
             dirEl.className = 'tree-item dir';
             dirEl.style.paddingLeft = (depth * 12 + 8) + 'px';
-            dirEl.textContent = '▸ ' + name;
+            dirEl.textContent = '\u25B8 ' + name;
             parent.appendChild(dirEl);
 
             const children = document.createElement('div');
@@ -182,7 +117,7 @@
 
             dirEl.addEventListener('click', () => {
               const open = children.classList.toggle('open');
-              dirEl.textContent = (open ? '▾ ' : '▸ ') + name;
+              dirEl.textContent = (open ? '\u25BE ' : '\u25B8 ') + name;
             });
 
             renderTree(value, children, depth + 1);
@@ -198,7 +133,7 @@
         }
       }
 
-      renderTree(dirTree, container, 0);
+      renderTree(dirTree, containerEl, 0);
     }
 
     // Language detection for Monaco
@@ -217,66 +152,59 @@
     async function boot() {
       const status = document.getElementById('loading-status');
 
-      // Step 1: Fetch snapshot
+      // Step 1: Fetch snapshot (JSON mount tree built by editor/snapshot.mjs)
       status.textContent = `Fetching ${demo} snapshot...`;
-      log(`Fetching snapshot for "${demo}"...`, 'info');
 
       const basePath = document.baseURI.includes('/editor/')
         ? document.baseURI.replace(/\/editor\/.*$/, '')
         : '/ruby2js';
-      const snapshotUrl = `${basePath}/editor/snapshots/${demo}.tar.gz`;
-      let response;
+      const snapshotUrl = `${basePath}/editor/snapshots/${demo}.json`;
+      let mountTree;
       try {
-        response = await fetch(snapshotUrl);
+        const response = await fetch(snapshotUrl);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        mountTree = await response.json();
       } catch (err) {
-        log(`Failed to fetch snapshot: ${err.message}`, 'error');
-        log(`URL: ${snapshotUrl}`, 'error');
-        status.textContent = 'Failed to load snapshot';
+        status.textContent = `Failed to load snapshot: ${err.message}`;
         return;
       }
-      log('Snapshot downloaded.', 'success');
-
-      // Step 2: Decompress
-      status.textContent = 'Decompressing...';
-      log('Decompressing tar.gz...', 'info');
-      const ds = new DecompressionStream('gzip');
-      const decompressed = response.body.pipeThrough(ds);
-      const tarBuffer = await new Response(decompressed).arrayBuffer();
-      const files = parseTar(tarBuffer);
-      const fileCount = Object.keys(files).length;
-      log(`Extracted ${fileCount} files.`, 'success');
 
       // Step 3: Boot WebContainer
       status.textContent = 'Booting WebContainer...';
-      log('Booting WebContainer...', 'info');
 
       const { WebContainer } = await import('https://unpkg.com/@webcontainer/api@1.5.1/dist/index.js');
       let container;
       try {
         container = await WebContainer.boot();
       } catch (err) {
-        log(`WebContainer boot failed: ${err.message}`, 'error');
         if (!window.crossOriginIsolated) {
-          log('Cross-Origin-Isolation is not enabled. The COI service worker may need a page reload.', 'warn');
-          log('Reloading in 2 seconds...', 'warn');
-          setTimeout(() => location.reload(), 2000);
+          status.textContent = 'Enabling Cross-Origin Isolation (reloading)...';
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          status.textContent = `WebContainer boot failed: ${err.message}`;
         }
-        status.textContent = 'WebContainer boot failed';
         return;
       }
-      log('WebContainer booted.', 'success');
 
-      // Step 4: Mount files
+      // Step 3: Mount files — decode base64 binary files to Uint8Array
       status.textContent = 'Mounting file system...';
-      log('Mounting file system...', 'info');
-      const mountTree = buildMountTree(files);
+      function decodeBinaries(node) {
+        for (const [key, value] of Object.entries(node)) {
+          if (value.directory) {
+            decodeBinaries(value.directory);
+          } else if (value.file && value.file.binary) {
+            const b64 = value.file.contents;
+            const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+            value.file.contents = bin;
+            delete value.file.binary;
+          }
+        }
+      }
+      decodeBinaries(mountTree);
       await container.mount(mountTree);
-      log('File system mounted.', 'success');
 
       // Step 5: Load Monaco
       status.textContent = 'Loading editor...';
-      log('Loading Monaco editor...', 'info');
 
       await new Promise((resolve) => {
         const script = document.createElement('script');
@@ -297,13 +225,23 @@
         automaticLayout: true,
       });
 
-      // File text cache (decoded strings for editable files)
+      // Extract flat file map from mount tree for editor and file tree
       const textCache = {};
-      for (const [path, content] of Object.entries(files)) {
-        try {
-          textCache[path] = new TextDecoder('utf-8', { fatal: true }).decode(content);
-        } catch { /* binary file, skip */ }
+      function extractFiles(node, prefix) {
+        for (const [name, entry] of Object.entries(node)) {
+          const path = prefix ? `${prefix}/${name}` : name;
+          if (entry.directory) {
+            extractFiles(entry.directory, path);
+          } else if (entry.file) {
+            const c = entry.file.contents;
+            if (typeof c === 'string') {
+              textCache[path] = c;
+            }
+            // skip binary (base64) files for editing
+          }
+        }
       }
+      extractFiles(mountTree, '');
 
       let currentPath = null;
       let activeTreeItem = null;
@@ -331,9 +269,9 @@
 
       // Build tree UI
       const treeEl = document.getElementById('file-tree');
-      buildFileTreeUI(files, treeEl, openFile);
+      buildFileTreeUI(textCache, treeEl, openFile);
 
-      // Auto-expand app/ and open a default file
+      // Auto-expand app/ and open default file
       const appDir = treeEl.querySelector('.tree-item.dir');
       if (appDir) appDir.click();
 
@@ -341,13 +279,12 @@
       if (textCache[defaultFile]) {
         const fileEl = treeEl.querySelector(`[data-path="${defaultFile}"]`);
         if (fileEl) {
-          // Expand parent dirs
           let parent = fileEl.parentElement;
           while (parent && parent !== treeEl) {
             if (parent.classList.contains('tree-dir-children')) {
               parent.classList.add('open');
               const dirItem = parent.previousElementSibling;
-              if (dirItem) dirItem.textContent = dirItem.textContent.replace('▸', '▾');
+              if (dirItem) dirItem.textContent = dirItem.textContent.replace('\u25B8', '\u25BE');
             }
             parent = parent.parentElement;
           }
@@ -355,43 +292,63 @@
         }
       }
 
-      log('Editor ready.', 'success');
-
-      // Step 6: Start dev server
-      status.textContent = 'Starting dev server...';
-      log('Starting Vite dev server...', 'info');
-
-      // Run vite directly — the CLI just calls `npx vite` after validation,
-      // but npx doesn't resolve local bins in WebContainers. The snapshot
-      // already has everything configured, so we can skip the CLI wrapper.
-      const serverProcess = await container.spawn('node', ['node_modules/vite/bin/vite.js', '--port', '3000'], {
-        env: { JUNTOS_DATABASE: 'dexie' }
+      // Step 6: Set up xterm.js terminal
+      const xterm = new Terminal({
+        theme: {
+          background: '#1a1a1a',
+          foreground: '#cccccc',
+          cursor: '#ffffff',
+        },
+        fontSize: 13,
+        fontFamily: "'Cascadia Code', 'Fira Code', 'Menlo', monospace",
+        cursorBlink: true,
       });
+      const fitAddon = new FitAddon();
+      xterm.loadAddon(fitAddon);
+      xterm.open(document.getElementById('terminal'));
+      fitAddon.fit();
 
-      serverProcess.output.pipeTo(new WritableStream({
-        write(chunk) { log(chunk); }
-      }));
+      // Refit on resize
+      new ResizeObserver(() => fitAddon.fit()).observe(document.getElementById('terminal'));
 
-      // Listen for server-ready
+      // Hide overlay — editor and terminal are ready
+      document.getElementById('loading-overlay').style.display = 'none';
+
+      // Listen for server-ready to connect preview iframe
       container.on('server-ready', (port, url) => {
-        log(`Server ready on port ${port}: ${url}`, 'success');
+        xterm.writeln(`\r\n\x1b[32mServer ready on port ${port}: ${url}\x1b[0m`);
         document.getElementById('preview-header').textContent = `Preview — ${url}`;
         document.getElementById('preview-iframe').src = url;
-        document.getElementById('loading-overlay').style.display = 'none';
       });
 
-      // Fallback: hide overlay after 60s even if no server-ready
-      setTimeout(() => {
-        const overlay = document.getElementById('loading-overlay');
-        if (overlay.style.display !== 'none') {
-          overlay.style.display = 'none';
-          log('Timeout waiting for server-ready event. Check terminal output above.', 'warn');
-        }
-      }, 60000);
+      // Spawn interactive shell
+      const shell = await container.spawn('jsh', {
+        terminal: { cols: xterm.cols, rows: xterm.rows },
+        env: { JUNTOS_DATABASE: 'dexie' },
+      });
+
+      // Pipe shell output to xterm
+      shell.output.pipeTo(new WritableStream({
+        write(data) { xterm.write(data); }
+      }));
+
+      // Pipe xterm input to shell
+      const shellInput = shell.input.getWriter();
+      xterm.onData(data => shellInput.write(data));
+
+      // Resize shell when terminal resizes
+      xterm.onResize(({ cols, rows }) => {
+        shell.resize({ cols, rows });
+      });
+
+      // Log exit
+      shell.exit.then(code => {
+        xterm.writeln(`\r\n\x1b[33mShell exited (code ${code}). Refresh to restart.\x1b[0m`);
+      });
     }
 
     boot().catch(err => {
-      log(`Fatal error: ${err.message}`, 'error');
+      document.getElementById('loading-status').textContent = `Fatal: ${err.message}`;
       console.error(err);
     });
   </script>

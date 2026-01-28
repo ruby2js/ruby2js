@@ -34,3 +34,6 @@ demo/photo_gallery/
 demo/ssg-blog/
 demo/workflow_builder/
 artifacts/
+
+# Editor snapshots (built locally or by CI)
+editor/snapshots/

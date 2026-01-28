@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebContainers Explorer</title>
+  <script src="coi-serviceworker.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; font-family: system-ui, sans-serif; background: #1e1e1e; color: #ccc; }
+    #app { display: grid; grid-template-columns: 1fr 1fr; height: 100vh; }
+    #terminal-pane { display: flex; flex-direction: column; border-right: 1px solid #333; }
+    #terminal-header { padding: 8px 12px; background: #252526; border-bottom: 1px solid #333; font-size: 13px; }
+    #terminal { flex: 1; }
+    #preview-pane { display: flex; flex-direction: column; }
+    #preview-header { padding: 8px 12px; background: #252526; border-bottom: 1px solid #333; font-size: 13px; }
+    #preview-iframe { flex: 1; border: none; background: #fff; }
+    #loading { position: fixed; inset: 0; background: #1e1e1e; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; gap: 16px; }
+    #loading.hidden { display: none; }
+    .spinner { width: 32px; height: 32px; border: 3px solid #333; border-top-color: #569cd6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #status { font-size: 14px; color: #999; }
+    #progress { width: 300px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
+    #progress-bar { height: 100%; background: #569cd6; width: 0%; transition: width 0.3s; }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <div class="spinner"></div>
+    <div id="status">Initializing...</div>
+    <div id="progress"><div id="progress-bar"></div></div>
+  </div>
+  <div id="app">
+    <div id="terminal-pane">
+      <div id="terminal-header">Terminal</div>
+      <div id="terminal"></div>
+    </div>
+    <div id="preview-pane">
+      <div id="preview-header">Preview (waiting for server...)</div>
+      <iframe id="preview-iframe"></iframe>
+    </div>
+  </div>
+
+  <script type="module">
+    import { Terminal } from 'https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/+esm';
+    import { FitAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/+esm';
+
+    const RELEASES = 'https://ruby2js.github.io/ruby2js/releases';
+    const params = new URLSearchParams(location.search);
+    const demo = params.get('demo') || 'blog';
+
+    const status = document.getElementById('status');
+    const progressBar = document.getElementById('progress-bar');
+
+    function setProgress(pct, msg) {
+      progressBar.style.width = pct + '%';
+      if (msg) status.textContent = msg;
+    }
+
+    // =========================================================================
+    // Tar parser with pax extended header support
+    // =========================================================================
+    function parseTar(buffer) {
+      const files = {};
+      const view = new Uint8Array(buffer);
+      let offset = 0;
+      let paxHeaders = {};
+
+      while (offset < view.length - 512) {
+        // Check for empty block (end of archive)
+        let allZero = true;
+        for (let i = 0; i < 512 && allZero; i++) {
+          if (view[offset + i] !== 0) allZero = false;
+        }
+        if (allZero) break;
+
+        // Read header fields
+        const nameBytes = view.slice(offset, offset + 100);
+        let name = decodeString(nameBytes);
+
+        const mode = parseInt(decodeString(view.slice(offset + 100, offset + 108)), 8) || 0;
+        const sizeStr = decodeString(view.slice(offset + 124, offset + 136));
+        const size = parseInt(sizeStr, 8) || 0;
+        const typeFlag = String.fromCharCode(view[offset + 156]) || '0';
+
+        // USTAR prefix (bytes 345-500)
+        const prefix = decodeString(view.slice(offset + 345, offset + 500));
+        if (prefix) {
+          name = prefix + '/' + name;
+        }
+
+        // Check for pax path override
+        if (paxHeaders.path) {
+          name = paxHeaders.path;
+          delete paxHeaders.path;
+        }
+
+        // Remove leading ./
+        if (name.startsWith('./')) name = name.slice(2);
+
+        // Move past header
+        offset += 512;
+
+        if (typeFlag === 'x' || typeFlag === 'g') {
+          // Pax extended header - parse key=value pairs
+          const paxData = view.slice(offset, offset + size);
+          const paxStr = new TextDecoder().decode(paxData);
+          for (const line of paxStr.split('\n')) {
+            const match = line.match(/^\d+ ([^=]+)=(.*)$/);
+            if (match) {
+              paxHeaders[match[1]] = match[2];
+            }
+          }
+        } else if (typeFlag === 'L') {
+          // GNU long name
+          const longName = decodeString(view.slice(offset, offset + size));
+          paxHeaders.path = longName;
+        } else if ((typeFlag === '0' || typeFlag === '\0' || typeFlag === '') && name) {
+          // Regular file
+          const content = view.slice(offset, offset + size);
+          files[name] = { content: new Uint8Array(content), mode };
+        }
+        // Skip directories (typeFlag === '5') and other types
+
+        // Advance past data (rounded to 512-byte blocks)
+        offset += Math.ceil(size / 512) * 512;
+      }
+
+      return files;
+    }
+
+    function decodeString(bytes) {
+      const nullIdx = bytes.indexOf(0);
+      const slice = nullIdx >= 0 ? bytes.slice(0, nullIdx) : bytes;
+      return new TextDecoder().decode(slice);
+    }
+
+    // =========================================================================
+    // Build WebContainer mount tree from parsed files
+    // =========================================================================
+    function buildMountTree(files) {
+      const tree = {};
+
+      // Detect common prefix directory (e.g., "blog/") and strip it
+      const paths = Object.keys(files);
+      let stripPrefix = '';
+      if (paths.length > 0) {
+        const firstParts = paths[0].split('/');
+        if (firstParts.length > 1) {
+          const candidate = firstParts[0] + '/';
+          if (paths.every(p => p.startsWith(candidate))) {
+            stripPrefix = candidate;
+          }
+        }
+      }
+
+      for (const [rawPath, { content, mode }] of Object.entries(files)) {
+        // Strip the common prefix
+        const path = stripPrefix && rawPath.startsWith(stripPrefix)
+          ? rawPath.slice(stripPrefix.length)
+          : rawPath;
+
+        const parts = path.split('/').filter(p => p);
+        let node = tree;
+
+        for (let i = 0; i < parts.length - 1; i++) {
+          const dir = parts[i];
+          if (!node[dir]) node[dir] = { directory: {} };
+          node = node[dir].directory;
+        }
+
+        const fileName = parts[parts.length - 1];
+        if (!fileName) continue;
+
+        // Try to decode as UTF-8 text
+        let contents;
+        try {
+          const text = new TextDecoder('utf-8', { fatal: true }).decode(content);
+          // Check for binary content (null bytes in first 8KB)
+          let isBinary = false;
+          for (let i = 0; i < Math.min(content.length, 8192); i++) {
+            if (content[i] === 0) { isBinary = true; break; }
+          }
+          contents = isBinary ? content : text;
+        } catch {
+          contents = content; // Binary
+        }
+
+        node[fileName] = { file: { contents } };
+      }
+
+      return tree;
+    }
+
+    // =========================================================================
+    // Main boot sequence
+    // =========================================================================
+    async function boot() {
+      try {
+        // Step 1: Fetch all tarballs in parallel
+        setProgress(5, `Fetching ${demo} demo and packages...`);
+
+        const [demoResponse, ...packageResponses] = await Promise.all([
+          fetch(`${RELEASES}/demo-${demo}.tar.gz`),
+          fetch(`${RELEASES}/ruby2js-beta.tgz`),
+          fetch(`${RELEASES}/ruby2js-rails-beta.tgz`),
+          fetch(`${RELEASES}/vite-plugin-ruby2js-beta.tgz`),
+        ]);
+
+        if (!demoResponse.ok) {
+          throw new Error(`Demo "${demo}" not found (HTTP ${demoResponse.status})`);
+        }
+
+        setProgress(25, 'Decompressing demo...');
+
+        // Decompress demo tarball (it's .tar.gz)
+        const demoGz = await demoResponse.arrayBuffer();
+        const demoTar = await decompress(demoGz);
+
+        setProgress(35, 'Parsing demo files...');
+        const demoFiles = parseTar(demoTar);
+        const fileCount = Object.keys(demoFiles).length;
+
+        setProgress(45, `Building mount tree (${fileCount} files)...`);
+        const mountTree = buildMountTree(demoFiles);
+
+        // Add package tarballs as binary files in root
+        setProgress(50, 'Preparing packages...');
+        const packageNames = ['ruby2js-beta.tgz', 'ruby2js-rails-beta.tgz', 'vite-plugin-ruby2js-beta.tgz'];
+        for (let i = 0; i < packageResponses.length; i++) {
+          const buf = await packageResponses[i].arrayBuffer();
+          mountTree[packageNames[i]] = { file: { contents: new Uint8Array(buf) } };
+        }
+
+        // Step 2: Boot WebContainer
+        setProgress(60, 'Booting WebContainer...');
+        const { WebContainer } = await import('https://unpkg.com/@webcontainer/api@1.5.1/dist/index.js');
+
+        let container;
+        try {
+          container = await WebContainer.boot();
+        } catch (err) {
+          if (!window.crossOriginIsolated) {
+            setProgress(60, 'Enabling Cross-Origin Isolation (reloading)...');
+            setTimeout(() => location.reload(), 1500);
+            return;
+          }
+          throw err;
+        }
+
+        // Step 3: Mount files
+        setProgress(75, 'Mounting file system...');
+        await container.mount(mountTree);
+
+        // Step 4: Set up terminal
+        setProgress(90, 'Starting terminal...');
+
+        const xterm = new Terminal({
+          theme: { background: '#1a1a1a', foreground: '#cccccc', cursor: '#ffffff' },
+          fontSize: 14,
+          fontFamily: "'Cascadia Code', 'Fira Code', 'Menlo', monospace",
+          cursorBlink: true,
+        });
+        const fitAddon = new FitAddon();
+        xterm.loadAddon(fitAddon);
+        xterm.open(document.getElementById('terminal'));
+        fitAddon.fit();
+        new ResizeObserver(() => fitAddon.fit()).observe(document.getElementById('terminal'));
+
+        // Listen for server-ready
+        container.on('server-ready', (port, url) => {
+          document.getElementById('preview-header').textContent = `Preview — ${url}`;
+          document.getElementById('preview-iframe').src = url;
+          xterm.writeln(`\r\n\x1b[32mServer ready on port ${port}: ${url}\x1b[0m\r\n`);
+        });
+
+        // Spawn shell
+        const shell = await container.spawn('jsh', {
+          terminal: { cols: xterm.cols, rows: xterm.rows },
+        });
+
+        shell.output.pipeTo(new WritableStream({
+          write(data) { xterm.write(data); }
+        }));
+
+        const input = shell.input.getWriter();
+        xterm.onData(data => input.write(data));
+        xterm.onResize(({ cols, rows }) => shell.resize({ cols, rows }));
+
+        shell.exit.then(code => {
+          xterm.writeln(`\r\n\x1b[33mShell exited (${code}). Refresh to restart.\x1b[0m`);
+        });
+
+        // Hide loading, show instructions
+        setProgress(100, 'Ready!');
+        document.getElementById('loading').classList.add('hidden');
+
+        // Print welcome message
+        xterm.writeln('\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
+        xterm.writeln(`\x1b[36m  ${demo.toUpperCase()} DEMO - Ready to run\x1b[0m`);
+        xterm.writeln('\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
+        xterm.writeln('');
+        xterm.writeln('\x1b[33mStep 1:\x1b[0m Install dependencies (one time, ~15s):');
+        xterm.writeln('');
+        xterm.writeln('  npm install ./ruby2js-beta.tgz ./ruby2js-rails-beta.tgz \\');
+        xterm.writeln('    ./vite-plugin-ruby2js-beta.tgz dexie @hotwired/turbo \\');
+        xterm.writeln('    @hotwired/stimulus react react-dom');
+        xterm.writeln('');
+        xterm.writeln('\x1b[33mStep 2:\x1b[0m Start the dev server:');
+        xterm.writeln('');
+        xterm.writeln('  npx juntos dev -d dexie --host');
+        xterm.writeln('');
+        xterm.writeln('\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
+        xterm.writeln('');
+
+        // Expose for debugging
+        window.container = container;
+
+      } catch (err) {
+        status.textContent = `Error: ${err.message}`;
+        console.error(err);
+      }
+    }
+
+    async function decompress(gzBuffer) {
+      const ds = new DecompressionStream('gzip');
+      const stream = new Response(new Blob([gzBuffer])).body.pipeThrough(ds);
+      return await new Response(stream).arrayBuffer();
+    }
+
+    boot();
+  </script>
+</body>
+</html>

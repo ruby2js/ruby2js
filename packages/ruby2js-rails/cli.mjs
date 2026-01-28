@@ -79,14 +79,29 @@ function parseCommonArgs(args) {
     open: false,
     skipBuild: false,
     force: false,
-    outDir: null
+    outDir: null,
+    host: false
   };
 
   const remaining = [];
+  const passthrough = []; // Args after --
   let i = 0;
+  let seenDoubleDash = false;
 
   while (i < args.length) {
     const arg = args[i];
+
+    // After --, collect all remaining args as passthrough
+    if (arg === '--') {
+      seenDoubleDash = true;
+      i++;
+      continue;
+    }
+    if (seenDoubleDash) {
+      passthrough.push(arg);
+      i++;
+      continue;
+    }
 
     if (arg === '-d' || arg === '--database') {
       options.database = args[++i];
@@ -136,13 +151,19 @@ function parseCommonArgs(args) {
       options.base = arg.slice(7);
     } else if (arg === '-h' || arg === '--help') {
       options.help = true;
+    } else if (arg === '--host' || arg === '--binding') {
+      // --host (Vite style) or --binding (Rails style) - listen on all interfaces
+      options.host = true;
+    } else if (arg.startsWith('--binding=') || arg.startsWith('--host=')) {
+      // --binding=0.0.0.0 or --host=0.0.0.0
+      options.host = arg.split('=')[1] || true;
     } else {
       remaining.push(arg);
     }
     i++;
   }
 
-  return { options, remaining };
+  return { options, remaining, passthrough };
 }
 
 // ============================================
@@ -620,7 +641,7 @@ function isPackageInstalled(packageName) {
 // Command: dev
 // ============================================
 
-function runDev(options) {
+function runDev(options, extraArgs = []) {
   validateRailsApp();
   loadDatabaseConfig(options);
   validateDatabaseTarget(options);
@@ -633,6 +654,14 @@ function runDev(options) {
   }
   if (options.open) {
     args.push('--open');
+  }
+  if (options.host) {
+    // --host can be true (listen on all interfaces) or a specific address
+    args.push('--host', typeof options.host === 'string' ? options.host : '');
+  }
+  // Pass through any additional args
+  if (extraArgs.length > 0) {
+    args.push(...extraArgs);
   }
 
   console.log('Starting Vite dev server...');
@@ -652,7 +681,7 @@ function runDev(options) {
 // Command: build
 // ============================================
 
-function runBuild(options) {
+function runBuild(options, extraArgs = []) {
   validateRailsApp();
   loadDatabaseConfig(options);
   validateDatabaseTarget(options);
@@ -665,6 +694,10 @@ function runBuild(options) {
   }
   if (options.base) {
     args.push('--base', options.base);
+  }
+  // Pass through any additional args
+  if (extraArgs.length > 0) {
+    args.push(...extraArgs);
   }
 
   console.log('Building application...');
@@ -1036,14 +1069,23 @@ function runUp(options) {
       process.exit(1);
     }
 
+    const env = { ...process.env, PORT: String(options.port) };
+    if (options.host) {
+      env.HOST = typeof options.host === 'string' ? options.host : '0.0.0.0';
+    }
+
     spawn(runtime, [entryPoint], {
       cwd: APP_ROOT,  // Run from app root to access node_modules
       stdio: 'inherit',
-      env: { ...process.env, PORT: String(options.port) }
+      env
     });
   } else {
     console.log('Starting preview server...');
-    spawn('npx', ['vite', 'preview', '--port', String(options.port)], {
+    const previewArgs = ['vite', 'preview', '--port', String(options.port)];
+    if (options.host) {
+      previewArgs.push('--host', typeof options.host === 'string' ? options.host : '');
+    }
+    spawn('npx', previewArgs, {
       cwd: APP_ROOT,
       stdio: 'inherit',
       env: process.env
@@ -1085,16 +1127,25 @@ function runServer(options) {
       process.exit(1);
     }
 
+    const env = { ...process.env, PORT: String(options.port) };
+    if (options.host) {
+      env.HOST = typeof options.host === 'string' ? options.host : '0.0.0.0';
+    }
+
     console.log(`Starting ${runtime} server on port ${options.port}...`);
     spawn(runtime, [entryPoint], {
       cwd: APP_ROOT,
       stdio: 'inherit',
-      env: { ...process.env, PORT: String(options.port) }
+      env
     });
   } else {
     // Browser target - serve static files with vite preview
     console.log(`Starting static server on port ${options.port}...`);
-    spawn('npx', ['vite', 'preview', '--port', String(options.port), '--host'], {
+    const previewArgs = ['vite', 'preview', '--port', String(options.port)];
+    if (options.host) {
+      previewArgs.push('--host', typeof options.host === 'string' ? options.host : '');
+    }
+    spawn('npx', previewArgs, {
       cwd: APP_ROOT,
       stdio: 'inherit',
       env: process.env
@@ -2102,7 +2153,7 @@ Run 'juntos <command> --help' for command-specific options.
 // ============================================
 
 const args = process.argv.slice(2);
-const { options, remaining } = parseCommonArgs(args);
+const { options, remaining, passthrough } = parseCommonArgs(args);
 
 let command = remaining[0];
 const commandArgs = remaining.slice(1);
@@ -2136,28 +2187,31 @@ switch (command) {
 
   case 'dev':
     if (options.help) {
-      console.log('Usage: juntos dev [options]\n\nStart development server with hot reload.\n');
+      console.log('Usage: juntos dev [options] [-- vite-args...]\n\nStart development server with hot reload.\n');
       console.log('Options:');
       console.log('  -d, --database ADAPTER   Database adapter');
       console.log('  -p, --port PORT          Server port (default: 5173)');
       console.log('  -o, --open               Open browser automatically');
+      console.log('  --host, --binding        Listen on all interfaces (0.0.0.0)');
+      console.log('\nAny arguments after -- are passed directly to Vite.');
       process.exit(0);
     }
-    runDev(options);
+    runDev(options, passthrough);
     break;
 
   case 'build':
     if (options.help) {
-      console.log('Usage: juntos build [options]\n\nBuild application for deployment.\n');
+      console.log('Usage: juntos build [options] [-- vite-args...]\n\nBuild application for deployment.\n');
       console.log('Options:');
       console.log('  -d, --database ADAPTER   Database adapter');
       console.log('  -t, --target TARGET      Build target');
       console.log('  -e, --environment ENV    Environment');
       console.log('  --sourcemap              Generate source maps');
       console.log('  --base PATH              Base public path for assets');
+      console.log('\nAny arguments after -- are passed directly to Vite.');
       process.exit(0);
     }
-    runBuild(options);
+    runBuild(options, passthrough);
     break;
 
   case 'eject':
@@ -2185,6 +2239,7 @@ switch (command) {
       console.log('  -d, --database ADAPTER   Database adapter');
       console.log('  -t, --target TARGET      Runtime target (browser, node, bun)');
       console.log('  -p, --port PORT          Server port (default: 3000)');
+      console.log('  --host, --binding        Listen on all interfaces (0.0.0.0)');
       process.exit(0);
     }
     runUp(options);
@@ -2197,6 +2252,7 @@ switch (command) {
       console.log('  -t, --target TARGET      Runtime target (browser, node, bun, deno)');
       console.log('  -p, --port PORT          Server port (default: 3000)');
       console.log('  -e, --environment ENV    Environment (default: production)');
+      console.log('  --host, --binding        Listen on all interfaces (0.0.0.0)');
       process.exit(0);
     }
     runServer(options);
