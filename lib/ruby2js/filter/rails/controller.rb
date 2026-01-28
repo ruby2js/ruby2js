@@ -634,12 +634,15 @@ module Ruby2JS
         end
 
         # Generate conditional for JSON content negotiation
-        # Checks Accept header for 'application/json'
+        # Checks Accept header for 'application/json' OR params.format === 'json'
+        # The params.format check is needed for browser path helpers which set format
+        # in params rather than in the Accept header.
         # When format.html has no block (implicit view render), html_block is nil
         # and we return early for JSON, letting the normal view render handle HTML
         def generate_json_format_conditional(html_block, json_block)
           # Build: const accept = context.request?.headers?.accept ?? '';
-          #        if (accept.includes('application/json')) { return json_response }
+          #        if (accept.includes('application/json') || context.params?.format === 'json')
+          #          { return json_response }
           #        // else fall through to view render (or html_block if provided)
           # Use cattr for optional property access (?.) to handle missing request/headers
           accept_var = s(:lvasgn, :accept,
@@ -651,10 +654,22 @@ module Ruby2JS
                 :accept),
               s(:str, '')))
 
-          condition = s(:send,
+          # Check Accept header includes 'application/json'
+          accept_check = s(:send,
             s(:lvar, :accept),
             :includes,
             s(:str, 'application/json'))
+
+          # Check context.params?.format === 'json' (for browser path helpers)
+          format_check = s(:send,
+            s(:cattr,
+              s(:cattr, s(:lvar, :context), :params),
+              :format),
+            :===,
+            s(:str, 'json'))
+
+          # Combine with OR: accept.includes(...) || context.params?.format === 'json'
+          condition = s(:or, accept_check, format_check)
 
           # Wrap JSON block in return statement and add {json: data} wrapper
           json_content = transform_ivars_to_locals(json_block)
