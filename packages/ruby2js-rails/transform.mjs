@@ -215,9 +215,10 @@ export function fixImports(js, fromFile) {
   js = js.replace(/from ['"]\.\.\/views\/(\w+)\.js['"]/g, "from 'juntos:views/$1'");
   js = js.replace(/from ['"]\.\.\/views\/(\w+)\/([\w_]+)\.js['"]/g, "from 'app/views/$1/$2.html.erb'");
 
-  // Config: ../../config/paths.js → juntos:paths (inline in routes)
-  js = js.replace(/from ['"]\.\.\/\.\.\/config\/paths\.js['"]/g, "from 'config/routes.rb'");
-  js = js.replace(/from ['"]\.\/paths\.js['"]/g, "from 'config/routes.rb'");
+  // Config: ../../config/paths.js → juntos:paths (path helpers virtual module)
+  // This breaks the circular dependency between routes.rb and controllers
+  js = js.replace(/from ['"]\.\.\/\.\.\/config\/paths\.js['"]/g, "from 'juntos:paths'");
+  js = js.replace(/from ['"]\.\/paths\.js['"]/g, "from 'juntos:paths'");
 
   // Controllers: ../app/controllers/*.js → app/controllers/*.rb
   js = js.replace(/from ['"]\.\.\/app\/controllers\/(\w+)\.js['"]/g, "from 'app/controllers/$1.rb'");
@@ -261,6 +262,10 @@ export function fixTestImportsForEject(js) {
   js = js.replace(/from ['"]juntos:active-record['"]/g, "from 'ruby2js-rails/adapters/active_record.mjs'");
   js = js.replace(/await import\(['"]juntos:active-record['"]\)/g, "await import('ruby2js-rails/adapters/active_record.mjs')");
 
+  // Path helpers virtual module → concrete paths.js file
+  js = js.replace(/from ['"]juntos:paths['"]/g, "from '../config/paths.js'");
+  js = js.replace(/await import\(['"]juntos:paths['"]\)/g, "await import('../config/paths.js')");
+
   // Controller imports: .rb → .js
   js = js.replace(/from ['"]\.\.\/app\/controllers\/(\w+)\.rb['"]/g, "from '../app/controllers/$1.js'");
   js = js.replace(/await import\(['"]\.\.\/app\/controllers\/(\w+)\.rb['"]\)/g, "await import('../app/controllers/$1.js')");
@@ -294,19 +299,21 @@ export function fixImportsForEject(js, fromFile, config = {}) {
   js = js.replace(/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, "from 'ruby2js-rails/adapters/active_record.mjs'");
   js = js.replace(/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, "from 'ruby2js-rails/adapters/active_record.mjs'");
 
-  // Virtual module @config/paths.js → config/routes.js with correct relative path
+  // Virtual module @config/paths.js → config/paths.js with correct relative path
+  // Path helpers are in a separate file to avoid circular dependency with routes.js
   if (fromFile) {
-    // Calculate relative path from the file to config/routes.js
+    // Calculate relative path from the file to config/paths.js
     const depth = fromFile.split('/').length - 1;
     const prefix = '../'.repeat(depth);
-    js = js.replace(/from ['"]@config\/paths\.js['"]/g, `from '${prefix}config/routes.js'`);
+    js = js.replace(/from ['"]@config\/paths\.js['"]/g, `from '${prefix}config/paths.js'`);
   } else {
     // Fallback: assume we're one level deep
-    js = js.replace(/from ['"]@config\/paths\.js['"]/g, "from '../config/routes.js'");
+    js = js.replace(/from ['"]@config\/paths\.js['"]/g, "from '../config/paths.js'");
   }
 
-  // Also handle relative paths to config/paths.js → config/routes.js
-  js = js.replace(/config\/paths\.js/g, 'config/routes.js');
+  // Handle relative paths to config/paths.js (keep as paths.js, not routes.js)
+  // This is used for controllers: ../../config/paths.js → ../../config/paths.js
+  // No change needed - paths.js is the correct target
 
   // ApplicationRecord → local file (generated separately)
   js = js.replace(/from ['"]\.\/application_record\.js['"]/g, "from './application_record.js'");

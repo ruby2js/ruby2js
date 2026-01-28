@@ -25,6 +25,7 @@ import {
   findMigrations,
   findViewResources,
   findControllers,
+  getBuildOptions,
   generateModelsModuleForEject,
   generateMigrationsModuleForEject,
   generateViewsModuleForEject,
@@ -859,15 +860,47 @@ async function runEject(options) {
     fileCount++;
   }
 
-  // Transform routes
+  // Transform routes - generate paths.js first, then routes.js
+  // This breaks the circular dependency between routes.js and controllers
   const routesFile = join(APP_ROOT, 'config/routes.rb');
   if (existsSync(routesFile)) {
     console.log('  Transforming routes...');
     const source = readFileSync(routesFile, 'utf-8');
-    const result = await transformRuby(source, routesFile, null, config, APP_ROOT);
-    // Pass relative output path for correct import resolution
-    let code = fixImportsForEject(result.code, 'config/routes.js', config);
-    writeFileSync(join(outDir, 'config/routes.js'), code);
+    const { convert } = await ensureRuby2jsReady();
+
+    // Generate paths.js first (path helpers only, no controller imports)
+    const pathsOptions = {
+      ...getBuildOptions(null, config.target),
+      file: 'config/routes.rb',
+      database: config.database,
+      target: config.target,
+      paths_only: true,  // Generate only path helpers
+      base: config.base || '/'
+    };
+    const pathsResult = convert(source, pathsOptions);
+    let pathsCode = pathsResult.toString();
+    // For browser targets, use browser path helper
+    if (config.target === 'browser') {
+      pathsCode = pathsCode.replace(
+        /from ['"]ruby2js-rails\/path_helper\.mjs['"]/g,
+        "from 'ruby2js-rails/path_helper_browser.mjs'"
+      );
+    }
+    writeFileSync(join(outDir, 'config/paths.js'), pathsCode);
+    fileCount++;
+
+    // Generate routes.js with paths_file option (imports from paths.js)
+    const routesOptions = {
+      ...getBuildOptions(null, config.target),
+      file: 'config/routes.rb',
+      database: config.database,
+      target: config.target,
+      paths_file: './paths.js',  // Import path helpers from paths.js
+      base: config.base || '/'
+    };
+    const routesResult = convert(source, routesOptions);
+    let routesCode = fixImportsForEject(routesResult.toString(), 'config/routes.js', config);
+    writeFileSync(join(outDir, 'config/routes.js'), routesCode);
     fileCount++;
   }
 

@@ -541,8 +541,9 @@ function createErbPlugin(config) {
     // The selfhost converter generates relative paths assuming .juntos/ structure
     // We redirect everything to virtual modules and source files
 
-    // Paths: ../../../config/paths.js → config/routes.rb (paths exported from routes)
-    js = js.replace(/from ["']\.\.\/\.\.\/\.\.\/config\/paths\.js["']/g, 'from "config/routes.rb"');
+    // Paths: ../../../config/paths.js → juntos:paths (path helpers virtual module)
+    // This breaks the circular dependency between routes.rb and controllers
+    js = js.replace(/from ["']\.\.\/\.\.\/\.\.\/config\/paths\.js["']/g, 'from "juntos:paths"');
 
     // Rails runtime: use virtual module
     js = js.replace(/from ["']\.\.\/\.\.\/\.\.\/lib\/rails\.js["']/g, 'from "juntos:rails"');
@@ -855,7 +856,8 @@ export { application };
         else if (id.includes('/db/migrate/')) section = null; // Migrations use default options
         else if (id.endsWith('/routes.rb')) section = null; // Routes use default with special options
 
-        // Special handling for routes.rb - include paths inline
+        // Special handling for routes.rb - import paths from virtual module
+        // This breaks the circular dependency between routes.rb and controllers
         let result;
         if (id.endsWith('/routes.rb')) {
           const { convert } = await ensureRuby2jsReady();
@@ -864,7 +866,7 @@ export { application };
             file: path.relative(appRoot, id),
             database: config.database,
             target: config.target,
-            // Don't use paths_file - export paths inline
+            paths_file: 'juntos:paths',  // Import path helpers from virtual module
             base: config.base || '/'
           };
           result = convert(source, options);
@@ -1006,7 +1008,8 @@ function createConfigPlugin(config, appRoot) {
 
         // Config aliases (used by rails/helpers filter for ERB transforms)
         // @config/paths.js exports path helpers (e.g., articles_path)
-        '@config/paths.js': path.join(appRoot, 'config/routes.rb'),
+        // Uses juntos:paths virtual module to avoid circular dependency with routes.rb
+        '@config/paths.js': 'juntos:paths',
 
         // Alias for Rails importmap-style imports in Stimulus controllers
         'controllers/application': path.join(appRoot, 'app/javascript/controllers/application.js'),
@@ -2249,6 +2252,9 @@ function createVirtualPlugin(config, appRoot) {
         return isClient ? '\0juntos:active-storage:client' : '\0juntos:active-storage';
       }
 
+      // juntos:paths - path helpers extracted from routes (breaks circular dependency)
+      if (id === 'juntos:paths') return '\0juntos:paths';
+
       // For browser targets, use browser-specific path helper that invokes controllers directly
       // instead of making fetch() calls (which require a server)
       if (id === 'ruby2js-rails/path_helper.mjs' && targetDir === 'browser') {
@@ -2305,9 +2311,51 @@ export * from 'ruby2js-rails/adapters/${adapterFile}';
         return `export * from 'ruby2js-rails/adapters/active_storage_indexeddb.mjs';`;
       }
 
+      // juntos:paths - path helpers only (no controller imports)
+      // This breaks the circular dependency between routes.rb and controllers
+      if (id === '\0juntos:paths') {
+        return generatePathsModule(appRoot, config);
+      }
+
       return null;
     }
   };
+}
+
+/**
+ * Generate the juntos:paths virtual module content.
+ * This transforms routes.rb with paths_only: true to get just path helpers.
+ */
+async function generatePathsModule(appRoot, config) {
+  const routesFile = path.join(appRoot, 'config/routes.rb');
+  if (!fs.existsSync(routesFile)) {
+    return '// No routes.rb found\n';
+  }
+
+  const { convert } = await ensureRuby2jsReady();
+  const source = fs.readFileSync(routesFile, 'utf-8');
+
+  const options = {
+    ...getBuildOptions(null, config.target),
+    file: 'config/routes.rb',
+    database: config.database,
+    target: config.target,
+    paths_only: true,  // Generate only path helpers, no controller imports
+    base: config.base || '/'
+  };
+
+  const result = convert(source, options);
+  let js = result.toString();
+
+  // Fix path helper import for browser targets
+  if (config.target === 'browser') {
+    js = js.replace(
+      /from ['"]ruby2js-rails\/path_helper\.mjs['"]/g,
+      "from 'ruby2js-rails/path_helper_browser.mjs'"
+    );
+  }
+
+  return js;
 }
 
 export default juntos;
