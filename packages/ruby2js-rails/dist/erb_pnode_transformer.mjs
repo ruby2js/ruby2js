@@ -218,6 +218,7 @@ export class ErbPnodeTransformer {
         let jsx = this.#convertElement(scanner, {insideJsx: false});
         parts.push(`%x{${jsx}}`)
       } else {
+        // Skip unexpected content
         scanner.getch
       }
     };
@@ -282,6 +283,8 @@ export class ErbPnodeTransformer {
 
     // Parse children (we're now inside JSX)
     let children = this.#convertJsxChildren(scanner);
+
+    // Consume closing tag
     scanner.match(new RegExp(`</${tag}\\s*>`, "g"));
     return children.length == 0 ? `<${tag}${attrStr} />` : `<${tag}${attrStr}>${children}</${tag}>`
   };
@@ -292,11 +295,8 @@ export class ErbPnodeTransformer {
     let parts = [];
 
     while (!scanner.eos) {
-      if (scanner.check(/<\/[a-zA-Z]/)) {
-        // Check for closing tag
-        break
-      };
-
+      // Check for closing tag
+      if (scanner.check(/<\/[a-zA-Z]/)) break;
       let part = this.#convertJsxChild(scanner);
       if (part && part.length != 0) parts.push(part)
     };

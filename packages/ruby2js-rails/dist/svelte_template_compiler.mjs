@@ -53,10 +53,12 @@ export class SvelteTemplateCompiler {
       let braceStart = this.#findNextBrace(this.#template, pos);
 
       if (braceStart == null) {
+        // No more braces, add remaining text
         result.push(this.#template.slice(pos));
         break
       };
 
+      // Add text before brace
       if (braceStart > pos) result.push(this.#template.slice(pos, braceStart));
       let braceEnd = this.#findMatchingBrace(this.#template, braceStart);
 

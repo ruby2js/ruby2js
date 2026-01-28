@@ -205,6 +205,7 @@ export class VueComponentTransformer {
       if (/^[A-Z]/m.test(constName)) this.#imports.models.add(constName)
     };
 
+    // Recurse into children
     for (let child of node.children) {
       if (astNode(child)) this.#analyzeAst(child)
     }
@@ -251,9 +252,12 @@ export class VueComponentTransformer {
   #transformScriptContent(js) {
     let result = js.toString() // Use to_s instead of dup for JS compatibility (strings are immutable);
 
+    // Transform instance variable declarations to refs
+    // Pattern: let varName = value → const varName = ref(value)
     for (let refName of this.#refs) {
       let camelName = this.#toCamelCase(refName);
 
+      // Handle initial assignment
       result = result.replaceAll(
         new RegExp(`let ${camelName} = (.+?)(;|\\n)`, "g"),
 
@@ -264,7 +268,12 @@ export class VueComponentTransformer {
       )
     };
 
+    // Handle .value access for refs (in method bodies)
+    // This is tricky - we need to add .value when accessing refs
+    // Transform lifecycle hooks
     for (let [rubyName, vueName] of Object.entries(VueComponentTransformer.LIFECYCLE_HOOKS)) {
+      // Pattern: function mounted() { ... } → onMounted(() => { ... })
+      // or: async function mounted() { ... } → onMounted(async () => { ... })
       result = result.replaceAll(
         new RegExp(`^(\\s*)(async )?function ${this.#toCamelCase(rubyName.toString())}\\(\\) \\{`, "gm"),
 
@@ -276,6 +285,9 @@ export class VueComponentTransformer {
       )
     };
 
+    // Close the lifecycle hook properly
+    // This is simplified - real implementation would need proper brace matching
+    // Transform router.push
     result = result.replaceAll(/router\.push\(/g, "router.push(");
     return result
   };

@@ -1020,7 +1020,15 @@ function createConfigPlugin(config, appRoot) {
         // - juntos:active-record-client - RPC adapter for browser in server builds
       };
 
-      const rollupOptions = getRollupOptions(config.target, config.database);
+      // For dev mode with browser targets, don't set rollupOptions.input
+      // (HTML is served virtually by configureServer, no real file needed)
+      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
+      const isBrowserTarget = browserTargets.includes(config.target);
+      const isDevMode = command === 'serve';
+
+      const rollupOptions = (isDevMode && isBrowserTarget)
+        ? {} // No input needed for dev - middleware serves virtual HTML
+        : getRollupOptions(config.target, config.database);
       const buildTarget = getBuildTarget(config.target);
 
       // Add CSS to inputs for server targets so Vite fingerprints it
@@ -1106,16 +1114,27 @@ export { application };`,
       };
     },
 
-    // Serve .browser/index.html for the root URL in dev mode
+    // Serve virtual index.html for the root URL in dev mode
     configureServer(server) {
       const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
       if (!browserTargets.includes(config.target)) return;
 
-      // Middleware to serve .browser/index.html for root requests
-      server.middlewares.use((req, res, next) => {
-        // Only handle root path requests for HTML
+      // Generate index.html content once
+      const appName = detectAppName(appRoot);
+      const indexHtml = generateBrowserIndexHtml(appName, '/.browser/main.js');
+
+      // Middleware to serve virtual index.html for root requests
+      server.middlewares.use(async (req, res, next) => {
         if (req.url === '/' || req.url === '/index.html') {
-          req.url = '/.browser/index.html';
+          try {
+            // Transform HTML through Vite's pipeline (handles HMR injection, etc.)
+            const transformedHtml = await server.transformIndexHtml(req.url, indexHtml);
+            res.setHeader('Content-Type', 'text/html');
+            res.end(transformedHtml);
+          } catch (err) {
+            next(err);
+          }
+          return;
         }
         next();
       });
@@ -1343,23 +1362,46 @@ function getDatabasePackages(database) {
 }
 
 /**
- * Browser entry plugin - generates .browser/index.html and main.js for browser targets.
+ * Browser entry plugin - serves virtual entry points for browser targets.
  *
- * This plugin creates entry points for SPA builds only when needed (browser, pwa, capacitor).
- * Files are generated in .browser/ to avoid conflicts with Rails' public/ directory.
+ * In dev mode: Serves index.html and main.js as virtual modules (no files created).
+ * In build mode: Creates .browser/ files just before build starts.
  *
- * For server-side targets (Node, Cloudflare, etc.), no index.html is needed.
+ * This avoids cluttering the project with generated files during development,
+ * and ensures files exist when Vite's rollup resolver needs them for builds.
  */
 function createBrowserEntryPlugin(config, appRoot) {
   const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
   const isBrowserTarget = browserTargets.includes(config.target);
 
+  // Virtual module ID for main.js
+  const VIRTUAL_MAIN_ID = '\0virtual:browser-main';
+
+  // Cache generated content
+  let indexHtmlContent = null;
+  let mainJsContent = null;
+
+  function getIndexHtml() {
+    if (!indexHtmlContent) {
+      const appName = detectAppName(appRoot);
+      indexHtmlContent = generateBrowserIndexHtml(appName, '/.browser/main.js');
+    }
+    return indexHtmlContent;
+  }
+
+  function getMainJs() {
+    if (!mainJsContent) {
+      mainJsContent = generateBrowserMainJs('../config/routes.rb', '../app/javascript/controllers/index.js');
+    }
+    return mainJsContent;
+  }
+
   return {
     name: 'juntos-browser-entry',
 
-    async buildStart() {
-      // Only generate for browser-like targets
-      if (!isBrowserTarget) return;
+    // For build mode: create files synchronously before Vite resolves rollupOptions.input
+    config(userConfig, { command }) {
+      if (command !== 'build' || !isBrowserTarget) return;
 
       const browserDir = path.join(appRoot, '.browser');
       const indexPath = path.join(browserDir, 'index.html');
@@ -1367,26 +1409,33 @@ function createBrowserEntryPlugin(config, appRoot) {
 
       // Create .browser directory if needed
       if (!fs.existsSync(browserDir)) {
-        await fs.promises.mkdir(browserDir, { recursive: true });
-        console.log('[juntos] Created .browser/ directory');
+        fs.mkdirSync(browserDir, { recursive: true });
       }
 
-      // Generate index.html if it doesn't exist
-      if (!fs.existsSync(indexPath)) {
-        const appName = detectAppName(appRoot);
-        // Vite serves from .browser/, so path is /.browser/main.js
-        const indexContent = generateBrowserIndexHtml(appName, '/.browser/main.js');
-        await fs.promises.writeFile(indexPath, indexContent);
-        console.log('[juntos] Generated .browser/index.html');
-      }
+      // Generate index.html
+      fs.writeFileSync(indexPath, getIndexHtml());
 
-      // Generate main.js if it doesn't exist
-      if (!fs.existsSync(mainPath)) {
-        // Paths are relative from .browser/ directory, importing .rb files for Vite to transform
-        const mainContent = generateBrowserMainJs('../config/routes.rb', '../app/javascript/controllers/index.js');
-        await fs.promises.writeFile(mainPath, mainContent);
-        console.log('[juntos] Generated .browser/main.js');
+      // Generate main.js
+      fs.writeFileSync(mainPath, getMainJs());
+
+      console.log('[juntos] Generated .browser/ entry files for build');
+    },
+
+    // For dev mode: resolve /.browser/main.js as a virtual module
+    resolveId(id) {
+      if (!isBrowserTarget) return null;
+      if (id === '/.browser/main.js' || id === '.browser/main.js') {
+        return VIRTUAL_MAIN_ID;
       }
+      return null;
+    },
+
+    // For dev mode: load virtual main.js content
+    load(id) {
+      if (id === VIRTUAL_MAIN_ID) {
+        return getMainJs();
+      }
+      return null;
     }
   };
 }

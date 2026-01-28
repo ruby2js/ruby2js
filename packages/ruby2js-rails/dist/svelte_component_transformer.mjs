@@ -217,6 +217,7 @@ export class SvelteComponentTransformer {
       if (/^[A-Z]/m.test(constName)) this.#imports.models.add(constName)
     };
 
+    // Recurse into children
     for (let child of node.children) {
       if (astNode(child)) this.#analyzeAst(child)
     }
@@ -261,6 +262,7 @@ export class SvelteComponentTransformer {
   #transformScriptContent(js) {
     let result = js.toString() // Use to_s instead of dup for JS compatibility (strings are immutable);
 
+    // Transform lifecycle hooks
     for (let [rubyName, svelteName] of Object.entries(SvelteComponentTransformer.LIFECYCLE_HOOKS)) {
       // Pattern: function onMount() { ... } → onMount(() => { ... })
       // or: async function onMount() { ... } → onMount(async () => { ... })
@@ -276,6 +278,7 @@ export class SvelteComponentTransformer {
         }
       );
 
+      // Also handle if the method name wasn't camelCased by Ruby2JS
       result = result.replaceAll(
         new RegExp(`^(\\s*)(async )?function ${rubyName}\\(\\) \\{`, "gm"),
 

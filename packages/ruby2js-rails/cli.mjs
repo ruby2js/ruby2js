@@ -485,6 +485,33 @@ exec npx juntos "$@"
     if (!quiet) console.log('  Skipping bin/juntos (already exists)');
   }
 
+  // Add .browser/ to .gitignore (generated at build time)
+  const gitignorePath = join(destDir, '.gitignore');
+  if (existsSync(gitignorePath)) {
+    const content = readFileSync(gitignorePath, 'utf8');
+    if (!content.includes('.browser/') && !content.includes('.browser\n')) {
+      if (!quiet) console.log('  Adding .browser/ to .gitignore...');
+      writeFileSync(gitignorePath, content.trimEnd() + '\n\n# Juntos build artifacts\n.browser/\n');
+    }
+  } else {
+    if (!quiet) console.log('  Creating .gitignore...');
+    writeFileSync(gitignorePath, `# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Juntos build artifacts
+.browser/
+
+# Editor and OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
+`);
+  }
+
   // In quiet mode or --no-install, we're done
   if (quiet || options.noInstall) {
     if (!quiet) {

@@ -9,16 +9,18 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { height: 100%; font-family: system-ui, sans-serif; background: #1e1e1e; color: #ccc; }
-    #app { display: grid; grid-template-columns: 220px 1fr 1fr; grid-template-rows: 1fr 220px; height: 100vh; }
+    html, body { height: 100%; font-family: system-ui, sans-serif; background: #1e1e1e; color: #ccc; overflow: hidden; }
+    #app { display: grid; grid-template-columns: 220px 1fr 1fr; grid-template-rows: 1fr 200px; height: 100vh; overflow: hidden; }
     #file-tree { grid-row: 1 / 2; overflow-y: auto; background: #252526; border-right: 1px solid #333; padding: 8px 0; font-size: 13px; }
     #editor-container { grid-row: 1 / 2; min-width: 0; }
-    #preview-pane { grid-row: 1 / 2; border-left: 1px solid #333; display: flex; flex-direction: column; }
-    #preview-pane iframe { flex: 1; border: none; background: #fff; }
-    #preview-header { padding: 4px 8px; background: #252526; border-bottom: 1px solid #333; font-size: 12px; color: #999; }
-    #terminal-pane { grid-column: 1 / -1; grid-row: 2 / 3; border-top: 1px solid #333; display: flex; flex-direction: column; }
-    #terminal-header { padding: 4px 8px; background: #252526; border-bottom: 1px solid #333; font-size: 12px; color: #999; }
-    #terminal { flex: 1; }
+    #preview-pane { grid-row: 1 / 2; border-left: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
+    #preview-pane iframe { flex: 1; border: none; background: #fff; width: 100%; min-height: 0; }
+    #preview-header { padding: 4px 8px; background: #252526; border-bottom: 1px solid #333; font-size: 12px; color: #999; flex-shrink: 0; }
+    #preview-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; background: #1a1a1a; color: #666; font-size: 13px; text-align: center; padding: 20px; }
+    #terminal-pane { grid-column: 1 / -1; grid-row: 2 / 3; border-top: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
+    #terminal-header { padding: 4px 8px; background: #252526; border-bottom: 1px solid #333; font-size: 12px; color: #999; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    #terminal-status { color: #569cd6; }
+    #terminal { flex: 1; overflow: hidden; }
 
     .tree-item { padding: 2px 8px 2px 0; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tree-item:hover { background: #2a2d2e; }
@@ -29,25 +31,33 @@
     .tree-dir-children.open { display: block; }
 
     #loading-overlay { position: fixed; inset: 0; background: #1e1e1e; display: flex; align-items: center; justify-content: center; z-index: 1000; flex-direction: column; gap: 16px; }
-    #loading-overlay .spinner { width: 40px; height: 40px; border: 3px solid #333; border-top-color: #569cd6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    #loading-overlay.hidden { display: none; }
+    .spinner { width: 40px; height: 40px; border: 3px solid #333; border-top-color: #569cd6; border-radius: 50%; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #loading-overlay .status { font-size: 14px; color: #999; }
+    #loading-status { font-size: 14px; color: #999; }
+    #loading-progress { width: 300px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
+    #loading-bar { height: 100%; background: #569cd6; width: 0%; transition: width 0.3s; }
   </style>
 </head>
 <body>
   <div id="loading-overlay">
     <div class="spinner"></div>
-    <div class="status" id="loading-status">Initializing...</div>
+    <div id="loading-status">Initializing...</div>
+    <div id="loading-progress"><div id="loading-bar"></div></div>
   </div>
   <div id="app">
     <div id="file-tree"></div>
     <div id="editor-container"></div>
     <div id="preview-pane">
       <div id="preview-header">Preview</div>
-      <iframe id="preview-iframe" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+      <div id="preview-placeholder">Starting server...</div>
+      <iframe id="preview-iframe" style="display: none;"></iframe>
     </div>
     <div id="terminal-pane">
-      <div id="terminal-header">Terminal</div>
+      <div id="terminal-header">
+        <span>Terminal</span>
+        <span id="terminal-status"></span>
+      </div>
       <div id="terminal"></div>
     </div>
   </div>
@@ -56,12 +66,133 @@
     import { Terminal } from 'https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/+esm';
     import { FitAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/+esm';
 
-    // Determine demo from URL params
+    const RELEASES = 'https://ruby2js.github.io/ruby2js/releases';
     const params = new URLSearchParams(location.search);
     const demo = params.get('demo') || 'blog';
     document.title = `Ruby2JS Editor — ${demo}`;
 
-    // Editable file extensions
+    const loadingStatus = document.getElementById('loading-status');
+    const loadingBar = document.getElementById('loading-bar');
+    const terminalStatus = document.getElementById('terminal-status');
+
+    function setProgress(pct, msg) {
+      loadingBar.style.width = pct + '%';
+      if (msg) loadingStatus.textContent = msg;
+    }
+
+    function setTerminalStatus(msg) {
+      terminalStatus.textContent = msg;
+    }
+
+    // =========================================================================
+    // Tar parser with pax extended header support
+    // =========================================================================
+    function parseTar(buffer) {
+      const files = {};
+      const view = new Uint8Array(buffer);
+      let offset = 0;
+      let paxHeaders = {};
+
+      while (offset < view.length - 512) {
+        let allZero = true;
+        for (let i = 0; i < 512 && allZero; i++) {
+          if (view[offset + i] !== 0) allZero = false;
+        }
+        if (allZero) break;
+
+        const nameBytes = view.slice(offset, offset + 100);
+        let name = decodeString(nameBytes);
+        const sizeStr = decodeString(view.slice(offset + 124, offset + 136));
+        const size = parseInt(sizeStr, 8) || 0;
+        const typeFlag = String.fromCharCode(view[offset + 156]) || '0';
+        const prefix = decodeString(view.slice(offset + 345, offset + 500));
+        if (prefix) name = prefix + '/' + name;
+        if (paxHeaders.path) { name = paxHeaders.path; delete paxHeaders.path; }
+        if (name.startsWith('./')) name = name.slice(2);
+
+        offset += 512;
+
+        if (typeFlag === 'x' || typeFlag === 'g') {
+          const paxData = view.slice(offset, offset + size);
+          const paxStr = new TextDecoder().decode(paxData);
+          for (const line of paxStr.split('\n')) {
+            const match = line.match(/^\d+ ([^=]+)=(.*)$/);
+            if (match) paxHeaders[match[1]] = match[2];
+          }
+        } else if (typeFlag === 'L') {
+          paxHeaders.path = decodeString(view.slice(offset, offset + size));
+        } else if ((typeFlag === '0' || typeFlag === '\0' || typeFlag === '') && name) {
+          files[name] = new Uint8Array(view.slice(offset, offset + size));
+        }
+
+        offset += Math.ceil(size / 512) * 512;
+      }
+      return files;
+    }
+
+    function decodeString(bytes) {
+      const nullIdx = bytes.indexOf(0);
+      const slice = nullIdx >= 0 ? bytes.slice(0, nullIdx) : bytes;
+      return new TextDecoder().decode(slice);
+    }
+
+    // =========================================================================
+    // Build WebContainer mount tree from parsed files
+    // =========================================================================
+    function buildMountTree(files) {
+      const tree = {};
+
+      // Detect and strip common prefix directory
+      const paths = Object.keys(files);
+      let stripPrefix = '';
+      if (paths.length > 0) {
+        const firstParts = paths[0].split('/');
+        if (firstParts.length > 1) {
+          const candidate = firstParts[0] + '/';
+          if (paths.every(p => p.startsWith(candidate))) {
+            stripPrefix = candidate;
+          }
+        }
+      }
+
+      for (const [rawPath, content] of Object.entries(files)) {
+        const path = stripPrefix && rawPath.startsWith(stripPrefix)
+          ? rawPath.slice(stripPrefix.length)
+          : rawPath;
+
+        const parts = path.split('/').filter(p => p);
+        let node = tree;
+
+        for (let i = 0; i < parts.length - 1; i++) {
+          const dir = parts[i];
+          if (!node[dir]) node[dir] = { directory: {} };
+          node = node[dir].directory;
+        }
+
+        const fileName = parts[parts.length - 1];
+        if (!fileName) continue;
+
+        let contents;
+        try {
+          const text = new TextDecoder('utf-8', { fatal: true }).decode(content);
+          let isBinary = false;
+          for (let i = 0; i < Math.min(content.length, 8192); i++) {
+            if (content[i] === 0) { isBinary = true; break; }
+          }
+          contents = isBinary ? content : text;
+        } catch {
+          contents = content;
+        }
+
+        node[fileName] = { file: { contents } };
+      }
+
+      return tree;
+    }
+
+    // =========================================================================
+    // File tree helpers
+    // =========================================================================
     const EDITABLE_EXT = /\.(rb|erb|html|css|js|json|yml|yaml|rake|ru|gemfile)$/i;
     const EDITABLE_DIRS = ['app/', 'config/', 'db/', 'test/', 'Gemfile', 'Rakefile'];
 
@@ -76,8 +207,8 @@
       return false;
     }
 
-    // Build file tree UI
     function buildFileTreeUI(files, containerEl, onFileClick) {
+      containerEl.innerHTML = '';
       const paths = Object.keys(files).filter(shouldShow).sort();
       const dirTree = {};
 
@@ -136,7 +267,6 @@
       renderTree(dirTree, containerEl, 0);
     }
 
-    // Language detection for Monaco
     function langForPath(path) {
       if (path.endsWith('.rb')) return 'ruby';
       if (path.endsWith('.erb')) return 'html';
@@ -148,209 +278,253 @@
       return 'plaintext';
     }
 
-    // Main boot sequence
-    async function boot() {
-      const status = document.getElementById('loading-status');
+    // =========================================================================
+    // Run a command and wait for it to complete
+    // =========================================================================
+    async function runCommand(container, xterm, cmd, args, statusMsg) {
+      setTerminalStatus(statusMsg);
+      xterm.writeln(`\x1b[36m$ ${cmd} ${args.join(' ')}\x1b[0m`);
 
-      // Step 1: Fetch snapshot (JSON mount tree built by editor/snapshot.mjs)
-      status.textContent = `Fetching ${demo} snapshot...`;
-
-      const basePath = document.baseURI.includes('/editor/')
-        ? document.baseURI.replace(/\/editor\/.*$/, '')
-        : '/ruby2js';
-      const snapshotUrl = `${basePath}/editor/snapshots/${demo}.json`;
-      let mountTree;
-      try {
-        const response = await fetch(snapshotUrl);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        mountTree = await response.json();
-      } catch (err) {
-        status.textContent = `Failed to load snapshot: ${err.message}`;
-        return;
-      }
-
-      // Step 3: Boot WebContainer
-      status.textContent = 'Booting WebContainer...';
-
-      const { WebContainer } = await import('https://unpkg.com/@webcontainer/api@1.5.1/dist/index.js');
-      let container;
-      try {
-        container = await WebContainer.boot();
-      } catch (err) {
-        if (!window.crossOriginIsolated) {
-          status.textContent = 'Enabling Cross-Origin Isolation (reloading)...';
-          setTimeout(() => location.reload(), 1500);
-        } else {
-          status.textContent = `WebContainer boot failed: ${err.message}`;
-        }
-        return;
-      }
-
-      // Step 3: Mount files — decode base64 binary files to Uint8Array
-      status.textContent = 'Mounting file system...';
-      function decodeBinaries(node) {
-        for (const [key, value] of Object.entries(node)) {
-          if (value.directory) {
-            decodeBinaries(value.directory);
-          } else if (value.file && value.file.binary) {
-            const b64 = value.file.contents;
-            const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-            value.file.contents = bin;
-            delete value.file.binary;
-          }
-        }
-      }
-      decodeBinaries(mountTree);
-      await container.mount(mountTree);
-
-      // Step 5: Load Monaco
-      status.textContent = 'Loading editor...';
-
-      await new Promise((resolve) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js';
-        script.onload = () => {
-          require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs' } });
-          require(['vs/editor/editor.main'], resolve);
-        };
-        document.head.appendChild(script);
-      });
-
-      const editor = monaco.editor.create(document.getElementById('editor-container'), {
-        value: '// Select a file from the tree on the left',
-        language: 'plaintext',
-        theme: 'vs-dark',
-        minimap: { enabled: false },
-        fontSize: 13,
-        automaticLayout: true,
-      });
-
-      // Extract flat file map from mount tree for editor and file tree
-      const textCache = {};
-      function extractFiles(node, prefix) {
-        for (const [name, entry] of Object.entries(node)) {
-          const path = prefix ? `${prefix}/${name}` : name;
-          if (entry.directory) {
-            extractFiles(entry.directory, path);
-          } else if (entry.file) {
-            const c = entry.file.contents;
-            if (typeof c === 'string') {
-              textCache[path] = c;
-            }
-            // skip binary (base64) files for editing
-          }
-        }
-      }
-      extractFiles(mountTree, '');
-
-      let currentPath = null;
-      let activeTreeItem = null;
-      let writeTimeout = null;
-
-      function openFile(path, treeEl) {
-        if (activeTreeItem) activeTreeItem.classList.remove('active');
-        if (treeEl) { treeEl.classList.add('active'); activeTreeItem = treeEl; }
-        currentPath = path;
-        const text = textCache[path] || '';
-        const model = monaco.editor.createModel(text, langForPath(path));
-        editor.setModel(model);
-      }
-
-      // Debounced write-back
-      editor.onDidChangeModelContent(() => {
-        if (!currentPath) return;
-        const value = editor.getValue();
-        textCache[currentPath] = value;
-        clearTimeout(writeTimeout);
-        writeTimeout = setTimeout(() => {
-          container.fs.writeFile(currentPath, value);
-        }, 300);
-      });
-
-      // Build tree UI
-      const treeEl = document.getElementById('file-tree');
-      buildFileTreeUI(textCache, treeEl, openFile);
-
-      // Auto-expand app/ and open default file
-      const appDir = treeEl.querySelector('.tree-item.dir');
-      if (appDir) appDir.click();
-
-      const defaultFile = 'app/models/article.rb';
-      if (textCache[defaultFile]) {
-        const fileEl = treeEl.querySelector(`[data-path="${defaultFile}"]`);
-        if (fileEl) {
-          let parent = fileEl.parentElement;
-          while (parent && parent !== treeEl) {
-            if (parent.classList.contains('tree-dir-children')) {
-              parent.classList.add('open');
-              const dirItem = parent.previousElementSibling;
-              if (dirItem) dirItem.textContent = dirItem.textContent.replace('\u25B8', '\u25BE');
-            }
-            parent = parent.parentElement;
-          }
-          openFile(defaultFile, fileEl);
-        }
-      }
-
-      // Step 6: Set up xterm.js terminal
-      const xterm = new Terminal({
-        theme: {
-          background: '#1a1a1a',
-          foreground: '#cccccc',
-          cursor: '#ffffff',
-        },
-        fontSize: 13,
-        fontFamily: "'Cascadia Code', 'Fira Code', 'Menlo', monospace",
-        cursorBlink: true,
-      });
-      const fitAddon = new FitAddon();
-      xterm.loadAddon(fitAddon);
-      xterm.open(document.getElementById('terminal'));
-      fitAddon.fit();
-
-      // Refit on resize
-      new ResizeObserver(() => fitAddon.fit()).observe(document.getElementById('terminal'));
-
-      // Hide overlay — editor and terminal are ready
-      document.getElementById('loading-overlay').style.display = 'none';
-
-      // Listen for server-ready to connect preview iframe
-      container.on('server-ready', (port, url) => {
-        xterm.writeln(`\r\n\x1b[32mServer ready on port ${port}: ${url}\x1b[0m`);
-        document.getElementById('preview-header').textContent = `Preview — ${url}`;
-        document.getElementById('preview-iframe').src = url;
-      });
-
-      // Spawn interactive shell
-      const shell = await container.spawn('jsh', {
-        terminal: { cols: xterm.cols, rows: xterm.rows },
+      const process = await container.spawn(cmd, args, {
         env: { JUNTOS_DATABASE: 'dexie' },
       });
 
-      // Pipe shell output to xterm
-      shell.output.pipeTo(new WritableStream({
+      process.output.pipeTo(new WritableStream({
         write(data) { xterm.write(data); }
       }));
 
-      // Pipe xterm input to shell
-      const shellInput = shell.input.getWriter();
-      xterm.onData(data => shellInput.write(data));
-
-      // Resize shell when terminal resizes
-      xterm.onResize(({ cols, rows }) => {
-        shell.resize({ cols, rows });
-      });
-
-      // Log exit
-      shell.exit.then(code => {
-        xterm.writeln(`\r\n\x1b[33mShell exited (code ${code}). Refresh to restart.\x1b[0m`);
-      });
+      const exitCode = await process.exit;
+      if (exitCode !== 0) {
+        xterm.writeln(`\x1b[31mCommand failed with exit code ${exitCode}\x1b[0m`);
+      }
+      return exitCode;
     }
 
-    boot().catch(err => {
-      document.getElementById('loading-status').textContent = `Fatal: ${err.message}`;
-      console.error(err);
-    });
+    // =========================================================================
+    // Main boot sequence
+    // =========================================================================
+    async function boot() {
+      try {
+        // Step 1: Fetch tarballs in parallel
+        setProgress(5, `Fetching ${demo} demo...`);
+
+        const [demoResponse, ...packageResponses] = await Promise.all([
+          fetch(`${RELEASES}/demo-${demo}.tar.gz`),
+          fetch(`${RELEASES}/ruby2js-beta.tgz`),
+          fetch(`${RELEASES}/ruby2js-rails-beta.tgz`),
+          fetch(`${RELEASES}/vite-plugin-ruby2js-beta.tgz`),
+        ]);
+
+        if (!demoResponse.ok) {
+          throw new Error(`Demo "${demo}" not found (HTTP ${demoResponse.status})`);
+        }
+
+        setProgress(20, 'Decompressing...');
+        const demoGz = await demoResponse.arrayBuffer();
+        const ds = new DecompressionStream('gzip');
+        const demoTar = await new Response(
+          new Response(new Blob([demoGz])).body.pipeThrough(ds)
+        ).arrayBuffer();
+
+        setProgress(30, 'Parsing files...');
+        const demoFiles = parseTar(demoTar);
+        const mountTree = buildMountTree(demoFiles);
+
+        // Add package tarballs
+        const packageNames = ['ruby2js-beta.tgz', 'ruby2js-rails-beta.tgz', 'vite-plugin-ruby2js-beta.tgz'];
+        for (let i = 0; i < packageResponses.length; i++) {
+          const buf = await packageResponses[i].arrayBuffer();
+          mountTree[packageNames[i]] = { file: { contents: new Uint8Array(buf) } };
+        }
+
+        // Step 2: Boot WebContainer
+        setProgress(40, 'Booting WebContainer...');
+        const { WebContainer } = await import('https://unpkg.com/@webcontainer/api@1.5.1/dist/index.js');
+
+        let container;
+        try {
+          container = await WebContainer.boot();
+        } catch (err) {
+          if (!window.crossOriginIsolated) {
+            setProgress(40, 'Enabling Cross-Origin Isolation (reloading)...');
+            setTimeout(() => location.reload(), 1500);
+            return;
+          }
+          throw err;
+        }
+
+        // Step 3: Mount files
+        setProgress(50, 'Mounting files...');
+        await container.mount(mountTree);
+
+        // Step 4: Load Monaco editor
+        setProgress(60, 'Loading editor...');
+        await new Promise((resolve) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js';
+          script.onload = () => {
+            require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs' } });
+            require(['vs/editor/editor.main'], resolve);
+          };
+          document.head.appendChild(script);
+        });
+
+        const editor = monaco.editor.create(document.getElementById('editor-container'), {
+          value: '// Select a file from the tree on the left\n// Server is starting in the terminal below...',
+          language: 'plaintext',
+          theme: 'vs-dark',
+          minimap: { enabled: false },
+          fontSize: 13,
+          automaticLayout: true,
+        });
+
+        // Extract text files for editor
+        const textCache = {};
+        function extractFiles(node, prefix) {
+          for (const [name, entry] of Object.entries(node)) {
+            const path = prefix ? `${prefix}/${name}` : name;
+            if (entry.directory) {
+              extractFiles(entry.directory, path);
+            } else if (entry.file && typeof entry.file.contents === 'string') {
+              textCache[path] = entry.file.contents;
+            }
+          }
+        }
+        extractFiles(mountTree, '');
+
+        let currentPath = null;
+        let activeTreeItem = null;
+        let writeTimeout = null;
+
+        function openFile(path, treeEl) {
+          if (activeTreeItem) activeTreeItem.classList.remove('active');
+          if (treeEl) { treeEl.classList.add('active'); activeTreeItem = treeEl; }
+          currentPath = path;
+          const text = textCache[path] || '';
+          const model = monaco.editor.createModel(text, langForPath(path));
+          editor.setModel(model);
+        }
+
+        // Debounced write-back to WebContainer
+        editor.onDidChangeModelContent(() => {
+          if (!currentPath) return;
+          const value = editor.getValue();
+          textCache[currentPath] = value;
+          clearTimeout(writeTimeout);
+          writeTimeout = setTimeout(() => {
+            container.fs.writeFile(currentPath, value);
+          }, 300);
+        });
+
+        // Build file tree
+        const treeEl = document.getElementById('file-tree');
+        buildFileTreeUI(textCache, treeEl, openFile);
+
+        // Auto-expand app/ and open default file
+        const appDir = treeEl.querySelector('.tree-item.dir');
+        if (appDir) appDir.click();
+
+        const defaultFile = 'app/models/article.rb';
+        if (textCache[defaultFile]) {
+          const fileEl = treeEl.querySelector(`[data-path="${defaultFile}"]`);
+          if (fileEl) {
+            let parent = fileEl.parentElement;
+            while (parent && parent !== treeEl) {
+              if (parent.classList.contains('tree-dir-children')) {
+                parent.classList.add('open');
+                const dirItem = parent.previousElementSibling;
+                if (dirItem) dirItem.textContent = dirItem.textContent.replace('\u25B8', '\u25BE');
+              }
+              parent = parent.parentElement;
+            }
+            openFile(defaultFile, fileEl);
+          }
+        }
+
+        // Step 5: Set up terminal
+        setProgress(70, 'Starting terminal...');
+        const xterm = new Terminal({
+          theme: { background: '#1a1a1a', foreground: '#cccccc', cursor: '#ffffff' },
+          fontSize: 13,
+          fontFamily: "'Cascadia Code', 'Fira Code', 'Menlo', monospace",
+          cursorBlink: true,
+        });
+        const fitAddon = new FitAddon();
+        xterm.loadAddon(fitAddon);
+        xterm.open(document.getElementById('terminal'));
+        fitAddon.fit();
+        new ResizeObserver(() => fitAddon.fit()).observe(document.getElementById('terminal'));
+
+        // Hide loading overlay - user can now browse files
+        setProgress(100, 'Ready!');
+        document.getElementById('loading-overlay').classList.add('hidden');
+
+        // Listen for server-ready
+        container.on('server-ready', (port, url) => {
+          xterm.writeln(`\r\n\x1b[32m Server ready: ${url}\x1b[0m\r\n`);
+          setTerminalStatus('Server running');
+          document.getElementById('preview-header').textContent = `Preview — ${url}`;
+          // Small delay to ensure Vite has finished initial compilation
+          setTimeout(() => {
+            document.getElementById('preview-placeholder').style.display = 'none';
+            document.getElementById('preview-iframe').style.display = 'block';
+            document.getElementById('preview-iframe').src = url;
+          }, 500);
+        });
+
+        // Step 6: Auto-run setup commands
+        xterm.writeln('\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
+        xterm.writeln(`\x1b[36m  ${demo.toUpperCase()} DEMO - Setting up...\x1b[0m`);
+        xterm.writeln('\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m\r\n');
+
+        // npm install
+        await runCommand(container, xterm, 'npm', [
+          'install',
+          './ruby2js-beta.tgz',
+          './ruby2js-rails-beta.tgz',
+          './vite-plugin-ruby2js-beta.tgz',
+          'dexie', '@hotwired/turbo', '@hotwired/stimulus', 'react', 'react-dom'
+        ], 'Installing dependencies...');
+
+        // juntos init
+        await runCommand(container, xterm, 'npx', [
+          'juntos', 'init', '--no-install'
+        ], 'Configuring Vite...');
+
+        // Small delay to ensure config files are fully written
+        await new Promise(r => setTimeout(r, 500));
+
+        // juntos dev (this one doesn't exit)
+        setTerminalStatus('Starting dev server...');
+        xterm.writeln(`\x1b[36m$ npx juntos dev -d dexie --host\x1b[0m`);
+
+        const devProcess = await container.spawn('npx', ['juntos', 'dev', '-d', 'dexie', '--host'], {
+          terminal: { cols: xterm.cols, rows: xterm.rows },
+          env: { JUNTOS_DATABASE: 'dexie' },
+        });
+
+        devProcess.output.pipeTo(new WritableStream({
+          write(data) { xterm.write(data); }
+        }));
+
+        const devInput = devProcess.input.getWriter();
+        xterm.onData(data => devInput.write(data));
+        xterm.onResize(({ cols, rows }) => devProcess.resize({ cols, rows }));
+
+        devProcess.exit.then(code => {
+          xterm.writeln(`\r\n\x1b[33mDev server exited (code ${code}). Refresh to restart.\x1b[0m`);
+          setTerminalStatus('Server stopped');
+        });
+
+        window.container = container;
+
+      } catch (err) {
+        loadingStatus.textContent = `Error: ${err.message}`;
+        console.error(err);
+      }
+    }
+
+    boot();
   </script>
 </body>
 </html>
