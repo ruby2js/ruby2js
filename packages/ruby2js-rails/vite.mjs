@@ -1990,24 +1990,36 @@ function createHmrPlugin() {
       // Normalize path for matching
       const normalizedFile = file.replace(/\\/g, '/');
 
-      // Models: full reload (associations, dependencies unknown)
+      // Models: Turbo reload (associations, dependencies unknown)
       if (normalizedFile.includes('/app/models/') && file.endsWith('.rb')) {
-        console.log('[juntos] Model changed, triggering full reload:', file);
-        server.ws.send({ type: 'full-reload' });
+        console.log('[juntos] Model changed, triggering Turbo reload:', file);
+        server.ws.send({
+          type: 'custom',
+          event: 'ruby2js:turbo-reload',
+          data: { file }
+        });
         return [];
       }
 
-      // Routes: full reload (need full regeneration)
+      // Routes: Turbo reload (need full regeneration)
       if (normalizedFile.includes('/config/routes')) {
-        console.log('[juntos] Routes changed, triggering full reload:', file);
-        server.ws.send({ type: 'full-reload' });
+        console.log('[juntos] Routes changed, triggering Turbo reload:', file);
+        server.ws.send({
+          type: 'custom',
+          event: 'ruby2js:turbo-reload',
+          data: { file }
+        });
         return [];
       }
 
-      // Rails controllers (app/controllers/): full reload (route handlers)
+      // Rails controllers (app/controllers/): Turbo reload (route handlers)
       if (normalizedFile.includes('/app/controllers/') && file.endsWith('.rb')) {
-        console.log('[juntos] Rails controller changed, triggering full reload:', file);
-        server.ws.send({ type: 'full-reload' });
+        console.log('[juntos] Rails controller changed, triggering Turbo reload:', file);
+        server.ws.send({
+          type: 'custom',
+          event: 'ruby2js:turbo-reload',
+          data: { file }
+        });
         return [];
       }
 
@@ -2076,10 +2088,11 @@ function extractControllerName(filePath) {
 }
 
 /**
- * HMR runtime script for Stimulus controllers.
+ * HMR runtime script for Stimulus controllers and Turbo-aware reloads.
  */
 const STIMULUS_HMR_RUNTIME = `
 if (import.meta.hot) {
+  // Stimulus controller hot updates
   import.meta.hot.on('ruby2js:stimulus-update', async (data) => {
     const { file, controller } = data;
 
@@ -2105,6 +2118,19 @@ if (import.meta.hot) {
       console.error('[juntos] Failed to hot update controller:', controller, error);
       // Fall back to full reload
       import.meta.hot.invalidate();
+    }
+  });
+
+  // Turbo-aware page reload (smooth navigation instead of hard refresh)
+  import.meta.hot.on('ruby2js:turbo-reload', (data) => {
+    console.log('[juntos] Reloading via Turbo:', data?.file || 'unknown');
+
+    // Use Turbo.visit for smooth page transition if available
+    if (window.Turbo) {
+      window.Turbo.visit(location.href, { action: 'replace' });
+    } else {
+      // Fall back to hard reload if Turbo isn't available
+      location.reload();
     }
   });
 }
