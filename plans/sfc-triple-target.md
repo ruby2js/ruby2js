@@ -82,55 +82,16 @@ export default defineConfig({
 
 ---
 
-### Phase 2: React Framework Target
-
-Implement `--framework react` as a stepping stone:
-
-1. Try to parse ERB as well-formed XML
-2. If successful → output true React component (enables react-refresh HMR)
-3. If not → fall back to async string function (current behavior)
-4. Tag output with `renderStrategy` property
-
-**Why React first:**
-- Smallest delta from current behavior
-- Proves the "try component, fallback to string" pattern
-- Enables HMR for well-formed templates without breaking malformed ones
-- Same runtime, just different view output
-
-**Output format:**
-```javascript
-// Well-formed ERB → React component
-function ArticleCard({ article }) {
-  return <div className="article">
-    <h1>{article.title}</h1>
-    <p>{article.body}</p>
-  </div>;
-}
-ArticleCard.renderStrategy = 'react';
-
-// Malformed ERB → string function (fallback)
-async function render(article) {
-  return `<div class="article">...`;
-}
-render.renderStrategy = 'string';
-```
-
-**Tasks:**
-- [ ] Add well-formed XML detection to ERB transformer
-- [ ] Add React component output generator
-- [ ] Add `renderStrategy` tagging
-- [ ] Verify react-refresh HMR works for React components
-- [ ] Verify string fallback still works
-
-**Files to modify:**
-- `packages/ruby2js-rails/vite.mjs` (ERB transform logic)
-- `lib/ruby2js/filter/erb.rb` (if Ruby-side changes needed)
-
----
-
-### Phase 3: Astro Framework Target
+### Phase 2: Astro Framework Target
 
 Implement `--framework astro` to produce Astro components:
+
+**Why Astro first:**
+- Primary eject target - produces standalone Astro project
+- File-based routing maps naturally from Rails routes
+- No fallback needed - malformed ERB is a build error to fix
+- `test/astro-blog-v3/` provides a working reference to match
+- Once Astro works, React/Vue/Svelte become "same pattern, different syntax"
 
 **ERB → Astro template mapping:**
 | ERB | Astro |
@@ -168,6 +129,35 @@ src/
 - [ ] Test against Stage 0 Astro blog as reference
 
 **Validation:** Output should match hand-crafted `test/astro-blog-v3/`
+
+---
+
+### Phase 3: React Framework Target
+
+Implement `--framework react` for React component output:
+
+1. Parse ERB as well-formed XML
+2. Output true React component (enables react-refresh HMR)
+3. Malformed ERB is a build error (no fallback - fix the template)
+
+**Output format:**
+```javascript
+function ArticleCard({ article }) {
+  return <div className="article">
+    <h1>{article.title}</h1>
+    <p>{article.body}</p>
+  </div>;
+}
+```
+
+**Tasks:**
+- [ ] Add React component output generator (reuse Astro XML parsing)
+- [ ] Handle `class` → `className` transformation
+- [ ] Verify react-refresh HMR works
+- [ ] Test against blog demo
+
+**Files to modify:**
+- `packages/ruby2js-rails/vite.mjs` (ERB transform logic)
 
 ---
 
@@ -295,16 +285,15 @@ Two approaches exist:
 - [ ] `--framework` option accepted by CLI and Vite plugin
 - [ ] Option flows through to ERB transformer
 
-### Phase 2 (React)
-- [ ] Well-formed ERB → React component with HMR
-- [ ] Malformed ERB → string function fallback
-- [ ] No breaking changes to existing apps
-- [ ] `renderStrategy` tagging works
-
-### Phase 3 (Astro)
+### Phase 2 (Astro)
 - [ ] `juntos build -f astro` produces working Astro app
 - [ ] Output matches Stage 0 reference (`test/astro-blog-v3/`)
 - [ ] CRUD works, data persists
+
+### Phase 3 (React)
+- [ ] Well-formed ERB → React component with HMR
+- [ ] No fallback - malformed ERB is build error
+- [ ] react-refresh HMR works
 
 ### Phase 4-5 (Vue/Svelte)
 - [ ] Each framework target produces working app
@@ -331,5 +320,3 @@ Two approaches exist:
 2. **Layout strategy**: Rails layouts use `yield`. Astro/Vue/Svelte use slots. Mapping is straightforward but needs verification.
 
 3. **Form helpers**: `form_with`, `button_to` etc. - convert to framework idioms or keep as HTML with Turbo?
-
-4. **HMR scope**: With `--framework react`, only React component views get true HMR. Is this clear enough to users?
