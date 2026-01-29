@@ -54,6 +54,16 @@ describe Ruby2JS::Filter::ESM do
       to_js('import X, [ Y, Z ], from: "xyz.js"').
         must_include 'import X, { Y, Z } from "xyz.js"'
     end
+
+    it "should handle named import with alias" do
+      to_js('import [ {LocalName: ExportedName} ], from: "module.js"').
+        must_include 'import { ExportedName as LocalName } from "module.js"'
+    end
+
+    it "should handle mixed named imports with and without aliases" do
+      to_js('import [ Foo, {Bar: Baz}, Qux ], from: "module.js"').
+        must_include 'import { Foo, Baz as Bar, Qux } from "module.js"'
+    end
   end
 
   describe "require" do

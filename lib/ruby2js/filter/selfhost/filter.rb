@@ -71,13 +71,21 @@ module Ruby2JS
             end
           end
 
-          # Handle require_relative '../filter' and 'active_record'
-          # These are internal dependencies that are available via the filter runtime
+          # Handle require_relative '../filter' - skip these as they're part of the runtime
           if target.nil? && method_name == :require_relative && args.length == 1
             if args.first.type == :str
               path = args.first.children.first
-              if path == '../filter' || path == './filter' || path == 'active_record'
+              if path == '../filter' || path == './filter'
                 return s(:hide)
+              end
+
+              # Handle require_relative 'active_record' - generate proper import with alias
+              # The JS module exports Rails_ActiveRecordHelpers but Ruby code uses ActiveRecordHelpers
+              if path == 'active_record'
+                return s(:import,
+                  [s(:pair, s(:sym, :from), s(:str, './active_record.js'))],
+                  [s(:hash, s(:pair, s(:sym, :ActiveRecordHelpers), s(:const, nil, :Rails_ActiveRecordHelpers)))]
+                )
               end
             end
           end
