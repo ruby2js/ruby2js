@@ -71,11 +71,12 @@ module Ruby2JS
             end
           end
 
-          # Handle require_relative '../filter'
+          # Handle require_relative '../filter' and 'active_record'
+          # These are internal dependencies that are available via the filter runtime
           if target.nil? && method_name == :require_relative && args.length == 1
             if args.first.type == :str
               path = args.first.children.first
-              if path == '../filter' || path == './filter'
+              if path == '../filter' || path == './filter' || path == 'active_record'
                 return s(:hide)
               end
             end

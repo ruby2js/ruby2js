@@ -28,6 +28,7 @@
     "jsx_spec.rb"
   ],
   "partial": [
+    "rails_test_spec.rb",
     "phlex_spec.rb",
     "polyfill_spec.rb",
     "pragma_spec.rb",

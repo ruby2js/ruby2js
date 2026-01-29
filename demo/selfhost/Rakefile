@@ -96,7 +96,8 @@ SPEC_TO_FILTER = {
   'rails_controller_spec.rb' => 'rails/controller',
   'rails_routes_spec.rb' => 'rails/routes',
   'rails_migration_spec.rb' => 'rails/migration',
-  'rails_seeds_spec.rb' => 'rails/seeds'
+  'rails_seeds_spec.rb' => 'rails/seeds',
+  'rails_test_spec.rb' => 'rails/test'
 }
 
 # Derive filter name from spec name
@@ -104,12 +105,17 @@ def filter_for_spec(spec_name)
   SPEC_TO_FILTER[spec_name] || spec_name.sub('_spec.rb', '')
 end
 
+# Extra filter dependencies (not tied to specs)
+# These are shared modules required by other filters
+EXTRA_FILTERS = ['rails/active_record'].freeze
+
 # Get filters needed for ready + partial specs (only those with actual filter files)
 def manifest_filters
   specs = manifest['ready'] + manifest['partial'].map { |e| e.is_a?(Hash) ? e['spec'] : e }
-  specs.map { |s| filter_for_spec(s) }
-       .uniq
-       .select { |name| File.exist?("#{ROOT}/lib/ruby2js/filter/#{name}.rb") }
+  filters = specs.map { |s| filter_for_spec(s) }
+  # Add extra dependencies
+  filters += EXTRA_FILTERS
+  filters.uniq.select { |name| File.exist?("#{ROOT}/lib/ruby2js/filter/#{name}.rb") }
 end
 
 # Filter output files for manifest specs

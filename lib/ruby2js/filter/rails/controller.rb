@@ -1,17 +1,12 @@
 require 'ruby2js'
 require 'ruby2js/inflector'
+require_relative 'active_record'
 
 module Ruby2JS
   module Filter
     module Rails
       module Controller
         include SEXP
-
-        # ActiveRecord class methods that should be awaited
-        AR_CLASS_METHODS = %i[all find find_by where first last count create create! order].freeze
-
-        # ActiveRecord instance methods that should be awaited
-        AR_INSTANCE_METHODS = %i[save save! update update! destroy destroy! reload].freeze
 
         def initialize(*args)
           # Note: super must be called first for JS class compatibility
@@ -36,6 +31,12 @@ module Ruby2JS
         # Can be passed via options[:model_associations] from the builder
         def model_associations
           @rails_model_associations ||= (@options && @options[:model_associations]) || {}
+        end
+
+        # Wrap ActiveRecord operations with await for async database support
+        # Delegates to shared helper in ActiveRecordHelpers
+        def wrap_with_await_if_needed(node)
+          ActiveRecordHelpers.wrap_with_await_if_needed(node, @rails_model_refs)
         end
 
         # Detect controller class and transform to module
@@ -765,59 +766,6 @@ module Ruby2JS
                 s(:hash,
                   s(:pair, s(:sym, :"$context"), s(:lvar, :context)),
                   s(:pair, s(:sym, model_name), s(:lvar, model_name))))))
-        end
-
-        # Wrap ActiveRecord operations with await for async database support
-        def wrap_with_await_if_needed(node)
-          return node unless node.type == :send
-
-          target, method, *_args = node.children
-
-          # Check for class method calls on model constants (e.g., Article.find)
-          if target&.type == :const && target.children[0].nil?
-            const_name = target.children[1].to_s
-            # Convert Set to Array for JS compatibility (Set.include? doesn't exist in JS)
-            model_refs_array = @rails_model_refs ? [*@rails_model_refs] : []
-            if model_refs_array.include?(const_name) && AR_CLASS_METHODS.include?(method)
-              # Use updated(:await!) to force parens (method call, not property access)
-              return node.updated(:await!)
-            end
-          end
-
-          # Check for chained method calls ending with an AR class method
-          # e.g., Article.includes(:comments).all, Article.where(...).first
-          if target&.type == :send && AR_CLASS_METHODS.include?(method)
-            # Walk up the chain to find the root target
-            chain_start = target
-            while chain_start&.type == :send
-              chain_start = chain_start.children[0]
-            end
-            # If chain starts with a model constant, await the whole thing
-            if chain_start&.type == :const && chain_start.children[0].nil?
-              const_name = chain_start.children[1].to_s
-              model_refs_array = @rails_model_refs ? [*@rails_model_refs] : []
-              if model_refs_array.include?(const_name)
-                return node.updated(:await!)
-              end
-            end
-          end
-
-          # Check for instance method calls on local variables (e.g., article.save)
-          if target&.type == :lvar && AR_INSTANCE_METHODS.include?(method)
-            return node.updated(:await!)
-          end
-
-          # Check for association method chains (e.g., article.comments.find(id), article.comments.count)
-          # These are: lvar.accessor.method where method is an AR method
-          if target&.type == :send && %i[find create count first last].include?(method)
-            assoc_target, _assoc_method = target.children
-            # If the chain starts from a local variable (e.g., article.comments.find)
-            if assoc_target&.type == :lvar
-              return node.updated(:await!)
-            end
-          end
-
-          node
         end
 
         def transform_redirect_to(args)
