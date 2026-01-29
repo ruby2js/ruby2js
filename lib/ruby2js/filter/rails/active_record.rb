@@ -19,13 +19,15 @@ module Ruby2JS
 
         # Class methods that return promises (need await)
         # These are called on model classes: Article.find, User.where, etc.
+        # NOTE: Only include "terminal" methods that execute the query.
+        # Chainable methods (includes, joins, limit, offset) are handled via
+        # chain detection - only the final method in a chain gets awaited.
         AR_CLASS_METHODS = %i[
           all find find_by find_by! where
           first last take
           count sum average minimum maximum
           create create!
-          order limit offset
-          includes joins left_joins left_outer_joins
+          order
           distinct pluck ids exists?
           find_each find_in_batches
           update_all destroy_all delete_all
