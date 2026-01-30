@@ -49,10 +49,10 @@ module Ruby2JS
 
       def add_html_import
         return unless respond_to?(:prepend_list) && respond_to?(:modules_enabled?)
-        return unless modules_enabled?
+        return unless self.modules_enabled?
 
         # Check if we already have the html import
-        has_import = prepend_list.any? do |node|
+        has_import = self.prepend_list.any? do |node|
           next false unless node.respond_to?(:type) && node.type == :import
           # Check for our HTML_IMPORT pattern - children[1] can be an array
           second_child = node.children[1]
@@ -65,7 +65,7 @@ module Ruby2JS
           end
         end
 
-        prepend_list << HTML_IMPORT unless has_import
+        self.prepend_list << HTML_IMPORT unless has_import
       end
 
       # Handle pnode_text (from Phlex filter)
@@ -311,9 +311,9 @@ module Ruby2JS
 
         # insert/update static get properties() {}
         unless @le_props.empty?
-          values = nodes.find_index {|child| 
-            (child.type == :defs and child.children[0..1] == [s(:self), :properties]) or
-            (child.type == :send and child.children[0..1] == [s(:self), :properties=])
+          values = nodes.find_index {|child|
+            (child.type == :defs and child.children[0] == s(:self) and child.children[1] == :properties) or
+            (child.type == :send and child.children[0] == s(:self) and child.children[1] == :properties=)
           }
 
           if values == nil || values < 0
@@ -328,23 +328,44 @@ module Ruby2JS
                 s(:hash, *props_pairs))))
             end
           elsif nodes[values].children.last.type == :hash
-            le_props_array = @le_props.map {|name, type| # Pragma: entries
-              [s(:sym, name.to_s[1..-1].to_sym),
-              s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String)))]
-            }
-            le_props = le_props_array.to_h.merge(
-              nodes[values].children.last.children.map {|pair| pair.children}.to_h
-            )
+            # Build lookup of explicit properties from self.properties = {...}
+            explicit_pairs = {}
+            nodes[values].children.last.children.each do |pair|
+              name_str = pair.children[0].children[0].to_s
+              explicit_pairs[name_str] = pair
+            end
 
-            le_props_final = le_props.map{|name, value| s(:pair, name, value)} # Pragma: entries
+            # Ruby merge semantics: auto_inferred.merge(explicit)
+            # - Auto-inferred properties come first (in their original order)
+            # - Explicit properties override auto-inferred values
+            # - New explicit properties (not in auto) are added at the end
+
+            # First: auto-inferred properties (possibly overridden by explicit)
+            result_pairs = @le_props.map do |name, type| # Pragma: entries
+              name_str = name.to_s[1..-1]
+              # Use explicit if it exists, otherwise create from auto-inferred
+              if explicit_pairs.key?(name_str)
+                explicit_pairs[name_str]
+              else
+                s(:pair, s(:sym, name_str.to_sym),
+                  s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String))))
+              end
+            end
+
+            # Second: explicit properties that aren't in auto-inferred
+            auto_names = @le_props.keys.map { |n| n.to_s[1..-1] } # Pragma: keys
+            explicit_pairs.each do |name_str, pair| # Pragma: entries
+              result_pairs << pair unless auto_names.include?(name_str)
+            end
+
             nodes[values] = nodes[values].updated(nil,
-              [*nodes[values].children[0..-2], s(:hash, *le_props_final)])
+              [*nodes[values].children[0..-2], s(:hash, *result_pairs)])
           end
         end
 
         # customElement is converted to customElements.define
-        customElement = nodes.find_index {|child| 
-          child&.type == :send and (child.children[0..1] == [nil, :customElement] || child.children[0..1] == [nil, :custom_element])
+        customElement = nodes.find_index {|child|
+          child&.type == :send and child.children[0].nil? and (child.children[1] == :customElement or child.children[1] == :custom_element)
         }
         if customElement != nil and customElement >= 0 and nodes[customElement].children.length == 3
           nodes[customElement] = nodes[customElement].updated(nil,
@@ -363,10 +384,10 @@ module Ruby2JS
         end
 
         # self.styles returning string is converted to a taglit :css
-        styles = nodes.find_index {|child| 
+        styles = nodes.find_index {|child|
           (child&.type == :ivasgn and child.children[0] == :@styles) or
-          (child&.type == :defs and child.children[0..1] == [s(:self), :styles]) or
-          (child&.type == :send and child.children[0..1] == [s(:self), :styles=])
+          (child&.type == :defs and child.children[0] == s(:self) and child.children[1] == :styles) or
+          (child&.type == :send and child.children[0] == s(:self) and child.children[1] == :styles=)
         }
         if styles != nil and styles >= 0 and %i[str dstr].include?(nodes[styles].children.last&.type)
           string = nodes[styles].children.last
@@ -379,7 +400,7 @@ module Ruby2JS
           end
 
           if children.last.type == :str
-            children << s(:str, children.pop.children.first.chomp)
+            children << s(:str, children.pop().children.first.chomp)
           end
 
           if es2022
@@ -463,7 +484,7 @@ module Ruby2JS
           end
 
           if children.last.type == :str
-            children << s(:str, children.pop.children.first.chomp)
+            children << s(:str, children.pop().children.first.chomp)
           end
 
           s(:taglit, s(:sym, :html), node.updated(nil, children))

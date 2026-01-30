@@ -53,8 +53,8 @@ module Ruby2JS
 
         # ActionCable.createConsumer() or ActionCable.createConsumer(url)
         if target == s(:const, nil, :ActionCable) && method == :createConsumer
-          if modules_enabled?
-            prepend_list << s(:import,
+          if self.modules_enabled?
+            self.prepend_list << s(:import,
               ['@rails/actioncable'],
               [s(:const, nil, :createConsumer)])
           end
@@ -71,6 +71,7 @@ module Ruby2JS
 
           # Process the options hash if present
           if options_arg&.type == :hash
+            processed_options = nil
             begin
               @action_cable_subscription = true
               processed_options = process_subscription_hash(options_arg)
@@ -86,7 +87,7 @@ module Ruby2JS
 
         # Inside subscription: perform("action", data)
         if @action_cable_subscription && target.nil? &&
-           SUBSCRIPTION_METHODS.include?(method)
+           SUBSCRIPTION_METHODS.include?(method) # Pragma: set
           return s(:send, s(:self), method, *process_all(args))
         end
 
@@ -104,7 +105,7 @@ module Ruby2JS
           key_name = key.type == :sym ? key.children[0] : nil
 
           # Convert lambda callbacks to method definitions
-          if SUBSCRIPTION_CALLBACKS.include?(key_name) && value.type == :block
+          if SUBSCRIPTION_CALLBACKS.include?(key_name) && value.type == :block # Pragma: set
             # -> { ... } or ->(arg) { ... }
             lambda_call = value.children[0]
             lambda_args = value.children[1]

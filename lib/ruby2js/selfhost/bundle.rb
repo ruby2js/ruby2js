@@ -155,9 +155,19 @@ export def convert(source, options = {})
 
   # Resolve filter names to filter objects
   # Filters can be passed as strings ('Phlex') or as filter objects directly
+  # Try exact match first, then PascalCase (e.g., 'esm' -> 'ESM', 'lit' -> 'Lit')
   filters = (options[:filters] || []).map do |f|
     if f.is_a?(String)
       resolved = Ruby2JS::Filter[f]
+      # Try PascalCase if exact match fails
+      unless resolved
+        pascal_case = f.gsub(/(?:^|_)([a-z])/) { $1.upcase }
+        resolved = Ruby2JS::Filter[pascal_case]
+      end
+      # Try all-caps for acronyms like ESM, CJS
+      unless resolved
+        resolved = Ruby2JS::Filter[f.upcase]
+      end
       unless resolved
         raise "Filter #{f} not loaded. Load it via run_all_specs.mjs or import manually."
       end

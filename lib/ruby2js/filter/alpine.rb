@@ -64,8 +64,8 @@ module Ruby2JS
           block_body = node.children[2]
 
           # Add import if ESM is enabled
-          if modules_enabled?
-            prepend_list << s(:import,
+          if self.modules_enabled?
+            self.prepend_list << s(:import,
               ['alpinejs'],
               s(:const, nil, :Alpine))
           end
@@ -177,7 +177,7 @@ module Ruby2JS
         target, method, *args = node.children
 
         # Convert Alpine magic properties (_el -> this.$el, etc.)
-        if target.nil? && ALPINE_MAGIC.include?(method)
+        if target.nil? && ALPINE_MAGIC.include?(method) # Pragma: set
           js_method = ('$' + method.to_s[1..-1]).to_sym
           if args.empty?
             s(:attr, s(:self), js_method)

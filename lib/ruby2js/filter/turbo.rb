@@ -83,13 +83,14 @@ module Ruby2JS
           block_body = node.children[2]
 
           # Add import if ESM is enabled
-          if modules_enabled?
-            prepend_list << s(:import,
+          if self.modules_enabled?
+            self.prepend_list << s(:import,
               ['@hotwired/turbo'],
               s(:const, nil, :Turbo))
           end
 
           # Process the block body with this.* prefixing enabled
+          processed_body = nil
           begin
             @turbo_stream_action = true
             processed_body = block_body ? process(block_body) : nil
@@ -121,8 +122,8 @@ module Ruby2JS
         end
 
         # turbo_stream.replace, turbo_stream.append, etc.
-        if target&.type == :send && target.children == [nil, :turbo_stream]
-          if TURBO_STREAM_ACTIONS.include?(method)
+        if target&.type == :send && target.children[0].nil? && target.children[1] == :turbo_stream
+          if TURBO_STREAM_ACTIONS.include?(method) # Pragma: set
             return process_turbo_stream_action(method, args)
           end
         end
@@ -130,7 +131,7 @@ module Ruby2JS
         return super unless @turbo_stream_action
 
         # Convert unqualified Turbo stream properties to this.*
-        if target.nil? && TURBO_STREAM_PROPS.include?(method)
+        if target.nil? && TURBO_STREAM_PROPS.include?(method) # Pragma: set
           s(:send, s(:self), method, *process_all(args))
         else
           super

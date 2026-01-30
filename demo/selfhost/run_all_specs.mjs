@@ -43,6 +43,7 @@ const FILTER_NAME_EXCEPTIONS = {
 // Additional filter dependencies (spec name => additional filter files to load)
 const FILTER_DEPENDENCIES = {
   'camelcase_spec.rb': ['lit.js'],
+  'lit_spec.rb': ['esm.js'],
   'jsx_spec.rb': ['react.js', 'functions.js'],
   // Rails filters depend on shared active_record module
   'rails_controller_spec.rb': ['rails/active_record.js'],

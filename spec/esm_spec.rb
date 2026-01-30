@@ -73,29 +73,29 @@ describe Ruby2JS::Filter::ESM do
     end
 
     it "should convert require to import with explicit exports" do
-      # Skip in browser context (no filesystem access) or selfhost (no Ruby2JS.parse)
-      return skip() if defined?(Window) or !Ruby2JS.respond_to?(:parse)
+      # Skip in browser context or selfhost (no filesystem access)
+      return skip() if defined?(Window) or defined?(RUBY2JS_SELFHOST)
       to_js('require "require/test4.rb"', file: __FILE__).
         must_equal 'import Whoa, { Foo } from "./require/test4.rb"'
     end
 
     it "should convert require to import with auto exports" do
-      # Skip in browser context (no filesystem access) or selfhost (no Ruby2JS.parse)
-      return skip() if defined?(Window) or !Ruby2JS.respond_to?(:parse)
+      # Skip in browser context or selfhost (no filesystem access)
+      return skip() if defined?(Window) or defined?(RUBY2JS_SELFHOST)
       to_js('require "require/test5.rb"', file: __FILE__, autoexports: true).
         must_equal 'import { Foo } from "./require/test5.rb"'
     end
 
     it "should convert require to import with auto exports default" do
-      # Skip in browser context (no filesystem access) or selfhost (no Ruby2JS.parse)
-      return skip() if defined?(Window) or !Ruby2JS.respond_to?(:parse)
+      # Skip in browser context or selfhost (no filesystem access)
+      return skip() if defined?(Window) or defined?(RUBY2JS_SELFHOST)
       to_js('require "require/test5.rb"', file: __FILE__, autoexports: :default).
         must_equal 'import Foo from "./require/test5.rb"'
     end
 
     it "should handle require_recursive" do
-      # Skip in browser context (no filesystem access) or selfhost (no Ruby2JS.parse)
-      return skip() if defined?(Window) or !Ruby2JS.respond_to?(:parse)
+      # Skip in browser context or selfhost (no filesystem access)
+      return skip() if defined?(Window) or defined?(RUBY2JS_SELFHOST)
       to_js('require "require/test7.rb"', file: __FILE__, autoexports: :default, require_recursive: true).
         must_equal 'import A from "./require/sub1/test8.rb"; ' +
           'import B from "./require/sub1/sub2/test9.rb"; ' +

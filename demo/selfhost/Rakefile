@@ -65,7 +65,7 @@ file "#{SELFHOST}/prism_browser.js" => [*prism_browser_deps, *selfhost_deps] do
 end
 
 desc "Build ruby2js.js (library for CLI, browser, and tests)"
-file "#{SELFHOST}/ruby2js.js" => [*bundle_deps, *runtime_deps, *namespace_deps, *walker_deps, *converter_deps, *selfhost_deps] do
+file "#{SELFHOST}/ruby2js.js" => [*bundle_deps, *runtime_deps, *namespace_deps, *walker_deps, *converter_deps, *selfhost_deps, "#{SELFHOST}/filter_runtime.js"] do
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_bundle.rb > #{SELFHOST}/ruby2js.js")
 end
 

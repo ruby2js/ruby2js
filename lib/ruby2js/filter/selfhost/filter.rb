@@ -416,6 +416,25 @@ module Ruby2JS
             super
           end
         end
+
+        # Handle .uniq { |x| ... } → .uniqBy(x => ...)
+        # The bundle's .uniq is a getter (no args), so block form needs uniqBy.
+        # Block syntax: (block (send target :uniq) (args (arg :x)) body)
+        def on_block(node)
+          call, args, body = node.children
+          if call.type == :send
+            target, method_name = call.children
+            if method_name == :uniq && target
+              # Transform to .uniqBy(fn)
+              return process node.updated(nil, [
+                call.updated(nil, [target, :uniqBy]),
+                args,
+                body
+              ])
+            end
+          end
+          super
+        end
       end
 
       # NOTE: Filter is NOT added to DEFAULTS - it's loaded explicitly

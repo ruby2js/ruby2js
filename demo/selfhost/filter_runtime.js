@@ -12,6 +12,55 @@ if (!Array.prototype.dup) {
   };
 }
 
+// Array.prototype.first - Ruby's first returns the first element
+if (!Array.prototype.first) {
+  Object.defineProperty(Array.prototype, 'first', {
+    get() { return this[0]; },
+    configurable: true
+  });
+}
+
+// Array.prototype.last - Ruby's last returns the last element
+if (!Array.prototype.last) {
+  Object.defineProperty(Array.prototype, 'last', {
+    get() { return this[this.length - 1]; },
+    configurable: true
+  });
+}
+
+// Array.prototype.uniqBy - Ruby's uniq { |x| ... } with block for key extraction
+// Note: Simple .uniq is handled by the getter in the main bundle
+if (!Array.prototype.uniqBy) {
+  Array.prototype.uniqBy = function(fn) {
+    const seen = new Map();
+    const result = [];
+    for (const item of this) {
+      const key = fn(item);
+      const keyStr = JSON.stringify(key);
+      if (!seen.has(keyStr)) {
+        seen.set(keyStr, true);
+        result.push(item);
+      }
+    }
+    return result;
+  };
+}
+
+// Array.prototype.compact - Ruby's compact removes nil/null/undefined
+if (!Array.prototype.compact) {
+  Object.defineProperty(Array.prototype, 'compact', {
+    get() { return this.filter(x => x != null); },
+    configurable: true
+  });
+}
+
+// RegExp.escape - escapes special regex characters in a string
+if (!RegExp.escape) {
+  RegExp.escape = function(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
+}
+
 // Error.prototype.set_backtrace - Ruby method, no-op in JS
 if (!Error.prototype.set_backtrace) {
   Error.prototype.set_backtrace = function(backtrace) {
