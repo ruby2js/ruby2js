@@ -88,6 +88,7 @@ module Ruby2JS
         int: :number,
         float: :number,
         regexp: :regexp,
+        proc: :proc,     # proc/lambda - callable with []
       }.freeze
 
       def initialize(*args)
@@ -129,12 +130,17 @@ module Ruby2JS
         end
 
         # Hash.new { block } - treat as :map (will become $Hash)
+        # proc { } and lambda { } - treat as :proc (callable with [])
         if node.type == :block
           call = node.children.first
           if call.type == :send
             receiver, method = call.children
             if method == :new && receiver&.type == :const && receiver.children.last == :Hash
               return :map
+            end
+            # proc { } or lambda { } - callable
+            if receiver.nil? && [:proc, :lambda].include?(method)
+              return :proc
             end
           end
         end
@@ -747,7 +753,7 @@ module Ruby2JS
             end
           end
 
-        # [] - Map: get (keep as method call), Hash/Array: bracket access
+        # [] - Map: get, Proc: call, Hash/Array: bracket access
         when :[]
           # Check pragma first, then fall back to inferred type
           type = if pragma?(node, :map) then :map
@@ -757,6 +763,9 @@ module Ruby2JS
           if type == :map && args.length == 1
             # target.get(key)
             return process s(:send, target, :get, args.first)
+          elsif type == :proc
+            # proc[args] -> proc(args) - direct function call
+            return process node.updated(:call, [target, nil, *args])
           end
 
         # []= - Map: set (keep as method call), Hash/Array: bracket assignment

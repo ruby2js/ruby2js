@@ -702,6 +702,38 @@ describe Ruby2JS::Filter::Pragma do
       end
     end
 
+    describe "from proc/lambda" do
+      it "should infer proc type from proc { }" do
+        to_js('fn = proc { |x| x + 1 }; fn[5]').
+          must_equal 'let fn = x => x + 1; fn(5)'
+      end
+
+      it "should infer proc type from lambda { }" do
+        to_js('fn = lambda { |x| x * 2 }; fn[10]').
+          must_equal 'let fn = x => x * 2; fn(10)'
+      end
+
+      it "should convert proc[] with multiple arguments" do
+        to_js('fn = proc { |a, b| a + b }; fn[1, 2]').
+          must_equal 'let fn = (a, b) => a + b; fn(1, 2)'
+      end
+
+      it "should not affect regular array access" do
+        to_js('arr = [1, 2, 3]; arr[0]').
+          must_equal 'let arr = [1, 2, 3]; arr[0]'
+      end
+
+      it "should not affect unknown variable bracket access" do
+        to_js('def test(fn); fn[1]; end').
+          must_include 'fn[1]'
+      end
+
+      it "should handle proc reassignment" do
+        to_js('x = proc { 1 }; x[]; x = [1]; x[0]').
+          must_equal 'let x = () => 1; x(); x = [1]; x[0]'
+      end
+    end
+
     describe "instance variables" do
       it "should track types for instance variables" do
         to_js('@items = []; @items << "x"').

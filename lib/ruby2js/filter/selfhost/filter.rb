@@ -45,25 +45,12 @@ module Ruby2JS
         def initialize(*args)
           super
           @selfhost_filter_name = nil
-          @proc_vars = Set.new  # Track local variables assigned proc/lambda values
         end
 
         # Skip require/require_relative for external dependencies
         # Also handle AST structural comparisons (nodesEqual)
         def on_send(node)
           target, method_name, *args = node.children
-
-          # Convert proc/lambda calls: proc_var[args] → proc_var(args)
-          # Ruby's `proc[arg]` syntax calls the proc, but in JavaScript
-          # `func[arg]` is property access. Convert to function call syntax.
-          if method_name == :[] && target&.type == :lvar
-            var_name = target.children[0]
-            if @proc_vars.include?(var_name)
-              # Convert s(:send, s(:lvar, :foo), :[], arg) to s(:send, nil, :foo, arg)
-              # This produces foo(arg) instead of foo[arg]
-              return process node.updated(nil, [nil, var_name, *args])
-            end
-          end
 
           # Skip Ruby2JS.module_default = :xxx
           # This is a Ruby-side setting that doesn't apply in JS context
@@ -219,21 +206,6 @@ module Ruby2JS
             return node.updated(:csend, [process(target), method_name])
           end
 
-          super
-        end
-
-        # Track local variable assignments to proc/lambda values
-        # This allows us to convert `proc_var[args]` to `proc_var(args)` later
-        def on_lvasgn(node)
-          var_name, value = node.children
-          if value&.type == :block
-            block_call = value.children[0]
-            if block_call&.type == :send &&
-               block_call.children[0].nil? &&
-               [:proc, :lambda].include?(block_call.children[1])
-              @proc_vars.add(var_name)
-            end
-          end
           super
         end
 

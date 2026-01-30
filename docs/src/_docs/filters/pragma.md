@@ -325,6 +325,10 @@ Types are inferred from:
 - `Hash.new` → hash
 - `String.new` → string
 
+**Callable types:**
+- `proc { }` → proc (callable with `[]`)
+- `lambda { }` → proc (callable with `[]`)
+
 **Sorbet T.let annotations:**
 - `T.let(value, Array)` → array
 - `T.let(value, Hash)` → hash
@@ -352,6 +356,11 @@ cache[:key] = value
 config = {}
 config.empty?
 # => let config = {}; Object.keys(config).length === 0
+
+# Proc/lambda calls are converted
+fn = proc { |x| x * 2 }
+fn[5]
+# => let fn = x => x * 2; fn(5)
 ```
 
 ### Sorbet T.let
