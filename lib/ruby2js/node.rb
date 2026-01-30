@@ -28,6 +28,12 @@ module Ruby2JS
       )
     end
 
+    # Create a copy of this node (for selfhost compatibility)
+    # Takes optional dummy argument to work with both property and method call syntax
+    def dup(*_args)  # Pragma: method
+      updated(nil, @children.dup)
+    end
+
     # Return children array (for compatibility with code expecting to_a method)
     def to_a
       @children

@@ -54,6 +54,23 @@ if (!Array.prototype.compact) {
   });
 }
 
+// Array.prototype.partition - Ruby's partition splits array by predicate
+// Returns [truthy_items, falsy_items]
+if (!Array.prototype.partition) {
+  Array.prototype.partition = function(fn) {
+    const truthy = [];
+    const falsy = [];
+    for (const item of this) {
+      if (fn(item)) {
+        truthy.push(item);
+      } else {
+        falsy.push(item);
+      }
+    }
+    return [truthy, falsy];
+  };
+}
+
 // RegExp.escape - escapes special regex characters in a string
 // Always use Ruby-compatible escape (native ES2025 escapes more characters like \a \x61)
 RegExp.escape = function(string) {
