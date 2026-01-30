@@ -601,7 +601,7 @@ module Ruby2JS
             return super
           end
 
-        elsif node.children[1] == :~
+        elsif node.type == :send and node.children[1] == :~
           # Locate a DOM Node
           #   map ~(expression) to document.querySelector(expression)
           #   map ~name to this.refs.name
@@ -728,12 +728,14 @@ module Ruby2JS
       private
 
       # Process a pnode element and convert to React.createElement
+      # Note: Uses is_a? instead of case/when for proper JavaScript typeof transpilation
+      # In JavaScript context, symbols become strings, so we check for hyphens to detect
+      # custom elements (e.g., "my-widget") vs component names (e.g., "Card" from :Card)
       def process_pnode_element(tag, attrs, children)
-        case tag
-        when nil
+        if tag.nil?
           # Fragment
           process_pnode_fragment(attrs, children)
-        when Symbol
+        elsif tag.is_a?(Symbol)
           if tag.to_s[0] =~ /[A-Z]/
             # Component (uppercase)
             process_pnode_component(tag, attrs, children)
@@ -741,9 +743,20 @@ module Ruby2JS
             # HTML element (lowercase)
             process_pnode_html_element(tag, attrs, children)
           end
-        when String
-          # Custom element
-          process_pnode_custom_element(tag, attrs, children)
+        elsif tag.is_a?(String)
+          # In JS context, symbols become strings. Distinguish by:
+          # - Custom elements contain hyphens (e.g., "my-widget")
+          # - Everything else is treated like a symbol (component or HTML element)
+          if tag.include?('-')
+            # Custom element (has hyphen)
+            process_pnode_custom_element(tag, attrs, children)
+          elsif tag[0] =~ /[A-Z]/
+            # Component (uppercase, no hyphen) - came from symbol in Ruby
+            process_pnode_component(tag, attrs, children)
+          else
+            # HTML element (lowercase, no hyphen) - came from symbol in Ruby
+            process_pnode_html_element(tag, attrs, children)
+          end
         end
       end
 
@@ -852,7 +865,7 @@ module Ruby2JS
           else
             # Convert data_foo to data-foo for data attributes
             if key.to_s.start_with?('data_')
-              key.to_s.tr('_', '-').to_sym
+              key.to_s.gsub('_', '-').to_sym
             else
               key
             end
@@ -1345,8 +1358,9 @@ module Ruby2JS
             node.children[i+1].children[2].type == :hash and
             (@comments[node.children[i+1]].nil? || @comments[node.children[i+1]].empty?)
           then
-            pairs = node.children[i].children[2].children +
-                   node.children[i+1].children[2].children
+            j = i + 1
+            pairs = node.children[i].children[2].children
+            pairs = pairs + node.children[j].children[2].children # Pragma: array
             children = node.children.dup
             children.delete_at(i)
             children[i] = children[i].updated(nil, [

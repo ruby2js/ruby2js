@@ -29,7 +29,8 @@
     "action_cable_spec.rb",
     "alpine_spec.rb",
     "turbo_spec.rb",
-    "lit_spec.rb"
+    "lit_spec.rb",
+    "preact_spec.rb"
   ],
   "partial": [
     "rails_test_spec.rb",
@@ -41,8 +42,7 @@
     "astro_spec.rb",
     "vue_spec.rb",
     "combiner_spec.rb",
-    "require_spec.rb",
-    "preact_spec.rb"
+    "require_spec.rb"
   ],
   "blocked": {
   }

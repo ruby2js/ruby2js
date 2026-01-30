@@ -43,7 +43,22 @@ module Ruby2JS
     def initialize(ast, comments, filters: [], options: {})
       @original_ast = ast
       @ast = ast
-      @comments = comments
+      # Ensure comments has Map-like interface (.get/.set methods)
+      # In JS context, wrap plain objects in a Map
+      if defined?(globalThis) && comments
+        has_get = comments.respond_to?(:get)  # Pragma: boolean
+        unless has_get
+          wrapped = Map.new
+          Object.entries(comments).each do |key, value|
+            wrapped.set(key, value)
+          end
+          @comments = wrapped
+        else
+          @comments = comments
+        end
+      else
+        @comments = comments
+      end
       @filters = filters
       @options = options
       @namespace = options[:namespace] || Namespace.new
