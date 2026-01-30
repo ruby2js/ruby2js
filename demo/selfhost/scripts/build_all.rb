@@ -151,15 +151,20 @@ def specs_to_build(target = nil)
   end
 end
 
+# Extra filter dependencies (not tied to specs)
+# These are shared modules required by other filters
+EXTRA_FILTERS = ['rails/active_record'].freeze
+
 # Get list of filters to build
 def filters_to_build(target = nil)
   if target
     [target]
   else
     specs = manifest['ready'] + manifest['partial'].map { |e| e.is_a?(Hash) ? e['spec'] : e }
-    specs.map { |s| filter_for_spec(s) }
-         .uniq
-         .select { |name| File.exist?(File.join(ROOT, 'lib/ruby2js/filter', "#{name}.rb")) }
+    filters = specs.map { |s| filter_for_spec(s) }
+    # Add extra dependencies
+    filters += EXTRA_FILTERS
+    filters.uniq.select { |name| File.exist?(File.join(ROOT, 'lib/ruby2js/filter', "#{name}.rb")) }
   end
 end
 

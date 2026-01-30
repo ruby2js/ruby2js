@@ -43,7 +43,11 @@ const FILTER_NAME_EXCEPTIONS = {
 // Additional filter dependencies (spec name => additional filter files to load)
 const FILTER_DEPENDENCIES = {
   'camelcase_spec.rb': ['lit.js'],
-  'jsx_spec.rb': ['react.js', 'functions.js']
+  'jsx_spec.rb': ['react.js', 'functions.js'],
+  // Rails filters depend on shared active_record module
+  'rails_controller_spec.rb': ['rails/active_record.js'],
+  'rails_seeds_spec.rb': ['rails/active_record.js'],
+  'rails_test_spec.rb': ['rails/active_record.js']
 };
 
 // Derive filter file path from spec name
@@ -81,8 +85,13 @@ async function loadFilterForSpec(specName) {
   for (const dep of deps) {
     if (!loadedFilters.has(dep)) {
       try {
-        await import(`./filters/${dep}?t=${Date.now()}`);
+        const module = await import(`./filters/${dep}?t=${Date.now()}`);
         loadedFilters.add(dep);
+
+        // Create global alias for ActiveRecordHelpers (used by controller, seeds, test filters)
+        if (dep === 'rails/active_record.js' && module.Rails_ActiveRecordHelpers) {
+          globalThis.ActiveRecordHelpers = module.Rails_ActiveRecordHelpers;
+        }
       } catch (e) {
         // Dependency not available, continue anyway
       }

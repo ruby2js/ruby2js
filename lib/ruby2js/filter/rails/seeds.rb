@@ -1,13 +1,11 @@
 require 'ruby2js'
+require_relative 'active_record'
 
 module Ruby2JS
   module Filter
     module Rails
       module Seeds
         include SEXP
-
-        # ActiveRecord class methods that should be awaited
-        AR_CLASS_METHODS = %i[all find find_by where first last count create create!].freeze
 
         def initialize(*args)
           # Note: super must be called first for JS class compatibility
@@ -232,52 +230,9 @@ module Ruby2JS
           s(:asyncs, s(:self), method_name, args, transformed_body)
         end
 
+        # Wrap AR operations with await - delegates to shared helper
         def wrap_ar_operations(node)
-          return node unless node.respond_to?(:type)
-
-          case node.type
-          when :send
-            target, method, *args = node.children
-
-            # Check for class method calls on model constants (e.g., Article.create)
-            if target&.type == :const && target.children[0].nil?
-              const_name = target.children[1].to_s
-              if @rails_seeds_models.include?(const_name) && AR_CLASS_METHODS.include?(method)
-                # Wrap with await, process children first
-                new_args = args.map { |a| wrap_ar_operations(a) }
-                new_node = node.updated(nil, [target, method, *new_args])
-                return new_node.updated(:await!)
-              end
-            end
-
-            # Check for association methods (e.g., workflow.nodes.create!, article.comments.count)
-            if %i[create create! count first last].include?(method)
-              # Wrap with await, process target and args
-              new_target = wrap_ar_operations(target)
-              new_args = args.map { |a| wrap_ar_operations(a) }
-              new_node = node.updated(nil, [new_target, method, *new_args])
-              return new_node.updated(:await!)
-            end
-
-            # Process children recursively
-            new_children = node.children.map do |c|
-              c.respond_to?(:type) ? wrap_ar_operations(c) : c
-            end
-            # Note: explicit return for JS switch/case compatibility
-            return node.updated(nil, new_children)
-
-          else
-            if node.children.any?
-              # Note: use different variable name to avoid JS TDZ error in switch/case
-              mapped_children = node.children.map do |c|
-                c.respond_to?(:type) ? wrap_ar_operations(c) : c
-              end
-              # Note: explicit return for JS switch/case compatibility
-              return node.updated(nil, mapped_children)
-            else
-              return node
-            end
-          end
+          ActiveRecordHelpers.wrap_ar_operations(node, @rails_seeds_models)
         end
       end
     end

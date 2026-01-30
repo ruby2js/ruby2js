@@ -33,6 +33,12 @@ import React, [ Component ], from: "react"
 
 import "*", as: React, from: "react"
 # => import * as React from "react"
+
+import [ {LocalName: ExportedName} ], from: "module"
+# => import { ExportedName as LocalName } from "module"
+
+import [ Foo, {Bar: Baz}, Qux ], from: "module"
+# => import { Foo, Baz as Bar, Qux } from "module"
 ```
 
 ### import.meta

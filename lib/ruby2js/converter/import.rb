@@ -45,12 +45,27 @@ module Ruby2JS
 
         # handle the default name or { ConstA, Const B } portion
         put "{ " unless default_import
-        args.each_with_index do |arg, index|
-          put ', ' unless index == 0
-          if arg.type == :str
-            put arg.children.first # useful for '*'
+        first = true
+        args.each do |arg|
+          if arg.type == :hash
+            # Handle alias imports: {LocalName: ExportedName} => ExportedName as LocalName
+            arg.children.each do |pair|
+              put ', ' unless first
+              first = false
+              key = pair.children[0].children[0]  # :sym node -> symbol (local name)
+              value = pair.children[1]            # the exported name
+              parse value
+              put ' as '
+              put key.to_s
+            end
           else
-            parse arg
+            put ', ' unless first
+            first = false
+            if arg.type == :str
+              put arg.children.first # useful for '*'
+            else
+              parse arg
+            end
           end
         end
         put " }" unless default_import
