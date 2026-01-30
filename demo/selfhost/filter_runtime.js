@@ -55,11 +55,10 @@ if (!Array.prototype.compact) {
 }
 
 // RegExp.escape - escapes special regex characters in a string
-if (!RegExp.escape) {
-  RegExp.escape = function(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  };
-}
+// Always use Ruby-compatible escape (native ES2025 escapes more characters like \a \x61)
+RegExp.escape = function(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
 
 // Error.prototype.set_backtrace - Ruby method, no-op in JS
 if (!Error.prototype.set_backtrace) {
