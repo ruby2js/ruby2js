@@ -324,7 +324,14 @@ module Ruby2JS
 
                   # Copy static methods (def self.X) to the registered filter so they're accessible
                   # via Ruby2JS.Filter.Pragma.reorder instead of just Pragma.reorder
-                  defs_nodes = filter_mod_body.select { |n| n&.type == :defs && n.children[0]&.type == :self }
+                  # Skip methods with no arguments - they become getters in JS and accessing
+                  # them to copy would trigger execution (e.g., React.genAttrs)
+                  defs_nodes = filter_mod_body.select { |n|
+                    n&.type == :defs &&
+                    n.children[0]&.type == :self &&
+                    n.children[2]&.type == :args &&
+                    n.children[2].children.any?  # has at least one argument
+                  }
                   defs_nodes.each do |defs_node|
                     method_name = defs_node.children[1].to_s.sub(/[?!]$/, '').to_sym
                     output_statements << s(:send,
