@@ -45,6 +45,8 @@ const FILTER_DEPENDENCIES = {
   'camelcase_spec.rb': ['lit.js'],
   'lit_spec.rb': ['esm.js'],
   'jsx_spec.rb': ['react.js', 'functions.js'],
+  // React spec uses to_js6 (Functions, JSX) and to_esm (ESM)
+  'react_spec.rb': ['functions.js', 'jsx.js', 'esm.js'],
   // Rails filters depend on shared active_record module
   'rails_controller_spec.rb': ['rails/active_record.js'],
   'rails_seeds_spec.rb': ['rails/active_record.js'],

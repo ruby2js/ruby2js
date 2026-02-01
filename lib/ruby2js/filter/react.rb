@@ -247,7 +247,8 @@ module Ruby2JS
             @react_props = []
             @react_methods = []
 
-            if hookinit
+            # Use explicit nil check - 0 is truthy in Ruby but falsy in JS
+            unless hookinit.nil?
               body = body.dup
               hookinit = body.delete_at(hookinit)
               pairs.unshift process hookinit.children[2]
@@ -267,7 +268,8 @@ module Ruby2JS
             react_walk(node)
 
             if hook
-              react_walk(hookinit) if hookinit
+              # Use explicit nil check - 0 is truthy in Ruby but falsy in JS
+              react_walk(hookinit) unless hookinit.nil?
               useState = [*@reactIvars[:asgn], *@reactIvars[:ref]].uniq
             end
 
