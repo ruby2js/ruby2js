@@ -52,7 +52,9 @@ const FILTER_DEPENDENCIES = {
   // Rails filters depend on shared active_record module
   'rails_controller_spec.rb': ['rails/active_record.js'],
   'rails_seeds_spec.rb': ['rails/active_record.js'],
-  'rails_test_spec.rb': ['rails/active_record.js']
+  'rails_test_spec.rb': ['rails/active_record.js'],
+  // Pragma spec tests filter reordering with require filter
+  'pragma_spec.rb': ['require.js']
 };
 
 // Derive filter file path from spec name

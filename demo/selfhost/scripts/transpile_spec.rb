@@ -10,6 +10,7 @@ require 'ruby2js/filter/selfhost'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/return'
 require 'ruby2js/filter/esm'
+require 'ruby2js/filter/node'
 
 spec_file = ARGV[0] || raise("Usage: transpile_spec.rb <spec_file>")
 source = File.read(spec_file)
@@ -26,6 +27,7 @@ js = Ruby2JS.convert(source,
   file: spec_file,
   filters: [
     Ruby2JS::Filter::Pragma,
+    Ruby2JS::Filter::Node,
     Ruby2JS::Filter::Combiner,
     Ruby2JS::Filter::Selfhost::Core,
     Ruby2JS::Filter::Selfhost::Walker,

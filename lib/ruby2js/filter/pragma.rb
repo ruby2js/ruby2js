@@ -112,7 +112,12 @@ module Ruby2JS
         return nil unless node.respond_to?(:type)
 
         # Direct literal types
-        return TYPE_INFERENCE[node.type] if TYPE_INFERENCE.key?(node.type)
+        # Use explicit hash lookup to avoid prototype chain issues in JS.
+        # Hash#key? transpiles to `in` which checks prototype chain, so we check
+        # if the type is in our known set of keys first.
+        if [:array, :hash, :str, :dstr, :xstr, :int, :float, :regexp, :proc].include?(node.type)
+          return TYPE_INFERENCE[node.type]
+        end
 
         # Constructor calls: Set.new, Map.new, Array.new, Hash.new, String.new
         if node.type == :send
@@ -156,7 +161,9 @@ module Ruby2JS
 
         # Check for T.let pattern: receiver is T constant, method is :let, 2 args
         return nil unless method == :let && args.length == 2
-        return nil unless receiver&.type == :const && receiver.children == [nil, :T]
+        # Check for T constant: [nil, :T] - use element comparison for JS compatibility
+        return nil unless receiver&.type == :const &&
+          receiver.children.first.nil? && receiver.children.last == :T
 
         value_node = args[0]
         type_node = args[1]
@@ -169,33 +176,34 @@ module Ruby2JS
       def sorbet_type_to_symbol(node)
         return nil unless node
 
-        case node.type
-        when :const
+        # Use explicit returns instead of implicit case expression values for JS compatibility
+        if node.type == :const
           # Simple type: Array, Hash, Set, String, Integer, etc.
           case node.children.last
-          when :Array then :array
-          when :Hash then :hash
-          when :Set then :set
-          when :Map then :map
-          when :String then :string
+          when :Array then return :array
+          when :Hash then return :hash
+          when :Set then return :set
+          when :Map then return :map
+          when :String then return :string
           end
-
-        when :send
+        elsif node.type == :send
           # Generic type: T::Array[X], T::Hash[K,V], T::Set[X]
           receiver, method, *_args = node.children
           if method == :[] && receiver&.type == :const
             # Check for T::Array, T::Hash, T::Set pattern
             parent = receiver.children[0]
             type_name = receiver.children[1]
-            if parent&.type == :const && parent.children == [nil, :T]
+            # Use element comparison for JS compatibility (array === compares references)
+            if parent&.type == :const && parent.children.first.nil? && parent.children.last == :T
               case type_name
-              when :Array then :array
-              when :Hash then :hash
-              when :Set then :set
+              when :Array then return :array
+              when :Hash then return :hash
+              when :Set then return :set
               end
             end
           end
         end
+        nil
       end
 
       # Track variable types from assignments
@@ -653,7 +661,7 @@ module Ruby2JS
           if [:require, :require_relative].include?(method) &&
              args.length == 1 && args.first.type == :str &&
              args.first.children.first == 'sorbet-runtime'
-            return s(:begin)
+            return s(:hide)
           end
         end
 

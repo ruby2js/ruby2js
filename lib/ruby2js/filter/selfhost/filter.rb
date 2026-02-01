@@ -322,6 +322,18 @@ module Ruby2JS
                     s(:send, nil, :registerFilter, s(:str, full_filter_name), s(:attr, s(:const, nil, full_filter_name.to_sym), :prototype))
                   ]
 
+                  # Copy static methods (def self.X) to the registered filter so they're accessible
+                  # via Ruby2JS.Filter.Pragma.reorder instead of just Pragma.reorder
+                  defs_nodes = filter_mod_body.select { |n| n&.type == :defs && n.children[0]&.type == :self }
+                  defs_nodes.each do |defs_node|
+                    method_name = defs_node.children[1].to_s.sub(/[?!]$/, '').to_sym
+                    output_statements << s(:send,
+                      s(:attr, s(:attr, s(:const, nil, :Ruby2JS), :Filter), full_filter_name.to_sym),
+                      "#{method_name}=".to_sym,
+                      s(:attr, s(:const, nil, full_filter_name.to_sym), method_name)
+                    )
+                  end
+
                   # For namespaced filters (e.g., Rails::Model), also register under Ruby2JS.Filter.Rails.Model
                   if namespace_name
                     # Ruby2JS.Filter.Rails = Ruby2JS.Filter.Rails || {}
