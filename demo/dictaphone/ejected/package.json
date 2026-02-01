@@ -1,0 +1,22 @@
+{
+  "name": "dictaphone-ejected",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "start": "node main.js"
+  },
+  "dependencies": {
+    "ruby2js": "https://ruby2js.github.io/ruby2js/releases/ruby2js-beta.tgz",
+    "ruby2js-rails": "https://ruby2js.github.io/ruby2js/releases/ruby2js-rails-beta.tgz",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "better-sqlite3": "^11.10.0"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0",
+    "vitest": "^2.0.0"
+  }
+}
