@@ -45,7 +45,7 @@ module Ruby2JS
 
       # Helper to generate fs calls - handles sync vs async
       def fs_call(method, *args)
-        if async?
+        if async?()
           self.prepend_list << import_fs_promises
           # Remove Sync suffix for async methods
           async_method = method.to_s.sub(/Sync$/, '').to_sym
@@ -59,7 +59,7 @@ module Ruby2JS
 
       # Special case for existsSync - no async equivalent
       def fs_exists_call(*args)
-        if async?
+        if async?()
           self.prepend_list << import_fs_sync
           S(:send, s(:attr, nil, :fsSync), :existsSync, *args)
         else
@@ -70,7 +70,7 @@ module Ruby2JS
 
       # Helper for fs.glob - async returns iterator, needs Array.fromAsync
       def fs_glob_call(*args)
-        if async?
+        if async?()
           self.prepend_list << import_fs_promises
           # await Array.fromAsync(fs.glob(pattern))
           S(:send, nil, :await,
@@ -297,7 +297,7 @@ module Ruby2JS
 
           elsif method == :touch
             S(:begin, *list[args.first].map {|file|
-              if async?
+              if async?()
                 self.prepend_list << import_fs_promises
                 # For async: await fs.writeFile(file, '', {flag: 'a'})
                 S(:send, nil, :await,
@@ -359,11 +359,11 @@ module Ruby2JS
         elsif method == :relative_path_from and args.length == 1 and
               target&.type == :send and
               target.children[0]&.type == :const and
-              target.children[0].children == [nil, :Pathname] and
+              const_is?(target.children[0], :Pathname) and
               target.children[1] == :new and
               args.first&.type == :send and
               args.first.children[0]&.type == :const and
-              args.first.children[0].children == [nil, :Pathname] and
+              const_is?(args.first.children[0], :Pathname) and
               args.first.children[1] == :new
         then
           self.prepend_list << node_import_path
@@ -396,17 +396,23 @@ module Ruby2JS
         end
       end
 
+      # Helper for comparing node.children to [nil, :Symbol] in JS-compatible way
+      # Ruby's == compares array values, JS's === compares references
+      def const_is?(node, name)
+        node.children.first.nil? && node.children.last == name
+      end
+
       def on_const(node)
-        if node.children == [nil, :ARGV]
+        if const_is?(node, :ARGV)
           self.prepend_list << setup_argv
           super
-        elsif node.children == [nil, :ENV]
+        elsif const_is?(node, :ENV)
           S(:attr, s(:attr, nil, :process), :env)
-        elsif node.children == [nil, :STDIN]
+        elsif const_is?(node, :STDIN)
           S(:attr, s(:attr, nil, :process), :stdin)
-        elsif node.children == [nil, :STDOUT]
+        elsif const_is?(node, :STDOUT)
           S(:attr, s(:attr, nil, :process), :stdout)
-        elsif node.children == [nil, :STDERR]
+        elsif const_is?(node, :STDERR)
           S(:attr, s(:attr, nil, :process), :stderr)
         elsif node.children.first == s(:const, nil, :File)
           if node.children.last == :SEPARATOR
@@ -424,11 +430,12 @@ module Ruby2JS
       end
 
       def on_gvar(node)
-        if node.children == [:$stdin]
+        # Use element access instead of array comparison for JS compatibility
+        if node.children.first == :$stdin
           S(:attr, s(:attr, nil, :process), :stdin)
-        elsif node.children == [:$stdout]
+        elsif node.children.first == :$stdout
           S(:attr, s(:attr, nil, :process), :stdout)
-        elsif node.children == [:$stderr]
+        elsif node.children.first == :$stderr
           S(:attr, s(:attr, nil, :process), :stderr)
         else
           super

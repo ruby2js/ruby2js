@@ -83,17 +83,22 @@ module Ruby2JS
 
     # Deep equality check - transpiles to JavaScript for selfhost
     # Used by conditionally_equals in logical.rb
+    # Note: Uses index-based loop instead of each_with_index because
+    # forEach returns from callbacks don't work in JS
     def equals(other)
       return false unless other.respond_to?(:type) && other.respond_to?(:children)
       return false unless type == other.type
       return false unless children.length == other.children.length
-      children.each_with_index do |child, i|
+      i = 0
+      while i < children.length
+        child = children[i]
         other_child = other.children[i]
         if child.respond_to?(:equals)
           return false unless child.equals(other_child)
         else
           return false unless child == other_child
         end
+        i += 1
       end
       true
     end

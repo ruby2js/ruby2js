@@ -33,12 +33,12 @@
     "preact_spec.rb",
     "react_spec.rb",
     "phlex_spec.rb",
-    "pragma_spec.rb"
+    "pragma_spec.rb",
+    "node_spec.rb"
   ],
   "partial": [
     "rails_test_spec.rb",
     "polyfill_spec.rb",
-    "node_spec.rb",
     "astro_spec.rb",
     "vue_spec.rb",
     "combiner_spec.rb",
