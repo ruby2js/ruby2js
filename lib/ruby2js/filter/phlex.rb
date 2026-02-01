@@ -310,7 +310,8 @@ module Ruby2JS
         return true if self.phlex_parent?(parent)
 
         # Check for conventional Phlex directories
-        return true if self.phlex_path?
+        # Use explicit parentheses for JS compatibility (method call, not property access)
+        return true if self.phlex_path?()
 
         # Check for pragma: # Pragma: phlex
         self.has_phlex_pragma?(node)
