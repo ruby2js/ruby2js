@@ -13,47 +13,16 @@ FILTERS_DIR = File.join(SELFHOST, 'filters')
 
 $LOAD_PATH.unshift File.join(ROOT, 'lib')
 
-require 'ruby2js'
-require 'ruby2js/filter/combiner'
-require 'ruby2js/filter/pragma'
-require 'ruby2js/filter/selfhost'
-require 'ruby2js/filter/selfhost/filter'
+# Shared filter configurations
+require_relative 'filter_config'
+
+# Additional requires for build_all (polyfill for some filters)
 require 'ruby2js/filter/polyfill'
-require 'ruby2js/filter/functions'
-require 'ruby2js/filter/return'
-require 'ruby2js/filter/esm'
-require 'ruby2js/filter/node'
 
 # Load manifest
 def manifest
   @manifest ||= JSON.parse(File.read(File.join(SELFHOST, 'spec_manifest.json')))
 end
-
-# Common filter options for specs
-SPEC_FILTERS = [
-  Ruby2JS::Filter::Pragma,
-  Ruby2JS::Filter::Node,
-  Ruby2JS::Filter::Combiner,
-  Ruby2JS::Filter::Selfhost::Core,
-  Ruby2JS::Filter::Selfhost::Walker,
-  Ruby2JS::Filter::Selfhost::Spec,
-  Ruby2JS::Filter::Functions,
-  Ruby2JS::Filter::Return,
-  Ruby2JS::Filter::ESM
-]
-
-# Common filter options for filter files
-FILTER_FILTERS = [
-  Ruby2JS::Filter::Pragma,
-  Ruby2JS::Filter::Combiner,
-  Ruby2JS::Filter::Selfhost::Filter,
-  Ruby2JS::Filter::Selfhost::Core,
-  Ruby2JS::Filter::Selfhost::Converter,
-  Ruby2JS::Filter::Functions,
-  Ruby2JS::Filter::Node,
-  Ruby2JS::Filter::Return,
-  Ruby2JS::Filter::ESM
-]
 
 # Exceptions to the naming convention (spec name => filter name)
 # Convention: X_spec.rb => X, rails_X_spec.rb => rails/X
