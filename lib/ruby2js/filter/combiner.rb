@@ -148,15 +148,21 @@ module Ruby2JS
 
       # Merge two module or class definitions
       def merge_definition(original, reopened)
+        # Use array indexing instead of destructuring to avoid
+        # JS block-scoping issues (let in if/else creates new scope)
+        orig_name = original.children[0]
+
         if original.type == :class
           # class has 3 children: name, superclass, body
-          orig_name, orig_super, orig_body = original.children
-          reopen_name, reopen_super, reopen_body = reopened.children
+          orig_super = original.children[1]
+          orig_body = original.children[2]
+          reopen_super = reopened.children[1]
+          reopen_body = reopened.children[2]
           superclass = orig_super || reopen_super
         else
           # module has 2 children: name, body
-          orig_name, orig_body = original.children
-          reopen_name, reopen_body = reopened.children
+          orig_body = original.children[1]
+          reopen_body = reopened.children[1]
           superclass = nil
         end
 
@@ -165,7 +171,9 @@ module Ruby2JS
         reopen_children = body_children(reopen_body)
 
         # Recursively merge any nested modules/classes
-        merged_children = merge_definitions(orig_children + reopen_children)
+        # Note: Use splat instead of + for JS compatibility
+        # Ruby's array + is not the same as JS's + operator
+        merged_children = merge_definitions([*orig_children, *reopen_children])
 
         # Reorder: put class variable assignments (cvasgn) first
         # JavaScript requires static fields to be declared before use
@@ -188,7 +196,9 @@ module Ruby2JS
       # Extract children from a body node
       def body_children(body)
         return [] if body.nil?
-        return body.children.to_a if body.type == :begin
+        # Note: Don't use .to_a here - children is already an array,
+        # and JS Object.prototype.to_a returns entries not the array itself
+        return body.children if body.type == :begin
         [body]
       end
 
@@ -267,7 +277,8 @@ module Ruby2JS
 
         # Merge named imports
         if orig_named || new_named
-          all_named = (orig_named || []) + (new_named || [])
+          # Use splat for JS-compatible array concatenation
+          all_named = [*(orig_named || []), *(new_named || [])]
           # Deduplicate by const name
           seen = {}
           unique_named = all_named.select do |spec|
@@ -296,7 +307,8 @@ module Ruby2JS
         end
 
         # Class variables first, then everything else
-        cvasgns + others
+        # Use splat for JS-compatible array concatenation
+        [*cvasgns, *others]
       end
     end
 
