@@ -264,7 +264,7 @@ task :test_specs => [:npm_install, :setup_require_symlink, :setup_combiner_symli
 end
 
 desc "Run only ready spec tests"
-task :test_ready => [:npm_install, :setup_require_symlink] do
+task :test_ready => [:npm_install, :setup_require_symlink, :setup_combiner_symlink] do
   Dir.chdir(SELFHOST) do
     sh "node run_all_specs.mjs --skip-transpile --ready-only"
   end

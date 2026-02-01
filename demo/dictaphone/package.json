@@ -1,0 +1,25 @@
+{
+  "name": "dictaphone",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hotwired/stimulus": "^3.2.2",
+    "@hotwired/turbo": "^8.0.21",
+    "@xenova/transformers": "^2.17.2",
+    "dexie": "^4.2.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "ruby2js": "file:../selfhost",
+    "ruby2js-rails": "file:../../packages/ruby2js-rails",
+    "vite-plugin-ruby2js": "file:../../packages/vite-plugin-ruby2js"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0",
+    "vitest": "^2.0.0"
+  }
+}

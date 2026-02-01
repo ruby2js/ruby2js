@@ -1,0 +1,4 @@
+#!/bin/sh
+# Juntos - Rails patterns, JavaScript runtimes
+# This binstub delegates to the juntos CLI from ruby2js-rails
+exec npx juntos "$@"
