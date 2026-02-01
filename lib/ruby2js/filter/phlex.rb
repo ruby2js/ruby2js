@@ -170,7 +170,7 @@ module Ruby2JS
           # Transform the body
           transformed_body = process(body)
 
-          if phlex_framework_mode?
+          if phlex_framework_mode?()
             # Framework mode (React/Lit): return pnodes directly (no buffer pattern)
             # The transformed_body contains pnodes wrapped in buffer ops - extract them
             new_body = build_framework_render_body(transformed_body)
@@ -459,7 +459,7 @@ module Ruby2JS
         # Create pnode
         pnode = s(:pnode, tag, attrs, *children)
 
-        if phlex_framework_mode?
+        if phlex_framework_mode?()
           # Framework mode (React/Lit): return pnode directly (will be processed later)
           pnode
         else
@@ -488,7 +488,7 @@ module Ruby2JS
         # Create pnode with uppercase symbol for component
         pnode = s(:pnode, component_name, attrs, *children)
 
-        if phlex_framework_mode?
+        if phlex_framework_mode?()
           # Framework mode (React/Lit): return pnode directly
           pnode
         else
@@ -513,7 +513,7 @@ module Ruby2JS
         # Create pnode with string tag for custom element
         pnode = s(:pnode, tag_name, attrs, *children)
 
-        if phlex_framework_mode?
+        if phlex_framework_mode?()
           # Framework mode (React/Lit): return pnode directly
           pnode
         else
@@ -533,7 +533,7 @@ module Ruby2JS
         # Create fragment pnode (nil tag)
         pnode = s(:pnode, nil, s(:hash), *children)
 
-        if phlex_framework_mode?
+        if phlex_framework_mode?()
           # Framework mode (React/Lit): return pnode directly
           pnode
         else
