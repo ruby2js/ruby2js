@@ -32,6 +32,7 @@ end
 # Common filter options for specs
 SPEC_FILTERS = [
   Ruby2JS::Filter::Pragma,
+  Ruby2JS::Filter::Node,
   Ruby2JS::Filter::Combiner,
   Ruby2JS::Filter::Selfhost::Core,
   Ruby2JS::Filter::Selfhost::Walker,
