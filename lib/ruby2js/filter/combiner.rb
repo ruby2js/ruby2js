@@ -32,7 +32,8 @@ module Ruby2JS
         combiner_index = filters.index(Ruby2JS::Filter::Combiner)
         esm_index = filters.index(esm_filter)
 
-        return filters unless combiner_index && esm_index
+        # Use explicit nil check - in JS, index 0 is falsy so `!index` would be true
+        return filters if combiner_index.nil? || esm_index.nil?
         return filters if combiner_index > esm_index  # Already after ESM
 
         # Move combiner to after ESM
@@ -72,7 +73,9 @@ module Ruby2JS
           next unless node
           if node.type == :begin
             # Recursively flatten nested begins
-            result.concat(flatten_begins(node.children))
+            # Note: Use push with splat instead of concat - Ruby's concat modifies
+            # in place but JS concat returns a new array
+            result.push(*flatten_begins(node.children))
           else
             result << node
           end
@@ -230,8 +233,13 @@ module Ruby2JS
         path = node.children[0]
         if path.is_a?(Array)
           # Find the 'from:' pair
-          from_pair = path.find { |p| p.respond_to?(:type) && p.type == :pair &&
-                                      p.children[0].children[0] == :from rescue false }
+          # Note: Use explicit guards instead of rescue - the rescue modifier
+          # transpiles to try/catch without return statements in JS
+          from_pair = path.find do |p|
+            next false unless p.respond_to?(:type) && p.type == :pair
+            next false unless p.children[0].respond_to?(:children)
+            p.children[0].children[0] == :from
+          end
           from_pair ? from_pair.children[1].children[0] : path[0].to_s
         elsif path.is_a?(String)
           path

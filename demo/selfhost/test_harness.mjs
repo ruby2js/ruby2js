@@ -9,6 +9,64 @@ if (!Array.prototype.uniq) {
   });
 }
 
+// Polyfill for Ruby's Array#dup - returns shallow copy
+if (!Array.prototype.dup) {
+  Object.defineProperty(Array.prototype, "dup", {
+    value() { return [...this] },
+    configurable: true
+  });
+}
+
+// Polyfill for Ruby's Array#delete_at - removes element at index, returns it
+if (!Array.prototype.delete_at) {
+  Object.defineProperty(Array.prototype, "delete_at", {
+    value(index) {
+      if (index < 0 || index >= this.length) return null;
+      return this.splice(index, 1)[0];
+    },
+    configurable: true
+  });
+}
+
+// Polyfill for Ruby's Array#insert - inserts element(s) at index
+if (!Array.prototype.insert) {
+  Object.defineProperty(Array.prototype, "insert", {
+    value(index, ...items) {
+      this.splice(index, 0, ...items);
+      return this;
+    },
+    configurable: true
+  });
+}
+
+// Polyfill for Ruby's Array#partition - splits into two arrays based on predicate
+if (!Array.prototype.partition) {
+  Object.defineProperty(Array.prototype, "partition", {
+    value(fn) {
+      const truthy = [];
+      const falsy = [];
+      for (const item of this) {
+        if (fn(item)) {
+          truthy.push(item);
+        } else {
+          falsy.push(item);
+        }
+      }
+      return [truthy, falsy];
+    },
+    configurable: true
+  });
+}
+
+// Polyfill for Ruby's Pathname - path manipulation class
+import nodePath from 'node:path';
+globalThis.Pathname = class Pathname {
+  constructor(path) { this._path = path || '.'; }
+  join(other) { return new Pathname(nodePath.join(this._path, other)); }
+  get parent() { return new Pathname(nodePath.dirname(this._path)); }
+  toString() { return this._path; }
+};
+
 // Polyfill for Ruby's Struct - creates a factory function for named attributes
 globalThis.Struct = function Struct(...args) {
   // Handle keyword_init option
@@ -441,6 +499,34 @@ Object.defineProperty(Array.prototype, 'wont_be_empty', {
   },
   configurable: true
 });
+
+// Array wont_include - check array doesn't contain item
+Array.prototype.wont_include = function(item) {
+  if (this.includes(item)) {
+    throw new Error(`Expected array not to include ${item}`);
+  }
+  return this;
+};
+
+// Number/value must_be - comparison assertions like x.must_be(:>, 5)
+// In Ruby: x.must_be :>, 5 checks x > 5
+Number.prototype.must_be = function(operator, value) {
+  const num = this.valueOf();
+  let pass = false;
+  switch (operator) {
+    case '>': pass = num > value; break;
+    case '<': pass = num < value; break;
+    case '>=': pass = num >= value; break;
+    case '<=': pass = num <= value; break;
+    case '==': pass = num == value; break;
+    case '===': pass = num === value; break;
+    default: throw new Error(`Unknown operator: ${operator}`);
+  }
+  if (!pass) {
+    throw new Error(`Expected ${num} ${operator} ${value}`);
+  }
+  return this;
+};
 
 // Object/value wont_be_nil
 Object.defineProperty(Object.prototype, 'wont_be_nil', {

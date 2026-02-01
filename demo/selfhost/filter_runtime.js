@@ -188,7 +188,8 @@ export function createSetup(filterObj) {
 // Register a filter in the Ruby2JS namespace
 // Class-based filters have non-enumerable prototype methods, so we make them enumerable
 // for compatibility with Object.assign in the pipeline
-export function registerFilter(name, filterObj) {
+// Set addToDefaults=false for filters that shouldn't be auto-included (like Combiner)
+export function registerFilter(name, filterObj, addToDefaults = true) {
   // Make all prototype methods enumerable so Object.assign can copy them
   for (const key of Object.getOwnPropertyNames(filterObj)) {
     if (key !== 'constructor') {
@@ -198,8 +199,10 @@ export function registerFilter(name, filterObj) {
       }
     }
   }
-  // Push to Ruby2JS.Filter.DEFAULTS (the one tests check), not the local DEFAULTS
-  Ruby2JS.Filter.DEFAULTS.push(filterObj);
+  // Push to Ruby2JS.Filter.DEFAULTS unless explicitly disabled
+  if (addToDefaults) {
+    Ruby2JS.Filter.DEFAULTS.push(filterObj);
+  }
   Ruby2JS.Filter[name] = filterObj;
   filterObj._setup = createSetup(filterObj);
 }

@@ -6,6 +6,18 @@ module Ruby2JS
     module Require
       include SEXP
 
+      # Convert file:// URL to filesystem path (for ES module import.meta.url)
+      # In JS, import.meta.url returns file:///path/to/file.mjs
+      # We need to convert this to /path/to/file.mjs for filesystem operations
+      # Note: Written in JS-compatible style for selfhost transpilation
+      def url_to_path(path)
+        return path unless path.is_a?(String)
+        return path unless path.start_with?('file:')
+        # Remove file:// prefix and return the path
+        # This handles both file:///path (Unix) and file:///C:/path (Windows)
+        path.sub(/^file:\/\//, '')
+      end
+
       def initialize(*args)
         @require_expr = nil
         @require_seen = {}
@@ -83,10 +95,11 @@ module Ruby2JS
             file2 = @options[:file2]
 
             basename = node.children[2].children.first
-            dirname = File.dirname(File.expand_path(@options[:file]))
+            # Use url_to_path to handle file:// URLs from import.meta.url
+            dirname = File.dirname(File.expand_path(url_to_path(@options[:file])))
 
             if file2 and node.children[1] == :require_relative
-              dirname = File.dirname(File.expand_path(file2))
+              dirname = File.dirname(File.expand_path(url_to_path(file2)))
             end
 
             filename = File.join(dirname, basename)

@@ -243,14 +243,21 @@ end
 desc "Create symlink to spec/require for ESM require tests"
 task :setup_require_symlink do
   require_link = File.join(DIST, 'require')
-  require_target = File.join(ROOT, 'spec/require')
   unless File.exist?(require_link)
     FileUtils.ln_s(File.join('..', '..', '..', 'spec', 'require'), require_link)
   end
 end
 
+desc "Create symlink to spec/combiner for combiner fixture tests"
+task :setup_combiner_symlink do
+  combiner_link = File.join(DIST, 'combiner')
+  unless File.exist?(combiner_link)
+    FileUtils.ln_s(File.join('..', '..', '..', 'spec', 'combiner'), combiner_link)
+  end
+end
+
 desc "Run spec tests (requires build first)"
-task :test_specs => [:npm_install, :setup_require_symlink] do
+task :test_specs => [:npm_install, :setup_require_symlink, :setup_combiner_symlink] do
   Dir.chdir(SELFHOST) do
     sh "node run_all_specs.mjs --skip-transpile"
   end

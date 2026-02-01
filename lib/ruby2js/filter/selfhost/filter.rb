@@ -291,6 +291,24 @@ module Ruby2JS
                   # - filters/foo.js imports from ../ruby2js.js
                   # - filters/rails/foo.js imports from ../../ruby2js.js
                   import_path = namespace_name ? '../../ruby2js.js' : '../ruby2js.js'
+
+                  # Check if filter should be added to DEFAULTS (look for DEFAULTS.push in source)
+                  # Filters without DEFAULTS.push should pass false to registerFilter
+                  has_defaults_push = filter_body.any? { |n|
+                    n&.type == :send &&
+                    n.children[0]&.type == :const &&
+                    n.children[0].children[1] == :DEFAULTS &&
+                    n.children[1] == :push
+                  }
+
+                  # Build registerFilter call with optional false for addToDefaults
+                  register_call = if has_defaults_push
+                    s(:send, nil, :registerFilter, s(:str, full_filter_name), s(:attr, s(:const, nil, full_filter_name.to_sym), :prototype))
+                  else
+                    # Pass false to skip adding to DEFAULTS
+                    s(:send, nil, :registerFilter, s(:str, full_filter_name), s(:attr, s(:const, nil, full_filter_name.to_sym), :prototype), s(:false))
+                  end
+
                   output_statements = [
                     # Import from ruby2js.js (filter runtime is bundled there)
                     s(:import,
@@ -319,7 +337,7 @@ module Ruby2JS
                     # so they use the inherited methods from Filter.Processor
                     process(filter_class),
                     # Register the filter (pass prototype for Object.assign compatibility)
-                    s(:send, nil, :registerFilter, s(:str, full_filter_name), s(:attr, s(:const, nil, full_filter_name.to_sym), :prototype))
+                    register_call
                   ]
 
                   # Copy static methods (def self.X) to the registered filter so they're accessible
