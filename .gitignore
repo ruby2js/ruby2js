@@ -29,6 +29,7 @@ mise.toml
 # Local test demos (generated apps)
 demo/blog/
 demo/chat/
+demo/dictaphone/
 demo/notes/
 demo/photo_gallery/
 demo/ssg-blog/

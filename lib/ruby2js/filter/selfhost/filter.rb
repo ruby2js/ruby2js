@@ -246,6 +246,7 @@ module Ruby2JS
                 # Found module Ruby2JS::Filter - extract the inner filter module
                 filter_body = inner.children[1..-1]
                 filter_body = filter_body.first.children if filter_body.first&.type == :begin
+                outer_filter_body = filter_body  # Save for DEFAULTS.push check
 
                 # Find the actual filter module (skip DEFAULTS << X)
                 filter_modules = filter_body.select { |n| n&.type == :module }
@@ -294,7 +295,8 @@ module Ruby2JS
 
                   # Check if filter should be added to DEFAULTS (look for DEFAULTS.push in source)
                   # Filters without DEFAULTS.push should pass false to registerFilter
-                  has_defaults_push = filter_body.any? { |n|
+                  # Use outer_filter_body since DEFAULTS.push is at Filter level, not inside namespace
+                  has_defaults_push = outer_filter_body.any? { |n|
                     n&.type == :send &&
                     n.children[0]&.type == :const &&
                     n.children[0].children[1] == :DEFAULTS &&
