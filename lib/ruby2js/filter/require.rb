@@ -104,10 +104,14 @@ module Ruby2JS
 
             filename = File.join(dirname, basename)
 
-            if not File.file? filename and File.file? filename+".rb"
-              filename += '.rb'
-            elsif not File.file? filename and File.file? filename+".js.rb"
-              filename += '.js.rb'
+            # Note: Use unless/if pattern for cleaner JS transpilation
+            # The `not X and Y` pattern creates precedence issues in JS
+            unless File.file?(filename)
+              if File.file?(filename + ".rb")
+                filename += '.rb'
+              elsif File.file?(filename + ".js.rb")
+                filename += '.js.rb'
+              end
             end
 
             realpath = File.realpath(filename)

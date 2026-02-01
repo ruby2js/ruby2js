@@ -51,15 +51,19 @@ module Ruby2JS
           when :describe, :context
             # describe 'something' do ... end
             # Track that we're inside describe for it/before/after detection
+            # Note: Use explicit result variable for JS transpilation
+            # (Ruby's implicit return from begin/ensure doesn't transpile well)
+            result = nil
             begin
               @rails_test_describe_depth += 1
               # Collect model references from the body
               collect_test_model_references(node.children.last)
               # Process normally - describe blocks don't need async
-              super
+              result = super
             ensure
               @rails_test_describe_depth -= 1
             end
+            result
 
           when :it, :specify, :test
             return super unless @rails_test_describe_depth > 0
