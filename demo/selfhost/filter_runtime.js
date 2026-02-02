@@ -5,6 +5,45 @@
 
 import { Ruby2JS } from './ruby2js.js';
 
+// File polyfill - provides Ruby File methods for Node.js, no-ops for browser
+// Used by Converter for timestamp tracking in development (Vite)
+let _fs = null;
+if (typeof process !== 'undefined' && process.versions?.node) {
+  try {
+    _fs = await import('node:fs');
+  } catch {
+    // fs not available
+  }
+}
+
+// Convert file:// URLs to filesystem paths
+function urlToPath(pathOrUrl) {
+  if (typeof pathOrUrl !== 'string') return pathOrUrl;
+  if (pathOrUrl.startsWith('file://')) {
+    return pathOrUrl.slice(7); // Remove 'file://' prefix
+  }
+  return pathOrUrl;
+}
+
+globalThis.File = {
+  exist(path) {
+    if (!_fs) return false;
+    try {
+      return _fs.existsSync(urlToPath(path));
+    } catch {
+      return false;
+    }
+  },
+  mtime(path) {
+    if (!_fs) return null;
+    try {
+      return _fs.statSync(urlToPath(path)).mtime;
+    } catch {
+      return null;
+    }
+  }
+};
+
 // Array.prototype.dup - Ruby's dup creates a shallow copy
 if (!Array.prototype.dup) {
   Array.prototype.dup = function() {

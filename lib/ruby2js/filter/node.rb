@@ -148,6 +148,10 @@ module Ruby2JS
             # Use lstat (not stat) to check the link itself, not what it points to
             s(:send, fs_call(:lstatSync, process(args.first)), :isSymbolicLink)
 
+          elsif method == :mtime and args.length == 1
+            # File.mtime(path) → fs.statSync(path).mtime
+            s(:attr, fs_call(:statSync, process(args.first)), :mtime)
+
           elsif method == :readlink and args.length == 1
             fs_call(:readlinkSync, process(args.first))
 

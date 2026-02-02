@@ -478,7 +478,11 @@ module Ruby2JS
     end
 
     def timestamp(file)
-      super
+      # Inline Serializer's timestamp logic instead of super
+      # (super transpiles to _parent.timestamp which doesn't work for class inheritance)
+      if file
+        @timestamps[file] = File.mtime(file) if File.exist?(file)
+      end
 
       return unless file
 
@@ -486,7 +490,13 @@ module Ruby2JS
         if ast.loc and ast.loc.respond_to?(:expression) and ast.loc.expression
           filename = ast.loc.expression.source_buffer.name
           if filename and not filename.empty?
-            @timestamps[filename] ||= File.mtime(filename) rescue nil
+            unless @timestamps[filename]
+              begin
+                @timestamps[filename] = File.mtime(filename)
+              rescue
+                # File might not exist or be accessible
+              end
+            end
           end
         end
 

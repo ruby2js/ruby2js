@@ -39,10 +39,10 @@
     "rails_test_spec.rb",
     "polyfill_spec.rb",
     "vue_spec.rb",
-    "astro_spec.rb"
+    "astro_spec.rb",
+    "require_spec.rb"
   ],
   "partial": [
-    "require_spec.rb"
   ],
   "blocked": {
   }

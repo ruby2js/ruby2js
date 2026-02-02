@@ -55,14 +55,15 @@ module Ruby2JS
           comment_line = nil
           comment_file = nil
           if comment.respond_to?(:loc) && comment.loc
-            comment_line = comment.loc.line
-            # Get comment's source file
+            # Check for expression.line first (JS PrismComment), then loc.line (Ruby)
             if comment.loc.respond_to?(:expression) && comment.loc.expression
               expr = comment.loc.expression
+              comment_line = expr.line if expr.respond_to?(:line)
               if expr.respond_to?(:source_buffer) && expr.source_buffer.respond_to?(:name)
                 comment_file = expr.source_buffer.name
               end
             end
+            comment_line ||= comment.loc.line if comment.loc.respond_to?(:line)
           elsif comment.respond_to?(:location)
             loc = comment.location
             comment_line = loc.respond_to?(:start_line) ? loc.start_line : loc.line
@@ -124,8 +125,29 @@ module Ruby2JS
 
             @options[:file2] = filename
             ast, comments = Ruby2JS.parse(File.read(filename), filename)
-            # comments is already a hash with associated comments, merge it directly
-            @comments.merge!(comments) { |key, old, new| old + new }
+            # Merge comments from included file into main comments
+            # Ruby Hash uses each(key, value), JS Map uses forEach(value, key)
+            if comments.respond_to?(:each_pair)
+              # Ruby Hash - use each_pair
+              comments.each_pair do |key, value|
+                if @comments[key]
+                  @comments[key] = @comments[key] + value
+                else
+                  @comments[key] = value
+                end
+              end
+            elsif comments.respond_to?(:forEach)
+              # JS Map - use forEach (note: callback is (value, key) order)
+              comments.forEach do |value, key|
+                existing = @comments.get(key) # Pragma: map
+                if existing
+                  # Use concat for array concatenation (works in both Ruby and JS)
+                  @comments.set(key, existing.concat(value))
+                else
+                  @comments.set(key, value)
+                end
+              end
+            end
             if @comments[ast]
               @comments[node] = (@comments[node] || []) + @comments[ast]
             end

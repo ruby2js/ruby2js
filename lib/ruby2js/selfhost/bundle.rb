@@ -104,7 +104,7 @@ await initPrism()
 # Parse Ruby source to AST
 # @param source [String] Ruby source code
 # @param file [String] Optional file name
-# @return [Array] [ast, source_buffer]
+# @return [Array] [ast, comments_hash] - matches Ruby's Ruby2JS.parse signature
 export def parse(source, file=nil)
   prism_parse = getPrismParse()
   parse_result = prism_parse(source)
@@ -116,7 +116,15 @@ export def parse(source, file=nil)
   walker = Ruby2JS::PrismWalker.new(source, file)
   ast = walker.visit(parse_result.value)
 
-  [ast, walker.source_buffer]
+  # Associate comments with AST nodes (matches Ruby's parse return format)
+  source_buffer = walker.source_buffer
+  wrapped_comments = (parse_result.comments || []).map do |c|
+    PrismComment.new(c, source, source_buffer)
+  end
+  comments = associateComments(ast, wrapped_comments)
+  comments.set("_raw", wrapped_comments)
+
+  [ast, comments]
 end
 
 # Convert Ruby source to JavaScript
@@ -180,6 +188,9 @@ export def convert(source, options = {})
   # Run pipeline (handles filters if provided, converter setup, execution)
   pipeline = Ruby2JS::Pipeline.new(ast, comments, filters: filters, options: pipeline_options)
   result = pipeline.run
+
+  # Record timestamps for cache invalidation (used by Vite dev server)
+  result.timestamp(options[:file]) if options[:file]
 
   # Set file name for sourcemap generation
   result.file_name = options[:file] if options[:file]
