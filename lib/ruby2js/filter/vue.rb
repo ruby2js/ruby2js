@@ -122,8 +122,9 @@ module Ruby2JS
 
         if tag.nil?
           # Fragment - just children
+          # Note: Use push with splat instead of concat for JS compatibility
           children.each do |child|
-            parts.concat(build_vue_child(child))
+            parts.push(*build_vue_child(child))
           end
         elsif tag.to_s[0] =~ /[A-Z]/
           # Component - render as Vue component
@@ -185,7 +186,8 @@ module Ruby2JS
           end
         when :pnode
           tag, attrs, *grandchildren = child.children
-          parts.concat(build_vue_template(tag, attrs, grandchildren))
+          # Note: Use push with splat instead of concat for JS compatibility
+          parts.push(*build_vue_template(tag, attrs, grandchildren))
         when :vue_template
           parts << child.children.first
         when :block

@@ -297,7 +297,7 @@ module Ruby2JS
       def add_polyfill(name)
         return if @polyfills_added.include?(name)
         @polyfills_added << name
-        prepend_list << polyfill_ast(name)
+        self.prepend_list << polyfill_ast(name)
       end
 
       def on_send(node)

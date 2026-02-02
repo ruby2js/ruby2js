@@ -36,12 +36,12 @@
     "pragma_spec.rb",
     "node_spec.rb",
     "combiner_spec.rb",
-    "rails_test_spec.rb"
+    "rails_test_spec.rb",
+    "polyfill_spec.rb",
+    "vue_spec.rb",
+    "astro_spec.rb"
   ],
   "partial": [
-    "polyfill_spec.rb",
-    "astro_spec.rb",
-    "vue_spec.rb",
     "require_spec.rb"
   ],
   "blocked": {
