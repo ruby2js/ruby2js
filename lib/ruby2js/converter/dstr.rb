@@ -17,13 +17,16 @@ module Ruby2JS
 
       # gather length of string parts; if long enough, newlines will
       # not be escaped (poor man's HEREDOC)
-      strings = children.select {|child| child.type==:str}.
+      strings = children.select {|child| ast_node?(child) && child.type==:str}.
         map {|child| child.children.last}.join
       # Note: use (scan || []) pattern for JS compatibility where match() returns null
       heredoc = (strings.length > 40 and (strings.scan("\n") || []).length > 3)
 
       put '`'
       children.each do |child|
+        # Skip nil/non-AST children
+        next unless ast_node?(child)
+
         if child.type == :str
           str = child.children.first.inspect[1..-2].
             gsub('${', '$\{').gsub('`', '\\\`')

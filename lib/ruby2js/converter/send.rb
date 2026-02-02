@@ -558,7 +558,8 @@ module Ruby2JS
         else
           left = s(:dstr, left) if left.type == :str
           right = s(:dstr, right) if right.type == :str
-          return left.updated(nil, left.children + right.children)
+          # Use splat for JS compatibility (array + array doesn't concat in JS)
+          return left.updated(nil, [*left.children, *right.children])
         end
       end
 
