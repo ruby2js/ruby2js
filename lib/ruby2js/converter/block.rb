@@ -9,6 +9,22 @@ module Ruby2JS
 
     handle :block do |call, args, block|
 
+      # Handle Ruby 3.4 `it` implicit block parameter
+      # When args is nil and block uses `it`, convert to explicit parameter
+      if args.nil?
+        uses_it = false
+        walk = proc do |node|
+          next unless ast_node?(node)
+          if node.type == :lvar && node.children.first == :it
+            uses_it = true
+          else
+            node.children.each { |child| walk.call(child) }
+          end
+        end
+        walk.call(block)
+        args = uses_it ? s(:args, s(:arg, :it)) : s(:args)
+      end
+
       # Check for trailing `async` arg in block call: `it "works", async do end`
       # Using element-wise comparison for selfhost JS compatibility
       last_arg = call.children.last

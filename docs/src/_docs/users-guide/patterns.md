@@ -323,6 +323,25 @@ add = ->(a, b) { a + b }
 sum = add.call(1, 2)
 ```
 
+### Numbered and Implicit Parameters
+
+Ruby 2.7 introduced numbered parameters (`_1`, `_2`, etc.) and Ruby 3.4 added the `it` implicit parameter for single-parameter blocks. Both work with Ruby2JS:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
+```ruby
+# Numbered parameters (Ruby 2.7+)
+doubled = items.map { _1 * 2 }
+pairs = items.map { [_1, _2] }
+
+# Implicit it parameter (Ruby 3.4+)
+sorted = items.sort_by { it.name }
+filtered = items.select { it > 0 }
+```
+
 ## Variable Declarations
 
 ### Local Variables

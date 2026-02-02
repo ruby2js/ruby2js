@@ -693,6 +693,18 @@ describe Ruby2JS do
           must_equal '(_1, _2) => _1 + _2'
       end
     end
+
+    unless (RUBY_VERSION.split('.').map(&:to_i) <=> [3, 4, 0]) == -1
+      it "should handle Ruby 3.4 it implicit parameter" do
+        to_js( '[1,2,3].map { it * 2 }').
+          must_equal '[1, 2, 3].map(it => it * 2)'
+      end
+
+      it "should handle it with method calls" do
+        to_js( 'items.sort_by { it.slot || 0 }').
+          must_equal 'items.sort_by(it => it.slot ?? 0)'
+      end
+    end
   end
 
   describe 'object definition' do
