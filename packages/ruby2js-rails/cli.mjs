@@ -45,8 +45,8 @@ import {
   fixTestImportsForEject
 } from './transform.mjs';
 
-// Import config loading from Vite plugin (shared with eject)
-import { loadConfig } from './vite.mjs';
+// loadConfig is dynamically imported from vite.mjs when needed (in runEject)
+// to avoid loading js-yaml at startup, which may not be installed yet
 
 // Try to load js-yaml, fall back to naive parsing if not available
 // (js-yaml may not be available when CLI is run standalone from tarball)
@@ -886,6 +886,8 @@ async function runEject(options) {
 
   // Load full config from ruby2js.yml (same as Vite plugin uses)
   // This ensures eslevel, external, and other settings are read consistently
+  // Dynamic import to avoid loading js-yaml at CLI startup
+  const { loadConfig } = await import('./vite.mjs');
   const config = loadConfig(APP_ROOT, {
     database: options.database,
     target: options.target,
@@ -931,6 +933,7 @@ async function runEject(options) {
   }
 
   let fileCount = 0;
+  const errors = [];  // Track errors but continue processing
 
   // Transform models
   const modelsDir = join(APP_ROOT, 'app/models');
@@ -942,14 +945,20 @@ async function runEject(options) {
     if (modelFiles.length > 0) {
       console.log('  Transforming models...');
       for (const file of modelFiles) {
-        const source = readFileSync(join(modelsDir, file), 'utf-8');
-        const result = await transformRuby(source, join(modelsDir, file), null, config, APP_ROOT);
-        // Pass relative output path for correct import resolution
-        const relativeOutPath = `app/models/${file.replace('.rb', '.js')}`;
-        let code = fixImportsForEject(result.code, relativeOutPath, config);
-        const outFile = join(outDir, 'app/models', file.replace('.rb', '.js'));
-        writeFileSync(outFile, code);
-        fileCount++;
+        const relativePath = `app/models/${file}`;
+        try {
+          const source = readFileSync(join(modelsDir, file), 'utf-8');
+          const result = await transformRuby(source, join(modelsDir, file), null, config, APP_ROOT);
+          // Pass relative output path for correct import resolution
+          const relativeOutPath = `app/models/${file.replace('.rb', '.js')}`;
+          let code = fixImportsForEject(result.code, relativeOutPath, config);
+          const outFile = join(outDir, 'app/models', file.replace('.rb', '.js'));
+          writeFileSync(outFile, code);
+          fileCount++;
+        } catch (err) {
+          errors.push({ file: relativePath, error: err.message });
+          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+        }
       }
 
       // Generate models index (only if we have models)
@@ -968,14 +977,20 @@ async function runEject(options) {
     if (migrations.length > 0) {
       console.log('  Transforming migrations...');
       for (const m of migrations) {
-        const source = readFileSync(join(migrateDir, m.file), 'utf-8');
-        const result = await transformRuby(source, join(migrateDir, m.file), null, config, APP_ROOT);
-        // Pass relative output path for correct import resolution
-        const relativeOutPath = `db/migrate/${m.name}.js`;
-        let code = fixImportsForEject(result.code, relativeOutPath, config);
-        const outFile = join(outDir, 'db/migrate', m.name + '.js');
-        writeFileSync(outFile, code);
-        fileCount++;
+        const relativePath = `db/migrate/${m.file}`;
+        try {
+          const source = readFileSync(join(migrateDir, m.file), 'utf-8');
+          const result = await transformRuby(source, join(migrateDir, m.file), null, config, APP_ROOT);
+          // Pass relative output path for correct import resolution
+          const relativeOutPath = `db/migrate/${m.name}.js`;
+          let code = fixImportsForEject(result.code, relativeOutPath, config);
+          const outFile = join(outDir, 'db/migrate', m.name + '.js');
+          writeFileSync(outFile, code);
+          fileCount++;
+        } catch (err) {
+          errors.push({ file: relativePath, error: err.message });
+          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+        }
       }
 
       // Generate migrations index (only if we have migrations)
@@ -989,12 +1004,17 @@ async function runEject(options) {
   const seedsFile = join(APP_ROOT, 'db/seeds.rb');
   if (existsSync(seedsFile) && shouldInclude('db/seeds.rb')) {
     console.log('  Transforming seeds...');
-    const source = readFileSync(seedsFile, 'utf-8');
-    const result = await transformRuby(source, seedsFile, null, config, APP_ROOT);
-    // Pass relative output path for correct import resolution
-    let code = fixImportsForEject(result.code, 'db/seeds.js', config);
-    writeFileSync(join(outDir, 'db/seeds.js'), code);
-    fileCount++;
+    try {
+      const source = readFileSync(seedsFile, 'utf-8');
+      const result = await transformRuby(source, seedsFile, null, config, APP_ROOT);
+      // Pass relative output path for correct import resolution
+      let code = fixImportsForEject(result.code, 'db/seeds.js', config);
+      writeFileSync(join(outDir, 'db/seeds.js'), code);
+      fileCount++;
+    } catch (err) {
+      errors.push({ file: 'db/seeds.rb', error: err.message });
+      console.warn(`    Skipped db/seeds.rb: ${err.message}`);
+    }
   }
 
   // Transform routes - generate paths.js first, then routes.js
@@ -1002,46 +1022,51 @@ async function runEject(options) {
   const routesFile = join(APP_ROOT, 'config/routes.rb');
   if (existsSync(routesFile) && shouldInclude('config/routes.rb')) {
     console.log('  Transforming routes...');
-    const source = readFileSync(routesFile, 'utf-8');
-    const { convert } = await ensureRuby2jsReady();
+    try {
+      const source = readFileSync(routesFile, 'utf-8');
+      const { convert } = await ensureRuby2jsReady();
 
-    // Get routes-specific config from ruby2js.yml if available
-    const routesSectionConfig = config.sections?.routes || null;
+      // Get routes-specific config from ruby2js.yml if available
+      const routesSectionConfig = config.sections?.routes || null;
 
-    // Generate paths.js first (path helpers only, no controller imports)
-    const pathsOptions = {
-      ...getBuildOptions(null, config.target, routesSectionConfig),
-      file: 'config/routes.rb',
-      database: config.database,
-      target: config.target,
-      paths_only: true,  // Generate only path helpers
-      base: config.base || '/'
-    };
-    const pathsResult = convert(source, pathsOptions);
-    let pathsCode = pathsResult.toString();
-    // For browser targets, use browser path helper
-    if (config.target === 'browser') {
-      pathsCode = pathsCode.replace(
-        /from ['"]ruby2js-rails\/path_helper\.mjs['"]/g,
-        "from 'ruby2js-rails/path_helper_browser.mjs'"
-      );
+      // Generate paths.js first (path helpers only, no controller imports)
+      const pathsOptions = {
+        ...getBuildOptions(null, config.target, routesSectionConfig),
+        file: 'config/routes.rb',
+        database: config.database,
+        target: config.target,
+        paths_only: true,  // Generate only path helpers
+        base: config.base || '/'
+      };
+      const pathsResult = convert(source, pathsOptions);
+      let pathsCode = pathsResult.toString();
+      // For browser targets, use browser path helper
+      if (config.target === 'browser') {
+        pathsCode = pathsCode.replace(
+          /from ['"]ruby2js-rails\/path_helper\.mjs['"]/g,
+          "from 'ruby2js-rails/path_helper_browser.mjs'"
+        );
+      }
+      writeFileSync(join(outDir, 'config/paths.js'), pathsCode);
+      fileCount++;
+
+      // Generate routes.js with paths_file option (imports from paths.js)
+      const routesOptions = {
+        ...getBuildOptions(null, config.target, routesSectionConfig),
+        file: 'config/routes.rb',
+        database: config.database,
+        target: config.target,
+        paths_file: './paths.js',  // Import path helpers from paths.js
+        base: config.base || '/'
+      };
+      const routesResult = convert(source, routesOptions);
+      let routesCode = fixImportsForEject(routesResult.toString(), 'config/routes.js', config);
+      writeFileSync(join(outDir, 'config/routes.js'), routesCode);
+      fileCount++;
+    } catch (err) {
+      errors.push({ file: 'config/routes.rb', error: err.message });
+      console.warn(`    Skipped config/routes.rb: ${err.message}`);
     }
-    writeFileSync(join(outDir, 'config/paths.js'), pathsCode);
-    fileCount++;
-
-    // Generate routes.js with paths_file option (imports from paths.js)
-    const routesOptions = {
-      ...getBuildOptions(null, config.target, routesSectionConfig),
-      file: 'config/routes.rb',
-      database: config.database,
-      target: config.target,
-      paths_file: './paths.js',  // Import path helpers from paths.js
-      base: config.base || '/'
-    };
-    const routesResult = convert(source, routesOptions);
-    let routesCode = fixImportsForEject(routesResult.toString(), 'config/routes.js', config);
-    writeFileSync(join(outDir, 'config/routes.js'), routesCode);
-    fileCount++;
   }
 
   // Transform views
@@ -1065,14 +1090,20 @@ async function runEject(options) {
         .filter(f => shouldInclude(`app/views/${resource}/${f}`));
 
       for (const file of erbFiles) {
-        const source = readFileSync(join(resourceDir, file), 'utf-8');
-        const result = await transformErb(source, join(resourceDir, file), false, config);
-        // Pass relative output path for correct import resolution
-        const relativeOutPath = `app/views/${resource}/${file.replace('.html.erb', '.js')}`;
-        let code = fixImportsForEject(result.code, relativeOutPath, config);
-        const outFile = join(outResourceDir, file.replace('.html.erb', '.js'));
-        writeFileSync(outFile, code);
-        fileCount++;
+        const relativePath = `app/views/${resource}/${file}`;
+        try {
+          const source = readFileSync(join(resourceDir, file), 'utf-8');
+          const result = await transformErb(source, join(resourceDir, file), false, config);
+          // Pass relative output path for correct import resolution
+          const relativeOutPath = `app/views/${resource}/${file.replace('.html.erb', '.js')}`;
+          let code = fixImportsForEject(result.code, relativeOutPath, config);
+          const outFile = join(outResourceDir, file.replace('.html.erb', '.js'));
+          writeFileSync(outFile, code);
+          fileCount++;
+        } catch (err) {
+          errors.push({ file: relativePath, error: err.message });
+          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+        }
       }
 
       // Transform JSX.rb files
@@ -1081,14 +1112,20 @@ async function runEject(options) {
         .filter(f => shouldInclude(`app/views/${resource}/${f}`));
 
       for (const file of jsxFiles) {
-        const source = readFileSync(join(resourceDir, file), 'utf-8');
-        const result = await transformJsxRb(source, join(resourceDir, file), config);
-        // Pass relative output path for correct import resolution
-        const relativeOutPath = `app/views/${resource}/${file.replace('.jsx.rb', '.js')}`;
-        let code = fixImportsForEject(result.code, relativeOutPath, config);
-        const outFile = join(outResourceDir, file.replace('.jsx.rb', '.js'));
-        writeFileSync(outFile, code);
-        fileCount++;
+        const relativePath = `app/views/${resource}/${file}`;
+        try {
+          const source = readFileSync(join(resourceDir, file), 'utf-8');
+          const result = await transformJsxRb(source, join(resourceDir, file), config);
+          // Pass relative output path for correct import resolution
+          const relativeOutPath = `app/views/${resource}/${file.replace('.jsx.rb', '.js')}`;
+          let code = fixImportsForEject(result.code, relativeOutPath, config);
+          const outFile = join(outResourceDir, file.replace('.jsx.rb', '.js'));
+          writeFileSync(outFile, code);
+          fileCount++;
+        } catch (err) {
+          errors.push({ file: relativePath, error: err.message });
+          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+        }
       }
     }
 
@@ -1107,14 +1144,20 @@ async function runEject(options) {
         .filter(f => shouldInclude(`app/views/layouts/${f}`));
 
       for (const file of layoutFiles) {
-        const source = readFileSync(join(layoutsDir, file), 'utf-8');
-        const result = await transformErb(source, join(layoutsDir, file), true, config);
-        // Pass relative output path for correct import resolution
-        const relativeOutPath = `app/views/layouts/${file.replace('.html.erb', '.js')}`;
-        let code = fixImportsForEject(result.code, relativeOutPath, config);
-        const outFile = join(outDir, 'app/views/layouts', file.replace('.html.erb', '.js'));
-        writeFileSync(outFile, code);
-        fileCount++;
+        const relativePath = `app/views/layouts/${file}`;
+        try {
+          const source = readFileSync(join(layoutsDir, file), 'utf-8');
+          const result = await transformErb(source, join(layoutsDir, file), true, config);
+          // Pass relative output path for correct import resolution
+          const relativeOutPath = `app/views/layouts/${file.replace('.html.erb', '.js')}`;
+          let code = fixImportsForEject(result.code, relativeOutPath, config);
+          const outFile = join(outDir, 'app/views/layouts', file.replace('.html.erb', '.js'));
+          writeFileSync(outFile, code);
+          fileCount++;
+        } catch (err) {
+          errors.push({ file: relativePath, error: err.message });
+          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+        }
       }
     }
   }
@@ -1135,21 +1178,27 @@ async function runEject(options) {
         // Skip directories
         if (!statSync(inFile).isFile()) continue;
 
-        if (file.endsWith('.rb')) {
-          // Transform Ruby files
-          const source = readFileSync(inFile, 'utf-8');
-          const result = await transformRuby(source, inFile, 'stimulus', config, APP_ROOT);
-          // Pass relative output path for correct import resolution
-          const relativeOutPath = `app/javascript/controllers/${file.replace('.rb', '.js')}`;
-          let code = fixImportsForEject(result.code, relativeOutPath, config);
-          const outFile = join(outDir, 'app/javascript/controllers', file.replace('.rb', '.js'));
-          writeFileSync(outFile, code);
-          fileCount++;
-        } else if (file.endsWith('.js') || file.endsWith('.mjs')) {
-          // Copy JS files as-is
-          const outFile = join(outDir, 'app/javascript/controllers', file);
-          copyFileSync(inFile, outFile);
-          fileCount++;
+        const relativePath = `app/javascript/controllers/${file}`;
+        try {
+          if (file.endsWith('.rb')) {
+            // Transform Ruby files
+            const source = readFileSync(inFile, 'utf-8');
+            const result = await transformRuby(source, inFile, 'stimulus', config, APP_ROOT);
+            // Pass relative output path for correct import resolution
+            const relativeOutPath = `app/javascript/controllers/${file.replace('.rb', '.js')}`;
+            let code = fixImportsForEject(result.code, relativeOutPath, config);
+            const outFile = join(outDir, 'app/javascript/controllers', file.replace('.rb', '.js'));
+            writeFileSync(outFile, code);
+            fileCount++;
+          } else if (file.endsWith('.js') || file.endsWith('.mjs')) {
+            // Copy JS files as-is
+            const outFile = join(outDir, 'app/javascript/controllers', file);
+            copyFileSync(inFile, outFile);
+            fileCount++;
+          }
+        } catch (err) {
+          errors.push({ file: relativePath, error: err.message });
+          console.warn(`    Skipped ${relativePath}: ${err.message}`);
         }
       }
     }
@@ -1165,14 +1214,20 @@ async function runEject(options) {
     if (controllerFiles.length > 0) {
       console.log('  Transforming Rails controllers...');
       for (const file of controllerFiles) {
-        const source = readFileSync(join(appControllersDir, file), 'utf-8');
-        const result = await transformRuby(source, join(appControllersDir, file), 'controllers', config, APP_ROOT);
-        // Pass relative output path for correct import resolution
-        const relativeOutPath = `app/controllers/${file.replace('.rb', '.js')}`;
-        let code = fixImportsForEject(result.code, relativeOutPath, config);
-        const outFile = join(outDir, 'app/controllers', file.replace('.rb', '.js'));
-        writeFileSync(outFile, code);
-        fileCount++;
+        const relativePath = `app/controllers/${file}`;
+        try {
+          const source = readFileSync(join(appControllersDir, file), 'utf-8');
+          const result = await transformRuby(source, join(appControllersDir, file), 'controllers', config, APP_ROOT);
+          // Pass relative output path for correct import resolution
+          const relativeOutPath = `app/controllers/${file.replace('.rb', '.js')}`;
+          let code = fixImportsForEject(result.code, relativeOutPath, config);
+          const outFile = join(outDir, 'app/controllers', file.replace('.rb', '.js'));
+          writeFileSync(outFile, code);
+          fileCount++;
+        } catch (err) {
+          errors.push({ file: relativePath, error: err.message });
+          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+        }
       }
     }
   }
@@ -1193,10 +1248,16 @@ async function runEject(options) {
       }
 
       for (const file of testFiles) {
-        let content = readFileSync(join(testDir, file), 'utf-8');
-        content = fixTestImportsForEject(content);
-        writeFileSync(join(outTestDir, file), content);
-        fileCount++;
+        const relativePath = `test/${file}`;
+        try {
+          let content = readFileSync(join(testDir, file), 'utf-8');
+          content = fixTestImportsForEject(content);
+          writeFileSync(join(outTestDir, file), content);
+          fileCount++;
+        } catch (err) {
+          errors.push({ file: relativePath, error: err.message });
+          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+        }
       }
     }
   }
@@ -1254,6 +1315,14 @@ async function runEject(options) {
   } else {
     console.log('  npm test        # run tests');
     console.log('  npm start       # start server');
+  }
+
+  // Report any errors that occurred
+  if (errors.length > 0) {
+    console.log(`\n${errors.length} file(s) failed to transform:`);
+    for (const e of errors) {
+      console.log(`  ${e.file}: ${e.error}`);
+    }
   }
 }
 
