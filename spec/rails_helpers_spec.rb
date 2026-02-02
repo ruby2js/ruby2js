@@ -696,6 +696,30 @@ describe Ruby2JS::Filter::Rails::Helpers do
     end
   end
 
+  describe 'asset helpers' do
+    it "should handle image_tag with attributes" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= image_tag "logo.png", alt: "Arthur Murray Logo", class: "max-w-[600px]" %>')
+      result.must_include 'alt="Arthur Murray Logo"'
+      result.must_include 'class="max-w-[600px]"'
+      result.must_include '<img src="'
+    end
+
+    it "should handle image_tag with boolean attributes" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= image_tag "photo.jpg", loading: "lazy", decoding: "async" %>')
+      result.must_include 'loading="lazy"'
+      result.must_include 'decoding="async"'
+    end
+
+    it "should handle video_tag with attributes" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= video_tag "intro.mp4", controls: true, autoplay: false %>')
+      result.must_include '<video src="'
+      result.must_include 'controls'
+    end
+  end
+
   describe 'layout mode' do
     def to_js_layout(string, eslevel: 2015)
       _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Rails::Helpers, Ruby2JS::Filter::Erb, Ruby2JS::Filter::Functions], eslevel: eslevel, layout: true).to_s)

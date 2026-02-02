@@ -137,10 +137,9 @@ module Ruby2JS
               full_import_path = "../../../assets/#{import_path}"
 
               # Default import: import _asset_logo_png from '...';
-              self.prepend_list << s(:import,
-                [s(:pair, s(:sym, :default), s(:const, nil, var_name.to_sym)),
-                 s(:pair, s(:sym, :from), s(:str, full_import_path))],
-                nil)
+              # Format: s(:import, path, default_name)
+              self.prepend_list << s(:import, full_import_path,
+                s(:const, nil, var_name.to_sym))
             end
           end
         end
@@ -1428,17 +1427,18 @@ module Ruby2JS
           @erb_asset_imports << { var_name: var_name, import_path: import_path }
 
           # Extract HTML attributes from remaining args (hash argument)
-          attrs = {}
+          # Use array of pairs for JS compatibility (Object.map doesn't exist)
+          attrs = []
           if args[1]&.type == :hash
             args[1].children.each do |pair|
               key = pair.children[0]
               value = pair.children[1]
               if key.type == :sym && value.type == :str
-                attrs[key.children[0]] = value.children[0]
+                attrs << [key.children[0], value.children[0]]
               elsif key.type == :sym && value.type == :true
-                attrs[key.children[0]] = true
+                attrs << [key.children[0], true]
               elsif key.type == :sym && value.type == :false
-                attrs[key.children[0]] = false
+                attrs << [key.children[0], false]
               end
             end
           end
