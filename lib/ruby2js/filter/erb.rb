@@ -151,6 +151,15 @@ module Ruby2JS
         s(:lvar, prop_name)
       end
 
+      # Convert instance variable assignments to local variable assignments
+      # @scores = value -> scores = value
+      def on_ivasgn(node)
+        return super unless @erb_bufvar  # Only transform when in ERB mode
+        ivar_name, value = node.children
+        prop_name = ivar_name.to_s[1..-1].to_sym  # @scores -> scores
+        s(:lvasgn, prop_name, process(value))
+      end
+
       # Handle buffer initialization: _erbout = +''; or _buf = ::String.new
       def on_lvasgn(node)
         name, value = node.children

@@ -805,7 +805,9 @@ module Ruby2JS
               @rails_path_helpers.add(path_helper)
               # Use :send! to force method call with parentheses
               # Ruby source may have no parens but JS needs them
-              path = s(:send!, nil, path_helper, *target.children[2..-1])
+              # Transform arguments to convert @ivar to local var
+              transformed_args = target.children[2..-1].map { |arg| transform_ivars_to_locals(arg) }
+              path = s(:send!, nil, path_helper, *transformed_args)
             else
               path = transform_ivars_to_locals(target)
             end
@@ -816,7 +818,8 @@ module Ruby2JS
           # Build result hash with redirect and optional notice
           pairs = [s(:pair, s(:sym, :redirect), path)]
           if notice_node
-            pairs << s(:pair, s(:sym, :notice), notice_node)
+            # Transform notice to convert @ivar to local var (e.g., "#{@total} created")
+            pairs << s(:pair, s(:sym, :notice), transform_ivars_to_locals(notice_node))
           end
 
           s(:hash, *pairs)

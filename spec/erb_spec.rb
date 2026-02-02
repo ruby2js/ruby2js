@@ -32,6 +32,16 @@ describe Ruby2JS::Filter::Erb do
       result.wont_include '@name'
       result.wont_include 'this.name'
     end
+
+    it "should convert ivar assignments to local assignments" do
+      # Test that @foo = value becomes foo = value (not this.#foo = value)
+      erb_src = '_erbout = +\'\'; @scores = [1, 2, 3]; _erbout.<<(( @scores ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'scores = [1, 2, 3]'
+      result.must_include 'String(scores)'
+      result.wont_include '@scores'
+      result.wont_include 'this.#scores'  # Not private field
+    end
   end
 
   describe 'HERB output' do

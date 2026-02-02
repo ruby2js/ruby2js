@@ -206,6 +206,38 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).must_include '{redirect: article_path(article)}'
       _(result).must_include 'import([article_path]' # path helper is imported
     end
+
+    it "transforms ivars in path helper arguments" do
+      source = <<~RUBY
+        class ArticlesController < ApplicationController
+          def create
+            @article = Article.new
+            redirect_to article_path(@article)
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include '{redirect: article_path(article)}'
+      _(result).wont_include '@article'
+      _(result).wont_include 'this.#article'  # Not private field
+    end
+
+    it "transforms ivars in redirect_to notice messages" do
+      source = <<~RUBY
+        class ArticlesController < ApplicationController
+          def create
+            @total = 5
+            redirect_to articles_path, notice: "\#{@total} articles created"
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include '${total} articles created'
+      _(result).wont_include '@total'
+      _(result).wont_include 'this.#total'  # Not private field
+    end
   end
 
   describe 'render transformation' do
