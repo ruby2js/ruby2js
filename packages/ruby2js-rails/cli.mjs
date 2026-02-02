@@ -1316,6 +1316,49 @@ async function runEject(options) {
   }
 
   console.log(`\nEjected ${fileCount} files to ${relative(APP_ROOT, outDir) || outDir}/`);
+
+  // In DEBUG mode, run node --check on all generated JS files
+  if (DEBUG) {
+    console.log('\nChecking JavaScript syntax...');
+    const syntaxErrors = [];
+
+    // Recursively find all .js and .mjs files in outDir
+    const findJsFiles = (dir) => {
+      const files = [];
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const fullPath = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          files.push(...findJsFiles(fullPath));
+        } else if (entry.name.endsWith('.js') || entry.name.endsWith('.mjs')) {
+          files.push(fullPath);
+        }
+      }
+      return files;
+    };
+
+    const jsFiles = findJsFiles(outDir);
+    for (const file of jsFiles) {
+      try {
+        execSync(`node --check "${file}"`, { stdio: 'pipe' });
+      } catch (err) {
+        const relPath = relative(outDir, file);
+        const stderr = err.stderr ? err.stderr.toString() : err.message;
+        syntaxErrors.push({ file: relPath, error: stderr.trim() });
+      }
+    }
+
+    if (syntaxErrors.length > 0) {
+      console.log(`\n${syntaxErrors.length} file(s) have syntax errors:`);
+      for (const e of syntaxErrors) {
+        console.log(`\n  ${e.file}:`);
+        // Indent error message
+        console.log(e.error.split('\n').map(line => '    ' + line).join('\n'));
+      }
+    } else {
+      console.log(`  All ${jsFiles.length} JavaScript files passed syntax check.`);
+    }
+  }
+
   console.log('\nThe ejected project depends on ruby2js-rails for runtime support.');
   console.log('To use:');
   console.log('  cd ' + (relative(APP_ROOT, outDir) || outDir));
@@ -2547,7 +2590,7 @@ switch (command) {
       console.log('    include: [app/models/*.rb, app/views/articles/**/*]');
       console.log('    exclude: ["**/test_*"]');
       console.log('\nDebugging:');
-      console.log('  DEBUG=1 juntos eject     Show full stack traces for errors');
+      console.log('  DEBUG=1 juntos eject     Show full stack traces and check JS syntax');
       process.exit(0);
     }
     runEject(options).catch(err => {
