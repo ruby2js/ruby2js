@@ -1234,6 +1234,7 @@ module Ruby2JS
           # array.group_by { |k, v| k.to_s }  # with destructuring
           target = call.children.first
           args = node.children[1]
+          return super unless args  # Ruby 3.4 it blocks handled by converter
           block_body = node.children[2]
 
           # Check if we have multiple args (destructuring case)
@@ -1291,6 +1292,7 @@ module Ruby2JS
           # With ES2023+: array.toSorted((a, b) => ...)
           target = call.children.first
           args = node.children[1]
+          return super unless args  # Ruby 3.4 it blocks handled by converter
           block_body = node.children[2]
 
           # Create two argument names for the comparison function
@@ -1329,6 +1331,7 @@ module Ruby2JS
           # array.max_by { |x| x.score } => array.reduce((a, b) => key(a) > key(b) ? a : b)
           target = call.children.first
           args = node.children[1]
+          return super unless args  # Ruby 3.4 it blocks handled by converter
           block_body = node.children[2]
 
           arg_name = args.children.first.children.first
@@ -1349,6 +1352,7 @@ module Ruby2JS
           # array.min_by { |x| x.score } => array.reduce((a, b) => key(a) <= key(b) ? a : b)
           target = call.children.first
           args = node.children[1]
+          return super unless args  # Ruby 3.4 it blocks handled by converter
           block_body = node.children[2]
 
           arg_name = args.children.first.children.first
@@ -1435,6 +1439,7 @@ module Ruby2JS
         elsif method == :map and call.children.length == 2
           # For destructuring (multiple args), wrap in mlhs: ([a, b]) => ...
           args = node.children[1]
+          return super unless args  # Ruby 3.4 it blocks handled by converter
           processed_args = if args.children.length > 1
             s(:args, s(:mlhs, *args.children))
           else

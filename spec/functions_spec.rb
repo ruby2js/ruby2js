@@ -596,6 +596,18 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'a.map(([k, v]) => k + v)'
     end
 
+    unless (RUBY_VERSION.split('.').map(&:to_i) <=> [3, 4, 0]) == -1
+      it "should handle map with Ruby 3.4 it implicit parameter" do
+        to_js( 'a.map { it * 2 }' ).
+          must_equal 'a.map(it => it * 2)'
+      end
+
+      it "should handle sort_by with Ruby 3.4 it implicit parameter" do
+        to_js( 'items.sort_by { it.slot || 0 }' ).
+          must_equal 'items.sort_by(it => it.slot ?? 0)'
+      end
+    end
+
     it "should map .select to .filter" do
       to_js( 'a.select {|item| item > 0}' ).
         must_equal 'a.filter(item => item > 0)'
