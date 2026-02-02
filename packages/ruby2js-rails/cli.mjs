@@ -45,6 +45,9 @@ import {
   fixTestImportsForEject
 } from './transform.mjs';
 
+// Import config loading from Vite plugin (shared with eject)
+import { loadConfig } from './vite.mjs';
+
 // Try to load js-yaml, fall back to naive parsing if not available
 // (js-yaml may not be available when CLI is run standalone from tarball)
 let yaml = null;
@@ -881,28 +884,13 @@ async function runEject(options) {
   // Output directory: CLI > config > default
   const outDir = options.outDir || (ejectConfig.output ? join(APP_ROOT, ejectConfig.output) : join(APP_ROOT, 'ejected'));
 
-  // Determine database (command line takes precedence over config file)
-  const database = options.database || 'dexie';
-
-  // Determine target: explicit option > infer from database > default to browser
-  let target = options.target;
-  if (!target) {
-    // Infer target from database type
-    if (database === 'dexie') {
-      target = 'browser';
-    } else if (['sqlite3', 'sqlite', 'better_sqlite3'].includes(database)) {
-      target = 'node';
-    } else {
-      target = 'browser';
-    }
-  }
-
-  const config = {
-    target,
-    database,
-    base: options.base || '/',
-    eslevel: 2022
-  };
+  // Load full config from ruby2js.yml (same as Vite plugin uses)
+  // This ensures eslevel, external, and other settings are read consistently
+  const config = loadConfig(APP_ROOT, {
+    database: options.database,
+    target: options.target,
+    base: options.base
+  });
 
   // Helper to check if a file should be included
   const shouldInclude = (relativePath) => shouldIncludeFile(relativePath, includePatterns, excludePatterns);
@@ -1017,9 +1005,12 @@ async function runEject(options) {
     const source = readFileSync(routesFile, 'utf-8');
     const { convert } = await ensureRuby2jsReady();
 
+    // Get routes-specific config from ruby2js.yml if available
+    const routesSectionConfig = config.sections?.routes || null;
+
     // Generate paths.js first (path helpers only, no controller imports)
     const pathsOptions = {
-      ...getBuildOptions(null, config.target),
+      ...getBuildOptions(null, config.target, routesSectionConfig),
       file: 'config/routes.rb',
       database: config.database,
       target: config.target,
@@ -1040,7 +1031,7 @@ async function runEject(options) {
 
     // Generate routes.js with paths_file option (imports from paths.js)
     const routesOptions = {
-      ...getBuildOptions(null, config.target),
+      ...getBuildOptions(null, config.target, routesSectionConfig),
       file: 'config/routes.rb',
       database: config.database,
       target: config.target,

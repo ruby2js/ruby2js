@@ -235,6 +235,7 @@ export function loadConfig(appRoot, overrides = {}) {
   // Load ruby2js.yml if it exists
   let ruby2jsConfig = {};
   let topLevelConfig = {};
+  let sectionConfigs = {};
   const ruby2jsPath = path.join(appRoot, 'config/ruby2js.yml');
   if (fs.existsSync(ruby2jsPath)) {
     try {
@@ -244,6 +245,15 @@ export function loadConfig(appRoot, overrides = {}) {
       // Top-level config (not nested under environment) - for settings like 'external'
       // that don't vary by environment
       topLevelConfig = parsed || {};
+
+      // Section-specific configs (controllers, stimulus, components, jsx)
+      // These are at top level of the YAML, not nested under environment
+      const sectionNames = ['controllers', 'stimulus', 'components', 'jsx', 'models', 'routes'];
+      for (const name of sectionNames) {
+        if (parsed?.[name]) {
+          sectionConfigs[name] = parsed[name];
+        }
+      }
     } catch (e) {
       console.warn(`[juntos] Warning: Failed to parse ruby2js.yml: ${e.message}`);
     }
@@ -288,8 +298,19 @@ export function loadConfig(appRoot, overrides = {}) {
     target,
     broadcast: overrides.broadcast || ruby2jsConfig.broadcast,
     external,
-    base
+    base,
+    // Section-specific configs from ruby2js.yml (controllers, stimulus, etc.)
+    sections: sectionConfigs
   };
+}
+
+/**
+ * Get section-specific config for getBuildOptions.
+ * Returns the config for the given section, or null if not defined.
+ */
+export function getSectionConfig(config, section) {
+  if (!config?.sections || !section) return null;
+  return config.sections[section] || null;
 }
 
 /**
@@ -429,8 +450,10 @@ function createJsxRbPlugin(config, appRoot) {
       const { convert } = await ensureRuby2jsReady();
 
       try {
+        // Get section-specific config from ruby2js.yml if available
+        const sectionConfig = config.sections?.jsx || null;
         const result = convert(code, {
-          ...getBuildOptions('jsx', config.target),
+          ...getBuildOptions('jsx', config.target, sectionConfig),
           eslevel: config.eslevel,
           file: id
         });
@@ -641,8 +664,10 @@ function createRubyTransformPlugin(config, appRoot) {
   // Local wrapper for transformRuby that uses closure's config/appRoot
   async function transformRubyLocal(source, filePath, section = null) {
     const { convert } = await ensureRuby2jsReady();
+    // Get section-specific config from ruby2js.yml if available
+    const sectionConfig = config.sections?.[section] || null;
     const options = {
-      ...getBuildOptions(section, config.target),
+      ...getBuildOptions(section, config.target, sectionConfig),
       file: path.relative(appRoot, filePath),
       database: config.database,
       target: config.target
@@ -861,8 +886,10 @@ export { application };
         let result;
         if (id.endsWith('/routes.rb')) {
           const { convert } = await ensureRuby2jsReady();
+          // Get routes-specific config from ruby2js.yml if available
+          const sectionConfig = config.sections?.routes || null;
           const options = {
-            ...getBuildOptions(null, config.target),
+            ...getBuildOptions(null, config.target, sectionConfig),
             file: path.relative(appRoot, id),
             database: config.database,
             target: config.target,
@@ -2379,8 +2406,10 @@ async function generatePathsModule(appRoot, config) {
   const { convert } = await ensureRuby2jsReady();
   const source = fs.readFileSync(routesFile, 'utf-8');
 
+  // Get routes-specific config from ruby2js.yml if available
+  const sectionConfig = config.sections?.routes || null;
   const options = {
-    ...getBuildOptions(null, config.target),
+    ...getBuildOptions(null, config.target, sectionConfig),
     file: 'config/routes.rb',
     database: config.database,
     target: config.target,

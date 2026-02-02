@@ -84,35 +84,54 @@ export { singularize };
 /**
  * Get Ruby2JS transpilation options for a given section.
  * Uses filter names as strings (resolved by ruby2js).
+ *
+ * @param {string} section - The section type ('stimulus', 'controllers', 'jsx', or null for default)
+ * @param {string} target - The build target ('browser', 'node', etc.)
+ * @param {Object} sectionConfig - Optional section config from ruby2js.yml (e.g., { filters: [...], eslevel: 2022 })
+ * @returns {Object} Ruby2JS options
  */
-export function getBuildOptions(section, target) {
+export function getBuildOptions(section, target, sectionConfig = null) {
   const baseOptions = {
-    eslevel: 2022,
-    include: ['class', 'call']
+    eslevel: sectionConfig?.eslevel || 2022,
+    include: sectionConfig?.include || ['class', 'call']
   };
+
+  // Default filter sets for each section
+  const defaultFilters = {
+    stimulus: ['Pragma', 'Stimulus', 'Functions', 'ESM', 'Return'],
+    controllers: ['Pragma', 'Rails_Controller', 'Functions', 'ESM', 'Return'],
+    jsx: ['Pragma', 'Rails_Helpers', 'React', 'Functions', 'ESM', 'Return'],
+    default: ['Pragma', 'Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', 'Functions', 'ESM', 'Return']
+  };
+
+  // Use filters from sectionConfig if provided, otherwise use defaults
+  // Filter names from config are normalized to match Ruby2JS conventions
+  const filters = sectionConfig?.filters
+    ? normalizeFilterNames(sectionConfig.filters)
+    : defaultFilters[section] || defaultFilters.default;
 
   switch (section) {
     case 'stimulus':
       return {
         ...baseOptions,
-        autoexports: 'default',
-        filters: ['Pragma', 'Stimulus', 'Functions', 'ESM', 'Return'],
+        autoexports: sectionConfig?.autoexports ?? 'default',
+        filters,
         target
       };
 
     case 'controllers':
       return {
         ...baseOptions,
-        autoexports: true,
-        filters: ['Pragma', 'Rails_Controller', 'Functions', 'ESM', 'Return'],
+        autoexports: sectionConfig?.autoexports ?? true,
+        filters,
         target
       };
 
     case 'jsx':
       return {
         ...baseOptions,
-        autoexports: 'default',
-        filters: ['Pragma', 'Rails_Helpers', 'React', 'Functions', 'ESM', 'Return'],
+        autoexports: sectionConfig?.autoexports ?? 'default',
+        filters,
         target
       };
 
@@ -120,11 +139,44 @@ export function getBuildOptions(section, target) {
       // Models, routes, seeds, migrations
       return {
         ...baseOptions,
-        autoexports: true,
-        filters: ['Pragma', 'Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', 'Functions', 'ESM', 'Return'],
+        autoexports: sectionConfig?.autoexports ?? true,
+        filters,
         target
       };
   }
+}
+
+/**
+ * Normalize filter names from ruby2js.yml to Ruby2JS conventions.
+ * Converts lowercase names to proper case (e.g., 'stimulus' -> 'Stimulus')
+ */
+function normalizeFilterNames(filters) {
+  const filterMap = {
+    // Lowercase to proper case mapping
+    'pragma': 'Pragma',
+    'stimulus': 'Stimulus',
+    'functions': 'Functions',
+    'esm': 'ESM',
+    'return': 'Return',
+    'react': 'React',
+    'camelcase': 'CamelCase',
+    'rails_controller': 'Rails_Controller',
+    'rails_model': 'Rails_Model',
+    'rails_routes': 'Rails_Routes',
+    'rails_seeds': 'Rails_Seeds',
+    'rails_migration': 'Rails_Migration',
+    'rails_helpers': 'Rails_Helpers',
+    'phlex': 'Phlex',
+    // Also handle slash notation from config
+    'rails/controller': 'Rails_Controller',
+    'rails/model': 'Rails_Model',
+    'rails/routes': 'Rails_Routes',
+    'rails/seeds': 'Rails_Seeds',
+    'rails/migration': 'Rails_Migration',
+    'rails/helpers': 'Rails_Helpers'
+  };
+
+  return filters.map(f => filterMap[f.toLowerCase()] || f);
 }
 
 // ============================================================
@@ -898,8 +950,10 @@ export async function ensureRuby2jsReady() {
 export async function transformRuby(source, filePath, section, config, appRoot) {
   const { convert } = await ensureRuby2jsReady();
 
+  // Get section-specific config from ruby2js.yml if available
+  const sectionConfig = config.sections?.[section] || null;
   const options = {
-    ...getBuildOptions(section, config.target),
+    ...getBuildOptions(section, config.target, sectionConfig),
     file: path.relative(appRoot, filePath),
     database: config.database,
     target: config.target
@@ -981,8 +1035,10 @@ export async function transformErb(code, id, isLayout, config) {
 export async function transformJsxRb(source, filePath, config) {
   const { convert } = await ensureRuby2jsReady();
 
+  // Get section-specific config from ruby2js.yml if available
+  const sectionConfig = config.sections?.jsx || null;
   const options = {
-    ...getBuildOptions('jsx', config.target),
+    ...getBuildOptions('jsx', config.target, sectionConfig),
     file: filePath
   };
 
