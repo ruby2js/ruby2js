@@ -19,11 +19,12 @@ module Ruby2JS
           index += 1
 
           if node.type == :kwsplat
-            if node.children.first.type == :hash
-              pairs.unshift(*node.children.first.children)
+            child = node.children.first
+            if child && child.type == :hash
+              pairs.unshift(*child.children)
               index = 0
-            else
-              put '...'; parse node.children.first
+            elsif child
+              put '...'; parse child
             end
 
             next
