@@ -61,9 +61,20 @@ try {
 // CLI runs from the app's working directory
 const APP_ROOT = process.cwd();
 
+// Debug mode: set DEBUG=1 or JUNTOS_DEBUG=1 for verbose error output
+const DEBUG = process.env.DEBUG === '1' || process.env.JUNTOS_DEBUG === '1';
+
 // Path to this package (for migrate.mjs)
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATE_SCRIPT = join(__dirname, 'migrate.mjs');
+
+// Format error for display - includes stack trace in debug mode
+function formatError(err) {
+  if (DEBUG && err.stack) {
+    return err.stack;
+  }
+  return err.message;
+}
 
 // ============================================
 // Glob matching helpers (for eject filtering)
@@ -956,8 +967,8 @@ async function runEject(options) {
           writeFileSync(outFile, code);
           fileCount++;
         } catch (err) {
-          errors.push({ file: relativePath, error: err.message });
-          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+          errors.push({ file: relativePath, error: err.message, stack: err.stack });
+          console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
         }
       }
 
@@ -988,8 +999,8 @@ async function runEject(options) {
           writeFileSync(outFile, code);
           fileCount++;
         } catch (err) {
-          errors.push({ file: relativePath, error: err.message });
-          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+          errors.push({ file: relativePath, error: err.message, stack: err.stack });
+          console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
         }
       }
 
@@ -1012,8 +1023,8 @@ async function runEject(options) {
       writeFileSync(join(outDir, 'db/seeds.js'), code);
       fileCount++;
     } catch (err) {
-      errors.push({ file: 'db/seeds.rb', error: err.message });
-      console.warn(`    Skipped db/seeds.rb: ${err.message}`);
+      errors.push({ file: 'db/seeds.rb', error: err.message, stack: err.stack });
+      console.warn(`    Skipped db/seeds.rb: ${formatError(err)}`);
     }
   }
 
@@ -1064,8 +1075,8 @@ async function runEject(options) {
       writeFileSync(join(outDir, 'config/routes.js'), routesCode);
       fileCount++;
     } catch (err) {
-      errors.push({ file: 'config/routes.rb', error: err.message });
-      console.warn(`    Skipped config/routes.rb: ${err.message}`);
+      errors.push({ file: 'config/routes.rb', error: err.message, stack: err.stack });
+      console.warn(`    Skipped config/routes.rb: ${formatError(err)}`);
     }
   }
 
@@ -1101,8 +1112,8 @@ async function runEject(options) {
           writeFileSync(outFile, code);
           fileCount++;
         } catch (err) {
-          errors.push({ file: relativePath, error: err.message });
-          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+          errors.push({ file: relativePath, error: err.message, stack: err.stack });
+          console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
         }
       }
 
@@ -1123,8 +1134,8 @@ async function runEject(options) {
           writeFileSync(outFile, code);
           fileCount++;
         } catch (err) {
-          errors.push({ file: relativePath, error: err.message });
-          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+          errors.push({ file: relativePath, error: err.message, stack: err.stack });
+          console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
         }
       }
     }
@@ -1155,8 +1166,8 @@ async function runEject(options) {
           writeFileSync(outFile, code);
           fileCount++;
         } catch (err) {
-          errors.push({ file: relativePath, error: err.message });
-          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+          errors.push({ file: relativePath, error: err.message, stack: err.stack });
+          console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
         }
       }
     }
@@ -1197,8 +1208,8 @@ async function runEject(options) {
             fileCount++;
           }
         } catch (err) {
-          errors.push({ file: relativePath, error: err.message });
-          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+          errors.push({ file: relativePath, error: err.message, stack: err.stack });
+          console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
         }
       }
     }
@@ -1225,8 +1236,8 @@ async function runEject(options) {
           writeFileSync(outFile, code);
           fileCount++;
         } catch (err) {
-          errors.push({ file: relativePath, error: err.message });
-          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+          errors.push({ file: relativePath, error: err.message, stack: err.stack });
+          console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
         }
       }
     }
@@ -1255,8 +1266,8 @@ async function runEject(options) {
           writeFileSync(join(outTestDir, file), content);
           fileCount++;
         } catch (err) {
-          errors.push({ file: relativePath, error: err.message });
-          console.warn(`    Skipped ${relativePath}: ${err.message}`);
+          errors.push({ file: relativePath, error: err.message, stack: err.stack });
+          console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
         }
       }
     }
@@ -1321,7 +1332,15 @@ async function runEject(options) {
   if (errors.length > 0) {
     console.log(`\n${errors.length} file(s) failed to transform:`);
     for (const e of errors) {
-      console.log(`  ${e.file}: ${e.error}`);
+      if (DEBUG && e.stack) {
+        console.log(`\n  ${e.file}:`);
+        console.log(e.stack.split('\n').map(line => '    ' + line).join('\n'));
+      } else {
+        console.log(`  ${e.file}: ${e.error}`);
+      }
+    }
+    if (!DEBUG && errors.some(e => e.stack)) {
+      console.log('\nTip: Set DEBUG=1 for full stack traces');
     }
   }
 }
@@ -2527,11 +2546,12 @@ switch (command) {
       console.log('  eject:');
       console.log('    include: [app/models/*.rb, app/views/articles/**/*]');
       console.log('    exclude: ["**/test_*"]');
+      console.log('\nDebugging:');
+      console.log('  DEBUG=1 juntos eject     Show full stack traces for errors');
       process.exit(0);
     }
     runEject(options).catch(err => {
-      console.error('Eject failed:', err.message);
-      if (options.verbose) console.error(err.stack);
+      console.error('Eject failed:', formatError(err));
       process.exit(1);
     });
     break;
