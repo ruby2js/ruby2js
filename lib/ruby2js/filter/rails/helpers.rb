@@ -85,7 +85,10 @@ module Ruby2JS
             @erb_partials.uniq { |p| [p[:name], p[:directory]] }.sort_by { |p| p[:name] }.each do |partial_info|
               partial_name = partial_info[:name]
               partial_directory = partial_info[:directory]
-              module_name = "_#{partial_name}_module".to_sym
+              # Include directory in module name to avoid collisions (e.g., solos/form vs entries/form)
+              # Replace / with _ to create valid JS identifier
+              module_base = partial_directory ? "#{partial_directory}/#{partial_name}" : partial_name
+              module_name = "_#{module_base.gsub('/', '_')}_module".to_sym
 
               # Generate import path based on whether partial is in a different directory
               import_path = if partial_directory
@@ -1510,7 +1513,16 @@ module Ruby2JS
 
           if first_arg.type == :str
             # render "form" or render "form", locals: { ... }
-            partial_name = first_arg.children[0]
+            # render "solos/form" -> partial in subdirectory
+            full_path = first_arg.children[0]
+            if full_path.include?('/')
+              # Split "solos/form" into directory "solos" and name "form"
+              parts = full_path.split('/')
+              partial_name = parts.pop
+              partial_directory = parts.join('/')
+            else
+              partial_name = full_path
+            end
 
             # Check for additional hash argument with locals
             if args[1]&.type == :hash
@@ -1532,7 +1544,17 @@ module Ruby2JS
 
               case key.children[0]
               when :partial
-                partial_name = value.children[0] if value.type == :str
+                if value.type == :str
+                  full_path = value.children[0]
+                  if full_path.include?('/')
+                    # Split "solos/form" into directory "solos" and name "form"
+                    parts = full_path.split('/')
+                    partial_name = parts.pop
+                    partial_directory = parts.join('/')
+                  else
+                    partial_name = full_path
+                  end
+                end
               when :locals
                 if value.type == :hash
                   value.children.each do |local_pair|
@@ -1591,7 +1613,9 @@ module Ruby2JS
           end
 
           # Build the partial function call: _form_module.render({$context, article})
-          module_name = "_#{partial_name}_module".to_sym
+          # Include directory in module name to avoid collisions, replace / with _
+          module_base = partial_directory ? "#{partial_directory}/#{partial_name}" : partial_name
+          module_name = "_#{module_base.gsub('/', '_')}_module".to_sym
 
           # Build unified props hash with $context and locals
           # Use the appropriate context reference (context in layout mode, $context otherwise)
