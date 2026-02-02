@@ -1868,13 +1868,44 @@ module Ruby2JS
 
           when :check_box, :checkbox
             field_name = args.first
+            extra_attrs = build_field_attrs(options)
+
             if field_name&.type == :sym
               name = field_name.children.first.to_s
-              extra_attrs = build_field_attrs(options)
               html = %(<input type="checkbox" name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs} value="1">)
               s(:str, html)
+            elsif field_name&.type == :str
+              # Static string field name: form.check_box "custom_field"
+              name = field_name.children.first.to_s
+              # Generate id by replacing brackets with underscores
+              id_name = name.gsub(/[\[\]]/, '_').gsub(/_+/, '_').gsub(/^_|_$/, '')
+              html = %(<input type="checkbox" name="#{model}[#{name}]" id="#{model}_#{id_name}"#{extra_attrs} value="1">)
+              s(:str, html)
+            elsif field_name&.type == :dstr
+              # Dynamic/interpolated string field name: form.check_box "options][#{option.id}"
+              # Build name parts - wrap expressions in begin nodes
+              name_parts = field_name.children.map { |child|
+                child.type == :str ? child : s(:begin, process(child))
+              }
+              # Build id parts - replace brackets with underscores in strings,
+              # and wrap expressions to convert to string (they're typically numeric IDs)
+              id_parts = field_name.children.map { |child|
+                if child.type == :str
+                  s(:str, child.children.first.to_s.gsub(/[\[\]]/, '_').gsub(/_+/, '_'))
+                else
+                  # For dynamic parts, just include them directly (typically IDs)
+                  s(:begin, process(child))
+                end
+              }
+              s(:dstr,
+                s(:str, %(<input type="checkbox" name="#{model}[)),
+                *name_parts,
+                s(:str, %(]" id="#{model}_)),
+                *id_parts,
+                s(:str, %("#{extra_attrs} value="1">)))
             else
-              super
+              # Unknown type - return nil to skip transformation
+              nil
             end
 
           when :radio_button

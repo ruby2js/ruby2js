@@ -68,6 +68,24 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include 'post[body]'
     end
 
+    it "should handle check_box with symbol field name" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_for @user do |f| %><%= f.check_box :admin, class: "toggle" %><% end %>')
+      result.must_include 'type=\\"checkbox\\"'
+      result.must_include 'user[admin]'
+      result.must_include 'class=\\"toggle\\"'
+    end
+
+    it "should handle check_box with dynamic string field name" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      # This pattern is used for nested attributes like options][#{option.id}
+      result = erb_to_js('<%= form_with(model: @billable) do |form| %><%= form.check_box "options][#{option.id}", class: "entry" %><% end %>')
+      result.must_include 'type="checkbox"'
+      result.must_include 'billable[options]['
+      result.must_include 'option.id'
+      result.must_include 'class="entry"'
+    end
+
     it "should handle submit with custom label" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_for @user do |f| %><%= f.submit "Create Account" %><% end %>')
