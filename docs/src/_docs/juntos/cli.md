@@ -162,6 +162,9 @@ npx juntos eject [options]
 | `-d, --database ADAPTER` | Database adapter |
 | `-t, --target TARGET` | Build target |
 | `--base PATH` | Base public path |
+| `--include PATTERN` | Include only matching files (can be repeated) |
+| `--exclude PATTERN` | Exclude matching files (can be repeated) |
+| `--only FILES` | Comma-separated list of files to include |
 | `-h, --help` | Show help |
 
 **Examples:**
@@ -170,13 +173,53 @@ npx juntos eject [options]
 npx juntos eject                      # Output to ejected/
 npx juntos eject --output dist/js     # Custom output directory
 npx juntos eject -d sqlite -t node    # Eject for Node.js target
+
+# Selective eject with filtering
+npx juntos eject --include "app/models/*.rb"
+npx juntos eject --include "app/views/articles/**/*" --exclude "**/test_*"
+npx juntos eject --only app/models/article.rb,app/models/comment.rb
 ```
+
+**Filtering:**
+
+The `--include`, `--exclude`, and `--only` options let you eject a subset of files:
+
+- `--include PATTERN` — Only include files matching the pattern (can be repeated)
+- `--exclude PATTERN` — Exclude files matching the pattern (can be repeated)
+- `--only FILES` — Comma-separated list of specific files to include
+
+Patterns support glob syntax:
+- `*` — Match any characters except `/`
+- `**` — Match any characters including `/`
+- `?` — Match a single character
+
+**Filtering in ruby2js.yml:**
+
+Instead of command-line flags, you can configure filtering in `config/ruby2js.yml`:
+
+```yaml
+eject:
+  output: ejected
+  include:
+    - app/models/*.rb
+    - app/views/articles/**/*
+    - config/routes.rb
+  exclude:
+    - "**/*_test.rb"
+    - app/models/concerns/*
+```
+
+CLI flags take precedence over the config file. This is useful for:
+- **Converting piece by piece:** Start with a few models, verify they work, add more
+- **Partial migration:** Only eject the parts of the app you want to convert
+- **Debugging:** Isolate a specific file to inspect its transpilation
 
 **What it does:**
 
-1. Transforms all Ruby source files (models, controllers, views, routes, migrations, seeds)
-2. Writes individual JavaScript files to the output directory
-3. Copies runtime libraries needed to run the ejected code
+1. Transforms Ruby source files (models, controllers, views, routes, migrations, seeds)
+2. Applies include/exclude filters if specified
+3. Writes individual JavaScript files to the output directory
+4. Generates index files and runtime configuration
 
 **Output structure:**
 
@@ -202,6 +245,7 @@ Unlike `juntos build`, which produces bundled output optimized for deployment, `
 
 - **Debugging:** Inspect exactly what the Vite plugin produces
 - **Migration:** Use the JavaScript output as a new codebase, leaving Ruby behind
+- **Incremental adoption:** Convert your app piece by piece
 
 ## juntos up
 

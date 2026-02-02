@@ -63,6 +63,101 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATE_SCRIPT = join(__dirname, 'migrate.mjs');
 
 // ============================================
+// Glob matching helpers (for eject filtering)
+// ============================================
+
+/**
+ * Convert a glob pattern to a regex.
+ * Supports: * (any non-slash), ** (any including slash), ? (single char)
+ */
+function globToRegex(pattern) {
+  let regex = pattern
+    // Escape special regex chars (except * and ?)
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    // ** matches anything including /
+    .replace(/\*\*/g, '<<<GLOBSTAR>>>')
+    // * matches anything except /
+    .replace(/\*/g, '[^/]*')
+    // ? matches single char except /
+    .replace(/\?/g, '[^/]')
+    // Restore globstar
+    .replace(/<<<GLOBSTAR>>>/g, '.*');
+
+  return new RegExp(`^${regex}$`);
+}
+
+/**
+ * Check if a path matches any of the given glob patterns.
+ */
+function matchesAny(filePath, patterns) {
+  if (!patterns || patterns.length === 0) return false;
+  return patterns.some(pattern => {
+    // Normalize path separators
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const normalizedPattern = pattern.replace(/\\/g, '/');
+    return globToRegex(normalizedPattern).test(normalizedPath);
+  });
+}
+
+/**
+ * Determine if a file should be included in eject based on include/exclude patterns.
+ *
+ * @param {string} relativePath - Path relative to app root (e.g., 'app/models/article.rb')
+ * @param {string[]} includePatterns - Patterns to include (if empty, include all)
+ * @param {string[]} excludePatterns - Patterns to exclude
+ * @returns {boolean} True if file should be included
+ */
+function shouldIncludeFile(relativePath, includePatterns, excludePatterns) {
+  // Normalize path
+  const normalizedPath = relativePath.replace(/\\/g, '/');
+
+  // If include patterns specified, file must match at least one
+  if (includePatterns && includePatterns.length > 0) {
+    if (!matchesAny(normalizedPath, includePatterns)) {
+      return false;
+    }
+  }
+
+  // If exclude patterns specified, file must not match any
+  if (excludePatterns && excludePatterns.length > 0) {
+    if (matchesAny(normalizedPath, excludePatterns)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Load eject configuration from ruby2js.yml.
+ *
+ * @param {string} appRoot - Application root directory
+ * @returns {Object} Eject configuration { include, exclude, output }
+ */
+function loadEjectConfig(appRoot) {
+  const configPath = join(appRoot, 'config/ruby2js.yml');
+  if (!existsSync(configPath)) {
+    return { include: [], exclude: [], output: null };
+  }
+
+  try {
+    if (!yaml) {
+      return { include: [], exclude: [], output: null };
+    }
+    const parsed = yaml.load(readFileSync(configPath, 'utf8'));
+    const ejectConfig = parsed?.eject || {};
+    return {
+      include: ejectConfig.include || [],
+      exclude: ejectConfig.exclude || [],
+      output: ejectConfig.output || null
+    };
+  } catch (e) {
+    console.warn(`Warning: Failed to parse ruby2js.yml: ${e.message}`);
+    return { include: [], exclude: [], output: null };
+  }
+}
+
+// ============================================
 // Argument parsing
 // ============================================
 
@@ -81,7 +176,11 @@ function parseCommonArgs(args) {
     skipBuild: false,
     force: false,
     outDir: null,
-    host: false
+    host: false,
+    // Eject filtering options
+    include: [],      // --include patterns (can be repeated)
+    exclude: [],      // --exclude patterns (can be repeated)
+    only: null        // --only comma-separated list (shorthand for include-only)
   };
 
   const remaining = [];
@@ -158,6 +257,18 @@ function parseCommonArgs(args) {
     } else if (arg.startsWith('--binding=') || arg.startsWith('--host=')) {
       // --binding=0.0.0.0 or --host=0.0.0.0
       options.host = arg.split('=')[1] || true;
+    } else if (arg === '--include') {
+      options.include.push(args[++i]);
+    } else if (arg.startsWith('--include=')) {
+      options.include.push(arg.slice(10));
+    } else if (arg === '--exclude') {
+      options.exclude.push(args[++i]);
+    } else if (arg.startsWith('--exclude=')) {
+      options.exclude.push(arg.slice(10));
+    } else if (arg === '--only') {
+      options.only = args[++i];
+    } else if (arg.startsWith('--only=')) {
+      options.only = arg.slice(7);
     } else {
       remaining.push(arg);
     }
@@ -754,7 +865,21 @@ async function runEject(options) {
   loadDatabaseConfig(options);
   applyEnvOptions(options);
 
-  const outDir = options.outDir || join(APP_ROOT, 'ejected');
+  // Load eject config from ruby2js.yml
+  const ejectConfig = loadEjectConfig(APP_ROOT);
+
+  // Merge CLI options with config (CLI takes precedence)
+  let includePatterns = options.include.length > 0 ? options.include : ejectConfig.include;
+  let excludePatterns = options.exclude.length > 0 ? options.exclude : ejectConfig.exclude;
+
+  // Handle --only flag (shorthand for include-only mode)
+  if (options.only) {
+    includePatterns = options.only.split(',').map(p => p.trim());
+    excludePatterns = []; // --only implies no excludes from config
+  }
+
+  // Output directory: CLI > config > default
+  const outDir = options.outDir || (ejectConfig.output ? join(APP_ROOT, ejectConfig.output) : join(APP_ROOT, 'ejected'));
 
   // Determine database (command line takes precedence over config file)
   const database = options.database || 'dexie';
@@ -778,6 +903,21 @@ async function runEject(options) {
     base: options.base || '/',
     eslevel: 2022
   };
+
+  // Helper to check if a file should be included
+  const shouldInclude = (relativePath) => shouldIncludeFile(relativePath, includePatterns, excludePatterns);
+
+  // Show filtering info if patterns are active
+  if (includePatterns.length > 0 || excludePatterns.length > 0) {
+    console.log('Eject filtering:');
+    if (includePatterns.length > 0) {
+      console.log(`  Include: ${includePatterns.join(', ')}`);
+    }
+    if (excludePatterns.length > 0) {
+      console.log(`  Exclude: ${excludePatterns.join(', ')}`);
+    }
+    console.log();
+  }
 
   console.log(`Ejecting transpiled files to ${relative(APP_ROOT, outDir) || outDir}/\n`);
 
@@ -807,50 +947,59 @@ async function runEject(options) {
   // Transform models
   const modelsDir = join(APP_ROOT, 'app/models');
   if (existsSync(modelsDir)) {
-    console.log('  Transforming models...');
-    const modelFiles = readdirSync(modelsDir).filter(f => f.endsWith('.rb') && !f.startsWith('._'));
-    for (const file of modelFiles) {
-      const source = readFileSync(join(modelsDir, file), 'utf-8');
-      const result = await transformRuby(source, join(modelsDir, file), null, config, APP_ROOT);
-      // Pass relative output path for correct import resolution
-      const relativeOutPath = `app/models/${file.replace('.rb', '.js')}`;
-      let code = fixImportsForEject(result.code, relativeOutPath, config);
-      const outFile = join(outDir, 'app/models', file.replace('.rb', '.js'));
-      writeFileSync(outFile, code);
+    const modelFiles = readdirSync(modelsDir)
+      .filter(f => f.endsWith('.rb') && !f.startsWith('._'))
+      .filter(f => shouldInclude(`app/models/${f}`));
+
+    if (modelFiles.length > 0) {
+      console.log('  Transforming models...');
+      for (const file of modelFiles) {
+        const source = readFileSync(join(modelsDir, file), 'utf-8');
+        const result = await transformRuby(source, join(modelsDir, file), null, config, APP_ROOT);
+        // Pass relative output path for correct import resolution
+        const relativeOutPath = `app/models/${file.replace('.rb', '.js')}`;
+        let code = fixImportsForEject(result.code, relativeOutPath, config);
+        const outFile = join(outDir, 'app/models', file.replace('.rb', '.js'));
+        writeFileSync(outFile, code);
+        fileCount++;
+      }
+
+      // Generate models index (only if we have models)
+      const modelsIndex = generateModelsModuleForEject(APP_ROOT, config);
+      writeFileSync(join(outDir, 'app/models/index.js'), modelsIndex);
       fileCount++;
     }
-
-    // Generate models index
-    const modelsIndex = generateModelsModuleForEject(APP_ROOT, config);
-    writeFileSync(join(outDir, 'app/models/index.js'), modelsIndex);
-    fileCount++;
   }
 
   // Transform migrations
   const migrateDir = join(APP_ROOT, 'db/migrate');
   if (existsSync(migrateDir)) {
-    console.log('  Transforming migrations...');
-    const migrations = findMigrations(APP_ROOT);
-    for (const m of migrations) {
-      const source = readFileSync(join(migrateDir, m.file), 'utf-8');
-      const result = await transformRuby(source, join(migrateDir, m.file), null, config, APP_ROOT);
-      // Pass relative output path for correct import resolution
-      const relativeOutPath = `db/migrate/${m.name}.js`;
-      let code = fixImportsForEject(result.code, relativeOutPath, config);
-      const outFile = join(outDir, 'db/migrate', m.name + '.js');
-      writeFileSync(outFile, code);
+    const migrations = findMigrations(APP_ROOT)
+      .filter(m => shouldInclude(`db/migrate/${m.file}`));
+
+    if (migrations.length > 0) {
+      console.log('  Transforming migrations...');
+      for (const m of migrations) {
+        const source = readFileSync(join(migrateDir, m.file), 'utf-8');
+        const result = await transformRuby(source, join(migrateDir, m.file), null, config, APP_ROOT);
+        // Pass relative output path for correct import resolution
+        const relativeOutPath = `db/migrate/${m.name}.js`;
+        let code = fixImportsForEject(result.code, relativeOutPath, config);
+        const outFile = join(outDir, 'db/migrate', m.name + '.js');
+        writeFileSync(outFile, code);
+        fileCount++;
+      }
+
+      // Generate migrations index (only if we have migrations)
+      const migrationsIndex = generateMigrationsModuleForEject(APP_ROOT);
+      writeFileSync(join(outDir, 'db/migrate/index.js'), migrationsIndex);
       fileCount++;
     }
-
-    // Generate migrations index
-    const migrationsIndex = generateMigrationsModuleForEject(APP_ROOT);
-    writeFileSync(join(outDir, 'db/migrate/index.js'), migrationsIndex);
-    fileCount++;
   }
 
   // Transform seeds
   const seedsFile = join(APP_ROOT, 'db/seeds.rb');
-  if (existsSync(seedsFile)) {
+  if (existsSync(seedsFile) && shouldInclude('db/seeds.rb')) {
     console.log('  Transforming seeds...');
     const source = readFileSync(seedsFile, 'utf-8');
     const result = await transformRuby(source, seedsFile, null, config, APP_ROOT);
@@ -863,7 +1012,7 @@ async function runEject(options) {
   // Transform routes - generate paths.js first, then routes.js
   // This breaks the circular dependency between routes.js and controllers
   const routesFile = join(APP_ROOT, 'config/routes.rb');
-  if (existsSync(routesFile)) {
+  if (existsSync(routesFile) && shouldInclude('config/routes.rb')) {
     console.log('  Transforming routes...');
     const source = readFileSync(routesFile, 'utf-8');
     const { convert } = await ensureRuby2jsReady();
@@ -920,7 +1069,11 @@ async function runEject(options) {
       const files = readdirSync(resourceDir);
 
       // Transform ERB files
-      for (const file of files.filter(f => f.endsWith('.html.erb') && !f.startsWith('._'))) {
+      const erbFiles = files
+        .filter(f => f.endsWith('.html.erb') && !f.startsWith('._'))
+        .filter(f => shouldInclude(`app/views/${resource}/${f}`));
+
+      for (const file of erbFiles) {
         const source = readFileSync(join(resourceDir, file), 'utf-8');
         const result = await transformErb(source, join(resourceDir, file), false, config);
         // Pass relative output path for correct import resolution
@@ -932,7 +1085,11 @@ async function runEject(options) {
       }
 
       // Transform JSX.rb files
-      for (const file of files.filter(f => f.endsWith('.jsx.rb') && !f.startsWith('._'))) {
+      const jsxFiles = files
+        .filter(f => f.endsWith('.jsx.rb') && !f.startsWith('._'))
+        .filter(f => shouldInclude(`app/views/${resource}/${f}`));
+
+      for (const file of jsxFiles) {
         const source = readFileSync(join(resourceDir, file), 'utf-8');
         const result = await transformJsxRb(source, join(resourceDir, file), config);
         // Pass relative output path for correct import resolution
@@ -954,7 +1111,10 @@ async function runEject(options) {
     // Transform layouts
     const layoutsDir = join(viewsDir, 'layouts');
     if (existsSync(layoutsDir)) {
-      const layoutFiles = readdirSync(layoutsDir).filter(f => f.endsWith('.html.erb') && !f.startsWith('._'));
+      const layoutFiles = readdirSync(layoutsDir)
+        .filter(f => f.endsWith('.html.erb') && !f.startsWith('._'))
+        .filter(f => shouldInclude(`app/views/layouts/${f}`));
+
       for (const file of layoutFiles) {
         const source = readFileSync(join(layoutsDir, file), 'utf-8');
         const result = await transformErb(source, join(layoutsDir, file), true, config);
@@ -971,31 +1131,35 @@ async function runEject(options) {
   // Transform Stimulus controllers
   const controllersDir = join(APP_ROOT, 'app/javascript/controllers');
   if (existsSync(controllersDir)) {
-    console.log('  Transforming Stimulus controllers...');
-
     // Get all files in the controllers directory
-    const allFiles = readdirSync(controllersDir).filter(f => !f.startsWith('._') && !f.startsWith('.'));
+    const allFiles = readdirSync(controllersDir)
+      .filter(f => !f.startsWith('._') && !f.startsWith('.'))
+      .filter(f => shouldInclude(`app/javascript/controllers/${f}`));
 
-    for (const file of allFiles) {
-      const inFile = join(controllersDir, file);
-      // Skip directories
-      if (!statSync(inFile).isFile()) continue;
+    if (allFiles.length > 0) {
+      console.log('  Transforming Stimulus controllers...');
 
-      if (file.endsWith('.rb')) {
-        // Transform Ruby files
-        const source = readFileSync(inFile, 'utf-8');
-        const result = await transformRuby(source, inFile, 'stimulus', config, APP_ROOT);
-        // Pass relative output path for correct import resolution
-        const relativeOutPath = `app/javascript/controllers/${file.replace('.rb', '.js')}`;
-        let code = fixImportsForEject(result.code, relativeOutPath, config);
-        const outFile = join(outDir, 'app/javascript/controllers', file.replace('.rb', '.js'));
-        writeFileSync(outFile, code);
-        fileCount++;
-      } else if (file.endsWith('.js') || file.endsWith('.mjs')) {
-        // Copy JS files as-is
-        const outFile = join(outDir, 'app/javascript/controllers', file);
-        copyFileSync(inFile, outFile);
-        fileCount++;
+      for (const file of allFiles) {
+        const inFile = join(controllersDir, file);
+        // Skip directories
+        if (!statSync(inFile).isFile()) continue;
+
+        if (file.endsWith('.rb')) {
+          // Transform Ruby files
+          const source = readFileSync(inFile, 'utf-8');
+          const result = await transformRuby(source, inFile, 'stimulus', config, APP_ROOT);
+          // Pass relative output path for correct import resolution
+          const relativeOutPath = `app/javascript/controllers/${file.replace('.rb', '.js')}`;
+          let code = fixImportsForEject(result.code, relativeOutPath, config);
+          const outFile = join(outDir, 'app/javascript/controllers', file.replace('.rb', '.js'));
+          writeFileSync(outFile, code);
+          fileCount++;
+        } else if (file.endsWith('.js') || file.endsWith('.mjs')) {
+          // Copy JS files as-is
+          const outFile = join(outDir, 'app/javascript/controllers', file);
+          copyFileSync(inFile, outFile);
+          fileCount++;
+        }
       }
     }
   }
@@ -1003,39 +1167,46 @@ async function runEject(options) {
   // Transform Rails controllers
   const appControllersDir = join(APP_ROOT, 'app/controllers');
   if (existsSync(appControllersDir)) {
-    console.log('  Transforming Rails controllers...');
     const controllerFiles = readdirSync(appControllersDir)
-      .filter(f => f.endsWith('.rb') && !f.startsWith('._'));
-    for (const file of controllerFiles) {
-      const source = readFileSync(join(appControllersDir, file), 'utf-8');
-      const result = await transformRuby(source, join(appControllersDir, file), 'controllers', config, APP_ROOT);
-      // Pass relative output path for correct import resolution
-      const relativeOutPath = `app/controllers/${file.replace('.rb', '.js')}`;
-      let code = fixImportsForEject(result.code, relativeOutPath, config);
-      const outFile = join(outDir, 'app/controllers', file.replace('.rb', '.js'));
-      writeFileSync(outFile, code);
-      fileCount++;
+      .filter(f => f.endsWith('.rb') && !f.startsWith('._'))
+      .filter(f => shouldInclude(`app/controllers/${f}`));
+
+    if (controllerFiles.length > 0) {
+      console.log('  Transforming Rails controllers...');
+      for (const file of controllerFiles) {
+        const source = readFileSync(join(appControllersDir, file), 'utf-8');
+        const result = await transformRuby(source, join(appControllersDir, file), 'controllers', config, APP_ROOT);
+        // Pass relative output path for correct import resolution
+        const relativeOutPath = `app/controllers/${file.replace('.rb', '.js')}`;
+        let code = fixImportsForEject(result.code, relativeOutPath, config);
+        const outFile = join(outDir, 'app/controllers', file.replace('.rb', '.js'));
+        writeFileSync(outFile, code);
+        fileCount++;
+      }
     }
   }
 
   // Copy and transform test files
   const testDir = join(APP_ROOT, 'test');
   if (existsSync(testDir)) {
-    console.log('  Copying test files...');
-    const outTestDir = join(outDir, 'test');
-    if (!existsSync(outTestDir)) {
-      mkdirSync(outTestDir, { recursive: true });
-    }
-
     // Copy .mjs and .js test files with import fixes
-    const testFiles = readdirSync(testDir).filter(f =>
-      (f.endsWith('.test.mjs') || f.endsWith('.test.js')) && !f.startsWith('._')
-    );
-    for (const file of testFiles) {
-      let content = readFileSync(join(testDir, file), 'utf-8');
-      content = fixTestImportsForEject(content);
-      writeFileSync(join(outTestDir, file), content);
-      fileCount++;
+    const testFiles = readdirSync(testDir)
+      .filter(f => (f.endsWith('.test.mjs') || f.endsWith('.test.js')) && !f.startsWith('._'))
+      .filter(f => shouldInclude(`test/${f}`));
+
+    if (testFiles.length > 0) {
+      console.log('  Copying test files...');
+      const outTestDir = join(outDir, 'test');
+      if (!existsSync(outTestDir)) {
+        mkdirSync(outTestDir, { recursive: true });
+      }
+
+      for (const file of testFiles) {
+        let content = readFileSync(join(testDir, file), 'utf-8');
+        content = fixTestImportsForEject(content);
+        writeFileSync(join(outTestDir, file), content);
+        fileCount++;
+      }
     }
   }
 
@@ -2283,6 +2454,19 @@ switch (command) {
       console.log('  -d, --database ADAPTER   Database adapter');
       console.log('  -t, --target TARGET      Build target');
       console.log('  --base PATH              Base public path');
+      console.log('\nFiltering:');
+      console.log('  --include PATTERN        Include only matching files (can be repeated)');
+      console.log('  --exclude PATTERN        Exclude matching files (can be repeated)');
+      console.log('  --only FILES             Comma-separated list of files to include');
+      console.log('\nPatterns support glob syntax: * (any), ** (any including /), ? (single char)');
+      console.log('\nExamples:');
+      console.log('  juntos eject --include "app/models/*.rb"');
+      console.log('  juntos eject --include "app/views/articles/**/*" --exclude "**/test_*"');
+      console.log('  juntos eject --only app/models/article.rb,app/models/comment.rb');
+      console.log('\nFiltering can also be configured in config/ruby2js.yml:');
+      console.log('  eject:');
+      console.log('    include: [app/models/*.rb, app/views/articles/**/*]');
+      console.log('    exclude: ["**/test_*"]');
       process.exit(0);
     }
     runEject(options).catch(err => {

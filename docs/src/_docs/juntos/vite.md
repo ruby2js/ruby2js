@@ -197,6 +197,15 @@ dependencies:
 external:
   - "@hotwired/turbo"
   - "@hotwired/stimulus"
+
+# Eject command configuration (see "juntos eject --help")
+eject:
+  output: ejected
+  include:
+    - app/models/*.rb
+    - app/views/articles/**/*
+  exclude:
+    - "**/*_test.rb"
 ```
 
 ### dependencies vs external
