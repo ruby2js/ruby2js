@@ -218,16 +218,38 @@ module Ruby2JS
             if method == :absolute_path or method == :expand_path
               self.prepend_list << node_import_path
               # Ruby: File.expand_path(relative, base) -> JS: path.resolve(base, relative)
+              # Note: Ruby's expand_path has special semantics when base is a file:
+              #   File.expand_path('../x', '/a/b/c.rb') = '/a/b/x' (.. means "directory of file")
+              # But JS path.resolve has standard semantics:
+              #   path.resolve(dirname('/a/b/c.rb'), '../x') = '/a/x' (.. means "parent of directory")
+              # When base is __FILE__, we use dirname() which goes up one level, so we need to
+              # strip one leading '../' from the relative path to match Ruby semantics.
               reversed_args = args.reverse
-              # In ESM mode, __FILE__ becomes import.meta.url (a file:// URL) which path.resolve
-              # doesn't handle correctly. Use fileURLToPath to convert to filesystem path first.
-              # In CJS mode, __FILE__ becomes __filename which is already a filesystem path.
-              if reversed_args.first&.type == :__FILE__ && @options[:module] != :cjs
-                self.prepend_list << node_import_url
-                base = s(:send, s(:attr, nil, :path), :dirname,
-                  s(:send, nil, :fileURLToPath, process(reversed_args.first)))
+              if reversed_args.first&.type == :__FILE__
+                # Handle __FILE__ as base - need special path handling
+                relative_arg = reversed_args[1]
+                adjusted_relative = relative_arg
+
+                # Strip leading '../' to match Ruby's expand_path semantics
+                if relative_arg&.type == :str
+                  rel_path = relative_arg.children.first
+                  if rel_path.start_with?('../')
+                    adjusted_relative = s(:str, rel_path.sub(/^\.\.\//, ''))
+                  end
+                end
+
+                if @options[:module] != :cjs
+                  # ESM mode: use fileURLToPath for import.meta.url
+                  self.prepend_list << node_import_url
+                  base = s(:send, s(:attr, nil, :path), :dirname,
+                    s(:send, nil, :fileURLToPath, process(reversed_args.first)))
+                else
+                  # CJS mode: __filename is already a path, just use dirname
+                  base = s(:send, s(:attr, nil, :path), :dirname, process(reversed_args.first))
+                end
+
                 S(:send, s(:attr, nil, :path), :resolve,
-                  base, *process_all(reversed_args[1..-1]))
+                  base, process(adjusted_relative))
               else
                 S(:send, s(:attr, nil, :path), :resolve,
                   *process_all(reversed_args))

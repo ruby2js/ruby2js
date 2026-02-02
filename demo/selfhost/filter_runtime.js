@@ -20,7 +20,13 @@ if (typeof process !== 'undefined' && process.versions?.node) {
 function urlToPath(pathOrUrl) {
   if (typeof pathOrUrl !== 'string') return pathOrUrl;
   if (pathOrUrl.startsWith('file://')) {
-    return pathOrUrl.slice(7); // Remove 'file://' prefix
+    let path = pathOrUrl.slice(7); // Remove 'file://' prefix
+    // Strip query string (e.g., ?t=... for cache busting)
+    const queryIndex = path.indexOf('?');
+    if (queryIndex !== -1) {
+      path = path.slice(0, queryIndex);
+    }
+    return path;
   }
   return pathOrUrl;
 }

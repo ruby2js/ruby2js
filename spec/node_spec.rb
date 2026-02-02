@@ -239,16 +239,17 @@ describe Ruby2JS::Filter::Node do
     end
 
     it 'should handle File.expand_path with __FILE__ in CJS' do
-      # In CJS mode, no fileURLToPath needed since __filename is already a filesystem path
-      # Note: __FILE__ becomes __filename when CJS filter is applied (not shown here)
+      # Ruby's expand_path('../x', file) = dirname(file)/x (.. means "directory of file")
+      # So '../foo' becomes just 'foo' since dirname already goes up one level
       to_js( 'File.expand_path("../foo", __FILE__)' ).
-        must_equal 'const path = require("node:path"); path.resolve(__FILE__, "../foo")'
+        must_equal 'const path = require("node:path"); path.resolve(path.dirname(__FILE__), "foo")'
     end
 
     it 'should handle File.expand_path with __FILE__ in ESM' do
       # With both Node and ESM filters: uses fileURLToPath because import.meta.url is a file:// URL
+      # Ruby's expand_path('../x', file) semantics: '../' is stripped since dirname goes up one level
       to_js_esm_with_esm_filter( 'File.expand_path("../foo", __FILE__)' ).
-        must_equal 'import path from "node:path"; import { fileURLToPath } from "node:url"; path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../foo")'
+        must_equal 'import path from "node:path"; import { fileURLToPath } from "node:url"; path.resolve(path.dirname(fileURLToPath(import.meta.url)), "foo")'
     end
 
     it 'should handle File.absolute_path?' do

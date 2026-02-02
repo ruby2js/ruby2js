@@ -567,6 +567,14 @@ Number.prototype.must_equal = function(expected) {
   return this;
 };
 
+// Date assertions
+Date.prototype.must_equal = function(expected) {
+  if (this.getTime() !== expected?.getTime()) {
+    throw new Error(`Expected ${expected} but got ${this}`);
+  }
+  return this;
+};
+
 // Ruby's send method - call methods dynamically by name
 if (!Object.prototype.send) {
   Object.defineProperty(Object.prototype, 'send', {
