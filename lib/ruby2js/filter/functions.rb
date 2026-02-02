@@ -1236,6 +1236,8 @@ module Ruby2JS
           args = node.children[1]
           return super unless args  # Ruby 3.4 it blocks handled by converter
           block_body = node.children[2]
+          # Unwrap :return node from &:symbol syntax (processor.rb wraps in return)
+          block_body = block_body.children.first if block_body&.type == :return
 
           # Check if we have multiple args (destructuring case)
           if args.children.length > 1
@@ -1294,6 +1296,8 @@ module Ruby2JS
           args = node.children[1]
           return super unless args  # Ruby 3.4 it blocks handled by converter
           block_body = node.children[2]
+          # Unwrap :return node from &:symbol syntax (processor.rb wraps in return)
+          block_body = block_body.children.first if block_body&.type == :return
 
           # Create two argument names for the comparison function
           arg_name = args.children.first.children.first
@@ -1333,6 +1337,8 @@ module Ruby2JS
           args = node.children[1]
           return super unless args  # Ruby 3.4 it blocks handled by converter
           block_body = node.children[2]
+          # Unwrap :return node from &:symbol syntax (processor.rb wraps in return)
+          block_body = block_body.children.first if block_body&.type == :return
 
           arg_name = args.children.first.children.first
           key_a = replace_lvar(block_body, arg_name, :a)
@@ -1354,6 +1360,8 @@ module Ruby2JS
           args = node.children[1]
           return super unless args  # Ruby 3.4 it blocks handled by converter
           block_body = node.children[2]
+          # Unwrap :return node from &:symbol syntax (processor.rb wraps in return)
+          block_body = block_body.children.first if block_body&.type == :return
 
           arg_name = args.children.first.children.first
           key_a = replace_lvar(block_body, arg_name, :a)
