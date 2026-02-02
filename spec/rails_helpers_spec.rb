@@ -86,6 +86,29 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include 'class="entry"'
     end
 
+    it "should handle file_field" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @recording) do |form| %><%= form.file_field :song_file, class: "hidden" %><% end %>')
+      result.must_include 'type=\\"file\\"'
+      result.must_include 'recording[song_file]'
+      result.must_include 'class=\\"hidden\\"'
+      # File inputs should NOT have value attribute (check the specific input line)
+      result.must_include '<input type=\\"file\\"'
+      result.wont_include 'type=\\"file\\"" value='
+    end
+
+    it "should handle fields_for without crashing" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      # fields_for creates nested form builders for associations
+      result = erb_to_js('<%= form_with(model: @billable) do |form| %><%= form.fields_for :questions do |q| %><%= q.text_field :question_text %><% end %><% end %>')
+      # Should generate a loop over the association
+      result.must_include 'for'
+      result.must_include 'questions'
+      # Should generate input fields
+      result.must_include 'type="text"'
+      result.must_include 'question_text'
+    end
+
     it "should handle submit with custom label" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_for @user do |f| %><%= f.submit "Create Account" %><% end %>')

@@ -399,6 +399,13 @@ module Ruby2JS
               return process_turbo_stream_action(action, target_arg, block_body)
             end
 
+            # Handle form.fields_for (nested form builder)
+            if helper_name == :fields_for && @erb_block_var &&
+               receiver&.type == :lvar && receiver.children.first == @erb_block_var
+              association_name = block_send.children[2]
+              return process_fields_for(association_name, block_args, block_body)
+            end
+
             if helper_name == :button_to
               return process_button_to_block(block_send, block_args, block_body)
             elsif helper_name == :form_for
@@ -1829,7 +1836,7 @@ module Ruby2JS
                   s(:str, '">'))
               end
             else
-              super
+              nil
             end
 
           when :text_area, :textarea
@@ -1863,7 +1870,7 @@ module Ruby2JS
                   s(:str, '</textarea>'))
               end
             else
-              super
+              nil
             end
 
           when :check_box, :checkbox
@@ -1918,7 +1925,7 @@ module Ruby2JS
               html = %(<input type="radio" name="#{model}[#{name}]" id="#{model}_#{name}_#{val}"#{extra_attrs} value="#{val}">)
               s(:str, html)
             else
-              super
+              nil
             end
 
           when :label
@@ -1932,7 +1939,7 @@ module Ruby2JS
               html = %(<label for="#{model}_#{name}"#{extra_attrs}>#{label_text}</label>)
               s(:str, html)
             else
-              super
+              nil
             end
 
           when :select
@@ -1943,7 +1950,7 @@ module Ruby2JS
               html = %(<select name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs}></select>)
               s(:str, html)
             else
-              super
+              nil
             end
 
           when :submit
@@ -1980,9 +1987,87 @@ module Ruby2JS
             end
             s(:str, html)
 
+          when :file_field
+            # File inputs cannot have value pre-filled (browser security)
+            field_name = args.first
+            if field_name&.type == :sym
+              name = field_name.children.first.to_s
+              extra_attrs = build_field_attrs(options)
+              html = %(<input type="file" name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs}>)
+              s(:str, html)
+            else
+              nil
+            end
+
           else
-            super
+            # Unknown form builder method - return nil to skip transformation
+            # This prevents "super" calls to non-existent parent methods
+            nil
           end
+        end
+
+        # Process fields_for (nested form builder) into JavaScript
+        # form.fields_for :questions do |question_form| ... end
+        # Generates iteration over the association with nested field names
+        def process_fields_for(association_node, block_args, block_body)
+          return nil unless association_node&.type == :sym
+
+          association_name = association_node.children.first.to_s
+          block_param = block_args.children.first&.children&.first
+
+          # Save current form context
+          old_block_var = @erb_block_var
+          old_model_name = @erb_model_name
+
+          # Set up nested form context
+          # Field names become: parent_model[association_attributes][index][field]
+          parent_model = @erb_model_name || 'model'
+          nested_model_name = "#{parent_model}_#{association_name}"
+          @erb_block_var = block_param
+          @erb_model_name = nested_model_name
+
+          statements = []
+
+          # Generate iteration over the association
+          # for (let [_idx, item] of (model.association || []).entries()) { ... }
+          association_access = s(:or,
+            s(:attr, s(:lvar, parent_model.to_sym), association_name.to_sym),
+            s(:array))
+
+          # Use entries() to get index for field naming
+          entries_call = s(:send, association_access, :entries)
+
+          # Process block body
+          body_statements = if block_body&.type == :begin
+            block_body.children.map { |stmt| process(stmt) }.compact
+          elsif block_body
+            [process(block_body)].compact
+          else
+            []
+          end
+
+          # Build the for loop
+          # for (let [_fieldsIdx, nested_model_name] of entries) { ... }
+          idx_var = "_#{association_name}Idx".to_sym
+          item_var = association_name.singularize.to_sym rescue association_name.to_sym
+
+          # Generate field name prefix substitution in the body
+          # Replace nested_model_name[field] with parent_model[association_attributes][idx][field]
+          for_body = body_statements.empty? ? s(:nil) : s(:begin, *body_statements)
+
+          for_loop = s(:for,
+            s(:mlhs, s(:lvasgn, idx_var), s(:lvasgn, item_var)),
+            entries_call,
+            for_body)
+
+          statements << for_loop
+
+          # Restore form context
+          @erb_block_var = old_block_var
+          @erb_model_name = old_model_name
+
+          return nil if statements.empty?
+          statements.length == 1 ? statements.first : s(:begin, *statements)
         end
 
         # Process form_for block into JavaScript

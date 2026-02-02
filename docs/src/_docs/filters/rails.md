@@ -611,10 +611,12 @@ Both `form_for` and `form_with` accept `class:` and `data:` options:
 | `f.text_area :body`            | `<textarea name="model[body]" ...>${model.body ?? ''}</textarea>`                    |
 | `f.check_box :active`          | `<input type="checkbox" value="1" ...>`                                              |
 | `f.radio_button :role, :admin` | `<input type="radio" value="admin" ...>`                                             |
+| `f.file_field :avatar`         | `<input type="file" name="model[avatar]" ...>`                                       |
 | `f.label :name`                | `<label for="model_name">Name</label>`                                               |
 | `f.select :category`           | `<select name="model[category]" ...></select>`                                       |
 | `f.submit "Save"`              | `<input type="submit" value="Save">`                                                 |
 | `f.button "Click"`             | `<button type="submit">Click</button>`                                               |
+| `f.fields_for :items`          | Loop over nested association with nested form builder                                |
 
 Additional input types: `number_field`, `tel_field`, `url_field`, `search_field`, `date_field`, `time_field`, `datetime_local_field`, `month_field`, `week_field`, `color_field`, `range_field`.
 
