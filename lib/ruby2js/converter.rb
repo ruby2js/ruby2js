@@ -112,6 +112,7 @@ module Ruby2JS
       @truthy = :js
       @boolean_context = false
       @need_truthy_helpers = []
+      @need_range_class = false
       @underscored_private = true
       @nullish_to_s = false
       @redoable = false
@@ -157,6 +158,16 @@ module Ruby2JS
           helpers.reverse.each do |helper|
             @lines.unshift Line.new(helper + ';')
           end
+        end
+      end
+
+      # Inject $Range class if needed
+      if @need_range_class
+        range_class = 'class $Range {constructor(begin, end, excludeEnd=false) {this.begin = begin; this.end = end; this.excludeEnd = excludeEnd}}'
+        if @sep == '; '
+          @lines.first.unshift range_class + @sep
+        else
+          @lines.unshift Line.new(range_class)
         end
       end
     end
@@ -594,4 +605,5 @@ require_relative 'converter/astro_file'
 require_relative 'converter/astro_template'
 require_relative 'converter/vue_file'
 require_relative 'converter/vue_template'
+require_relative 'converter/range'
 require_relative 'converter/yield'

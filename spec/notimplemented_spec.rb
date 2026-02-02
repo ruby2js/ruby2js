@@ -9,19 +9,9 @@ describe 'not implemented' do
       must_raise NotImplementedError
   end
 
-  it "range inclusive" do
-    # NOTE: for loops and filter/functions will handle the special case of array indexes
-    # NOTE: filter/rubyjs implements this
-    # NOTE: .to_a is implemented in send
-
-    todo( '1..2' )
-  end
-
-  it "range exclusive" do
-    # NOTE: for loops and filter/functions will handle the special case of array indexes
-    # NOTE: filter/rubyjs implements this
-    todo( '1...2' )
-  end
+  # Ranges are now implemented - see range_spec.rb
+  # for loops and case statements handle ranges specially
+  # standalone ranges convert to new $Range(...)
 
   # class visibility modifiers are now implemented
   # see es2022_spec.rb and converter_spec.rb for tests

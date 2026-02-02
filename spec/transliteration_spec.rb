@@ -50,6 +50,28 @@ describe Ruby2JS do
       to_js( 'str[1..3]' ).must_equal 'str.slice(1, 4)'
     end
 
+    it "should convert standalone ranges to $Range objects" do
+      to_js( 'r = 1..10' ).must_include 'new $Range(1, 10)'
+      to_js( 'r = 1..10' ).wont_include ', true'
+      to_js( 'r = 1...10' ).must_include 'new $Range(1, 10, true)'
+    end
+
+    it "should handle endless and beginless ranges" do
+      to_js( 'r = 1..' ).must_include 'new $Range(1, null)'
+      to_js( 'r = ..10' ).must_include 'new $Range(null, 10)'
+      to_js( 'r = 1...' ).must_include 'new $Range(1, null, true)'
+      to_js( 'r = ...10' ).must_include 'new $Range(null, 10, true)'
+    end
+
+    it "should inject $Range class only when needed" do
+      # Standalone ranges need the class
+      to_js( 'r = 1..10' ).must_include 'class $Range'
+      # For loops don't need it - they use optimized form
+      to_js( 'for i in 1..10; x; end' ).wont_include '$Range'
+      # Case statements don't need it - they use comparison operators
+      to_js( 'case a; when 1..10; x; end' ).wont_include '$Range'
+    end
+
     it "should parse global variables" do
       to_js( "$a = 1" ).must_equal 'let $a = 1'
     end

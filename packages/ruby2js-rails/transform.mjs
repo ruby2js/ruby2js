@@ -862,6 +862,7 @@ export async function ensureRuby2jsReady() {
     await import('ruby2js/filters/esm.js');
     await import('ruby2js/filters/return.js');
     await import('ruby2js/filters/pragma.js');
+    await import('ruby2js/filters/polyfill.js');
 
     // Rails filters
     await import('ruby2js/filters/rails/model.js');

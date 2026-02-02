@@ -233,6 +233,9 @@ describe Ruby2JS::Filter::Polyfill do
     end
   end
 
+  # Range support is now built into the converter, not the polyfill filter.
+  # See range_spec.rb for Range tests.
+
   describe 'multiple polyfills' do
     it 'should add multiple polyfills when needed' do
       js = to_js('arr.first; arr.last; str.chomp')

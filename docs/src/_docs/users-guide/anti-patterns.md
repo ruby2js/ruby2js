@@ -137,21 +137,35 @@ Ruby symbols don't exist in JavaScript:
 { "foo" => 1 }    # => { "foo": 1 }
 ```
 
-### Ranges as Objects
+### Ranges
 
-Ruby ranges are objects with methods:
+Ranges work in several contexts:
 
 ```ruby
-# Works (converted to loops or conditions)
-(1..10).each { |i| puts i }
-(1...5).to_a
+# Loops - converted to optimized for loops
+for i in 1..10
+  puts i
+end
 
-# Problematic - ranges as first-class objects
-range = (1..10)
-range.include?(5)  # May not work as expected
+# Case statements - converted to comparisons
+case x
+when 1..10
+  puts "small"
+end
+
+# Array/string slicing - converted to slice()
+str[0..-2]    # => str.slice(0, -1)
+arr[1..3]     # => arr.slice(1, 4)
+
+# Standalone ranges - converted to $Range objects
+range = 1..10       # => new $Range(1, 10)
+range = 18..        # => new $Range(18, null)  (endless)
+range = ..65        # => new $Range(null, 65)  (beginless)
 ```
 
-**Alternative:** Use explicit loops or arrays.
+The `$Range` class is automatically injected when needed. Range objects have `begin`, `end`, and `excludeEnd` properties, making them useful for passing to APIs (like ActiveRecord's `where` clause).
+
+**Note:** Range methods like `include?`, `cover?`, `each`, and `to_a` are not yet supported on `$Range` objects. For iteration, use `for` loops instead.
 
 ### Multiple Return Values
 
@@ -376,6 +390,7 @@ str.force_encoding("UTF-8")
 | Arrays, hashes       | ✅ Safe    | Mind `<<`, `.dup`       |
 | String interpolation | ✅ Safe    |                         |
 | Control flow         | ✅ Safe    | Except `retry`, `redo`  |
+| Ranges               | ✅ Safe    | `$Range` for standalone |
 | `define_method`      | ✅ Safe    | In class bodies         |
 | `send`               | ✅ Safe    | Static or dynamic names |
 | `include`/`extend`   | ✅ Safe    | Module mixins           |

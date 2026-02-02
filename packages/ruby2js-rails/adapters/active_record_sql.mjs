@@ -506,6 +506,11 @@ export class ActiveRecordSQL extends ActiveRecordBase {
           const placeholders = value.map(() => this._param(paramIndex.value++)).join(', ');
           parts.push(`${key} IN (${placeholders})`);
           vals.push(...value.map(v => this._formatValue(v)));
+        } else if (this._isRange(value)) {
+          // Range: where({age: 18..65}) or where({age: 18...})
+          const { sql, values: rangeVals } = this._buildRangeSQL(key, value, paramIndex);
+          parts.push(sql);
+          vals.push(...rangeVals);
         } else if (value === null) {
           // IS NULL
           parts.push(`${key} IS NULL`);
@@ -518,6 +523,66 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     }
 
     return { parts, vals };
+  }
+
+  // Check if value is a $Range object (duck-type check)
+  // Supports both _prefixed props (from transpiled Ruby) and non-prefixed (direct JS)
+  static _isRange(value) {
+    if (value === null || typeof value !== 'object') return false;
+    // Check for transpiled Ruby $Range (_begin, _end, _excludeEnd)
+    if ('_begin' in value && '_end' in value && '_excludeEnd' in value) return true;
+    // Check for direct JS Range (begin, end, excludeEnd)
+    if ('begin' in value && 'end' in value && 'excludeEnd' in value) return true;
+    return false;
+  }
+
+  // Get Range properties (handles both _prefixed and non-prefixed)
+  static _getRangeProps(range) {
+    if ('_begin' in range) {
+      return { begin: range._begin, end: range._end, excludeEnd: range._excludeEnd };
+    }
+    return { begin: range.begin, end: range.end, excludeEnd: range.excludeEnd };
+  }
+
+  // Build SQL for a Range condition
+  // Returns { sql: string, values: any[] }
+  static _buildRangeSQL(column, range, paramIndex) {
+    const values = [];
+    let sql;
+
+    const { begin, end, excludeEnd } = this._getRangeProps(range);
+    const hasBegin = begin !== null;
+    const hasEnd = end !== null;
+
+    if (hasBegin && hasEnd) {
+      if (excludeEnd) {
+        // Exclusive range: 1...10 → column >= 1 AND column < 10
+        sql = `${column} >= ${this._param(paramIndex.value++)} AND ${column} < ${this._param(paramIndex.value++)}`;
+      } else {
+        // Inclusive range: 1..10 → column BETWEEN 1 AND 10
+        sql = `${column} BETWEEN ${this._param(paramIndex.value++)} AND ${this._param(paramIndex.value++)}`;
+      }
+      values.push(this._formatValue(begin), this._formatValue(end));
+    } else if (hasBegin) {
+      // Endless range: 18.. → column >= 18
+      sql = `${column} >= ${this._param(paramIndex.value++)}`;
+      values.push(this._formatValue(begin));
+    } else if (hasEnd) {
+      // Beginless range: ..65 or ...65
+      if (excludeEnd) {
+        // ...65 → column < 65
+        sql = `${column} < ${this._param(paramIndex.value++)}`;
+      } else {
+        // ..65 → column <= 65
+        sql = `${column} <= ${this._param(paramIndex.value++)}`;
+      }
+      values.push(this._formatValue(end));
+    } else {
+      // Both null - match everything (edge case, shouldn't happen)
+      sql = '1=1';
+    }
+
+    return { sql, values };
   }
 
   // Parse order option into [column, direction]

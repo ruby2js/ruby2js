@@ -289,6 +289,7 @@ module Ruby2JS
               )
             )
           )
+
         end
       end
 
