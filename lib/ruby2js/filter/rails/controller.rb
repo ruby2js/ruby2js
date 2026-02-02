@@ -822,7 +822,9 @@ module Ruby2JS
             pairs << s(:pair, s(:sym, :notice), transform_ivars_to_locals(notice_node))
           end
 
-          s(:hash, *pairs)
+          # Wrap in return statement so redirect exits the function early
+          # Without return, JS parses bare { key: value } as labeled block statement
+          s(:return, s(:hash, *pairs))
         end
 
         def transform_render(args)

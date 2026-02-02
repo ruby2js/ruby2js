@@ -238,6 +238,25 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).wont_include '@total'
       _(result).wont_include 'this.#total'  # Not private field
     end
+
+    it "wraps standalone redirect_to with return statement" do
+      # redirect_to outside respond_to block needs explicit return
+      # Without return, JS parses bare { key: value } as labeled block statement
+      source = <<~RUBY
+        class HeatsController < ApplicationController
+          def clean
+            scratched_count = 5
+            redirect_to heats_url, notice: "\#{scratched_count} heats removed"
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Check for return followed by hash (allowing for newlines/formatting)
+      _(result).must_match(/return\s*\{[\s\S]*redirect:/)
+      # Ensure we don't have bare hash statement (semicolon followed by hash)
+      _(result).wont_match(/;\s*\n\s*\{redirect:/)
+    end
   end
 
   describe 'render transformation' do
