@@ -203,11 +203,28 @@ export class ActiveRecord extends ActiveRecordBase {
     // Build the Dexie query
     let collection = this.table;
 
-    // Apply conditions
+    // Separate Range conditions from regular conditions
+    // Dexie's where() doesn't support Range objects
+    const regularConditions = {};
+    const rangeFilters = [];
+
     if (rel._conditions.length > 0) {
-      // Dexie only supports one where() - combine conditions
-      const combined = Object.assign({}, ...rel._conditions);
-      collection = collection.where(combined);
+      for (const cond of rel._conditions) {
+        for (const [key, value] of Object.entries(cond)) {
+          if (this._isRange(value)) {
+            // Range condition - will be applied as filter
+            rangeFilters.push(this._buildRangeFilter(key, value));
+          } else {
+            // Regular condition - can use Dexie's where()
+            regularConditions[key] = value;
+          }
+        }
+      }
+    }
+
+    // Apply regular conditions via Dexie's where()
+    if (Object.keys(regularConditions).length > 0) {
+      collection = collection.where(regularConditions);
     }
 
     // Apply raw SQL conditions via filter
@@ -223,6 +240,11 @@ export class ActiveRecord extends ActiveRecordBase {
       }
     } else {
       rows = await collection.toArray();
+    }
+
+    // Apply Range filters
+    for (const filterFn of rangeFilters) {
+      rows = rows.filter(filterFn);
     }
 
     // Apply ordering (in-memory for now)
@@ -277,6 +299,58 @@ export class ActiveRecord extends ActiveRecordBase {
     if (dir === ':desc') dir = 'desc';
     if (dir === ':asc') dir = 'asc';
     return [col, dir];
+  }
+
+  // Check if value is a $Range object (duck-type check)
+  // Supports both _prefixed props (from transpiled Ruby) and non-prefixed (direct JS)
+  static _isRange(value) {
+    if (value === null || typeof value !== 'object') return false;
+    // Check for transpiled Ruby $Range (_begin, _end, _excludeEnd)
+    if ('_begin' in value && '_end' in value && '_excludeEnd' in value) return true;
+    // Check for direct JS Range (begin, end, excludeEnd)
+    if ('begin' in value && 'end' in value && 'excludeEnd' in value) return true;
+    return false;
+  }
+
+  // Get Range properties (handles both _prefixed and non-prefixed)
+  static _getRangeProps(range) {
+    if ('_begin' in range) {
+      return { begin: range._begin, end: range._end, excludeEnd: range._excludeEnd };
+    }
+    return { begin: range.begin, end: range.end, excludeEnd: range.excludeEnd };
+  }
+
+  // Build a filter function for a Range condition
+  // Returns a function that takes a row and returns true if it matches
+  static _buildRangeFilter(column, range) {
+    const { begin, end, excludeEnd } = this._getRangeProps(range);
+    const hasBegin = begin !== null;
+    const hasEnd = end !== null;
+
+    if (hasBegin && hasEnd) {
+      if (excludeEnd) {
+        // Exclusive range: 1...10 → column >= 1 AND column < 10
+        return (row) => row[column] >= begin && row[column] < end;
+      } else {
+        // Inclusive range: 1..10 → column >= 1 AND column <= 10
+        return (row) => row[column] >= begin && row[column] <= end;
+      }
+    } else if (hasBegin) {
+      // Endless range: 18.. → column >= 18
+      return (row) => row[column] >= begin;
+    } else if (hasEnd) {
+      // Beginless range: ..65 or ...65
+      if (excludeEnd) {
+        // ...65 → column < 65
+        return (row) => row[column] < end;
+      } else {
+        // ..65 → column <= 65
+        return (row) => row[column] <= end;
+      }
+    } else {
+      // Both null - match everything (edge case)
+      return () => true;
+    }
   }
 
   // --- Association loading ---
