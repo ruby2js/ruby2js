@@ -13,6 +13,10 @@ describe Ruby2JS::Filter::Node do
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Node]).to_s)
   end
 
+  def to_js_esm_with_esm_filter(string)
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Node, Ruby2JS::Filter::ESM]).to_s)
+  end
+
   def to_js_async(string)
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Node],
     async: true).to_s)
@@ -232,6 +236,19 @@ describe Ruby2JS::Filter::Node do
     it 'should handle File.expand_path' do
       to_js( 'File.expand_path("foo")' ).
         must_equal 'const path = require("node:path"); path.resolve("foo")'
+    end
+
+    it 'should handle File.expand_path with __FILE__ in CJS' do
+      # In CJS mode, no fileURLToPath needed since __filename is already a filesystem path
+      # Note: __FILE__ becomes __filename when CJS filter is applied (not shown here)
+      to_js( 'File.expand_path("../foo", __FILE__)' ).
+        must_equal 'const path = require("node:path"); path.resolve(__FILE__, "../foo")'
+    end
+
+    it 'should handle File.expand_path with __FILE__ in ESM' do
+      # With both Node and ESM filters: uses fileURLToPath because import.meta.url is a file:// URL
+      to_js_esm_with_esm_filter( 'File.expand_path("../foo", __FILE__)' ).
+        must_equal 'import path from "node:path"; import { fileURLToPath } from "node:url"; path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../foo")'
     end
 
     it 'should handle File.absolute_path?' do

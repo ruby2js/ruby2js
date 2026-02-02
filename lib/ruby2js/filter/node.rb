@@ -33,6 +33,12 @@ module Ruby2JS
         @node_import_path ||= s(:import, ['node:path'], s(:attr, nil, :path))
       end
 
+      def node_import_url
+        # Named import: import { fileURLToPath } from "node:url"
+        @node_import_url ||= s(:import, ['node:url'],
+          [s(:attr, nil, :fileURLToPath)])
+      end
+
       def setup_argv
         @setup_argv ||= s(:lvasgn, :ARGV, s(:send, s(:attr,
             s(:attr, nil, :process), :argv), :slice, s(:int, 2)))
@@ -41,6 +47,18 @@ module Ruby2JS
       # Helper to check if async mode is enabled
       def async?
         @options[:async]
+      end
+
+      # Helper to process path arguments - handles __FILE__ in ESM mode
+      # In ESM, __FILE__ becomes import.meta.url (a file:// URL) which fs methods don't accept
+      # Wrap with fileURLToPath to convert to filesystem path
+      def process_path_arg(arg)
+        if arg&.type == :__FILE__ && @options[:module] != :cjs
+          self.prepend_list << node_import_url
+          s(:send, nil, :fileURLToPath, process(arg))
+        else
+          process(arg)
+        end
       end
 
       # Helper to generate fs calls - handles sync vs async
@@ -118,7 +136,7 @@ module Ruby2JS
           target.type == :const and target.children.first == nil
         then
           if method == :read and args.length == 1
-            fs_call(:readFileSync, *process_all(args), s(:str, 'utf8'))
+            fs_call(:readFileSync, process_path_arg(args.first), s(:str, 'utf8'))
 
           elsif method == :write and args.length == 2
             fs_call(:writeFileSync, *process_all(args))
@@ -127,18 +145,18 @@ module Ruby2JS
             super
 
           elsif [:exist?, :exists?].include? method and args.length == 1
-            fs_exists_call(process(args.first))
+            fs_exists_call(process_path_arg(args.first))
 
           elsif method == :directory? and args.length == 1
             # File.directory?(path) → fs.existsSync(path) && fs.statSync(path).isDirectory()
-            path_arg = process(args.first)
+            path_arg = process_path_arg(args.first)
             S(:and,
               fs_exists_call(path_arg),
               s(:send, fs_call(:statSync, path_arg), :isDirectory))
 
           elsif method == :file? and args.length == 1
             # File.file?(path) → fs.existsSync(path) && fs.statSync(path).isFile()
-            path_arg = process(args.first)
+            path_arg = process_path_arg(args.first)
             S(:and,
               fs_exists_call(path_arg),
               s(:send, fs_call(:statSync, path_arg), :isFile))
@@ -146,17 +164,17 @@ module Ruby2JS
           elsif method == :symlink? and args.length == 1
             # File.symlink?(path) → fs.lstatSync(path).isSymbolicLink()
             # Use lstat (not stat) to check the link itself, not what it points to
-            s(:send, fs_call(:lstatSync, process(args.first)), :isSymbolicLink)
+            s(:send, fs_call(:lstatSync, process_path_arg(args.first)), :isSymbolicLink)
 
           elsif method == :mtime and args.length == 1
             # File.mtime(path) → fs.statSync(path).mtime
-            s(:attr, fs_call(:statSync, process(args.first)), :mtime)
+            s(:attr, fs_call(:statSync, process_path_arg(args.first)), :mtime)
 
           elsif method == :readlink and args.length == 1
-            fs_call(:readlinkSync, process(args.first))
+            fs_call(:readlinkSync, process_path_arg(args.first))
 
           elsif method == :realpath and args.length == 1
-            fs_call(:realpathSync, process(args.first))
+            fs_call(:realpathSync, process_path_arg(args.first))
 
           elsif method == :rename and args.length == 2
             fs_call(:renameSync, *process_all(args))
@@ -199,8 +217,21 @@ module Ruby2JS
           elsif target.children.last == :File
             if method == :absolute_path or method == :expand_path
               self.prepend_list << node_import_path
-              S(:send, s(:attr, nil, :path), :resolve,
-                *process_all(args.reverse))
+              # Ruby: File.expand_path(relative, base) -> JS: path.resolve(base, relative)
+              reversed_args = args.reverse
+              # In ESM mode, __FILE__ becomes import.meta.url (a file:// URL) which path.resolve
+              # doesn't handle correctly. Use fileURLToPath to convert to filesystem path first.
+              # In CJS mode, __FILE__ becomes __filename which is already a filesystem path.
+              if reversed_args.first&.type == :__FILE__ && @options[:module] != :cjs
+                self.prepend_list << node_import_url
+                base = s(:send, s(:attr, nil, :path), :dirname,
+                  s(:send, nil, :fileURLToPath, process(reversed_args.first)))
+                S(:send, s(:attr, nil, :path), :resolve,
+                  base, *process_all(reversed_args[1..-1]))
+              else
+                S(:send, s(:attr, nil, :path), :resolve,
+                  *process_all(reversed_args))
+              end
             elsif method == :absolute_path?
               self.prepend_list << node_import_path
               S(:send, s(:attr, nil, :path), :isAbsolute, *process_all(args))

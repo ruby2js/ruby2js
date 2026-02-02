@@ -39,7 +39,7 @@ describe Ruby2JS::Filter::Require do
   
   describe :timestamps do
     it "should gather timestamps from require statements" do
-      # Skip in selfhost: file:// URLs from import.meta.url don't work with path.resolve/fs.statSync
+      # Skip in selfhost: test fixture files not available at expected paths
       return skip() if defined?(RUBY2JS_SELFHOST)
       timestamps = to_js_bare( 'require "require/test1.rb"' ).timestamps
       test1 = File.expand_path('../require/test1.rb', __FILE__)
