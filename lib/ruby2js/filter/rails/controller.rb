@@ -324,6 +324,11 @@ module Ruby2JS
           # view_call returns an array of statements (viewProps assignment + view rendering)
           body_statements.push(*view_call) if view_call
 
+          # Mark bare private method calls as send! so they get parens in output.
+          body_statements.each_with_index do |stmt, i|
+            body_statements[i] = mark_private_method_calls(stmt)
+          end
+
           # Wrap redirect/render hashes with return so the function exits early.
           # Without return, JS parses bare { key: value } as a labeled block statement.
           # Walks recursively through if/else/begin to find nested redirect hashes.
@@ -1081,6 +1086,24 @@ module Ruby2JS
           end
 
           imports
+        end
+
+        # Recursively mark bare private method calls as send! (force parens).
+        # Without this, `setup_data unless cond` becomes `if (!cond) let setup_data`
+        # because the converter treats no-arg no-paren sends as variable declarations.
+        def mark_private_method_calls(node)
+          return node unless node.respond_to?(:type)
+
+          if node.type == :send && node.children[0].nil? &&
+              node.children.length == 2 &&
+              @rails_private_methods.key?(node.children[1])
+            return node.updated(:send!, node.children)
+          elsif [:if, :begin, :kwbegin, :while, :until, :for].include?(node.type)
+            new_children = node.children.map { |c| mark_private_method_calls(c) }
+            return node.updated(nil, new_children)
+          end
+
+          node
         end
 
         # Recursively wrap redirect/render hash literals with return statements.

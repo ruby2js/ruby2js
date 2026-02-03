@@ -458,6 +458,29 @@ describe Ruby2JS::Filter::Rails::Controller do
     end
   end
 
+  describe 'private method calls' do
+    it "emits parens for bare private method calls in actions" do
+      source = <<~RUBY
+        class ScoresController < ApplicationController
+          def spa
+            @heat_number = params[:heat]
+            setup_heatlist_data unless @heat_number
+          end
+
+          private
+
+          def setup_heatlist_data
+            @heats = Heat.all
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include 'setup_heatlist_data()'
+      _(result).wont_include 'let setup_heatlist_data'
+    end
+  end
+
   describe 'view module naming' do
     it "uses singular form for view module" do
       source = <<~RUBY
