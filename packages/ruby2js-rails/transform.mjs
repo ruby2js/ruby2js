@@ -97,11 +97,15 @@ export function getBuildOptions(section, target, sectionConfig = null) {
   };
 
   // Default filter sets for each section
+  // Node filter is included for targets with Node.js-compatible APIs (fs, child_process, process.env).
+  // See docs/src/_docs/juntos/deploying/index.md for full target list.
+  const nodeTargets = ['node', 'bun', 'deno', 'fly', 'electron'];
+  const nodeFilter = target && nodeTargets.includes(target) ? ['Node'] : [];
   const defaultFilters = {
     stimulus: ['Pragma', 'Stimulus', 'Functions', 'ESM', 'Return'],
-    controllers: ['Pragma', 'Rails_Controller', 'Functions', 'ESM', 'Return'],
+    controllers: ['Pragma', 'Rails_Controller', ...nodeFilter, 'Functions', 'ESM', 'Return'],
     jsx: ['Pragma', 'Rails_Helpers', 'React', 'Functions', 'ESM', 'Return'],
-    default: ['Pragma', 'Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', 'Functions', 'ESM', 'Return']
+    default: ['Pragma', 'Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', ...nodeFilter, 'Functions', 'ESM', 'Return']
   };
 
   // Use filters from sectionConfig if provided, otherwise use defaults
@@ -167,6 +171,7 @@ function normalizeFilterNames(filters) {
     'rails_migration': 'Rails_Migration',
     'rails_helpers': 'Rails_Helpers',
     'phlex': 'Phlex',
+    'node': 'Node',
     // Also handle slash notation from config
     'rails/controller': 'Rails_Controller',
     'rails/model': 'Rails_Model',
@@ -952,6 +957,9 @@ export async function ensureRuby2jsReady() {
     await import('ruby2js/filters/react.js');
     await import('ruby2js/filters/stimulus.js');
 
+    // Node.js filter (File operations, backtick commands, etc.)
+    await import('ruby2js/filters/node.js');
+
     filtersLoaded = true;
   }
 
@@ -1016,8 +1024,10 @@ export async function transformErb(code, id, isLayout, config) {
   const rubySrc = compiler.src;
 
   // Step 2: Convert Ruby to JavaScript with ERB filters
+  const nodeTargets = ['node', 'bun', 'deno', 'fly', 'electron'];
+  const nodeFilter = config.target && nodeTargets.includes(config.target) ? ['Node'] : [];
   const options = {
-    filters: ['Rails_Helpers', 'Erb', 'Functions', 'Return'],
+    filters: ['Rails_Helpers', 'Erb', ...nodeFilter, 'Functions', 'Return'],
     eslevel: config.eslevel || 2022,
     include: ['class', 'call'],
     database: config.database,
