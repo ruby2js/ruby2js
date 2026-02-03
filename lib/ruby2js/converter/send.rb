@@ -589,14 +589,18 @@ module Ruby2JS
           return
         end
       else
-        # Use .compact because the first argument is nil with variables
-        # This way the first value is always set
-        start_value = start.children.compact.first
-        finish_value = finish.children.compact.first
         if start.type == :int and finish.type == :int
+          start_value = start.children.first
+          finish_value = finish.children.first
           length = finish_value - start_value + (node.type == :irange ? 1 : 0)
+          start_output = start_value.to_s
         else
-          length = "(#{finish_value}-#{start_value}" + (node.type == :irange ? "+1" : "") + ")"
+          # For non-literal values, serialize AST nodes to JS strings via capture
+          start_output = capture { parse start }
+          finish_output = capture { parse finish }
+          length = "(#{finish_output}-#{start_output}" + (node.type == :irange ? "+1" : "") + ")"
+          start_value = start.type == :int ? start.children.first : nil
+          finish_value = finish.type == :int ? finish.children.first : nil
         end
 
         # Avoid of using same variables in the map as used in the irange or elsewhere in this code
@@ -614,7 +618,7 @@ module Ruby2JS
           blank = '_'
         end
 
-        return put "Array.from({length: #{length}}, (#{blank}, #{index_var}) => #{index_var}+#{start_value})"
+        return put "Array.from({length: #{length}}, (#{blank}, #{index_var}) => #{index_var}+#{start_output})"
       end
     end
   end

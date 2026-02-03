@@ -121,6 +121,10 @@ describe Ruby2JS::Filter::Functions do
     it "(b..a).to_a" do
       to_js( '(b..a).to_a' ).must_equal('Array.from({length: (a-b+1)}, (_, idx) => idx+b)')
     end
+
+    it "(1..x.length).to_a" do
+      to_js( '(1..x.length).to_a' ).must_equal('Array.from({length: (x.length-1+1)}, (_, idx) => idx+1)')
+    end
   end
 
   describe :erange do

@@ -32,9 +32,55 @@ export class PrismSourceBuffer
       @lineOffsets.push(i + 1) if source[i] == "\n"
       i += 1
     end
+    # Build byte-to-char offset map for multi-byte UTF-8 sources.
+    # Prism reports byte offsets but JS strings use char indices.
+    @byteToChar = nil
+    byteIdx = 0
+    charIdx = 0
+    while charIdx < source.length
+      code = source.charCodeAt(charIdx)
+      if code < 0x80
+        byteIdx += 1
+      elsif code < 0x800
+        byteIdx += 2
+      elsif code >= 0xD800 && code <= 0xDBFF
+        byteIdx += 4
+        charIdx += 1
+      else
+        byteIdx += 3
+      end
+      charIdx += 1
+    end
+    if byteIdx != source.length
+      @byteToChar = Array.new(byteIdx + 1)
+      byteIdx = 0
+      charIdx = 0
+      while charIdx < source.length
+        @byteToChar[byteIdx] = charIdx
+        code = source.charCodeAt(charIdx)
+        if code < 0x80
+          byteIdx += 1
+        elsif code < 0x800
+          byteIdx += 2
+        elsif code >= 0xD800 && code <= 0xDBFF
+          byteIdx += 4
+          charIdx += 1
+        else
+          byteIdx += 3
+        end
+        charIdx += 1
+      end
+      @byteToChar[byteIdx] = charIdx
+    end
   end
 
   attr_reader :source, :name
+
+  # Convert a byte offset to a character index
+  def byteToCharOffset(byteOffset)
+    return byteOffset unless @byteToChar
+    @byteToChar[byteOffset] || byteOffset
+  end
 
   def lineForPosition(pos)
     idx = @lineOffsets.findIndex { |offset| offset > pos }
@@ -99,8 +145,10 @@ export class PrismComment
       @@next_object_id += 1
     end
 
-    start = prismComment.location.startOffset
-    end_ = start + prismComment.location.length
+    byteStart = prismComment.location.startOffset
+    byteEnd = byteStart + prismComment.location.length
+    start = sourceBuffer.byteToCharOffset(byteStart)
+    end_ = sourceBuffer.byteToCharOffset(byteEnd)
     @text = source[start...end_]
 
     @location = {

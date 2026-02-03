@@ -281,5 +281,14 @@ describe Ruby2JS::Filter::Rails::Routes do
       assert_includes result, 'function root_path()'
       assert_includes result, 'return createPathHelper("/")'
     end
+
+    it "generates valid empty module when no path helpers exist" do
+      result = to_js(<<~RUBY, paths_only: true)
+        Rails.application.routes.draw do
+          get '/health', to: 'health#show'
+        end
+      RUBY
+      refute_includes result, 'export []'
+    end
   end
 end

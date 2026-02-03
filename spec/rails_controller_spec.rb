@@ -738,5 +738,84 @@ describe Ruby2JS::Filter::Rails::Controller do
       # Should have HTML fallback (view call)
       _(result).must_include 'ArticleViews.show'
     end
+
+    it "does not import ENV, ARGV, or stdio globals as models" do
+      source = <<~RUBY
+        class ToolsController < ApplicationController
+          def show
+            @path = ENV.fetch("RAILS_DB_VOLUME", "db")
+            STDOUT.write("debug")
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).wont_include 'import { Env }'
+      _(result).wont_include 'import { Stdout }'
+      # ENV and STDOUT remain as-is (node target filter converts ENV to process.env)
+      _(result).must_include 'ENV.fetch'
+    end
+
+    it "does not duplicate import for require_relative constants" do
+      source = <<~RUBY
+        require_relative '../../lib/erb_prism_converter'
+
+        class TemplatesController < ApplicationController
+          def scoring
+            @converter = ErbPrismConverter.new("test")
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Should not auto-import ErbPrismConverter since it's already required
+      _(result).wont_include 'import([ErbPrismConverter]'
+    end
+
+    it "transforms class variables to closure-scoped locals in IIFE" do
+      source = <<~RUBY
+        class WidgetsController < ApplicationController
+          def show
+            @token = @@encryptor.sign(@widget)
+          end
+
+          @@encryptor = ActiveSupport::MessageEncryptor.new("key")
+        end
+      RUBY
+
+      result = to_js(source)
+      # Class variable assignment becomes let at IIFE scope
+      _(result).must_include 'let encryptor = new ActiveSupport'
+      # Class variable reference in action becomes plain variable
+      _(result).must_include 'encryptor.sign'
+      # Should NOT have private field syntax
+      _(result).wont_include '#$encryptor'
+      _(result).wont_include 'this.constructor'
+    end
+
+    it "handles multi-statement format.json blocks in respond_to" do
+      source = <<~RUBY
+        class ItemsController < ApplicationController
+          def create
+            @item = Item.new(params)
+            respond_to do |format|
+              format.html
+              format.json {
+                ItemJob.perform_later(@item.id)
+                render json: @item
+              }
+            end
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Preceding statement should be outside the json return
+      _(result).must_include 'ItemJob.perform_later'
+      # Return should wrap only the render value
+      _(result).must_include '{json: item}'
+      # The job call should NOT be inside the {json: ...} wrapper
+      _(result).wont_include '{json: ItemJob'
+    end
   end
 end

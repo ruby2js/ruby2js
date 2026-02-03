@@ -18,6 +18,8 @@ module Ruby2JS
           @rails_private_methods = {}
           @rails_private_method_calls = Set.new  # Private methods called from action code
           @rails_model_refs = Set.new
+          @rails_required_constants = Set.new  # Constants already imported via require/require_relative
+          @rails_top_scanned = false
           @rails_path_helpers = Set.new  # Track which path helpers are used
           @rails_needs_views = false
           @rails_needs_turbo_stream_views = false
@@ -38,6 +40,25 @@ module Ruby2JS
         # Delegates to shared helper in ActiveRecordHelpers
         def wrap_with_await_if_needed(node)
           ActiveRecordHelpers.wrap_with_await_if_needed(node, @rails_model_refs)
+        end
+
+        # Scan top-level AST for require/require_relative (runs once)
+        def process(node)
+          unless @rails_top_scanned
+            @rails_top_scanned = true
+            if node.respond_to?(:type) && node.type == :begin
+              node.children.each do |child|
+                next unless child.respond_to?(:type)
+                next unless child.type == :send && child.children[0].nil?
+                next unless [:require, :require_relative].include?(child.children[1])
+                next unless child.children[2]&.type == :str
+                basename = File.basename(child.children[2].children.first)
+                const_name = basename.split('_').map(&:capitalize).join
+                @rails_required_constants.add(const_name)
+              end
+            end
+          end
+          super
         end
 
         # Detect controller class and transform to module
@@ -266,16 +287,44 @@ module Ruby2JS
               next
             end
 
+            # Handle class variable assignments at module scope (@@var = value)
+            if child.type == :cvasgn
+              # Convert @@var = value to let var = value (closure-scoped in IIFE)
+              var_name = child.children[0].to_s.sub('@@', '').to_sym
+              value = child.children[1]
+              transformed << process(s(:lvasgn, var_name, replace_cvars(value)))
+              next
+            end
+
             # Transform public action methods
             if child.type == :def && !in_private
               transformed << transform_action_method(child)
             else
               # Pass through other nodes (class-level code, etc.)
-              transformed << process(child)
+              transformed << process(replace_cvars(child))
             end
           end
 
           transformed.length == 1 ? transformed.first : s(:begin, *transformed)
+        end
+
+        # Replace @@var references with plain variable references in AST nodes
+        def replace_cvars(node)
+          return node unless node.respond_to?(:type)
+
+          if node.type == :cvar
+            var_name = node.children[0].to_s.sub('@@', '').to_sym
+            return s(:lvar, var_name)
+          end
+
+          if node.type == :cvasgn
+            var_name = node.children[0].to_s.sub('@@', '').to_sym
+            value = node.children[1]
+            return s(:lvasgn, var_name, replace_cvars(value))
+          end
+
+          new_children = node.children.map { |child| replace_cvars(child) }
+          node.updated(nil, new_children)
         end
 
         def transform_action_method(node)
@@ -333,8 +382,8 @@ module Ruby2JS
 
           ivars = ivars.uniq.sort
 
-          # Transform body: @ivar -> ivar (local variable)
-          transformed_body = transform_ivars_to_locals(body)
+          # Transform body: @@cvar -> cvar (closure-scoped), @ivar -> ivar (local variable)
+          transformed_body = transform_ivars_to_locals(replace_cvars(body))
 
           # Prepend before_action code
           before_code = generate_before_action_code(method_name)
@@ -733,22 +782,37 @@ module Ruby2JS
           # Combine with OR: accept.includes(...) || context.params?.format === 'json'
           condition = s(:or, accept_check, format_check)
 
-          # Wrap JSON block in return statement and add {json: data} wrapper
-          json_content = transform_ivars_to_locals(json_block)
+          # For multi-statement blocks, extract preceding statements and only wrap the
+          # last statement (the render call) as the json return value
+          json_prefix = []
+          json_body = json_block
+          if json_body.respond_to?(:type) && json_body.type == :begin && json_body.children.length > 1
+            json_prefix = json_body.children[0..-2].map { |c| transform_ivars_to_locals(c) }
+            json_body = json_body.children.last
+          end
+
+          json_content = transform_ivars_to_locals(json_body)
           json_return = s(:return, s(:hash, s(:pair, s(:sym, :json), json_content)))
+
+          # Build the JSON branch: prefix statements + return
+          json_branch = if json_prefix.any?
+                          s(:begin, *json_prefix, json_return)
+                        else
+                          json_return
+                        end
 
           if html_block
             # Both JSON and HTML have explicit blocks
             html_branch = s(:return, transform_ivars_to_locals(html_block))
             s(:begin,
               accept_var,
-              s(:if, condition, json_return, html_branch))
+              s(:if, condition, json_branch, html_branch))
           else
             # JSON block with implicit HTML (view render)
             # Just check for JSON and return early, let normal view render handle HTML
             s(:begin,
               accept_var,
-              s(:if, condition, json_return, nil))
+              s(:if, condition, json_branch, nil))
           end
         end
 
@@ -976,8 +1040,8 @@ module Ruby2JS
             # Get the private method body
             method_node = @rails_private_methods[ba[:method]]
             if method_node
-              # Inline the method body, transforming ivars
-              inlined = transform_ivars_to_locals(method_node.children[2])
+              # Inline the method body, transforming cvars and ivars
+              inlined = transform_ivars_to_locals(replace_cvars(method_node.children[2]))
 
               # Handle params[:id] -> id (use the method parameter)
               inlined = transform_params_id(inlined)
@@ -1066,7 +1130,8 @@ module Ruby2JS
             const_name = node.children[1].to_s
             # Skip known non-model constants
             # Note: use .add() for JS Set compatibility (Ruby Set supports both << and add)
-            unless %w[ApplicationController].include?(const_name) || const_name.end_with?('Controller', 'Views')
+            # Skip Ruby/Node globals that other filters transform (e.g., ENV -> process.env)
+            unless %w[ApplicationController ENV ARGV STDIN STDOUT STDERR].include?(const_name) || const_name.end_with?('Controller', 'Views')
               @rails_model_refs.add(const_name)
             end
           end
@@ -1102,8 +1167,9 @@ module Ruby2JS
                 s(:send, s(:const, nil, :React), :createElement, s(:lvar, :View), s(:lvar, :props))))
           end
 
-          # Import each referenced model
+          # Import each referenced model (skip if already imported via require/require_relative)
           [*@rails_model_refs].sort.each do |model|
+            next if @rails_required_constants.include?(model)
             model_file = model.downcase
             imports << s(:send, nil, :import,
               s(:array, s(:const, nil, model.to_sym)),
@@ -1199,8 +1265,8 @@ module Ruby2JS
           args = node.children[1]
           body = node.children[2]
 
-          # Transform body: @ivar -> ivar, params handling, etc.
-          transformed_body = transform_ivars_to_locals(body) if body
+          # Transform body: @@cvar -> cvar (closure-scoped), @ivar -> ivar, params handling, etc.
+          transformed_body = transform_ivars_to_locals(replace_cvars(body)) if body
 
           # Build function args from the Ruby method args
           param_args = args.children.map { |arg| s(:arg, arg.children[0]) }

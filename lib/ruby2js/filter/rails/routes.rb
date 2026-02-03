@@ -861,6 +861,11 @@ module Ruby2JS
         def build_paths_only_module
           statements = []
 
+          if @rails_path_helpers.empty?
+            # No path helpers — emit a valid empty ESM module
+            return process(s(:str, ''))
+          end
+
           # Import createPathHelper for callable path helpers with HTTP methods
           statements << s(:import, 'ruby2js-rails/path_helper.mjs',
             s(:array, s(:const, nil, :createPathHelper)))
