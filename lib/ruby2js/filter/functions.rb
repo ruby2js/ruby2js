@@ -1612,15 +1612,25 @@ module Ruby2JS
           call.children[0].type == :begin and
           call.children[0].children.length == 1 and
           [:irange, :erange].include? call.children[0].children[0].type and
-          node.children[1].children.length == 1
+          node.children[1].children.length <= 1
         then
-          process s(:for, s(:lvasgn, node.children[1].children[0].children[0]),
+          lvasgn = if node.children[1].children.length == 1
+            s(:lvasgn, node.children[1].children[0].children[0])
+          else
+            s(:lvasgn, :_)
+          end
+          process s(:for, lvasgn,
             call.children[0].children[0], node.children[2])
 
         elsif \
           [:each, :each_value].include? method
         then
-          if node.children[1].children.length > 1
+          if node.children[1].children.length == 0
+            # No block args: collection.each do; ...; end
+            process node.updated(:for_of,
+              [s(:lvasgn, :_),
+              node.children[0].children[0], node.children[2]])
+          elsif node.children[1].children.length > 1
             process node.updated(:for_of,
               [s(:mlhs, *node.children[1].children.map {|child|
                 args_to_lvasgn(child)}),

@@ -864,6 +864,13 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'for (let i = 1; i < 10; i++) {p(i)}'
     end
 
+    it "should handle each with no block arguments" do
+      to_js( '(1...5).each do; puts "hi"; end' ).
+        must_equal 'for (let _ = 1; _ < 5; _++) {console.log("hi")}'
+      to_js( '[1,2,3].each do; puts "hi"; end' ).
+        must_equal 'for (let _ of [1, 2, 3]) {console.log("hi")}'
+    end
+
     it "should map step().each to for -- default" do
       to_js( '1.step(3).each {|i| p i}' ).
         must_equal 'for (let i = 1; i <= 3; i++) {p(i)}'
