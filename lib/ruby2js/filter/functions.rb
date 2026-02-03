@@ -121,7 +121,12 @@ module Ruby2JS
         # so method names get converted (e.g., include? -> includes)
         # then restore the csend type if needed
         result = on_send(node)
-        if result&.type == :send and node.type == :csend
+        if result&.type == :send and node.type == :csend and
+            (result.children[0] != nil or node.children[0] == nil)
+          # Only restore csend if the receiver wasn't moved to an argument.
+          # Methods like to_i/to_f transform `a.to_i` to `parseInt(a)`,
+          # changing receiver from non-nil to nil - restoring csend there
+          # would produce invalid `?.parseInt(a)`.
           result = result.updated(:csend)
         elsif result&.type == :call and node.type == :csend
           # Handle &.call -> ccall (conditional call) for optional chaining

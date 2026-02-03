@@ -52,8 +52,16 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.to_i' ).must_equal 'parseInt(a)'
     end
 
+    it "should handle to_i with safe navigation" do
+      to_js_2020( 'a&.to_i' ).must_equal 'parseInt(a)'
+    end
+
     it "should handle to_f" do
       to_js( 'a.to_f' ).must_equal 'parseFloat(a)'
+    end
+
+    it "should handle to_f with safe navigation" do
+      to_js_2020( 'a&.to_f' ).must_equal 'parseFloat(a)'
     end
 
     it "should handle puts" do
