@@ -232,8 +232,10 @@ describe('Notes Integration Tests', () => {
     it('create action adds a new note', async () => {
       const context = createContext();
       const params = {
-        title: 'New Note via Controller',
-        body: 'Created through the controller action.'
+        note: {
+          title: 'New Note via Controller',
+          body: 'Created through the controller action.'
+        }
       };
 
       const result = await NotesController.create(context, params);
@@ -253,7 +255,7 @@ describe('Notes Integration Tests', () => {
       });
 
       const context = createContext();
-      const result = await NotesController.update(context, note.id, { title: 'Modified' });
+      const result = await NotesController.update(context, note.id, { note: { title: 'Modified' } });
 
       expect(result.redirect).toBeDefined();
 
@@ -322,8 +324,10 @@ describe('Notes Integration Tests', () => {
     it('create returns JSON on success when Accept is application/json', async () => {
       const context = createJsonContext();
       const params = {
-        title: 'JSON Created Note',
-        body: 'Created via JSON API.'
+        note: {
+          title: 'JSON Created Note',
+          body: 'Created via JSON API.'
+        }
       };
 
       const result = await NotesController.create(context, params);
@@ -356,8 +360,10 @@ describe('Notes Integration Tests', () => {
       };
 
       const params = {
-        title: 'Redirect Test Note',
-        body: 'Testing redirect path.'
+        note: {
+          title: 'Redirect Test Note',
+          body: 'Testing redirect path.'
+        }
       };
 
       const result = await NotesController.create(context, params);

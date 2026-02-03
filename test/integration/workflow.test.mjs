@@ -313,7 +313,7 @@ describe('Workflow Builder Integration Tests', () => {
         contentFor: {}
       };
 
-      const params = { name: 'New Workflow' };
+      const params = { workflow: { name: 'New Workflow' } };
 
       const result = await WorkflowsController.create(context, params);
 
@@ -333,7 +333,7 @@ describe('Workflow Builder Integration Tests', () => {
         contentFor: {}
       };
 
-      const params = { name: 'New Name' };
+      const params = { workflow: { name: 'New Name' } };
 
       await WorkflowsController.update(context, workflow.id, params);
 
@@ -371,10 +371,12 @@ describe('Workflow Builder Integration Tests', () => {
       };
 
       const params = {
-        label: 'New Node',
-        node_type: 'default',
-        position_x: 150,
-        position_y: 75
+        node: {
+          label: 'New Node',
+          node_type: 'default',
+          position_x: 150,
+          position_y: 75
+        }
       };
 
       await NodesController.create(context, workflow.id, params);
@@ -398,7 +400,7 @@ describe('Workflow Builder Integration Tests', () => {
         contentFor: {}
       };
 
-      const params = { label: 'Updated Label' };
+      const params = { node: { label: 'Updated Label' } };
 
       await NodesController.update(context, workflow.id, node.id, params);
 
@@ -452,8 +454,10 @@ describe('Workflow Builder Integration Tests', () => {
       };
 
       const params = {
-        source_node_id: sourceNode.id,
-        target_node_id: targetNode.id
+        edge: {
+          source_node_id: sourceNode.id,
+          target_node_id: targetNode.id
+        }
       };
 
       const result = await EdgesController.create(context, workflow.id, params);

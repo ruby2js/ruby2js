@@ -1219,23 +1219,7 @@ module Ruby2JS
           method_name = method_node.children[0]
           body = method_node.children[2]
 
-          # Extract model name from params.require(:article)
-          require_call = body.children[0]  # the .require(:model) send
-          model_name = require_call.children[2].children[0]  # :article
-
-          # Extract permitted keys from .permit(:title, :body, nested: {})
-          permitted_keys = []
-          body.children[2..-1].each do |arg|
-            if arg.type == :sym
-              permitted_keys << arg.children[0]
-            elsif arg.type == :hash
-              arg.children.each do |pair|
-                if pair.children[0].type == :sym
-                  permitted_keys << pair.children[0].children[0]
-                end
-              end
-            end
-          end
+          model_name, permitted_keys = extract_strong_params_info(body)
 
           # Build: let _model = params.model || {};
           temp_var = "_#{model_name}".to_sym
@@ -1266,24 +1250,67 @@ module Ruby2JS
           end
         end
 
-        # Detect params.require(:x).permit(:a, :b) chain
+        # Extract model name and permitted keys from a strong params method body.
+        # Handles both Rails 7 (require/permit) and Rails 8 (expect) patterns.
+        def extract_strong_params_info(node)
+          target, method, *args = node.children
+
+          if method == :permit
+            # params.require(:article).permit(:title, :body)
+            model_name = target.children[2].children[0]
+
+            permitted_keys = []
+            args.each do |arg|
+              if arg.type == :sym
+                permitted_keys << arg.children[0]
+              elsif arg.type == :hash
+                arg.children.each do |pair|
+                  if pair.children[0].type == :sym
+                    permitted_keys << pair.children[0].children[0]
+                  end
+                end
+              end
+            end
+
+            [model_name, permitted_keys]
+          elsif method == :expect
+            # params.expect(article: [:title, :body])
+            hash_arg = args[0]
+            pair = hash_arg.children[0]
+            model_name = pair.children[0].children[0]
+            permitted_keys = pair.children[1].children.map { |sym| sym.children[0] }
+
+            [model_name, permitted_keys]
+          end
+        end
+
+        # Detect strong params patterns:
+        # Rails 7: params.require(:article).permit(:title, :body)
+        # Rails 8: params.expect(article: [:title, :body])
         def strong_params_chain?(node)
           return false unless node.respond_to?(:type) && node.type == :send
 
-          target, method, *_args = node.children
+          target, method, *args = node.children
 
-          # Check for .permit(...) at the end
-          return false unless method == :permit
+          # Pattern 1: params.require(:article).permit(:title, :body)
+          if method == :permit && target&.type == :send
+            require_target, require_method, *_require_args = target.children
+            if require_method == :require && require_target&.type == :send
+              params_target, params_method = require_target.children
+              return params_target.nil? && params_method == :params
+            end
+          end
 
-          # Check target is .require(...) on params
-          return false unless target&.type == :send
-          require_target, require_method, *_require_args = target.children
-          return false unless require_method == :require
+          # Pattern 2: params.expect(article: [:title, :body])
+          if method == :expect && target&.type == :send
+            params_target, params_method = target.children
+            if params_target.nil? && params_method == :params
+              arg = args[0]
+              return arg&.type == :hash
+            end
+          end
 
-          # Check that require is called on params
-          return false unless require_target&.type == :send
-          params_target, params_method = require_target.children
-          params_target.nil? && params_method == :params
+          false
         end
       end
     end

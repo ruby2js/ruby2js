@@ -726,9 +726,11 @@ describe('ClipsController', () => {
     };
 
     const params = {
-      name: 'New Recording',
-      transcript: 'This is the transcript.',
-      duration: 10.0
+      clip: {
+        name: 'New Recording',
+        transcript: 'This is the transcript.',
+        duration: 10.0
+      }
     };
 
     const result = await ClipsController.create(context, params);

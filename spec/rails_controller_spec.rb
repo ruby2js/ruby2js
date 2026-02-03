@@ -199,6 +199,29 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).must_include '_article.body'
     end
 
+    it "handles Rails 8 params.expect as strong params" do
+      source = <<~RUBY
+        class ArticlesController < ApplicationController
+          def create
+            @article = Article.new(article_params)
+          end
+
+          private
+          def article_params
+            params.expect(article: [:title, :body])
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include 'article_params(params)'
+      _(result).must_include 'function article_params(params)'
+      _(result).must_include 'params.article ??'
+      _(result).must_include '_article.title'
+      _(result).must_include '_article.body'
+      _(result).wont_include 'expect'
+    end
+
     it "handles nested params in strong params (options: {}, arrays)" do
       source = <<~RUBY
         class BillablesController < ApplicationController

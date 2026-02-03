@@ -404,8 +404,10 @@ describe('ArticlesController', () => {
     };
 
     const params = {
-      title: 'New Article via Controller',
-      body: 'Created through the controller action.'
+      article: {
+        title: 'New Article via Controller',
+        body: 'Created through the controller action.'
+      }
     };
 
     const result = await ArticlesController.create(context, params);

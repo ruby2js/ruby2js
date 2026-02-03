@@ -159,8 +159,10 @@ describe('Chat Integration Tests', () => {
       };
 
       const params = {
-        username: 'Carol',
-        body: 'New message from controller'
+        message: {
+          username: 'Carol',
+          body: 'New message from controller'
+        }
       };
 
       const result = await MessagesController.create(context, params);

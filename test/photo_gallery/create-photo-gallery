@@ -369,8 +369,10 @@ describe('PhotosController', () => {
     };
 
     const params = {
-      image_data: 'newphotobase64data',
-      caption: 'New photo from controller'
+      photo: {
+        image_data: 'newphotobase64data',
+        caption: 'New photo from controller'
+      }
     };
 
     const result = await PhotosController.create(context, params);

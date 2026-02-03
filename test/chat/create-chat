@@ -273,8 +273,10 @@ describe('MessagesController', () => {
     };
 
     const params = {
-      username: 'Bob',
-      body: 'New message from controller'
+      message: {
+        username: 'Bob',
+        body: 'New message from controller'
+      }
     };
 
     const result = await MessagesController.create(context, params);

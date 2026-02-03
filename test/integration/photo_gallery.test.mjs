@@ -175,8 +175,10 @@ describe('Photo Gallery Integration Tests', () => {
       };
 
       const params = {
-        image_data: SAMPLE_IMAGE_DATA,
-        caption: 'Controller photo'
+        photo: {
+          image_data: SAMPLE_IMAGE_DATA,
+          caption: 'Controller photo'
+        }
       };
 
       await PhotosController.create(context, params);
