@@ -784,6 +784,27 @@ export const migrations = [${exports.join(', ')}];
 }
 
 /**
+ * Deduplicate view exports when a partial and non-partial share the same name.
+ * E.g., _index.html.erb and index.html.erb both produce exportName "index".
+ * Non-partials win; partials keep their _ prefix to avoid collision.
+ */
+function deduplicateViewExports(views) {
+  const seen = new Set();
+  // First pass: collect non-partial export names
+  for (const v of views) {
+    if (!v.isPartial) seen.add(v.exportName);
+  }
+  // Second pass: rename partials that conflict with non-partials
+  for (const v of views) {
+    if (v.isPartial && seen.has(v.exportName)) {
+      v.exportName = '_' + v.exportName;
+    }
+    seen.add(v.exportName);
+  }
+  return views;
+}
+
+/**
  * Generate content for juntos:views/* virtual module.
  * @param {string} appRoot - Application root
  * @param {string} resource - Resource name (e.g., 'articles', 'workflows')
@@ -816,7 +837,7 @@ export function generateViewsModule(appRoot, resource) {
       return { file: f, name, exportName, isPartial: false, isReact: true };
     });
 
-  const views = [...erbViews, ...reactViews];
+  const views = deduplicateViewExports([...erbViews, ...reactViews]);
 
   const imports = views.map(v => {
     if (v.isReact) {
@@ -871,7 +892,7 @@ export function generateViewsModuleForEject(appRoot, resource) {
       return { file: f, outputFile, name, exportName, isPartial: false, isReact: true };
     });
 
-  const views = [...erbViews, ...reactViews];
+  const views = deduplicateViewExports([...erbViews, ...reactViews]);
 
   const imports = views.map(v => {
     if (v.isReact) {
