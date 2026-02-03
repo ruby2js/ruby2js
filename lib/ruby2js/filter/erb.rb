@@ -21,7 +21,41 @@ module Ruby2JS
         @options && @options[:layout]
       end
 
+      # Handle `def render` wrapping from ERB compiler output
+      def on_def(node)
+        method_name = node.children[0]
+        def_args = node.children[1]
+        def_body = node.children[2]
+
+        # Only handle def render with no args whose body starts with buffer assignment
+        return super unless method_name == :render
+        return super unless def_args.children.empty?
+
+        # The body should be a begin node wrapping the buffer statements
+        return super unless def_body
+        if def_body.type == :begin
+          children = def_body.children
+        else
+          children = [def_body]
+        end
+        return super unless children.length >= 2
+
+        first = children.first
+        bufvar = nil
+        if first.type == :lvasgn
+          name = first.children.first
+          if [:_erbout, :_buf].include?(name)
+            bufvar = name
+          end
+        end
+
+        return super unless bufvar
+
+        process_erb_body(children, bufvar)
+      end
+
       # Main entry point - detect ERB/HERB output patterns and transform
+      # (kept for backward compatibility with hand-crafted ERB strings in tests)
       def on_begin(node)
         # Check if this looks like ERB/HERB output:
         # - First statement assigns to _erbout or _buf
@@ -41,89 +75,35 @@ module Ruby2JS
         end
 
         return super unless bufvar
-        @erb_bufvar = bufvar
 
-        # Step 1: Collect instance variables BEFORE transformation
-        # (they get converted from @foo to foo by on_ivar)
-        @erb_ivars = Set.new
-        collect_ivars(node)
+        process_erb_body(children, bufvar)
+      end
 
-        # Step 2: Transform the body (this triggers all filters including helpers)
-        transformed_children = children.map { |child| process(child) }
+      # Handle yield in ERB mode
+      # yield -> content (layout mode)
+      # yield(:section) -> context.contentFor.section || ""
+      def on_yield(node)
+        return super unless @erb_bufvar
 
-        # Step 3: Let subclasses add imports via erb_prepend_imports hook
-        # (must happen before we check imported names)
-        erb_prepend_imports
+        args = node.children
 
-        # Step 4: Collect undefined locals from TRANSFORMED AST
-        # This runs after helper filters have processed their methods
-        @erb_locals = Set.new
-        @erb_lvar_assigns = Set.new
-        transformed_body = s(:begin, *transformed_children)
-        collect_locals(transformed_body)
-
-        # Step 5: Get names that were imported (these are defined, not undefined locals)
-        imported_names = collect_imported_names
-
-        # Build the function body with autoreturn for the last expression
-        body = s(:autoreturn, *transformed_children)
-
-        # Layout mode: generate function layout(context, content) signature
-        # yield becomes content, yield :section becomes context.contentFor.section
-        if erb_layout_mode?()
-          args = s(:args, s(:arg, :context), s(:arg, :content))
-          return s(:def, :layout, args, body)
+        if args.empty?
+          # yield -> content
+          return s(:lvar, :content)
         end
 
-        # Create parameter for the function - destructure ivars and undefined locals
-        # Combine ivars (converted to names) and undefined locals
-        all_params = []
-
-        # Add ivars (strip @ prefix)
-        [*@erb_ivars].sort.each do |ivar|
-          prop_name = ivar.to_s[1..-1].to_sym  # @title -> title
-          all_params << prop_name
+        # yield(:section) -> context.contentFor.section || ""
+        section = args.first
+        if section.type == :sym
+          section_name = section.children.first
+          return s(:or,
+            s(:attr,
+              s(:attr, s(:lvar, :context), :contentFor),
+              section_name),
+            s(:str, ""))
         end
 
-        # Add undefined locals (used but not assigned and not imported)
-        undefined_locals.each do |local|
-          next if all_params.include?(local)
-          next if imported_names.include?(local)
-          all_params << local
-        end
-
-        # Allow subclasses to prepend extra kwargs (e.g., $context)
-        # All args are now kwargs in a single destructured object
-        extra_kwargs = erb_render_extra_args
-
-        # Build unified kwargs list - extra first, then params
-        all_kwargs = []
-
-        # Add extra kwargs (e.g., $context)
-        extra_kwargs.each do |kwarg|
-          all_kwargs << kwarg
-        end
-
-        # Add params as kwargs (excluding any that are in extra)
-        extra_kwarg_names = extra_kwargs.map { |kwarg| kwarg.children.first }
-        all_params.each do |name|
-          next if extra_kwarg_names.include?(name)
-          all_kwargs << s(:kwarg, name)
-        end
-
-        if all_kwargs.empty?
-          args = s(:args)
-        else
-          args = s(:args, *all_kwargs)
-        end
-
-        # Wrap in arrow function or regular function
-        # Use async if any async operations were detected (e.g., association access)
-        if @erb_needs_async || self.erb_needs_async?()
-          s(:async, :render, args, body)
-        else
-          s(:def, :render, args, body)
-        end
+        super
       end
 
       # Hook for subclasses to indicate async is needed
@@ -319,6 +299,93 @@ module Ruby2JS
       end
 
       private
+
+      # Shared logic for processing ERB body from both on_begin and on_def
+      def process_erb_body(children, bufvar)
+        @erb_bufvar = bufvar
+
+        # Step 1: Collect instance variables BEFORE transformation
+        # (they get converted from @foo to foo by on_ivar)
+        @erb_ivars = Set.new
+        children.each { |child| collect_ivars(child) }
+
+        # Step 2: Transform the body (this triggers all filters including helpers)
+        transformed_children = children.map { |child| process(child) }
+
+        # Step 3: Let subclasses add imports via erb_prepend_imports hook
+        # (must happen before we check imported names)
+        erb_prepend_imports
+
+        # Step 4: Collect undefined locals from TRANSFORMED AST
+        # This runs after helper filters have processed their methods
+        @erb_locals = Set.new
+        @erb_lvar_assigns = Set.new
+        transformed_body = s(:begin, *transformed_children)
+        collect_locals(transformed_body)
+
+        # Step 5: Get names that were imported (these are defined, not undefined locals)
+        imported_names = collect_imported_names
+
+        # Build the function body with autoreturn for the last expression
+        body = s(:autoreturn, *transformed_children)
+
+        # Layout mode: generate function layout(context, content) signature
+        # yield becomes content, yield :section becomes context.contentFor.section
+        if erb_layout_mode?()
+          args = s(:args, s(:arg, :context), s(:arg, :content))
+          return s(:def, :layout, args, body)
+        end
+
+        # Create parameter for the function - destructure ivars and undefined locals
+        # Combine ivars (converted to names) and undefined locals
+        all_params = []
+
+        # Add ivars (strip @ prefix)
+        [*@erb_ivars].sort.each do |ivar|
+          prop_name = ivar.to_s[1..-1].to_sym  # @title -> title
+          all_params << prop_name
+        end
+
+        # Add undefined locals (used but not assigned and not imported)
+        undefined_locals.each do |local|
+          next if all_params.include?(local)
+          next if imported_names.include?(local)
+          all_params << local
+        end
+
+        # Allow subclasses to prepend extra kwargs (e.g., $context)
+        # All args are now kwargs in a single destructured object
+        extra_kwargs = erb_render_extra_args
+
+        # Build unified kwargs list - extra first, then params
+        all_kwargs = []
+
+        # Add extra kwargs (e.g., $context)
+        extra_kwargs.each do |kwarg|
+          all_kwargs << kwarg
+        end
+
+        # Add params as kwargs (excluding any that are in extra)
+        extra_kwarg_names = extra_kwargs.map { |kwarg| kwarg.children.first }
+        all_params.each do |name|
+          next if extra_kwarg_names.include?(name)
+          all_kwargs << s(:kwarg, name)
+        end
+
+        if all_kwargs.empty?
+          args = s(:args)
+        else
+          args = s(:args, *all_kwargs)
+        end
+
+        # Wrap in arrow function or regular function
+        # Use async if any async operations were detected (e.g., association access)
+        if @erb_needs_async || self.erb_needs_async?()
+          s(:async, :render, args, body)
+        else
+          s(:def, :render, args, body)
+        end
+      end
 
       # Collect instance variables from the original AST (before transformation)
       def collect_ivars(node)

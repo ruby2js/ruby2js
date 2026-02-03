@@ -130,6 +130,36 @@ describe Ruby2JS::Filter::Erb do
       result.wont_include '$context'
       result.wont_include '{ title }'
     end
+
+    it "should transform yield to content reference" do
+      erb_src = "def render\n_buf = ::String.new; _buf << (yield).to_s; _buf.to_s\nend"
+      result = to_js_layout(erb_src)
+      result.must_include 'content'
+      result.wont_include 'yield'
+    end
+
+    it "should transform yield(:section) to contentFor lookup" do
+      erb_src = "def render\n_buf = ::String.new; _buf << (yield(:head)).to_s; _buf.to_s\nend"
+      result = to_js_layout(erb_src)
+      result.must_include 'context.contentFor.head ?? ""'
+      result.wont_include 'yield'
+    end
+  end
+
+  describe 'def render wrapping' do
+    it "should handle def render wrapping from ERB compiler" do
+      erb_src = "def render\n_buf = ::String.new; _buf << \"<h1>\".freeze; _buf << (@title).to_s; _buf << \"</h1>\".freeze; _buf.to_s\nend"
+      result = to_js(erb_src)
+      result.must_include 'function render({ title })'
+      result.must_include '_buf += "<h1>"'
+      result.must_include 'String(title)'
+    end
+
+    it "should handle def render with multiple ivars" do
+      erb_src = "def render\n_buf = ::String.new; _buf << (@title).to_s; _buf << (@content).to_s; _buf.to_s\nend"
+      result = to_js(erb_src)
+      result.must_include '{ content, title }'
+    end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do

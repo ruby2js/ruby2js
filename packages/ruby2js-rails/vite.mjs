@@ -516,17 +516,6 @@ function createErbPlugin(config) {
 
     let template = code;
 
-    // For layouts, replace yield with content/contentFor
-    // yield becomes content, yield :section becomes context.contentFor.section
-    if (isLayout) {
-      // <%= yield :head %> -> <%= context.contentFor.head || '' %>
-      template = template.replace(/<%=\s*yield\s+:(\w+)\s*%>/g, (_, section) =>
-        `<%= context.contentFor.${section} || '' %>`
-      );
-      // <%= yield %> -> <%= content %>
-      template = template.replace(/<%=\s*yield\s*%>/g, '<%= content %>');
-    }
-
     // Step 1: Compile ERB to Ruby
     const compiler = new ErbCompiler(template);
     const rubySrc = compiler.src;

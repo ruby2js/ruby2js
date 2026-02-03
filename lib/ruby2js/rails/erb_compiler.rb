@@ -26,7 +26,7 @@ class ErbCompiler
   # Format: _buf = ::String.new; _buf << 'literal'.freeze; _buf << ( expr ).to_s; ... _buf.to_s
   # Key: buffer operations use semicolons, code blocks use newlines
   def src
-    ruby_code = "_buf = ::String.new;"
+    ruby_code = "def render\n_buf = ::String.new;"
     pos = 0
 
     while pos < @template.length
@@ -130,7 +130,7 @@ class ErbCompiler
       end
     end
 
-    ruby_code += "\n_buf.to_s"
+    ruby_code += "\n_buf.to_s\nend"
     ruby_code
   end
 

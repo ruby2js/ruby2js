@@ -1012,12 +1012,7 @@ export async function transformRuby(source, filePath, section, config, appRoot) 
 export async function transformErb(code, id, isLayout, config) {
   const { convert } = await ensureRuby2jsReady();
 
-  // Handle layout yield transformations
   let template = code;
-  if (isLayout) {
-    template = template.replace(/<%= yield :(\w+) %>/g, "<%= context.contentFor.$1 || '' %>");
-    template = template.replace(/<%= yield %>/g, '<%= content %>');
-  }
 
   // Step 1: Compile ERB to Ruby
   const compiler = new ErbCompiler(template);
