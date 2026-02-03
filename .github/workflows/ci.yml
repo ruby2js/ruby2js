@@ -5,6 +5,7 @@ on:
     branches: ["*"]
   push:
     branches: [master]
+  workflow_dispatch:
 
 # Sets permissions for GitHub Pages deployment
 permissions:
