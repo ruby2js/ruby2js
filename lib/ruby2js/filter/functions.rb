@@ -50,6 +50,8 @@ module Ruby2JS
       def args_to_lvasgn(child)
         if child.type == :mlhs
           s(:mlhs, *child.children.map { |c| args_to_lvasgn(c) })
+        elsif child.type == :splat
+          s(:restarg, child.children[0].children[0])
         else
           s(:lvasgn, child.children[0])
         end

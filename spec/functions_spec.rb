@@ -1048,6 +1048,11 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'hash.each { |(a, b), c| puts a }' ).
         must_include 'let [[a, b], c]'
     end
+
+    it "should handle splat in nested mlhs" do
+      to_js( 'scores.each { |(score, *students), count| puts score }' ).
+        must_include 'let [[score, ...students], count]'
+    end
   end
 
   describe "group_by" do
