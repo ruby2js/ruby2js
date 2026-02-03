@@ -437,6 +437,14 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'n.negative?' ).must_equal 'n < 0'
     end
 
+    it "should handle positive? with safe navigation" do
+      to_js_2020( 'n&.positive?' ).must_equal 'n > 0'
+    end
+
+    it "should handle negative? with safe navigation" do
+      to_js_2020( 'n&.negative?' ).must_equal 'n < 0'
+    end
+
     it "should handle clear" do
       to_js( 'a.clear()' ).must_equal 'a.length = 0'
     end

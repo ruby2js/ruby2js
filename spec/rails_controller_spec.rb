@@ -314,7 +314,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).must_include '{render:'
     end
 
-    it "converts render json: @model to return the model" do
+    it "converts render json: @model to return json wrapper" do
       source = <<~RUBY
         class ArticlesController < ApplicationController
           def create
@@ -329,12 +329,12 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      # Should return article directly, not wrapped in render hash
-      _(result).must_include 'await article.save() ? article :'
+      _(result).must_include '{json: article}'
+      _(result).must_include '{json: {errors: article.errors}}'
       _(result).wont_include '{render:'
     end
 
-    it "converts render json: hash to return the hash" do
+    it "converts render json: hash to return json wrapper" do
       source = <<~RUBY
         class ArticlesController < ApplicationController
           def create
@@ -345,9 +345,26 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      # Should return the error hash directly
-      _(result).must_include '{errors: article.errors}'
+      _(result).must_include '{json: {errors: article.errors}}'
       _(result).wont_include '{render:'
+    end
+
+    it "wraps render json: in conditionals with return" do
+      source = <<~RUBY
+        class RecordingsController < ApplicationController
+          def upload
+            if @recording.save
+              render json: { status: 'success' }
+            else
+              render json: { status: 'error' }
+            end
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_match(/return\s*\{json:/)
+      _(result).wont_match(/;\s*\n\s*\{json:/)
     end
   end
 

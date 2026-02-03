@@ -857,15 +857,15 @@ module Ruby2JS
                     s(:pair, s(:sym, :"$context"), s(:lvar, :context)),
                     s(:pair, s(:sym, model_name), s(:lvar, model_name))))))
           elsif target.type == :hash
-            # render json: @node -> return the expression directly
-            # render json: { errors: @node.errors }, status: :unprocessable_entity -> return errors hash
+            # render json: @node -> {json: node}
+            # render json: { errors: @node.errors }, status: :unprocessable_entity -> {json: errors hash}
             target.children.each do |pair|
               next unless pair.type == :pair
               key = pair.children[0]
               value = pair.children[1]
               if key.type == :sym && key.children[0] == :json
-                # Transform the value (convert @ivar to local var)
-                return transform_ivars_to_locals(value)
+                # Wrap in {json: value} so wrap_redirect_hashes adds return
+                return s(:hash, s(:pair, s(:sym, :json), transform_ivars_to_locals(value)))
               end
             end
             nil
@@ -1109,7 +1109,7 @@ module Ruby2JS
           node.children.any? do |pair|
             pair.respond_to?(:type) && pair.type == :pair &&
               pair.children[0].respond_to?(:type) && pair.children[0].type == :sym &&
-              (pair.children[0].children[0] == :redirect || pair.children[0].children[0] == :render)
+              [:redirect, :render, :json].include?(pair.children[0].children[0])
           end
         end
 
