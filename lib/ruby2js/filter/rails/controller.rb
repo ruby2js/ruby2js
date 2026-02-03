@@ -1209,31 +1209,26 @@ module Ruby2JS
           process(s(:def, method_name, s(:args, *param_args), transformed_body))
         end
 
-        # Generate a destructuring function for a strong params method.
-        # params.require(:article).permit(:title, :body) becomes:
-        #   function article_params(params) {
-        #     let _article = params.article || {};
-        #     return {title: _article.title, body: _article.body}
-        #   }
+        # Generate a function for a strong params method.
+        # params.require(:clip).permit(:name, :audio) becomes:
+        #   function clip_params(params) { return params.clip || {} }
+        #
+        # We return the full nested params object rather than enumerating
+        # individual permitted keys, because some keys may be virtual
+        # attributes (e.g., Active Storage attachments) rather than database
+        # columns. The Active Record adapter handles filtering to known columns.
         def generate_strong_params_function(method_node)
           method_name = method_node.children[0]
           body = method_node.children[2]
 
-          model_name, permitted_keys = extract_strong_params_info(body)
+          model_name, _permitted_keys = extract_strong_params_info(body)
 
-          # Build: let _model = params.model || {};
-          temp_var = "_#{model_name}".to_sym
-          source_assign = s(:lvasgn, temp_var,
+          # Build: return params.model || {}
+          return_expr = s(:return,
             s(:or, s(:attr, s(:lvar, :params), model_name), s(:hash)))
 
-          # Build: return {key1: _model.key1, key2: _model.key2, ...}
-          pairs = permitted_keys.map do |key|
-            s(:pair, s(:sym, key), s(:attr, s(:lvar, temp_var), key))
-          end
-          return_hash = s(:return, s(:hash, *pairs))
-
           process(s(:def, method_name, s(:args, s(:arg, :params)),
-            s(:begin, source_assign, return_hash)))
+            return_expr))
         end
 
         # Transform article_params call: preserve as function call with params arg

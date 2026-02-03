@@ -192,11 +192,10 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      # Extracts from params.article with nullish coalescing
+      # Returns nested params object (AR adapter filters to known columns)
+      _(result).must_include 'function article_params(params)'
       _(result).must_include 'params.article ??'
-      # Returns only permitted keys
-      _(result).must_include '_article.title'
-      _(result).must_include '_article.body'
+      _(result).must_include 'article_params(params)'
     end
 
     it "handles Rails 8 params.expect as strong params" do
@@ -217,8 +216,6 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).must_include 'article_params(params)'
       _(result).must_include 'function article_params(params)'
       _(result).must_include 'params.article ??'
-      _(result).must_include '_article.title'
-      _(result).must_include '_article.body'
       _(result).wont_include 'expect'
     end
 
@@ -239,12 +236,6 @@ describe Ruby2JS::Filter::Rails::Controller do
       result = to_js(source)
       _(result).must_include 'function billable_params(params)'
       _(result).must_include 'params.billable ??'
-      # Simple keys extracted
-      _(result).must_include '_billable.name'
-      _(result).must_include '_billable.price'
-      # Nested keys also extracted
-      _(result).must_include '_billable.options'
-      _(result).must_include '_billable.questions_attributes'
     end
 
     it "handles multiple strong params methods in one controller" do
@@ -267,7 +258,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      # Each extracts from its own key
+      # Each extracts from its own model key
       _(result).must_include 'function location_params(params)'
       _(result).must_include 'params.location ??'
       _(result).must_include 'function user_params(params)'
