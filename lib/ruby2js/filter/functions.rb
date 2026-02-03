@@ -51,7 +51,11 @@ module Ruby2JS
         if child.type == :mlhs
           s(:mlhs, *child.children.map { |c| args_to_lvasgn(c) })
         elsif child.type == :splat
+          # Prism: s(:splat, s(:arg, :name))
           s(:restarg, child.children[0].children[0])
+        elsif child.type == :restarg
+          # whitequark parser: s(:restarg, :name)
+          child
         else
           s(:lvasgn, child.children[0])
         end
