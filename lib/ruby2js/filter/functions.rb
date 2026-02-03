@@ -46,6 +46,41 @@ module Ruby2JS
         end
       end
 
+      # Convert a block arg (or nested mlhs) to lvasgn for for..of destructuring
+      def args_to_lvasgn(child)
+        if child.type == :mlhs
+          s(:mlhs, *child.children.map { |c| args_to_lvasgn(c) })
+        else
+          s(:lvasgn, child.children[0])
+        end
+      end
+
+      # Collect all leaf arg names from an args node (handles nested mlhs)
+      def collect_arg_names(node)
+        names = []
+        if node.type == :mlhs
+          node.children.each { |c| names.push(*collect_arg_names(c)) }
+        elsif node.type == :arg
+          names << node.children[0]
+        elsif node.type == :args
+          node.children.each { |c| names.push(*collect_arg_names(c)) }
+        end
+        names
+      end
+
+      # Suffix all leaf arg names in an args structure (for sort_by comparison)
+      def suffix_args(node, suffix)
+        if node.type == :mlhs
+          s(:mlhs, *node.children.map { |c| suffix_args(c, suffix) })
+        elsif node.type == :arg
+          s(:arg, :"#{node.children[0]}#{suffix}")
+        elsif node.type == :args
+          s(:args, *node.children.map { |c| suffix_args(c, suffix) })
+        else
+          node
+        end
+      end
+
       def initialize(*args)
         @jsx = false
         @index_result_vars = Set.new
@@ -1299,14 +1334,17 @@ module Ruby2JS
           # Unwrap :return node from &:symbol syntax (processor.rb wraps in return)
           block_body = block_body.children.first if block_body&.type == :return
 
-          # Create two argument names for the comparison function
-          arg_name = args.children.first.children.first
-          arg_a = :"#{arg_name}_a"
-          arg_b = :"#{arg_name}_b"
+          # Create two argument sets for the comparison function.
+          # Handle nested destructuring: |(pid, cid), _| has mlhs children
+          all_names = collect_arg_names(args)
 
-          # Replace references to the block argument with arg_a and arg_b
-          key_a = replace_lvar(block_body, arg_name, arg_a)
-          key_b = replace_lvar(block_body, arg_name, arg_b)
+          # Replace references to all block args with _a and _b suffixed versions
+          key_a = block_body
+          key_b = block_body
+          all_names.each do |name|
+            key_a = replace_lvar(key_a, name, :"#{name}_a")
+            key_b = replace_lvar(key_b, name, :"#{name}_b")
+          end
 
           # Build comparison: key_a < key_b ? -1 : key_a > key_b ? 1 : 0
           comparison = s(:if,
@@ -1317,9 +1355,20 @@ module Ruby2JS
               s(:int, 1),
               s(:int, 0)))
 
+          # Build comparison function args with _a and _b suffixed names
+          compare_args = s(:args, *args.children.map { |c| suffix_args(c, '_a') },
+                                  *args.children.map { |c| suffix_args(c, '_b') })
+
+          # For destructuring, wrap each comparison arg in mlhs
+          if args.children.length > 1 || args.children.first.type == :mlhs
+            arg_a_parts = args.children.map { |c| suffix_args(c, '_a') }
+            arg_b_parts = args.children.map { |c| suffix_args(c, '_b') }
+            compare_args = s(:args, s(:mlhs, *arg_a_parts), s(:mlhs, *arg_b_parts))
+          end
+
           compare_block = s(:block,
             s(:send, nil, :proc),
-            s(:args, s(:arg, arg_a), s(:arg, arg_b)),
+            compare_args,
             s(:autoreturn, comparison))
 
           if es2023
@@ -1561,12 +1610,12 @@ module Ruby2JS
           if node.children[1].children.length > 1
             process node.updated(:for_of,
               [s(:mlhs, *node.children[1].children.map {|child|
-                s(:lvasgn, child.children[0])}),
+                args_to_lvasgn(child)}),
               node.children[0].children[0], node.children[2]])
           elsif node.children[1].children[0].type == :mlhs
             process node.updated(:for_of,
               [s(:mlhs, *node.children[1].children[0].children.map {|child|
-                s(:lvasgn, child.children[0])}),
+                args_to_lvasgn(child)}),
               node.children[0].children[0], node.children[2]])
           else
             process node.updated(:for_of,

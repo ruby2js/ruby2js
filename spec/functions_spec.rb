@@ -1020,6 +1020,18 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'items.min_by { |i| i.price * i.qty }' ).
         must_equal 'items.reduce((a, b) => a.price * a.qty <= b.price * b.qty ? a : b)'
     end
+
+    it "should handle sort_by with nested destructuring" do
+      to_js( 'scores.sort_by { |(pid, cid), _| cid }' ).
+        must_include '[[pid_a, cid_a], __a]'
+    end
+  end
+
+  describe "each with nested destructuring" do
+    it "should handle nested mlhs in each block" do
+      to_js( 'hash.each { |(a, b), c| puts a }' ).
+        must_include 'let [[a, b], c]'
+    end
   end
 
   describe "group_by" do
