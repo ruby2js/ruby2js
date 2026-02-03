@@ -324,6 +324,13 @@ module Ruby2JS
           # view_call returns an array of statements (viewProps assignment + view rendering)
           body_statements.push(*view_call) if view_call
 
+          # Wrap redirect/render hashes with return so the function exits early.
+          # Without return, JS parses bare { key: value } as a labeled block statement.
+          # Walks recursively through if/else/begin to find nested redirect hashes.
+          body_statements.each_with_index do |stmt, i|
+            body_statements[i] = wrap_redirect_hashes(stmt)
+          end
+
           # Wrap in autoreturn for implicit return behavior
           final_body = if body_statements.empty?
                          s(:autoreturn, s(:nil))
@@ -822,9 +829,7 @@ module Ruby2JS
             pairs << s(:pair, s(:sym, :notice), transform_ivars_to_locals(notice_node))
           end
 
-          # Wrap in return statement so redirect exits the function early
-          # Without return, JS parses bare { key: value } as labeled block statement
-          s(:return, s(:hash, *pairs))
+          s(:hash, *pairs)
         end
 
         def transform_render(args)
@@ -1076,6 +1081,36 @@ module Ruby2JS
           end
 
           imports
+        end
+
+        # Recursively wrap redirect/render hash literals with return statements.
+        # Handles hashes nested inside if/else/begin blocks but skips nodes
+        # that already have returns (e.g., from respond_to format conditionals).
+        def wrap_redirect_hashes(node)
+          return node unless node.respond_to?(:type)
+
+          if node.type == :hash && redirect_or_render_hash?(node)
+            return s(:return, node)
+          elsif node.type == :if
+            # Recursively wrap branches of if/else
+            cond = node.children[0]
+            then_branch = node.children[1] ? wrap_redirect_hashes(node.children[1]) : nil
+            else_branch = node.children[2] ? wrap_redirect_hashes(node.children[2]) : nil
+            return node.updated(nil, [cond, then_branch, else_branch])
+          elsif node.type == :begin
+            new_children = node.children.map { |c| wrap_redirect_hashes(c) }
+            return node.updated(nil, new_children)
+          end
+
+          node
+        end
+
+        def redirect_or_render_hash?(node)
+          node.children.any? do |pair|
+            pair.respond_to?(:type) && pair.type == :pair &&
+              pair.children[0].respond_to?(:type) && pair.children[0].type == :sym &&
+              (pair.children[0].children[0] == :redirect || pair.children[0].children[0] == :render)
+          end
         end
 
         # Transform article_params call by inlining and transforming

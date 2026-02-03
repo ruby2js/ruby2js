@@ -239,6 +239,47 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).wont_include 'this.#total'  # Not private field
     end
 
+    it "does not double-return redirect_to inside respond_to" do
+      source = <<~RUBY
+        class CategoriesController < ApplicationController
+          def create
+            @category = Category.new(params)
+            if @category.save
+              respond_to do |format|
+                format.html { redirect_to categories_url, notice: "Created." }
+                format.json { render :show }
+              end
+            end
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).wont_include 'return return'
+      _(result).must_match(/return\s*\{[\s\S]*redirect:/)
+    end
+
+    it "wraps redirect_to inside if/else with return" do
+      # redirect_to inside a conditional (not respond_to) also needs return
+      source = <<~RUBY
+        class CategoriesController < ApplicationController
+          def toggle_lock
+            if id
+              redirect_to heats_url
+            else
+              redirect_to categories_url
+            end
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).wont_include 'return return'
+      # Both branches should have return
+      _(result).must_match(/return\s*\{[\s\S]*redirect:\s*heats_url/)
+      _(result).must_match(/return\s*\{[\s\S]*redirect:\s*categories_url/)
+    end
+
     it "wraps standalone redirect_to with return statement" do
       # redirect_to outside respond_to block needs explicit return
       # Without return, JS parses bare { key: value } as labeled block statement
