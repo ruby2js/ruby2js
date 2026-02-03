@@ -619,6 +619,18 @@ module Ruby2JS
               new_children = node.children.map do |c|
                 c.respond_to?(:type) ? transform_ivars_to_locals(c) : c
               end
+
+              # If the send child was wrapped with await! but the method is called
+              # with a block, it's an Enumerable method (e.g., Enumerable#find,
+              # Enumerable#any?), not an ActiveRecord query method.
+              # AR's find/any?/none?/count never take blocks.
+              transformed_send = new_children[0]
+              if transformed_send.respond_to?(:type) &&
+                 transformed_send.type == :await! &&
+                 %i[find any? none? all? count].include?(node.children[0].children[1])
+                new_children[0] = transformed_send.updated(:send)
+              end
+
               return node.updated(nil, new_children)
             end
 
@@ -1271,8 +1283,22 @@ module Ruby2JS
           # Build function args from the Ruby method args
           param_args = args.children.map { |arg| s(:arg, arg.children[0]) }
 
-          # Create a regular function (not async, not exported)
-          process(s(:def, method_name, s(:args, *param_args), transformed_body))
+          # Use async if the transformed body contains await nodes (e.g., AR queries).
+          # The converter's own await detection skips :block boundaries, so it misses
+          # await nodes inside the send child of blocks like .map { ... }.
+          node_type = contains_await_nodes?(transformed_body) ? :async : :def
+
+          process(s(node_type, method_name, s(:args, *param_args), transformed_body))
+        end
+
+        # Check if an AST node contains any :await or :await! nodes.
+        # Recurses into all children including block send children,
+        # but skips nested function definitions (:def, :defs, :async).
+        def contains_await_nodes?(node)
+          return false unless node.respond_to?(:type)
+          return true if node.type == :await || node.type == :await!
+          return false if [:def, :defs, :deff, :defm].include?(node.type)
+          node.children.any? { |child| contains_await_nodes?(child) }
         end
 
         # Generate a function for a strong params method.

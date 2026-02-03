@@ -102,9 +102,12 @@ module Ruby2JS
           # Check for association method chains (e.g., article.comments.find(id), article.comments.count)
           # These are: lvar.accessor.method where method is an AR association method
           if target&.type == :send && AR_ASSOCIATION_METHODS.include?(method)
-            assoc_target, _assoc_method = target.children
-            # If the chain starts from a local variable or instance variable
-            if assoc_target&.type == :lvar || assoc_target&.type == :ivar
+            assoc_target, assoc_method = target.children
+            # If the chain starts from a local variable or instance variable,
+            # and the intermediate method is a named accessor (not [] subscript,
+            # which is hash/array access, not an association proxy)
+            if (assoc_target&.type == :lvar || assoc_target&.type == :ivar) &&
+               assoc_method != :[]
               return node.updated(:await!)
             end
           end

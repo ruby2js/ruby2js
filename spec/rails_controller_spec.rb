@@ -818,4 +818,69 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).wont_include '{json: ItemJob'
     end
   end
+
+  describe 'private methods with async operations' do
+    it "makes private methods async when they contain AR queries" do
+      source = <<~RUBY
+        class BillablesController < ApplicationController
+          def edit
+            @billable = Billable.find(params[:id])
+            setup_form
+          end
+
+          private
+
+          def setup_form
+            @options = Billable.where(type: 'Option').map {|o| [o, true]}
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include 'async function setup_form()'
+    end
+  end
+
+  describe 'find with block vs AR find' do
+    it "does not add await to find with a block (Enumerable#find)" do
+      source = <<~RUBY
+        class AdminController < ApplicationController
+          def regions
+            @deployed = data['ProcessGroupRegions'].
+              find {|process| process['Name'] == 'app'}
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).wont_include 'await data'
+      _(result).must_include '.find('
+    end
+
+    it "does not add await to hash subscript chains" do
+      source = <<~RUBY
+        class AdminController < ApplicationController
+          def show
+            @item = config['items'].first
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).wont_include 'await config'
+    end
+
+    it "still adds await to association find without block" do
+      source = <<~RUBY
+        class ArticlesController < ApplicationController
+          def show
+            @comment = @article.comments.find(params[:id])
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include 'await'
+    end
+  end
 end
