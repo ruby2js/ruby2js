@@ -896,11 +896,13 @@ module Ruby2JS
               S(:send, s(:send, nil, :typeof, target), :===, s(:str, "symbol"))
             elsif parent == :Hash
               # typeof obj === "object" && obj !== null && !Array.isArray(obj)
+              # Process target for each use so earlier filters (e.g., erb ivar->lvar)
+              # can transform all copies, not just the original node
               S(:and,
                 s(:and,
-                  s(:send, s(:send, nil, :typeof, target), :===, s(:str, "object")),
-                  s(:send, target, :'!==', s(:nil))),
-                s(:send, s(:send, s(:const, nil, :Array), :isArray, target), :'!'))
+                  s(:send, s(:send, nil, :typeof, process(target)), :===, s(:str, "object")),
+                  s(:send, process(target), :'!==', s(:nil))),
+                s(:send, s(:send, s(:const, nil, :Array), :isArray, process(target)), :'!'))
             elsif parent == :NilClass
               # obj === null || obj === undefined
               S(:or,
