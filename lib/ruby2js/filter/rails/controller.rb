@@ -16,6 +16,7 @@ module Ruby2JS
           @rails_controller_plural = nil
           @rails_before_actions = []
           @rails_private_methods = {}
+          @rails_private_method_calls = Set.new  # Private methods called from action code
           @rails_model_refs = Set.new
           @rails_path_helpers = Set.new  # Track which path helpers are used
           @rails_needs_views = false
@@ -96,6 +97,7 @@ module Ruby2JS
           @rails_controller_plural = nil
           @rails_before_actions = []
           @rails_private_methods = {}
+          @rails_private_method_calls = Set.new
           @rails_model_refs = Set.new
           @rails_path_helpers = Set.new
           @rails_needs_views = false
@@ -126,6 +128,7 @@ module Ruby2JS
           children = body.type == :begin ? body.children : [body]
 
           in_private = false
+          action_bodies = []
           children.each do |child|
             next unless child
 
@@ -145,8 +148,29 @@ module Ruby2JS
             if in_private && child.type == :def
               method_name = child.children[0]
               @rails_private_methods[method_name] = child
+            elsif !in_private && child.type == :def
+              action_bodies << child.children[2] if child.children[2]
             end
           end
+
+          # Second pass: find which private methods are called from action bodies
+          action_bodies.each do |action_body|
+            collect_private_method_calls(action_body)
+          end
+        end
+
+        # Recursively find calls to known private methods in action bodies
+        def collect_private_method_calls(node)
+          return unless node.respond_to?(:type) && node.respond_to?(:children)
+
+          if node.type == :send && node.children[0].nil?
+            method_name = node.children[1]
+            if @rails_private_methods.key?(method_name)
+              @rails_private_method_calls.add(method_name)
+            end
+          end
+
+          node.children.each { |child| collect_private_method_calls(child) }
         end
 
         def collect_before_action(node)
@@ -219,8 +243,26 @@ module Ruby2JS
               next
             end
 
-            # Skip private methods (we've collected them for inlining)
+            # Handle private methods: skip strong params (inlined as `params`)
+            # and before_action-only methods (inlined into actions).
+            # Emit other private methods as module functions.
             if in_private && child.type == :def
+              method_name = child.children[0]
+              body = child.children[2]
+
+              # Emit strong params methods as destructuring functions
+              if strong_params_chain?(body)
+                transformed << generate_strong_params_function(child)
+                next
+              end
+
+              # Skip methods only used as before_actions (already inlined)
+              if before_action_only?(method_name)
+                next
+              end
+
+              # Emit as module function
+              transformed << transform_private_method(child)
               next
             end
 
@@ -491,8 +533,15 @@ module Ruby2JS
                 return node
               end
             elsif target.nil? && method.to_s.end_with?('_params')
-              # article_params -> inline the method body (strong params)
-              return transform_strong_params_call(method)
+              # article_params -> only inline if it's a genuine strong params method
+              result = transform_strong_params_call(method)
+              return result if result
+              # Not strong params - fall through to normal processing
+              new_children = node.children.map do |c|
+                c.respond_to?(:type) ? transform_ivars_to_locals(c) : c
+              end
+              transformed = node.updated(nil, new_children)
+              return wrap_with_await_if_needed(transformed)
             elsif strong_params_chain?(node)
               # params.require(:article).permit(:title, :body) -> params
               return s(:lvar, :params)
@@ -1136,15 +1185,84 @@ module Ruby2JS
           end
         end
 
-        # Transform article_params call by inlining and transforming
+        # Check if a private method is ONLY used as a before_action target
+        # (i.e., not called directly from any action body).
+        def before_action_only?(method_name)
+          @rails_before_actions.any? { |ba| ba[:method] == method_name } &&
+            !@rails_private_method_calls.include?(method_name)
+        end
+
+        # Transform a non-strong-params private method into a module function.
+        # Applies the same ivar→local and params transformations as action methods.
+        def transform_private_method(node)
+          method_name = node.children[0]
+          args = node.children[1]
+          body = node.children[2]
+
+          # Transform body: @ivar -> ivar, params handling, etc.
+          transformed_body = transform_ivars_to_locals(body) if body
+
+          # Build function args from the Ruby method args
+          param_args = args.children.map { |arg| s(:arg, arg.children[0]) }
+
+          # Create a regular function (not async, not exported)
+          process(s(:def, method_name, s(:args, *param_args), transformed_body))
+        end
+
+        # Generate a destructuring function for a strong params method.
+        # params.require(:article).permit(:title, :body) becomes:
+        #   function article_params(params) {
+        #     let _article = params.article || {};
+        #     return {title: _article.title, body: _article.body}
+        #   }
+        def generate_strong_params_function(method_node)
+          method_name = method_node.children[0]
+          body = method_node.children[2]
+
+          # Extract model name from params.require(:article)
+          require_call = body.children[0]  # the .require(:model) send
+          model_name = require_call.children[2].children[0]  # :article
+
+          # Extract permitted keys from .permit(:title, :body, nested: {})
+          permitted_keys = []
+          body.children[2..-1].each do |arg|
+            if arg.type == :sym
+              permitted_keys << arg.children[0]
+            elsif arg.type == :hash
+              arg.children.each do |pair|
+                if pair.children[0].type == :sym
+                  permitted_keys << pair.children[0].children[0]
+                end
+              end
+            end
+          end
+
+          # Build: let _model = params.model || {};
+          temp_var = "_#{model_name}".to_sym
+          source_assign = s(:lvasgn, temp_var,
+            s(:or, s(:attr, s(:lvar, :params), model_name), s(:hash)))
+
+          # Build: return {key1: _model.key1, key2: _model.key2, ...}
+          pairs = permitted_keys.map do |key|
+            s(:pair, s(:sym, key), s(:attr, s(:lvar, temp_var), key))
+          end
+          return_hash = s(:return, s(:hash, *pairs))
+
+          process(s(:def, method_name, s(:args, s(:arg, :params)),
+            s(:begin, source_assign, return_hash)))
+        end
+
+        # Transform article_params call: preserve as function call with params arg
+        # for genuine strong params methods, return nil otherwise.
         def transform_strong_params_call(method_name)
           method_node = @rails_private_methods[method_name]
-          if method_node
-            body = method_node.children[2]
-            transform_ivars_to_locals(body)
+          return nil unless method_node
+
+          body = method_node.children[2]
+          if strong_params_chain?(body)
+            s(:send, nil, method_name, s(:lvar, :params))
           else
-            # If we can't find the method, just return params
-            s(:lvar, :params)
+            nil
           end
         end
 

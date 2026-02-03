@@ -147,10 +147,111 @@ describe Ruby2JS::Filter::Rails::Controller do
 
       result = to_js(source)
       _(result).must_include 'function create(context, params)'
-      _(result).must_include 'new Article(params)'
-      _(result).wont_include 'article_params'
+      _(result).must_include 'new Article(article_params(params))'
+      # Strong params emitted as destructuring function
+      _(result).must_include 'function article_params(params)'
       _(result).wont_include 'require'
       _(result).wont_include 'permit'
+    end
+
+    it "does not inline non-strong-params methods ending in _params" do
+      source = <<~RUBY
+        class BillablesController < ApplicationController
+          def create
+            params_to_save = process_question_params(params)
+          end
+
+          private
+
+          def process_question_params(params)
+            return params unless params[:questions_attributes]
+            params
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Should NOT inline - process_question_params is not a strong params method
+      _(result).must_include 'process_question_params(params)'
+      # The method should be emitted as a module function
+      _(result).must_include 'function process_question_params(params)'
+    end
+
+    it "generates destructuring function for strong params" do
+      source = <<~RUBY
+        class ArticlesController < ApplicationController
+          def create
+            @article = Article.new(article_params)
+          end
+
+          private
+          def article_params
+            params.require(:article).permit(:title, :body)
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Extracts from params.article with nullish coalescing
+      _(result).must_include 'params.article ??'
+      # Returns only permitted keys
+      _(result).must_include '_article.title'
+      _(result).must_include '_article.body'
+    end
+
+    it "handles nested params in strong params (options: {}, arrays)" do
+      source = <<~RUBY
+        class BillablesController < ApplicationController
+          def create
+            @billable = Billable.new(billable_params)
+          end
+
+          private
+          def billable_params
+            params.require(:billable).permit(:name, :price, options: {}, questions_attributes: [:id, :text])
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include 'function billable_params(params)'
+      _(result).must_include 'params.billable ??'
+      # Simple keys extracted
+      _(result).must_include '_billable.name'
+      _(result).must_include '_billable.price'
+      # Nested keys also extracted
+      _(result).must_include '_billable.options'
+      _(result).must_include '_billable.questions_attributes'
+    end
+
+    it "handles multiple strong params methods in one controller" do
+      source = <<~RUBY
+        class LocationsController < ApplicationController
+          def create
+            @location = Location.new(location_params)
+            @user = User.new(user_params)
+          end
+
+          private
+          def location_params
+            params.require(:location).permit(:key, :name)
+          end
+
+          def user_params
+            params.require(:user).permit(:userid, :email)
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Each extracts from its own key
+      _(result).must_include 'function location_params(params)'
+      _(result).must_include 'params.location ??'
+      _(result).must_include 'function user_params(params)'
+      _(result).must_include 'params.user ??'
+      # Call sites preserved
+      _(result).must_include 'location_params(params)'
+      _(result).must_include 'user_params(params)'
     end
 
     it "adds id and params parameters to update action" do
@@ -171,7 +272,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       result = to_js(source)
       _(result).must_include 'function update(context, id, params)'
       _(result).must_include 'Article.find(id)'
-      _(result).must_include 'article.update(params)'
+      _(result).must_include 'article.update(article_params(params))'
     end
   end
 
