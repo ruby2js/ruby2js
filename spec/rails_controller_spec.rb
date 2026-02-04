@@ -904,4 +904,96 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).must_include 'return {followers: 1, leaders: 2}'
     end
   end
+
+  describe 'class methods (def self.foo)' do
+    it "transforms setter class method to set_name function" do
+      source = <<~RUBY
+        class EventController < ApplicationController
+          def self.logo
+            @@logo ||= 'default.png'
+          end
+
+          def self.logo=(logo)
+            @@logo = logo
+          end
+
+          def index
+            EventController.logo = 'new.png'
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include 'function set_logo(logo)'
+      _(result).must_include 'function logo()'
+      _(result).must_include 'set_logo("new.png")'
+      _(result).wont_include 'logo=('
+    end
+
+    it "transforms getter class method calls" do
+      source = <<~RUBY
+        class EventController < ApplicationController
+          def self.logo
+            @@logo ||= 'default.png'
+          end
+
+          def show
+            @current_logo = EventController.logo
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include 'logo()'
+    end
+  end
+
+  describe 'private method calls in private methods' do
+    it "marks bare private method calls with parens" do
+      source = <<~RUBY
+        class ScoresController < ApplicationController
+          def show
+            generate_agenda unless @agenda
+          end
+
+          private
+
+          def generate_agenda
+            @agenda = 'test'
+          end
+
+          def generate_scores
+            generate_agenda unless @agenda
+            @scores = 'data'
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Both action and private method should have parens on the call
+      _(result).must_include 'generate_agenda()'
+      # In generate_scores, the bare call should also have parens
+      _(result).must_include 'if (!agenda) generate_agenda()'
+    end
+  end
+
+  describe 'multi-statement reject block' do
+    it "negates only the last statement in reject block" do
+      source = <<~RUBY
+        class PeopleController < ApplicationController
+          def show
+            @strike = @people.reject do |person|
+              person_option = PersonOption.find_by(person_id: person.id)
+              person_option.present?
+            end
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include '.filter('
+      _(result).must_include 'return !(person_option.present)'
+      _(result).wont_include '!(person_option = '
+    end
+  end
 end

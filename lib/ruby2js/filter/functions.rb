@@ -1244,11 +1244,24 @@ module Ruby2JS
         elsif method == :reject and call.children.length == 2
           # arr.reject { |x| cond } => arr.filter(x => !(cond))
           call = call.updated nil, [call.children.first, :filter]
-          # Process the body first, then negate - use :send with :! to wrap
-          processed_body = process_all(node.children[2..-1])
-          negated_body = s(:send, s(:begin, *processed_body), :!)
-          node.updated nil, [process(call), process(node.children[1]),
-            s(:autoreturn, negated_body)]
+          body = node.children[2]
+
+          if body&.type == :begin && body.children.length > 1
+            # Multi-statement block: negate only the last statement
+            *setup, last = body.children
+            processed_setup = process_all(setup)
+            processed_last = process(last)
+            negated_last = s(:send, s(:begin, processed_last), :!)
+            new_body = s(:begin, *processed_setup, negated_last)
+            node.updated nil, [process(call), process(node.children[1]),
+              s(:autoreturn, new_body)]
+          else
+            # Single-statement block: negate the whole thing
+            processed_body = process_all(node.children[2..-1])
+            negated_body = s(:send, s(:begin, *processed_body), :!)
+            node.updated nil, [process(call), process(node.children[1]),
+              s(:autoreturn, negated_body)]
+          end
 
         elsif method == :any? and call.children.length == 2
           call = call.updated nil, [call.children.first, :some]

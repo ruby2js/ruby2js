@@ -1257,6 +1257,20 @@ describe Ruby2JS::Filter::Functions do
     it "should handle reject(&:nil?)" do
       to_js( 'arr.reject(&:nil?)' ).must_equal 'arr.filter(item => !(item == null))'
     end
+
+    it "should handle multi-statement reject block" do
+      source = <<~RUBY
+        arr.reject do |x|
+          y = x.foo
+          y.bar?
+        end
+      RUBY
+
+      result = Ruby2JS.convert(source, filters: [Ruby2JS::Filter::Functions]).to_s
+      _(result).must_include '.filter('
+      _(result).must_include 'let y = x.foo'
+      _(result).must_include 'return !(y.bar)'
+    end
   end
 
   describe "to_sym" do

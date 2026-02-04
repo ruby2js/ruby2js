@@ -26,6 +26,8 @@ module Ruby2JS
           @rails_needs_react = false
           @rails_needs_render_view = false
           @rails_current_action = nil
+          @rails_controller_const = nil  # e.g., :EventController
+          @rails_class_methods = Set.new  # class method names (def self.foo)
           # Model associations for preloading - set lazily from options in model_associations method
           @rails_model_associations = nil
         end
@@ -75,6 +77,7 @@ module Ruby2JS
           @rails_controller_plural = class_name.children.last.to_s.sub(/Controller$/, '').downcase
           @rails_controller_name = Ruby2JS::Inflector.singularize(@rails_controller_plural).capitalize
           @rails_controller = true
+          @rails_controller_const = class_name.children.last
 
           # First pass: collect before_actions, private methods, and model references
           collect_controller_metadata(body)
@@ -116,9 +119,11 @@ module Ruby2JS
           @rails_controller = nil
           @rails_controller_name = nil
           @rails_controller_plural = nil
+          @rails_controller_const = nil
           @rails_before_actions = []
           @rails_private_methods = {}
           @rails_private_method_calls = Set.new
+          @rails_class_methods = Set.new
           @rails_model_refs = Set.new
           @rails_path_helpers = Set.new
           @rails_needs_views = false
@@ -163,6 +168,11 @@ module Ruby2JS
             if child.type == :send && child.children[0].nil? && child.children[1] == :before_action
               collect_before_action(child)
               next
+            end
+
+            # Collect class methods (def self.foo)
+            if child.type == :defs && child.children[0]&.type == :self
+              @rails_class_methods.add(child.children[1])
             end
 
             # Collect private methods for inlining
@@ -293,6 +303,21 @@ module Ruby2JS
               var_name = child.children[0].to_s.sub('@@', '').to_sym
               value = child.children[1]
               transformed << process(s(:lvasgn, var_name, replace_cvars(value)))
+              next
+            end
+
+            # Handle class methods (def self.method) — transform like private methods
+            # but rename setter methods (def self.x=) to set_x since JS doesn't
+            # support = in function names outside of class getter/setter syntax.
+            if child.type == :defs && child.children[0]&.type == :self
+              method_name = child.children[1]
+              if method_name.to_s.end_with?('=')
+                clean_name = "set_#{method_name.to_s.chomp('=')}"
+                child = child.updated(nil, [child.children[0], clean_name.to_sym, *child.children[2..]])
+              end
+              transformed << transform_private_method(
+                s(:def, child.children[1], child.children[2], child.children[3])
+              )
               next
             end
 
@@ -594,6 +619,18 @@ module Ruby2JS
             elsif strong_params_chain?(node)
               # params.require(:article).permit(:title, :body) -> params
               return s(:lvar, :params)
+            elsif target&.type == :const &&
+                  target.children == [nil, @rails_controller_const] &&
+                  @rails_class_methods.include?(method)
+              # ControllerName.method(args) -> method(args) for class methods
+              # ControllerName.method=(value) -> set_method(value) for setters
+              new_args = args.map { |a| a.respond_to?(:type) ? transform_ivars_to_locals(a) : a }
+              if method.to_s.end_with?('=')
+                clean_name = "set_#{method.to_s.chomp('=')}".to_sym
+                return s(:send!, nil, clean_name, *new_args)
+              else
+                return s(:send!, nil, method, *new_args)
+              end
             else
               # Process children recursively first
               new_children = node.children.map do |c|
@@ -1279,6 +1316,11 @@ module Ruby2JS
 
           # Transform body: @@cvar -> cvar (closure-scoped), @ivar -> ivar, params handling, etc.
           transformed_body = transform_ivars_to_locals(replace_cvars(body)) if body
+
+          # Mark bare private method calls as send! so they get parens in output
+          # (same as action methods — without this, `generate_agenda unless @agenda`
+          # becomes `if (!agenda) let generate_agenda` instead of `generate_agenda()`)
+          transformed_body = mark_private_method_calls(transformed_body) if transformed_body
 
           # Build function args from the Ruby method args
           param_args = args.children.map { |arg| s(:arg, arg.children[0]) }

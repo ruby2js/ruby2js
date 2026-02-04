@@ -209,8 +209,8 @@ describe Ruby2JS do
     it "should drop ! and ? from method calls and property accesses" do
       to_js( "a!()" ).must_equal 'a()'
       to_js( "a?()" ).must_equal 'a()'
-      to_js( "a!" ).must_equal 'let a'
-      to_js( "a?" ).must_equal 'let a'
+      to_js( "a!" ).must_equal 'a()'
+      to_js( "a?" ).must_equal 'a()'
     end
 
     it "should wrap numeric literals in parenthesis" do
@@ -464,7 +464,7 @@ describe Ruby2JS do
     
     it "should handle basic variable scope" do
       to_js( 'z = 1; if a; b; elsif c; d = proc do e = 1; end; end; z = d' ).
-        must_equal 'let d; let z = 1; if (a) {let b} else if (c) {d = () => {let e = 1}}; z = d'
+        must_equal 'let d; let z = 1; if (a) {b()} else if (c) {d = () => {let e = 1}}; z = d'
 
       to_js( 'if a == 1; b = 0; c.forEach {|d| if d; b += d; end} end' ).
         must_equal 'if (a == 1) {let b = 0; c.forEach((d) => {if (d) b += d})}'
@@ -524,7 +524,7 @@ describe Ruby2JS do
 
     it "should handle empty when blocks" do
       to_js( 'case a; when 1; when 2; b; end' ).
-        must_equal 'switch (a) {case 1: ; break; case 2: let b}'
+        must_equal 'switch (a) {case 1: ; break; case 2: b()}'
     end
 
     it "should handle case statement with splat array" do
@@ -1061,7 +1061,7 @@ describe Ruby2JS do
       to_js( 'module M; def valid?; true; end; end' ).
         must_equal('const M = {valid() {true}}')
       to_js( 'module M; def clear!; x; end; end' ).
-        must_equal('const M = {clear() {let x}}')
+        must_equal('const M = {clear() {x()}}')
     end
 
     it "should convert module singleton methods to functions" do
@@ -1130,9 +1130,9 @@ describe Ruby2JS do
       to_js( 'a.kind_of? b' ).must_equal "(a instanceof b)"
       to_js( 'a.instance_of? b' ).must_equal "(a.constructor == b)"
 
-      to_js( 'x unless a.is_a? b' ).must_equal "if (!(a instanceof b)) let x"
-      to_js( 'x unless a.kind_of? b' ).must_equal "if (!(a instanceof b)) let x"
-      to_js( 'x unless a.instance_of? b' ).must_equal "if (!(a.constructor == b)) let x"
+      to_js( 'x unless a.is_a? b' ).must_equal "if (!(a instanceof b)) x()"
+      to_js( 'x unless a.kind_of? b' ).must_equal "if (!(a instanceof b)) x()"
+      to_js( 'x unless a.instance_of? b' ).must_equal "if (!(a.constructor == b)) x()"
     end
 
     it "should handle is_a?, kind_of?, instance_of? with safe navigation" do
@@ -1334,47 +1334,47 @@ describe Ruby2JS do
 
     it "should handle catching any exception" do
       to_js( 'begin a; rescue => e; b; end' ).
-        must_equal 'try {let a} catch (e) {let b}'
+        must_equal 'try {a()} catch (e) {b()}'
     end
 
     it "catching exceptions without a variable" do
       to_js("begin a; rescue; p $!; end").
-        must_equal 'try {let a} catch ($EXCEPTION) {p($EXCEPTION)}'
+        must_equal 'try {a()} catch ($EXCEPTION) {p($EXCEPTION)}'
     end
 
     it "should handle catching a specific exception" do
       to_js( 'begin a; rescue StandardError => e; b; end' ).
-        must_equal 'try {let a} catch (e) {if (e instanceof StandardError) {let b} else {throw e}}'
+        must_equal 'try {a()} catch (e) {if (e instanceof StandardError) {b()} else {throw e}}'
     end
 
     it "should handle catching a String" do
       to_js( 'begin a; rescue String => e; b; end' ).
-        must_equal 'try {let a} catch (e) {if (typeof e == "string") {let b} else {throw e}}'
+        must_equal 'try {a()} catch (e) {if (typeof e == "string") {b()} else {throw e}}'
     end
 
     it "catching exceptions with a type but without a variable" do
       to_js("begin a; rescue Foo; end").
-        must_equal 'try {let a} catch ($EXCEPTION) {if ($EXCEPTION instanceof Foo) {} else {throw $EXCEPTION}}'
+        must_equal 'try {a()} catch ($EXCEPTION) {if ($EXCEPTION instanceof Foo) {} else {throw $EXCEPTION}}'
     end
 
     it "should handle an ensure clause" do
       to_js( 'begin a; ensure b; end' ).
-        must_equal 'try {let a} finally {let b}'
+        must_equal 'try {a()} finally {b()}'
     end
 
     it "should handle catching an exception and an ensure clause" do
       to_js( 'begin a; rescue => e; b; ensure; c; end' ).
-        must_equal 'try {let a} catch (e) {let b} finally {let c}'
+        must_equal 'try {a()} catch (e) {b()} finally {c()}'
     end
 
     it "should handle multiple rescue clauses with different variables" do
       to_js( 'begin; a; rescue FooError => foo; b(foo); rescue BarError => bar; c(bar); end' ).
-        must_equal 'try {let a} catch (foo) {if (foo instanceof FooError) {b(foo)} else if (foo instanceof BarError) {var bar = foo; c(bar)} else {throw foo}}'
+        must_equal 'try {a()} catch (foo) {if (foo instanceof FooError) {b(foo)} else if (foo instanceof BarError) {var bar = foo; c(bar)} else {throw foo}}'
     end
 
     it "should handle multiple rescue clauses with mixed variable usage" do
       to_js( 'begin; a; rescue FooError => e; b(e); rescue BarError; c; end' ).
-        must_equal 'try {let a} catch (e) {if (e instanceof FooError) {b(e)} else if (e instanceof BarError) {let c} else {throw e}}'
+        must_equal 'try {a()} catch (e) {if (e instanceof FooError) {b(e)} else if (e instanceof BarError) {c()} else {throw e}}'
     end
 
     it "should handle implicit begin in methods" do
@@ -1394,31 +1394,31 @@ describe Ruby2JS do
 
     it "should handle retry in rescue block" do
       to_js( 'begin; a; rescue; retry; end' ).
-        must_equal 'while (true) {try {let a; break} catch {continue}}'
+        must_equal 'while (true) {try {a(); break} catch {continue}}'
     end
 
     it "should handle retry with exception type" do
       to_js( 'begin; a; rescue StandardError; retry; end' ).
-        must_equal 'while (true) {try {let a; break} catch ($EXCEPTION) {if ($EXCEPTION instanceof StandardError) {continue} else {throw $EXCEPTION}}}'
+        must_equal 'while (true) {try {a(); break} catch ($EXCEPTION) {if ($EXCEPTION instanceof StandardError) {continue} else {throw $EXCEPTION}}}'
     end
 
     it "should handle neither a rescue nor an ensure being present" do
-      to_js( 'begin a; b; end' ).must_equal '{let a; let b}'
+      to_js( 'begin a; b; end' ).must_equal '{a(); b()}'
     end
 
     it "should handle else clause in begin/rescue" do
       to_js( 'begin; a; rescue => e; b; else; c; end' ).
-        must_equal 'let $no_exception = false; try {let a; $no_exception = true} catch (e) {let b}; if ($no_exception) {let c}'
+        must_equal 'let $no_exception = false; try {a(); $no_exception = true} catch (e) {b()}; if ($no_exception) {c()}'
     end
 
     it "should handle else clause with ensure" do
       to_js( 'begin; a; rescue; b; else; c; ensure; d; end' ).
-        must_equal 'let $no_exception = false; try {let a; $no_exception = true} catch {let b} finally {let d}; if ($no_exception) {let c}'
+        must_equal 'let $no_exception = false; try {a(); $no_exception = true} catch {b()} finally {d()}; if ($no_exception) {c()}'
     end
 
     it "should hoist variables declared in try that are used in finally" do
       to_js( 'begin; x = 1; rescue; y; ensure; z(x); end', eslevel: 2020 ).
-        must_equal '{let x; try {x = 1} catch {let y} finally {z(x)}}'
+        must_equal '{let x; try {x = 1} catch {y()} finally {z(x)}}'
     end
 
     it "should not hoist variables already declared" do

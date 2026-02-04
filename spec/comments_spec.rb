@@ -13,7 +13,7 @@ describe Ruby2JS::Filter::Functions do
 
   describe 'comments before code' do
     it "should handle comment before statement" do
-      to_js("# comment\nstatement").must_include "// comment\nlet statement"
+      to_js("# comment\nstatement").must_include "// comment\nstatement()"
     end
 
     it "should handle comment before class" do
@@ -74,12 +74,12 @@ describe Ruby2JS::Filter::Functions do
   describe 'block comments' do
     it "should handle =begin...=end" do
       js = to_js("=begin\ncomment\n=end\nstatement".gsub(/^\s+/, ''))
-      js.must_equal "/*\ncomment\n*/\nlet statement"
+      js.must_equal "/*\ncomment\n*/\nstatement()"
     end
 
     it "should handle =begin...*/...=end with line comments" do
       js = to_js("=begin\n/* comment */\n=end\nstatement".gsub(/^\s+/, ''))
-      js.must_equal "//\n///* comment */\n//\nlet statement"
+      js.must_equal "//\n///* comment */\n//\nstatement()"
     end
   end
 

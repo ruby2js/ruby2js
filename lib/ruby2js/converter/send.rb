@@ -442,6 +442,11 @@ module Ruby2JS
             put ".#{ method_name }"
           elsif @ast.type == :attr || @ast.type == :await_attr
             put method_name
+          elsif @state == :statement
+            # In statement context, a bare word with no receiver and no args
+            # is a method call, not a variable declaration. There's no reason
+            # to declare a variable you never assign to.
+            put "#{ method_name }()"
           else
             parse @ast.updated(:lvasgn, [method_name]), @state
           end
