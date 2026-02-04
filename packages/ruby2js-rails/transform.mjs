@@ -139,6 +139,15 @@ export function getBuildOptions(section, target, sectionConfig = null) {
         target
       };
 
+    case 'test':
+      return {
+        ...baseOptions,
+        filters: sectionConfig?.filters
+          ? normalizeFilterNames(sectionConfig.filters)
+          : ['Pragma', 'Rails_Test', 'Rails_Model', ...nodeFilter, 'Functions', 'ESM', 'Return'],
+        target
+      };
+
     default:
       // Models, routes, seeds, migrations
       return {
@@ -178,7 +187,9 @@ function normalizeFilterNames(filters) {
     'rails/routes': 'Rails_Routes',
     'rails/seeds': 'Rails_Seeds',
     'rails/migration': 'Rails_Migration',
-    'rails/helpers': 'Rails_Helpers'
+    'rails/helpers': 'Rails_Helpers',
+    'rails_test': 'Rails_Test',
+    'rails/test': 'Rails_Test'
   };
 
   return filters.map(f => filterMap[f.toLowerCase()] || f);

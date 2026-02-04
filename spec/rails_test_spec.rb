@@ -993,6 +993,132 @@ describe Ruby2JS::Filter::Rails::Test do
     end
   end
 
+  describe "URL helpers with query params" do
+    it "passes hash args on URL helpers as context params" do
+      result = to_controller_js(<<~RUBY)
+        class HeatsControllerTest < ActionDispatch::IntegrationTest
+          test "index with category" do
+            get heats_url(cat: 'closed-american-smooth')
+          end
+        end
+      RUBY
+      assert_includes result, 'context({cat: "closed-american-smooth"})'
+      assert_includes result, 'HeatsController.index('
+    end
+
+    it "passes multiple hash args on URL helpers" do
+      result = to_controller_js(<<~RUBY)
+        class HeatsControllerTest < ActionDispatch::IntegrationTest
+          test "book with params" do
+            get book_heats_url(type: 'judge', format: 'pdf')
+          end
+        end
+      RUBY
+      assert_includes result, 'context({'
+      assert_includes result, 'type: "judge"'
+      assert_includes result, 'format: "pdf"'
+    end
+
+    it "passes URL hash args and request params separately" do
+      result = to_controller_js(<<~RUBY)
+        class TablesControllerTest < ActionDispatch::IntegrationTest
+          test "create with option" do
+            post tables_url(option_id: option.id), params: { table: { number: 99 } }
+          end
+        end
+      RUBY
+      assert_includes result, 'context({option_id: option.id})'
+      assert_includes result, '{table: {number: 99}}'
+    end
+
+    it "converts as: :turbo_stream to format context param" do
+      result = to_controller_js(<<~RUBY)
+        class CategoriesControllerTest < ActionDispatch::IntegrationTest
+          test "drop" do
+            post drop_categories_url, as: :turbo_stream, params: { source: 1, target: 2 }
+          end
+        end
+      RUBY
+      assert_includes result, 'context({format: "turbo_stream"})'
+      assert_includes result, '{source: 1, target: 2}'
+    end
+
+    it "converts as: :json to format context param" do
+      result = to_controller_js(<<~RUBY)
+        class ScoresControllerTest < ActionDispatch::IntegrationTest
+          test "batch" do
+            post scores_url, params: { scores: [] }, as: :json
+          end
+        end
+      RUBY
+      assert_includes result, 'context({format: "json"})'
+    end
+  end
+
+  describe "flash assertions" do
+    it "transforms flash[:notice] to _flash.notice" do
+      result = to_controller_js(<<~RUBY)
+        class ArticlesControllerTest < ActionDispatch::IntegrationTest
+          test "flash" do
+            post articles_url, params: { article: { title: "Test" } }
+            assert_equal 'Article created.', flash[:notice]
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(_flash.notice).toBe("Article created.")'
+    end
+
+    it "transforms flash[:alert] to _flash.alert" do
+      result = to_controller_js(<<~RUBY)
+        class ArticlesControllerTest < ActionDispatch::IntegrationTest
+          test "flash alert" do
+            post articles_url, params: { article: { title: "" } }
+            assert_equal "Error", flash[:alert]
+          end
+        end
+      RUBY
+      assert_includes result, '_flash.alert'
+    end
+
+    it "works with assert_match on flash" do
+      result = to_controller_js(<<~RUBY)
+        class ArticlesControllerTest < ActionDispatch::IntegrationTest
+          test "flash match" do
+            post articles_url, params: { article: { title: "Test" } }
+            assert_match /created|updated/, flash[:notice]
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(_flash.notice).toMatch'
+    end
+
+    it "emits _flash variable declaration in context helper" do
+      result = to_controller_js(<<~RUBY)
+        class ArticlesControllerTest < ActionDispatch::IntegrationTest
+          test "works" do
+            true
+          end
+        end
+      RUBY
+      assert_includes result, 'let _flash = {}'
+      assert_includes result, '_flash = {}'  # reset inside context()
+    end
+
+    it "context helper flash stores and retrieves values" do
+      result = to_controller_js(<<~RUBY)
+        class ArticlesControllerTest < ActionDispatch::IntegrationTest
+          test "works" do
+            true
+          end
+        end
+      RUBY
+      # Flash set method stores values
+      assert_includes result, 'set(k, v) {_flash[k] = v}'
+      # Flash get method retrieves values
+      assert_includes result, 'get(k) {return _flash[k]'
+    end
+  end
+
   describe "complex assert_difference patterns" do
     it "handles runtime expression as diff value" do
       result = to_controller_js(<<~RUBY)

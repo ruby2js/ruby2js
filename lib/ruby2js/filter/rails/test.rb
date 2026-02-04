@@ -154,6 +154,14 @@ module Ruby2JS
                 return transform_url_to_path(method, args)
               end
 
+              # Flash access: flash[:key] -> _flash.key
+              if target&.type == :send &&
+                 target.children[0].nil? && target.children[1] == :flash &&
+                 method == :[] && args.length == 1 && args[0].type == :sym
+                key = args[0].children[0]
+                return s(:attr, s(:lvar, :_flash), key)
+              end
+
               # Instance variables -> local variables
               # (handled via on_ivar/on_ivasgn below)
             end
@@ -521,8 +529,10 @@ module Ruby2JS
         # ============================================
 
         # Build the context() helper function for integration tests
+        # Includes a _flash variable that persists across context() calls
+        # so flash assertions can read values set by controller actions.
         def build_context_helper
-          s(:jsraw, "function context(params = {}) {\n  return {params, flash: {get() {return \"\"}, set() {}, consumeNotice() {return {present: false}}, consumeAlert() {return \"\"}}, contentFor: {}}\n}")
+          s(:jsraw, "let _flash = {};\n\nfunction context(params = {}) {\n  _flash = {};\n  return {params, flash: {get(k) {return _flash[k] || \"\"}, set(k, v) {_flash[k] = v}, consumeNotice() {let n = _flash.notice; delete _flash.notice; return {present: !!n, value: n}}, consumeAlert() {let a = _flash.alert; delete _flash.alert; return a || \"\"}}, contentFor: {}}\n}")
         end
 
         # Standard REST actions — URL helpers with these names map directly
@@ -694,14 +704,20 @@ module Ruby2JS
 
           url_node = args.first
           params_node = nil
+          as_node = nil
 
           # Extract params and other options from keyword hash
           if args.length > 1 && args[1]&.type == :hash
             args[1].children.each do |pair|
               key = pair.children[0]
               value = pair.children[1]
-              if key.type == :sym && key.children[0] == :params
-                params_node = value
+              if key.type == :sym
+                case key.children[0]
+                when :params
+                  params_node = value
+                when :as
+                  as_node = value
+                end
               end
             end
           end
@@ -709,11 +725,16 @@ module Ruby2JS
           # Parse URL helper to get controller and action info
           url_method = nil
           url_args = []
+          url_hash_node = nil
           if url_node.type == :send && url_node.children[0].nil?
             url_method = url_node.children[1]
-            # Collect only positional args (skip hash args like format: 'pdf')
+            # Collect positional args and hash args separately
             url_node.children[2..-1].each do |arg|
-              url_args << arg unless arg.type == :hash
+              if arg.type == :hash
+                url_hash_node = arg
+              else
+                url_args << arg
+              end
             end
           elsif url_node.type == :lvar || url_node.type == :ivar
             # Variable reference - can't determine controller, pass through
@@ -726,8 +747,25 @@ module Ruby2JS
           is_nested = resolve_nested(url_info, url_args)
           action = determine_action(http_method, url_info, is_nested)
 
-          # Build controller action call arguments
-          action_args = [s(:send!, nil, :context)]
+          # Build context arguments from URL hash args and `as:` option
+          context_params = []
+          if url_hash_node
+            url_hash_node.children.each { |c| context_params << c }
+          end
+          if as_node
+            # as: :turbo_stream -> format: "turbo_stream"
+            format_value = as_node.type == :sym ? s(:str, as_node.children[0].to_s) : as_node
+            context_params << s(:pair, s(:sym, :format), format_value)
+          end
+
+          # Note: action_args must be declared before the conditional to avoid
+          # block-scoped `let` in JS transpilation (selfhost compatibility).
+          action_args = []
+          if context_params.any?
+            action_args = [s(:send!, nil, :context, process(s(:hash, *context_params)))]
+          else
+            action_args = [s(:send!, nil, :context)]
+          end
 
           # For nested resources, pass parent id first
           if is_nested && !url_args.empty?
