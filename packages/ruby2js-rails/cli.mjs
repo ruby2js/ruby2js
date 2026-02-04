@@ -554,6 +554,216 @@ function addControllerImportsToTest(code, controllersDir, modelsDir) {
 }
 
 // ============================================
+// Dev-mode test transpilation (for juntos test)
+// ============================================
+
+/**
+ * Build association map from Ruby source model files.
+ * Parses belongs_to declarations to determine foreign key relationships.
+ * Used for fixture inlining when transpiled model files aren't available.
+ */
+function buildAssociationMapFromRuby(modelsDir) {
+  const assocMap = {};
+  if (!existsSync(modelsDir)) return assocMap;
+
+  const modelFiles = readdirSync(modelsDir)
+    .filter(f => f.endsWith('.rb') && f !== 'application_record.rb');
+
+  for (const file of modelFiles) {
+    try {
+      const content = readFileSync(join(modelsDir, file), 'utf-8');
+
+      // Extract class name
+      const classMatch = content.match(/class\s+(\w+)\s*</);
+      if (!classMatch) continue;
+      const className = classMatch[1];
+      const tableName = underscore(pluralize(className));
+
+      // Find belongs_to associations
+      const belongsToRegex = /belongs_to\s+:(\w+)/g;
+      let match;
+      const tableAssocs = {};
+      while ((match = belongsToRegex.exec(content)) !== null) {
+        const assocName = match[1];
+        const targetTable = pluralize(assocName);
+        tableAssocs[assocName] = targetTable;
+      }
+
+      if (Object.keys(tableAssocs).length > 0) {
+        assocMap[tableName] = tableAssocs;
+      }
+    } catch (err) {
+      // Skip files that can't be read
+    }
+  }
+  return assocMap;
+}
+
+/**
+ * Add model imports using virtual modules (for dev-mode tests).
+ * Uses 'juntos:models' virtual module instead of concrete file paths.
+ */
+function addModelImportsVirtual(code) {
+  const modelRefRegex = /\b([A-Z][a-z]\w+)\.(create|find|where|all|first|last|count|new|order|destroy_all)\b/g;
+  const referencedModels = new Set();
+  let match;
+  while ((match = modelRefRegex.exec(code)) !== null) {
+    referencedModels.add(match[1]);
+  }
+  const fixtureModelRegex = /await\s+([A-Z][a-z]\w+)\.create\b/g;
+  while ((match = fixtureModelRegex.exec(code)) !== null) {
+    referencedModels.add(match[1]);
+  }
+  if (referencedModels.size === 0) return code;
+
+  const modelNames = [...referencedModels].sort().join(', ');
+  return `import { ${modelNames} } from 'juntos:models';\n\n` + code;
+}
+
+/**
+ * Add controller, path helper, and model imports using virtual modules.
+ * For dev-mode tests, controllers are imported from .rb paths (Vite transforms them),
+ * path helpers from 'juntos:paths', and models from 'juntos:models'.
+ */
+function addControllerImportsVirtual(code) {
+  const imports = [];
+  let match;
+
+  // Find controller references: XxxController.method
+  const controllerRefRegex = /\b([A-Z][a-z]\w*Controller)\.\w+/g;
+  const referencedControllers = new Set();
+  while ((match = controllerRefRegex.exec(code)) !== null) {
+    referencedControllers.add(match[1]);
+  }
+  for (const controllerName of referencedControllers) {
+    const controllerFile = underscore(controllerName) + '.rb';
+    imports.push(`import { ${controllerName} } from '../../app/controllers/${controllerFile}';`);
+  }
+
+  // Find path helper references: xxx_path(
+  const pathRefRegex = /\b([a-z_]+_path)\s*\(/g;
+  const referencedPaths = new Set();
+  while ((match = pathRefRegex.exec(code)) !== null) {
+    referencedPaths.add(match[1]);
+  }
+  if (referencedPaths.size > 0) {
+    const pathNames = [...referencedPaths].sort().join(', ');
+    imports.push(`import { ${pathNames} } from 'juntos:paths';`);
+  }
+
+  // Find model references
+  const modelRefRegex = /\b([A-Z][a-z]\w+)\.(create|find|where|all|first|last|count|new|order|destroy_all)\b/g;
+  const referencedModels = new Set();
+  while ((match = modelRefRegex.exec(code)) !== null) {
+    referencedModels.add(match[1]);
+  }
+  const fixtureModelRegex = /await\s+([A-Z][a-z]\w+)\.create\b/g;
+  while ((match = fixtureModelRegex.exec(code)) !== null) {
+    referencedModels.add(match[1]);
+  }
+  if (referencedModels.size > 0) {
+    const modelNames = [...referencedModels].sort().join(', ');
+    imports.push(`import { ${modelNames} } from 'juntos:models';`);
+  }
+
+  if (imports.length === 0) return code;
+  return imports.join('\n') + '\n\n' + code;
+}
+
+/**
+ * Transpile Ruby test files to .test.mjs for Vitest consumption.
+ * Called by `juntos test` before running vitest.
+ * Writes .test.mjs files alongside the .rb source files.
+ */
+async function transpileTestFiles(appRoot, config) {
+  const testDir = join(appRoot, 'test');
+  if (!existsSync(testDir)) return;
+
+  // Check if there are any Ruby test files
+  const modelTestDir = join(testDir, 'models');
+  const controllerTestDir = join(testDir, 'controllers');
+  const hasModelTests = existsSync(modelTestDir) && findRubyTestFiles(modelTestDir).length > 0;
+  const hasControllerTests = existsSync(controllerTestDir) && findRubyTestFiles(controllerTestDir).length > 0;
+  if (!hasModelTests && !hasControllerTests) return;
+
+  await ensureRuby2jsReady();
+
+  // Parse fixture YAML files
+  const fixtures = parseFixtureFiles(appRoot);
+
+  // Build association map from Ruby source files (not transpiled .js)
+  const associationMap = buildAssociationMapFromRuby(join(appRoot, 'app/models'));
+
+  let count = 0;
+
+  // Transpile model tests
+  if (hasModelTests) {
+    for (const file of findRubyTestFiles(modelTestDir)) {
+      const outName = file.replace(/_test\.rb$/, '.test.mjs');
+      const outPath = join(modelTestDir, outName);
+
+      // Skip if .test.mjs is newer than _test.rb
+      if (existsSync(outPath)) {
+        const rbStat = statSync(join(modelTestDir, file));
+        const mjsStat = statSync(outPath);
+        if (mjsStat.mtimeMs > rbStat.mtimeMs) continue;
+      }
+
+      try {
+        const source = readFileSync(join(modelTestDir, file), 'utf-8');
+        const result = await transformRuby(source, join(modelTestDir, file), 'test', config, appRoot);
+        let code = result.code;
+
+        if (Object.keys(fixtures).length > 0) {
+          code = inlineFixtures(code, fixtures, associationMap);
+        }
+
+        code = addModelImportsVirtual(code);
+        writeFileSync(outPath, code);
+        count++;
+      } catch (err) {
+        console.warn(`  Warning: Failed to transpile ${file}: ${err.message}`);
+      }
+    }
+  }
+
+  // Transpile controller tests
+  if (hasControllerTests) {
+    for (const file of findRubyTestFiles(controllerTestDir)) {
+      const outName = file.replace(/_test\.rb$/, '.test.mjs');
+      const outPath = join(controllerTestDir, outName);
+
+      // Skip if .test.mjs is newer than _test.rb
+      if (existsSync(outPath)) {
+        const rbStat = statSync(join(controllerTestDir, file));
+        const mjsStat = statSync(outPath);
+        if (mjsStat.mtimeMs > rbStat.mtimeMs) continue;
+      }
+
+      try {
+        const source = readFileSync(join(controllerTestDir, file), 'utf-8');
+        const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, appRoot);
+        let code = result.code;
+
+        if (Object.keys(fixtures).length > 0) {
+          code = inlineFixtures(code, fixtures, associationMap);
+        }
+
+        code = addControllerImportsVirtual(code);
+        writeFileSync(outPath, code);
+        count++;
+      } catch (err) {
+        console.warn(`  Warning: Failed to transpile ${file}: ${err.message}`);
+      }
+    }
+  }
+
+  if (count > 0) {
+    console.log(`Transpiled ${count} test file${count > 1 ? 's' : ''}.`);
+  }
+}
+
+// ============================================
 // Argument parsing
 // ============================================
 
@@ -2521,12 +2731,20 @@ function runDoctor(options) {
 // Command: test
 // ============================================
 
-function runTest(options, testArgs) {
+async function runTest(options, testArgs) {
   validateRailsApp();
   loadDatabaseConfig(options);
   validateDatabaseTarget(options);
   ensurePackagesInstalled(options);
   applyEnvOptions(options);
+
+  // Transpile Ruby test files to .test.mjs before running vitest
+  const { loadConfig } = await import('./vite.mjs');
+  const config = loadConfig(APP_ROOT, {
+    database: options.database,
+    target: options.target
+  });
+  await transpileTestFiles(APP_ROOT, config);
 
   // Ensure vitest is installed
   if (!isPackageInstalled('vitest')) {
@@ -3124,7 +3342,10 @@ switch (command) {
       console.log('  juntos test -d sqlite          # Run tests with SQLite');
       process.exit(0);
     }
-    runTest(options, commandArgs);
+    runTest(options, commandArgs).catch(err => {
+      console.error(`Test failed: ${err.message}`);
+      process.exit(1);
+    });
     break;
 
   case 'deploy':

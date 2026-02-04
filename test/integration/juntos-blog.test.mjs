@@ -4,9 +4,11 @@
 // The demo contains:
 // - app/models/*.rb - Model definitions with validations and associations
 // - app/controllers/*.rb - Controller actions
-// - test/*.test.mjs - Vitest tests that exercise the above
+// - test/models/*_test.rb - Model tests (transpiled to .test.mjs by juntos test)
+// - test/controllers/*_test.rb - Controller tests (transpiled to .test.mjs by juntos test)
 //
-// The Vite plugin transforms .rb files on-the-fly during test runs.
+// `juntos test` transpiles Ruby test files to .test.mjs, then runs Vitest.
+// The Vite plugin transforms app .rb files on-the-fly during test runs.
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { execSync } from 'child_process';
@@ -24,20 +26,22 @@ describe('Blog Demo Integration Tests', () => {
       throw new Error(`Demo not found at ${DEMO_DIR}. Run: node setup.mjs blog`);
     }
 
-    // Verify test files exist
-    if (!existsSync(join(DEMO_DIR, 'test/articles.test.mjs'))) {
+    // Verify Ruby test files exist (these get transpiled to .test.mjs by juntos test)
+    const hasModelTests = existsSync(join(DEMO_DIR, 'test/models'));
+    const hasControllerTests = existsSync(join(DEMO_DIR, 'test/controllers'));
+    if (!hasModelTests && !hasControllerTests) {
       throw new Error('Test files not found. The demo may need to be regenerated.');
     }
   });
 
   it('runs the demo test suite successfully', () => {
-    // Run npm test in the demo directory
-    // This executes vitest which transforms .rb files on-the-fly
+    // Run juntos test which transpiles Ruby test files then runs vitest
     try {
-      const output = execSync('JUNTOS_DATABASE=sqlite npm test', {
+      const output = execSync('npx juntos test -d sqlite', {
         cwd: DEMO_DIR,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 120000,
         env: {
           ...process.env,
           JUNTOS_DATABASE: 'sqlite',
