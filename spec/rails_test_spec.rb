@@ -666,7 +666,7 @@ describe Ruby2JS::Filter::Rails::Test do
   end
 
   describe "assert_response" do
-    it "converts assert_response :success to expect(response).toBeDefined()" do
+    it "converts assert_response :success to check no redirect" do
       result = to_controller_js(<<~RUBY)
         class ArticlesControllerTest < ActionDispatch::IntegrationTest
           test "success" do
@@ -675,10 +675,10 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(response).toBeDefined()'
+      assert_includes result, 'expect(response.redirect).toBeUndefined()'
     end
 
-    it "converts assert_response :redirect" do
+    it "converts assert_response :redirect to check redirect present" do
       result = to_controller_js(<<~RUBY)
         class ArticlesControllerTest < ActionDispatch::IntegrationTest
           test "redirect" do
@@ -688,6 +688,18 @@ describe Ruby2JS::Filter::Rails::Test do
         end
       RUBY
       assert_includes result, 'expect(response.redirect).toBeDefined()'
+    end
+
+    it "converts assert_response :unprocessable_entity to check render present" do
+      result = to_controller_js(<<~RUBY)
+        class ArticlesControllerTest < ActionDispatch::IntegrationTest
+          test "validation error" do
+            post articles_url, params: { article: { title: "" } }
+            assert_response :unprocessable_entity
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(response.render).toBeDefined()'
     end
   end
 
@@ -944,7 +956,7 @@ describe Ruby2JS::Filter::Rails::Test do
   end
 
   describe "non-standard assert_response codes" do
-    it "converts assert_response with numeric code" do
+    it "converts numeric 303 to redirect check" do
       result = to_controller_js(<<~RUBY)
         class FooControllerTest < ActionDispatch::IntegrationTest
           test "303" do
@@ -953,10 +965,22 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(response.status).toBe(303)'
+      assert_includes result, 'expect(response.redirect).toBeDefined()'
     end
 
-    it "converts assert_response :unprocessable_content" do
+    it "converts numeric 422 to render check" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "422" do
+            post items_url, params: { item: {} }
+            assert_response 422
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(response.render).toBeDefined()'
+    end
+
+    it "converts assert_response :unprocessable_content to render check" do
       result = to_controller_js(<<~RUBY)
         class FooControllerTest < ActionDispatch::IntegrationTest
           test "422" do
@@ -965,10 +989,10 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(response.status).toBe(422)'
+      assert_includes result, 'expect(response.render).toBeDefined()'
     end
 
-    it "converts assert_response :no_content" do
+    it "converts assert_response :no_content to success check" do
       result = to_controller_js(<<~RUBY)
         class FooControllerTest < ActionDispatch::IntegrationTest
           test "204" do
@@ -977,10 +1001,10 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(response.status).toBe(204)'
+      assert_includes result, 'expect(response.redirect).toBeUndefined()'
     end
 
-    it "converts assert_response :created" do
+    it "converts assert_response :created to success check" do
       result = to_controller_js(<<~RUBY)
         class FooControllerTest < ActionDispatch::IntegrationTest
           test "201" do
@@ -989,7 +1013,19 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(response.status).toBe(201)'
+      assert_includes result, 'expect(response.redirect).toBeUndefined()'
+    end
+
+    it "converts numeric 200 to success check" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "200" do
+            get items_url
+            assert_response 200
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(response.redirect).toBeUndefined()'
     end
   end
 

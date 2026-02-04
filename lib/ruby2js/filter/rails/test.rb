@@ -538,35 +538,6 @@ module Ruby2JS
         # Standard REST actions — URL helpers with these names map directly
         STANDARD_REST_ACTIONS = %w[new edit].freeze
 
-        # Map of HTTP status symbols to numeric codes
-        STATUS_CODES = {
-          success: nil, # special case: toBeDefined
-          redirect: nil, # special case: redirect.toBeDefined
-          ok: 200,
-          created: 201,
-          accepted: 202,
-          no_content: 204,
-          moved_permanently: 301,
-          found: 302,
-          see_other: 303,
-          not_modified: 304,
-          bad_request: 400,
-          unauthorized: 401,
-          forbidden: 403,
-          not_found: 404,
-          method_not_allowed: 405,
-          not_acceptable: 406,
-          conflict: 409,
-          gone: 410,
-          unprocessable_entity: 422,
-          unprocessable_content: 422,
-          too_many_requests: 429,
-          internal_server_error: 500,
-          not_implemented: 501,
-          bad_gateway: 502,
-          service_unavailable: 503
-        }.freeze
-
         # Parse URL helper to extract controller and action info.
         #
         # Handles:
@@ -799,8 +770,23 @@ module Ruby2JS
           process(s(:send, nil, method, *args))
         end
 
-        # Transform assert_response to expect() calls
-        # Handles :success, :redirect, numeric codes, and HTTP status symbols
+        # Transform assert_response to expect() calls.
+        #
+        # Transpiled controller actions return:
+        #   {redirect: path}  for redirects
+        #   {render: view}    for validation errors (re-rendered form)
+        #   string/view       for successful renders
+        #
+        # So we map Rails status categories to property checks:
+        #   :success                -> expect(response.redirect).toBeUndefined()
+        #   :redirect               -> expect(response.redirect).toBeDefined()
+        #   :unprocessable_entity   -> expect(response.render).toBeDefined()
+        #   :no_content / :ok etc.  -> expect(response.redirect).toBeUndefined()
+        #
+        # Redirect status codes (301, 302, 303, 307, 308) check redirect property.
+        # Client/server error codes (4xx, 5xx) check render property.
+        # Success codes (2xx) check absence of redirect.
+        #
         def transform_assert_response(args)
           return nil if args.empty?
 
@@ -808,26 +794,42 @@ module Ruby2JS
           if status.type == :sym
             sym = status.children.first
             case sym
-            when :success
-              # expect(response).toBeDefined()
-              s(:send!, s(:send, nil, :expect, s(:lvar, :response)), :toBeDefined)
-            when :redirect
+            when :success, :ok, :no_content, :created, :accepted
+              # Successful response — not a redirect
+              # expect(response.redirect).toBeUndefined()
+              s(:send!, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :redirect)), :toBeUndefined)
+            when :redirect, :moved_permanently, :found, :see_other
+              # Redirect response
               # expect(response.redirect).toBeDefined()
               s(:send!, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :redirect)), :toBeDefined)
+            when :unprocessable_entity, :unprocessable_content
+              # Validation error — re-rendered form
+              # expect(response.render).toBeDefined()
+              s(:send!, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :render)), :toBeDefined)
+            when :not_found, :forbidden, :unauthorized, :bad_request,
+                 :method_not_allowed, :not_acceptable, :conflict, :gone,
+                 :too_many_requests, :internal_server_error, :not_implemented,
+                 :bad_gateway, :service_unavailable, :not_modified
+              # Error/other status — check render property
+              # expect(response.render).toBeDefined()
+              s(:send!, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :render)), :toBeDefined)
             else
-              # Look up status code from symbol
-              code = STATUS_CODES[sym]
-              if code
-                # expect(response.status).toBe(code)
-                s(:send, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :status)), :toBe, s(:int, code))
-              else
-                # Unknown symbol - pass through as status check
-                s(:send, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :status)), :toBe, s(:str, sym.to_s))
-              end
+              # Unknown symbol — fall back to render check
+              s(:send!, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :render)), :toBeDefined)
             end
           elsif status.type == :int
-            # Numeric status code: assert_response 303
-            s(:send, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :status)), :toBe, status)
+            # Numeric status code — categorize by range
+            code = status.children.first
+            if code >= 300 && code < 400
+              # Redirect range
+              s(:send!, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :redirect)), :toBeDefined)
+            elsif code >= 400
+              # Client/server error range
+              s(:send!, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :render)), :toBeDefined)
+            else
+              # 2xx success range
+              s(:send!, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :redirect)), :toBeUndefined)
+            end
           else
             nil
           end
