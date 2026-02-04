@@ -281,145 +281,73 @@ two:
   body: This pattern really helps keep code organized!
 FIXTURES
 
-# Create integration test for articles (demo-specific)
-cat > test/articles.test.mjs << 'TEST'
-import { describe, it, expect } from 'vitest';
+# Replace scaffold-generated model test stubs with real tests
+cat > test/models/article_test.rb << 'TEST'
+require "test_helper"
 
-describe('Article Model', () => {
-  it('creates an article with valid attributes', async () => {
-    const { Article } = await import('juntos:models');
+class ArticleTest < ActiveSupport::TestCase
+  test "creates an article with valid attributes" do
+    article = Article.create(title: "Test Article", body: "This is the body of the test article with enough content.")
+    assert_not_nil article.id
+    assert_equal "Test Article", article.title
+  end
 
-    const article = await Article.create({
-      title: 'Test Article',
-      body: 'This is the body of the test article with enough content.'
-    });
+  test "validates title presence" do
+    article = Article.new(title: "", body: "Valid body content here.")
+    assert_not article.save
+  end
 
-    expect(article.id).toBeDefined();
-    expect(article.title).toBe('Test Article');
-  });
+  test "validates body minimum length" do
+    article = Article.new(title: "Valid Title", body: "Short")
+    assert_not article.save
+  end
+end
+TEST
 
-  it('validates title presence', async () => {
-    const { Article } = await import('juntos:models');
+cat > test/models/comment_test.rb << 'TEST'
+require "test_helper"
 
-    const article = new Article({ title: '', body: 'Valid body content here.' });
-    const saved = await article.save();
+class CommentTest < ActiveSupport::TestCase
+  test "creates a comment on an article" do
+    article = Article.create(title: "Article with Comments", body: "This article will have comments attached.")
+    comment = Comment.create(article_id: article.id, commenter: "Test User", body: "This is a test comment.")
+    assert_not_nil comment.id
+    assert_equal article.id, comment.article_id
+  end
 
-    expect(saved).toBe(false);
-    expect(article.errors.title).toBeDefined();
-  });
+  test "belongs to article association" do
+    article = Article.create(title: "Parent Article", body: "This article has a comment child.")
+    comment = Comment.create(article_id: article.id, commenter: "Commenter", body: "Comment body text.")
+    assert_equal article.id, comment.article.id
+  end
+end
+TEST
 
-  it('validates body minimum length', async () => {
-    const { Article } = await import('juntos:models');
+# Fix scaffold-generated comments controller test for nested routes
+# (comments are nested under articles, only create and destroy actions exist)
+cat > test/controllers/comments_controller_test.rb << 'TEST'
+require "test_helper"
 
-    const article = new Article({ title: 'Valid Title', body: 'Short' });
-    const saved = await article.save();
+class CommentsControllerTest < ActionDispatch::IntegrationTest
+  setup do
+    @article = articles(:one)
+    @comment = comments(:one)
+  end
 
-    expect(saved).toBe(false);
-    expect(article.errors.body).toBeDefined();
-  });
-});
+  test "should create comment" do
+    assert_difference("Comment.count") do
+      post article_comments_url(@article), params: { comment: { commenter: "Test", body: "A test comment." } }
+    end
+    assert_redirected_to article_url(@article)
+  end
 
-describe('Comment Model', () => {
-  it('creates a comment on an article', async () => {
-    const { Article, Comment } = await import('juntos:models');
-
-    const article = await Article.create({
-      title: 'Article with Comments',
-      body: 'This article will have comments attached.'
-    });
-
-    const comment = await Comment.create({
-      article_id: article.id,
-      commenter: 'Test User',
-      body: 'This is a test comment.'
-    });
-
-    expect(comment.id).toBeDefined();
-    expect(comment.article_id).toBe(article.id);
-  });
-
-  it('belongs to article association', async () => {
-    const { Article, Comment } = await import('juntos:models');
-
-    const article = await Article.create({
-      title: 'Parent Article',
-      body: 'This article has a comment child.'
-    });
-
-    const comment = await Comment.create({
-      article_id: article.id,
-      commenter: 'Commenter',
-      body: 'Comment body text.'
-    });
-
-    const parentArticle = await comment.article;
-    expect(parentArticle.id).toBe(article.id);
-  });
-});
-
-describe('ArticlesController', () => {
-  it('index action returns list', async () => {
-    const { Article } = await import('juntos:models');
-    const { ArticlesController } = await import('../app/controllers/articles_controller.rb');
-
-    await Article.create({ title: 'Listed Article', body: 'This should appear in the index.' });
-
-    const context = {
-      params: {},
-      flash: { get: () => '', consumeNotice: () => ({ present: false }), consumeAlert: () => '' },
-      contentFor: {}
-    };
-
-    const html = await ArticlesController.index(context);
-    expect(html).toContain('Listed Article');
-  });
-
-  it('show action returns article details', async () => {
-    const { Article } = await import('juntos:models');
-    const { ArticlesController } = await import('../app/controllers/articles_controller.rb');
-
-    const article = await Article.create({
-      title: 'Show This Article',
-      body: 'The full article body should be visible on show page.'
-    });
-
-    const context = {
-      params: { id: article.id },
-      flash: { get: () => '', consumeNotice: () => ({ present: false }), consumeAlert: () => '' },
-      contentFor: {}
-    };
-
-    const html = await ArticlesController.show(context, article.id);
-    expect(html).toContain('Show This Article');
-  });
-
-  it('create action adds a new article', async () => {
-    const { Article } = await import('juntos:models');
-    const { ArticlesController } = await import('../app/controllers/articles_controller.rb');
-
-    const context = {
-      params: {},
-      flash: { set: () => {} },
-      contentFor: {}
-    };
-
-    const params = {
-      article: {
-        title: 'New Article via Controller',
-        body: 'Created through the controller action.'
-      }
-    };
-
-    const result = await ArticlesController.create(context, params);
-
-    // Should return redirect after successful create
-    expect(result.redirect).toBeDefined();
-
-    const articles = await Article.all();
-    expect(articles.length).toBe(1);
-    expect(articles[0].title).toBe('New Article via Controller');
-  });
-});
+  test "should destroy comment" do
+    assert_difference("Comment.count", -1) do
+      delete article_comment_url(@article, @comment)
+    end
+    assert_redirected_to article_url(@article)
+  end
+end
 TEST
 
 echo ""
