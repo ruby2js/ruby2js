@@ -41,10 +41,13 @@ class Article < ApplicationRecord
 end
 MODEL
 
-# Update Comment model with broadcasting
+# Update Comment model with validations and broadcasting
 cat > app/models/comment.rb << 'MODEL'
 class Comment < ApplicationRecord
   belongs_to :article
+
+  validates :commenter, presence: true
+  validates :body, presence: true
 
   # Broadcast comment changes to article show page subscribers
   # Lambda receives the record being broadcast
@@ -56,6 +59,16 @@ class Comment < ApplicationRecord
   after_destroy_commit { article.broadcast_replace_to("articles") rescue nil }
 end
 MODEL
+
+# Remove unused scaffold views for comments (only _comment partial is used)
+rm -f app/views/comments/index.html.erb
+rm -f app/views/comments/show.html.erb
+rm -f app/views/comments/new.html.erb
+rm -f app/views/comments/edit.html.erb
+rm -f app/views/comments/_form.html.erb
+rm -f app/views/comments/index.json.jbuilder
+rm -f app/views/comments/show.json.jbuilder
+rm -f app/views/comments/_comment.json.jbuilder
 
 # Set up nested routes
 cat > config/routes.rb << 'ROUTES'
@@ -319,6 +332,18 @@ class CommentTest < ActiveSupport::TestCase
     article = Article.create(title: "Parent Article", body: "This article has a comment child.")
     comment = article.comments.create(commenter: "Commenter", body: "Comment body text.")
     assert_equal article.id, comment.article_id
+  end
+
+  test "requires commenter" do
+    article = Article.create(title: "Test Article", body: "Article body text here.")
+    comment = article.comments.build(body: "Comment without commenter")
+    assert_not comment.save
+  end
+
+  test "requires body" do
+    article = Article.create(title: "Test Article", body: "Article body text here.")
+    comment = article.comments.build(commenter: "Someone")
+    assert_not comment.save
   end
 end
 TEST
