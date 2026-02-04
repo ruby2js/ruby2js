@@ -45,6 +45,8 @@ import {
   fixTestImportsForEject
 } from './transform.mjs';
 
+import { singularize, camelize, pluralize, underscore } from './adapters/inflector.mjs';
+
 // loadConfig is dynamically imported from vite.mjs when needed (in runEject)
 // to avoid loading js-yaml at startup, which may not be installed yet
 
@@ -169,6 +171,386 @@ function loadEjectConfig(appRoot) {
     console.warn(`Warning: Failed to parse ruby2js.yml: ${e.message}`);
     return { include: [], exclude: [], output: null };
   }
+}
+
+// ============================================
+// Test file transpilation helpers
+// ============================================
+
+/**
+ * Recursively find Ruby test files (*_test.rb) in a directory.
+ */
+function findRubyTestFiles(dir) {
+  const files = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      const subFiles = findRubyTestFiles(join(dir, entry.name));
+      files.push(...subFiles.map(f => join(entry.name, f)));
+    } else if (entry.name.endsWith('_test.rb') && !entry.name.startsWith('._')) {
+      files.push(entry.name);
+    }
+  }
+  return files;
+}
+
+/**
+ * Parse all fixture YAML files from test/fixtures/.
+ * Returns a map: { table_name: { fixture_name: { column: value, ... }, ... }, ... }
+ */
+function parseFixtureFiles(appRoot) {
+  const fixturesDir = join(appRoot, 'test/fixtures');
+  if (!existsSync(fixturesDir)) return {};
+  if (!yaml) return {};
+
+  const fixtures = {};
+  const fixtureFiles = readdirSync(fixturesDir)
+    .filter(f => f.endsWith('.yml') && !f.startsWith('._'));
+
+  for (const file of fixtureFiles) {
+    const tableName = file.replace('.yml', '');
+    try {
+      let content = readFileSync(join(fixturesDir, file), 'utf-8');
+      // Handle simple ERB expressions (e.g., <%= Date.current.iso8601 %>)
+      content = content.replace(/<%=\s*Date\.current\.iso8601\s*%>/g, new Date().toISOString().split('T')[0]);
+      content = content.replace(/<%=\s*Date\.today\.iso8601\s*%>/g, new Date().toISOString().split('T')[0]);
+      content = content.replace(/<%=\s*Time\.now\.iso8601\s*%>/g, new Date().toISOString());
+      // Remove remaining ERB tags (best-effort)
+      content = content.replace(/<%.*?%>/g, '""');
+
+      const parsed = yaml.load(content);
+      if (parsed && typeof parsed === 'object') {
+        fixtures[tableName] = parsed;
+      }
+    } catch (err) {
+      if (DEBUG) {
+        console.warn(`    Warning: Failed to parse fixture ${file}: ${err.message}`);
+      }
+    }
+  }
+  return fixtures;
+}
+
+/**
+ * Build an association map from transpiled model files.
+ * Reads .associations = {...} from each model file.
+ * Returns: { table_name: { assoc_name: target_table, ... }, ... }
+ */
+function buildAssociationMap(modelsDir) {
+  const assocMap = {};
+  if (!existsSync(modelsDir)) return assocMap;
+
+  const modelFiles = readdirSync(modelsDir)
+    .filter(f => f.endsWith('.js') && f !== 'index.js' && f !== 'application_record.js');
+
+  for (const file of modelFiles) {
+    try {
+      const content = readFileSync(join(modelsDir, file), 'utf-8');
+      // Match: ModelName.associations = {key: {type: "belongs_to", model: "ModelName"}, ...}
+      const match = content.match(/(\w+)\.associations\s*=\s*(\{[^}]+(?:\{[^}]*\}[^}]*)*\})/);
+      if (match) {
+        const className = match[1];
+        const tableName = underscore(pluralize(className));
+
+        // Parse the associations object (simplified — extract key: {model: "X"} pairs)
+        const assocStr = match[2];
+        const assocRegex = /(\w+):\s*\{[^}]*model:\s*"(\w+)"/g;
+        let assocMatch;
+        const tableAssocs = {};
+        while ((assocMatch = assocRegex.exec(assocStr)) !== null) {
+          const assocName = assocMatch[1];
+          const targetModel = assocMatch[2];
+          const targetTable = underscore(pluralize(targetModel));
+          tableAssocs[assocName] = targetTable;
+        }
+        if (Object.keys(tableAssocs).length > 0) {
+          assocMap[tableName] = tableAssocs;
+        }
+      }
+    } catch (err) {
+      // Skip files that can't be read
+    }
+  }
+  return assocMap;
+}
+
+/**
+ * Build dependency graph from fixtures and topologically sort tables.
+ * Returns ordered array of table names.
+ */
+function topologicalSortTables(referencedTables, fixtures, associationMap) {
+  const deps = {};  // table -> Set of tables it depends on
+  for (const table of referencedTables) {
+    deps[table] = new Set();
+    const tableAssocs = associationMap[table] || {};
+    const tableFixtures = fixtures[table] || {};
+
+    for (const fixtureName of Object.keys(tableFixtures)) {
+      const fixtureData = tableFixtures[fixtureName];
+      if (!fixtureData || typeof fixtureData !== 'object') continue;
+
+      for (const [col, value] of Object.entries(fixtureData)) {
+        // Check if this column is a foreign key reference
+        if (col.endsWith('_id') && typeof value === 'number') {
+          // Explicit ID - no dependency
+          continue;
+        }
+        // Check if column matches an association
+        const targetTable = tableAssocs[col];
+        if (targetTable && referencedTables.has(targetTable) && typeof value === 'string') {
+          deps[table].add(targetTable);
+        }
+      }
+    }
+  }
+
+  // Topological sort (Kahn's algorithm)
+  // inDegree[A] = number of tables A depends on (must be created first)
+  const sorted = [];
+  const indeg = {};
+  for (const table of referencedTables) {
+    indeg[table] = deps[table]?.size || 0;
+  }
+
+  const queue = [];
+  for (const table of referencedTables) {
+    if (indeg[table] === 0) queue.push(table);
+  }
+
+  while (queue.length > 0) {
+    const table = queue.shift();
+    sorted.push(table);
+    // Find tables that depend on this one and decrement their in-degree
+    for (const [other, otherDeps] of Object.entries(deps)) {
+      if (otherDeps.has(table)) {
+        indeg[other]--;
+        if (indeg[other] === 0) {
+          queue.push(other);
+        }
+      }
+    }
+  }
+
+  // If there are remaining tables (cycle), append them
+  for (const table of referencedTables) {
+    if (!sorted.includes(table)) {
+      sorted.push(table);
+    }
+  }
+
+  return sorted;
+}
+
+/**
+ * Scan transpiled test code for fixture function calls and inline fixture data.
+ *
+ * Fixture calls look like: tableName("fixtureName") e.g., songs("one"), dances("waltz")
+ * These are replaced with _fixtures.tableName_fixtureName references,
+ * and a beforeEach block is prepended with Model.create() calls.
+ */
+function inlineFixtures(code, fixtures, associationMap) {
+  // Find all fixture references: word("string")
+  const fixtureCallRegex = /\b([a-z_]+)\("(\w+)"\)/g;
+  const referencedFixtures = new Map();  // "table_fixture" -> { table, fixture }
+  let match;
+
+  while ((match = fixtureCallRegex.exec(code)) !== null) {
+    const tableName = match[1];
+    const fixtureName = match[2];
+    // Verify this table exists in fixtures
+    if (fixtures[tableName] && fixtures[tableName][fixtureName]) {
+      const key = `${tableName}_${fixtureName}`;
+      referencedFixtures.set(key, { table: tableName, fixture: fixtureName });
+    }
+  }
+
+  if (referencedFixtures.size === 0) return code;
+
+  // Resolve transitive dependencies
+  const allFixtures = new Map(referencedFixtures);
+  const toResolve = [...referencedFixtures.values()];
+  while (toResolve.length > 0) {
+    const { table, fixture } = toResolve.pop();
+    const fixtureData = fixtures[table]?.[fixture];
+    if (!fixtureData || typeof fixtureData !== 'object') continue;
+
+    const tableAssocs = associationMap[table] || {};
+    for (const [col, value] of Object.entries(fixtureData)) {
+      const targetTable = tableAssocs[col];
+      if (targetTable && typeof value === 'string' && fixtures[targetTable]?.[value]) {
+        const key = `${targetTable}_${value}`;
+        if (!allFixtures.has(key)) {
+          allFixtures.set(key, { table: targetTable, fixture: value });
+          toResolve.push({ table: targetTable, fixture: value });
+        }
+      }
+    }
+  }
+
+  // Collect all referenced tables and sort by dependency
+  const referencedTables = new Set([...allFixtures.values()].map(f => f.table));
+  const sortedTables = topologicalSortTables(referencedTables, fixtures, associationMap);
+
+  // Generate fixture creation code
+  const createLines = [];
+  const sortedFixtures = [];
+
+  for (const table of sortedTables) {
+    const tableFixtures = [...allFixtures.values()].filter(f => f.table === table);
+    for (const { fixture } of tableFixtures) {
+      const fixtureData = fixtures[table]?.[fixture];
+      if (!fixtureData || typeof fixtureData !== 'object') continue;
+
+      const key = `${table}_${fixture}`;
+      const modelName = camelize(singularize(table));
+      const tableAssocs = associationMap[table] || {};
+
+      // Build create attributes
+      const attrs = [];
+      for (const [col, value] of Object.entries(fixtureData)) {
+        const targetTable = tableAssocs[col];
+        if (targetTable && typeof value === 'string' && allFixtures.has(`${targetTable}_${value}`)) {
+          // Foreign key reference - use _fixtures ref
+          attrs.push(`${col}_id: _fixtures.${targetTable}_${value}.id`);
+        } else if (col.endsWith('_id') || col === 'id') {
+          // Explicit ID
+          attrs.push(`${col}: ${JSON.stringify(value)}`);
+        } else {
+          // Regular attribute
+          attrs.push(`${col}: ${JSON.stringify(value)}`);
+        }
+      }
+
+      createLines.push(`  _fixtures.${key} = await ${modelName}.create({${attrs.join(', ')}});`);
+      sortedFixtures.push({ key, table, fixture, modelName });
+    }
+  }
+
+  if (createLines.length === 0) return code;
+
+  // Build the fixture beforeEach block
+  const fixtureSetup = `let _fixtures = {};\n\nbeforeEach(async () => {\n${createLines.join('\n')}\n});`;
+
+  // Replace fixture calls with _fixtures references
+  let result = code;
+  for (const [key, { table, fixture }] of allFixtures) {
+    // Replace tableName("fixtureName") with _fixtures.tableName_fixtureName
+    const callPattern = new RegExp(`\\b${table}\\("${fixture}"\\)`, 'g');
+    result = result.replace(callPattern, `_fixtures.${key}`);
+  }
+
+  // Insert fixture setup after the opening of describe block
+  // Match various describe formats:
+  //   describe("Name", () => {
+  //   describe(\n  "Name",\n  () => {
+  const describeMatch = result.match(/(describe\([\s\S]*?\(\)\s*=>\s*\{)\s*\n/);
+  if (describeMatch) {
+    const insertPoint = describeMatch.index + describeMatch[0].length;
+    result = result.slice(0, insertPoint) + fixtureSetup + '\n\n' + result.slice(insertPoint);
+  } else {
+    // Fallback: prepend before first test/beforeEach
+    result = fixtureSetup + '\n\n' + result;
+  }
+
+  return result;
+}
+
+/**
+ * Add model imports to a test file based on model references found in the code.
+ * Scans for Model.create, Model.find, etc. and adds import statements.
+ */
+function addModelImportsToTest(code, modelsDir) {
+  if (!existsSync(modelsDir)) return code;
+
+  // Find all model references (PascalCase.method or extends PascalCase)
+  const modelRefRegex = /\b([A-Z][a-z]\w+)\.(create|find|where|all|first|last|count|new|order|destroy_all)\b/g;
+  const referencedModels = new Set();
+  let match;
+
+  while ((match = modelRefRegex.exec(code)) !== null) {
+    referencedModels.add(match[1]);
+  }
+
+  // Also check for models in fixture creation (_fixtures references use model names)
+  const fixtureModelRegex = /await\s+([A-Z][a-z]\w+)\.create\b/g;
+  while ((match = fixtureModelRegex.exec(code)) !== null) {
+    referencedModels.add(match[1]);
+  }
+
+  if (referencedModels.size === 0) return code;
+
+  // Build import statements
+  const imports = [];
+  for (const modelName of referencedModels) {
+    const modelFile = underscore(modelName) + '.js';
+    if (existsSync(join(modelsDir, modelFile))) {
+      imports.push(`import { ${modelName} } from '../../app/models/${modelFile}';`);
+    }
+  }
+
+  if (imports.length === 0) return code;
+
+  // Prepend imports to file
+  return imports.join('\n') + '\n\n' + code;
+}
+
+/**
+ * Add controller and path helper imports to a controller test file.
+ * Scans for XxxController.method patterns and xxx_path( patterns.
+ */
+function addControllerImportsToTest(code, controllersDir, modelsDir) {
+  const imports = [];
+
+  // Find controller references: XxxController.method
+  const controllerRefRegex = /\b([A-Z][a-z]\w*Controller)\.\w+/g;
+  const referencedControllers = new Set();
+  let match;
+  while ((match = controllerRefRegex.exec(code)) !== null) {
+    referencedControllers.add(match[1]);
+  }
+
+  // Add controller imports
+  for (const controllerName of referencedControllers) {
+    const controllerFile = underscore(controllerName) + '.js';
+    if (existsSync(join(controllersDir, controllerFile))) {
+      imports.push(`import { ${controllerName} } from '../../app/controllers/${controllerFile}';`);
+    }
+  }
+
+  // Find path helper references: xxx_path(
+  const pathRefRegex = /\b([a-z_]+_path)\s*\(/g;
+  const referencedPaths = new Set();
+  while ((match = pathRefRegex.exec(code)) !== null) {
+    referencedPaths.add(match[1]);
+  }
+
+  // Add path helper imports
+  if (referencedPaths.size > 0) {
+    const pathNames = [...referencedPaths].sort().join(', ');
+    imports.push(`import { ${pathNames} } from '../../config/paths.js';`);
+  }
+
+  // Add model imports (reuse existing logic)
+  if (modelsDir && existsSync(modelsDir)) {
+    const modelRefRegex = /\b([A-Z][a-z]\w+)\.(create|find|where|all|first|last|count|new|order|destroy_all)\b/g;
+    const referencedModels = new Set();
+    while ((match = modelRefRegex.exec(code)) !== null) {
+      referencedModels.add(match[1]);
+    }
+    const fixtureModelRegex = /await\s+([A-Z][a-z]\w+)\.create\b/g;
+    while ((match = fixtureModelRegex.exec(code)) !== null) {
+      referencedModels.add(match[1]);
+    }
+    for (const modelName of referencedModels) {
+      const modelFile = underscore(modelName) + '.js';
+      if (existsSync(join(modelsDir, modelFile))) {
+        imports.push(`import { ${modelName} } from '../../app/models/${modelFile}';`);
+      }
+    }
+  }
+
+  if (imports.length === 0) return code;
+
+  return imports.join('\n') + '\n\n' + code;
 }
 
 // ============================================
@@ -1268,6 +1650,100 @@ async function runEject(options) {
         } catch (err) {
           errors.push({ file: relativePath, error: err.message, stack: err.stack });
           console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+        }
+      }
+    }
+
+    // Transpile Ruby model test files
+    const modelTestDir = join(testDir, 'models');
+    if (existsSync(modelTestDir)) {
+      const rubyTestFiles = findRubyTestFiles(modelTestDir);
+      const filteredTestFiles = rubyTestFiles
+        .filter(f => shouldInclude(`test/models/${f}`));
+
+      if (filteredTestFiles.length > 0) {
+        console.log('  Transpiling model tests...');
+        const outModelTestDir = join(outDir, 'test/models');
+        if (!existsSync(outModelTestDir)) {
+          mkdirSync(outModelTestDir, { recursive: true });
+        }
+
+        // Parse fixture YAML files
+        const fixtures = parseFixtureFiles(APP_ROOT);
+
+        // Build association map from transpiled model files
+        const associationMap = buildAssociationMap(join(outDir, 'app/models'));
+
+        for (const file of filteredTestFiles) {
+          const relativePath = `test/models/${file}`;
+          const outName = file.replace(/_test\.rb$/, '.test.mjs');
+          try {
+            const source = readFileSync(join(modelTestDir, file), 'utf-8');
+            const result = await transformRuby(source, join(modelTestDir, file), 'test', config, APP_ROOT);
+            let code = fixTestImportsForEject(result.code);
+
+            // Inline fixtures if we have fixture data
+            if (Object.keys(fixtures).length > 0) {
+              code = inlineFixtures(code, fixtures, associationMap);
+            }
+
+            // Add model imports
+            code = addModelImportsToTest(code, join(outDir, 'app/models'));
+
+            writeFileSync(join(outModelTestDir, outName), code);
+            fileCount++;
+          } catch (err) {
+            errors.push({ file: relativePath, error: err.message, stack: err.stack });
+            console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+          }
+        }
+      }
+    }
+
+    // Transpile Ruby controller test files
+    const controllerTestDir = join(testDir, 'controllers');
+    if (existsSync(controllerTestDir)) {
+      const rubyControllerTestFiles = findRubyTestFiles(controllerTestDir);
+      const filteredControllerTestFiles = rubyControllerTestFiles
+        .filter(f => shouldInclude(`test/controllers/${f}`));
+
+      if (filteredControllerTestFiles.length > 0) {
+        console.log('  Transpiling controller tests...');
+        const outControllerTestDir = join(outDir, 'test/controllers');
+        if (!existsSync(outControllerTestDir)) {
+          mkdirSync(outControllerTestDir, { recursive: true });
+        }
+
+        // Parse fixture YAML files (reuse if already parsed for model tests)
+        const ctrlFixtures = parseFixtureFiles(APP_ROOT);
+        const ctrlAssociationMap = buildAssociationMap(join(outDir, 'app/models'));
+
+        for (const file of filteredControllerTestFiles) {
+          const relativePath = `test/controllers/${file}`;
+          const outName = file.replace(/_test\.rb$/, '.test.mjs');
+          try {
+            const source = readFileSync(join(controllerTestDir, file), 'utf-8');
+            const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, APP_ROOT);
+            let code = fixTestImportsForEject(result.code);
+
+            // Inline fixtures if we have fixture data
+            if (Object.keys(ctrlFixtures).length > 0) {
+              code = inlineFixtures(code, ctrlFixtures, ctrlAssociationMap);
+            }
+
+            // Add controller, model, and path helper imports
+            code = addControllerImportsToTest(
+              code,
+              join(outDir, 'app/controllers'),
+              join(outDir, 'app/models')
+            );
+
+            writeFileSync(join(outControllerTestDir, outName), code);
+            fileCount++;
+          } catch (err) {
+            errors.push({ file: relativePath, error: err.message, stack: err.stack });
+            console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+          }
         }
       }
     }
