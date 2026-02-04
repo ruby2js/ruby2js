@@ -661,6 +661,11 @@ function addControllerImportsVirtual(code) {
   while ((match = fixtureModelRegex.exec(code)) !== null) {
     referencedModels.add(match[1]);
   }
+  // Exclude controller names from model imports (e.g., ArticlesController.create
+  // matches the model regex but is a controller action call, not a model operation)
+  for (const controllerName of referencedControllers) {
+    referencedModels.delete(controllerName);
+  }
   if (referencedModels.size > 0) {
     const modelNames = [...referencedModels].sort().join(', ');
     imports.push(`import { ${modelNames} } from 'juntos:models';`);
@@ -668,6 +673,54 @@ function addControllerImportsVirtual(code) {
 
   if (imports.length === 0) return code;
   return imports.join('\n') + '\n\n' + code;
+}
+
+/**
+ * Hoist `let` variable declarations from beforeEach callbacks to describe scope.
+ *
+ * Rails setup blocks assign instance variables (@article = ...) that are
+ * accessible in all test methods. After transpilation, these become
+ * `let article = ...` inside a beforeEach callback, which is block-scoped
+ * and not accessible in test functions.
+ *
+ * This function transforms:
+ *   beforeEach(async () => { let article = expr });
+ * To:
+ *   let article; beforeEach(async () => { article = expr });
+ */
+function hoistBeforeEachVars(code) {
+  // Match: beforeEach(async () => { ... }) blocks containing let declarations
+  // Look for the pattern: beforeEach(async () => {\n  let var = expr\n});
+  // This handles single and multiple let declarations inside beforeEach
+  return code.replace(
+    /beforeEach\(async \(\) => \{([^}]*)\}\)/g,
+    (match, body) => {
+      const hoisted = [];
+      const newBody = body.replace(/\n(\s*)let (\w+)( = [^;\n]+)/g, (m, indent, name, assignment) => {
+        hoisted.push(`let ${name};`);
+        return `\n${indent}${name}${assignment}`;
+      });
+      if (hoisted.length === 0) return match;
+      return hoisted.join('\n') + '\n' + `beforeEach(async () => {${newBody}})`;
+    }
+  );
+}
+
+/**
+ * Fix redirect assertions to compare string representations.
+ *
+ * Path helpers return objects (with toString), not primitive strings.
+ * toBe uses Object.is (===) which fails on different instances.
+ * Converting to String() allows proper comparison.
+ *
+ * Transform: expect(response.redirect).toBe(article_path(...))
+ * To:        expect(String(response.redirect)).toBe(String(article_path(...)))
+ */
+function fixRedirectAssertions(code) {
+  return code.replace(
+    /expect\(response\.redirect\)\.toBe\((\w+_path\([^)]*\))\)/g,
+    'expect(String(response.redirect)).toBe(String($1))'
+  );
 }
 
 /**
@@ -719,6 +772,7 @@ async function transpileTestFiles(appRoot, config) {
         }
 
         code = addModelImportsVirtual(code);
+        code = hoistBeforeEachVars(code);
         writeFileSync(outPath, code);
         count++;
       } catch (err) {
@@ -750,6 +804,8 @@ async function transpileTestFiles(appRoot, config) {
         }
 
         code = addControllerImportsVirtual(code);
+        code = hoistBeforeEachVars(code);
+        code = fixRedirectAssertions(code);
         writeFileSync(outPath, code);
         count++;
       } catch (err) {

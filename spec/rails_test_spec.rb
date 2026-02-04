@@ -777,7 +777,9 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'let article = articles("one")'
+      # Hoisted declaration at describe scope, assignment inside beforeEach
+      assert_includes result, 'let article;'
+      assert_includes result, 'article = articles("one")'
       refute_includes result, '@article'
     end
   end
@@ -861,8 +863,9 @@ describe Ruby2JS::Filter::Rails::Test do
       assert_includes result, 'describe("ArticlesController"'
       # Should have context helper
       assert_includes result, 'function context(params = {})'
-      # Should have fixture setup
-      assert_includes result, 'let article = articles("one")'
+      # Should have fixture setup (hoisted declaration + assignment)
+      assert_includes result, 'let article;'
+      assert_includes result, 'article = articles("one")'
       # Should not have require or @ivars
       refute_includes result, 'require'
       refute_includes result, 'test_helper'

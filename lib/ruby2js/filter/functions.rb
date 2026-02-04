@@ -1248,9 +1248,12 @@ module Ruby2JS
 
           if body&.type == :begin && body.children.length > 1
             # Multi-statement block: negate only the last statement
-            *setup, last = body.children
+            # Use explicit slicing instead of splat to avoid selfhost transpilation issues
+            children = body.children
+            setup = children[0...-1]  # All but last
+            last_stmt = children[-1]  # Last element
             processed_setup = process_all(setup)
-            processed_last = process(last)
+            processed_last = process(last_stmt)
             negated_last = s(:send, s(:begin, processed_last), :!)
             new_body = s(:begin, *processed_setup, negated_last)
             node.updated nil, [process(call), process(node.children[1]),

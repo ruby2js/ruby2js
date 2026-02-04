@@ -229,11 +229,25 @@ module Ruby2JS
             # setup do ... end -> beforeEach(async () => { ... })
             body = node.children.last
             collect_test_model_references(body)
+
+            # Extract ivar names from setup body so they can be declared at
+            # describe scope. This ensures variables like @article set in setup
+            # are accessible in test functions (not block-scoped to beforeEach).
+            ivar_names = extract_ivar_names(body)
+
             wrapped_body = wrap_ar_operations(body)
             processed_body = process(wrapped_body)
 
             async_fn = s(:async, nil, s(:args), processed_body)
-            s(:send, nil, :beforeEach, async_fn)
+            before_each = s(:send, nil, :beforeEach, async_fn)
+
+            if ivar_names.any?
+              # Emit: let var1; let var2; beforeEach(async () => { var1 = ...; var2 = ... })
+              declarations = ivar_names.map { |name| s(:lvasgn, name) }
+              s(:begin, *declarations, before_each)
+            else
+              before_each
+            end
 
           when :teardown
             return super unless @rails_test_describe_depth > 0
@@ -342,6 +356,21 @@ module Ruby2JS
             file_str.end_with?('.test.rb') ||
             file_str.include?('/test/') ||
             file_str.include?('/spec/')
+        end
+
+        # Extract instance variable names from a setup body.
+        # Returns an array of symbols like [:article, :comment].
+        def extract_ivar_names(node)
+          names = []
+          return names unless node.respond_to?(:type)
+          if node.type == :ivasgn
+            names << node.children.first.to_s.sub(/^@/, '').to_sym
+          elsif node.type == :begin
+            node.children.each do |child|
+              names.concat(extract_ivar_names(child))
+            end
+          end
+          names.uniq
         end
 
         # Collect model references from test code
