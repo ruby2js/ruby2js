@@ -60,16 +60,6 @@ class Comment < ApplicationRecord
 end
 MODEL
 
-# Remove unused scaffold views for comments (only _comment partial is used)
-rm -f app/views/comments/index.html.erb
-rm -f app/views/comments/show.html.erb
-rm -f app/views/comments/new.html.erb
-rm -f app/views/comments/edit.html.erb
-rm -f app/views/comments/_form.html.erb
-rm -f app/views/comments/index.json.jbuilder
-rm -f app/views/comments/show.json.jbuilder
-rm -f app/views/comments/_comment.json.jbuilder
-
 # Set up nested routes
 cat > config/routes.rb << 'ROUTES'
 Rails.application.routes.draw do
