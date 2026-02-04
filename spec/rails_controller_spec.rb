@@ -906,7 +906,7 @@ describe Ruby2JS::Filter::Rails::Controller do
   end
 
   describe 'class methods (def self.foo)' do
-    it "transforms setter class method to set_name function" do
+    it "emits getter/setter accessor syntax on return object" do
       source = <<~RUBY
         class EventController < ApplicationController
           def self.logo
@@ -924,17 +924,25 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'function set_logo(logo)'
-      _(result).must_include 'function logo()'
-      _(result).must_include 'set_logo("new.png")'
-      _(result).wont_include 'logo=('
+      _(result).must_include 'get logo()'
+      _(result).must_include 'set logo('
+      # Setter parameter must not shadow the closure variable
+      _(result).wont_include 'set logo(logo)'
+      _(result).must_include 'set logo(_logo)'
+      # Caller should use ControllerName.prop = val syntax
+      _(result).must_include 'EventController.logo = "new.png"'
+      _(result).wont_include 'set_logo('
     end
 
-    it "transforms getter class method calls" do
+    it "preserves getter class method calls via ControllerName.prop" do
       source = <<~RUBY
         class EventController < ApplicationController
           def self.logo
             @@logo ||= 'default.png'
+          end
+
+          def self.logo=(logo)
+            @@logo = logo
           end
 
           def show
@@ -944,7 +952,52 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'logo()'
+      _(result).must_include 'EventController.logo'
+      _(result).must_include 'get logo()'
+    end
+
+    it "declares closure variable when no class-level @@cvar exists" do
+      source = <<~RUBY
+        class EventController < ApplicationController
+          def self.logo
+            @@logo ||= 'default.png'
+          end
+
+          def self.logo=(logo)
+            @@logo = logo == '' ? nil : logo
+          end
+
+          def show
+            EventController.logo = 'new.png'
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Should add `let logo` declaration at IIFE scope even without @@logo = nil
+      _(result).must_include 'let logo'
+      # Setter must assign to closure variable, not declare a new local
+      _(result).wont_include 'let logo ='
+      _(result).must_include 'logo = _logo'
+    end
+
+    it "keeps non-accessor class methods as bare calls" do
+      source = <<~RUBY
+        class TestController < ApplicationController
+          def self.version
+            "1.0"
+          end
+
+          def show
+            v = TestController.version
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include 'function version()'
+      _(result).must_include 'version()'
+      _(result).wont_include 'get version'
     end
   end
 

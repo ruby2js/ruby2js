@@ -127,8 +127,69 @@ module Ruby2JS
         end
       end
 
+      # Detect getter/setter pairs for object literal accessor syntax.
+      # Uses arrays (not hashes) to avoid iteration issues in selfhost JS.
+      # accessor_list: [[base_sym, getter_node_or_nil, setter_node], ...]
+      accessor_list = []
+      body.each do |node|
+        next unless node.respond_to?(:type) && node.type == :def
+        name_str = node.children.first.to_s
+        if name_str.end_with?('=')
+          base = name_str.chomp('=').to_sym
+          getter = body.find { |n| n.respond_to?(:type) && n.type == :def && n.children.first == base }
+          accessor_list.push [base, getter, node]
+        end
+      end
+
+      unless accessor_list.empty?
+        accessor_nodes = accessor_list.flat_map { |info| [info[1], info[2]].compact }
+        body = body.reject { |node| accessor_nodes.include?(node) }
+
+        # Build list of symbol names to exclude (both getter and setter names).
+        # Use reject+include? instead of Array#delete for JS compatibility.
+        excluded_syms = []
+        accessor_list.each do |info|
+          excluded_syms.push info[0]
+          excluded_syms.push :"#{info[0]}="
+        end
+        symbols = symbols.reject { |sym| excluded_syms.include?(sym) }
+
+        # Ensure closure variables used by getter/setter are declared in IIFE
+        # scope.  When @@logo is only used inside methods (no top-level
+        # @@logo = nil), the IIFE has no `let logo` declaration.  Add one
+        # so the setter can assign to the closure variable rather than
+        # creating a new local with `let`.
+        accessor_list.each do |info|
+          base = info[0]
+          already_declared = body.any? { |n|
+            n.respond_to?(:type) && n.type == :lvasgn && n.children[0] == base
+          }
+          body.unshift s(:lvasgn, base) unless already_declared
+        end
+
+        # Make getter/setter def nodes anonymous (name=nil) so the def
+        # converter inherits @vars from the IIFE scope. This ensures
+        # assignments to closure variables (from @@cvar -> cvar conversion)
+        # don't produce spurious `let` declarations. The hash converter's
+        # @prop mechanism provides the output name (get/set).
+        accessor_list.each do |info|
+          if info[1]
+            info[1] = info[1].updated(nil, [nil, *info[1].children[1..-1]])
+          end
+          info[2] = info[2].updated(nil, [nil, *info[2].children[1..-1]])
+        end
+      end
+
+      regular_pairs = symbols.map {|sym| s(:pair, s(:sym, sym), s(:lvar, sym))}
+      prop_pairs = accessor_list.map do |info|
+        pair = {}
+        pair[:get] = info[1] if info[1]
+        pair[:set] = info[2]
+        s(:pair, s(:prop, info[0]), pair)
+      end
+
       body = body.reject {|node| omit.include? node}.concat([s(:return, s(:hash,
-        *symbols.map {|sym| s(:pair, s(:sym, sym), s(:lvar, sym))}))])
+        *regular_pairs, *prop_pairs))])
 
       body = s(:send, s(:block, s(:send, nil, :proc), s(:args),
         s(:begin, *body)), :[])

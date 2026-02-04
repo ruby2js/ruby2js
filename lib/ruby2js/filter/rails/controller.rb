@@ -28,6 +28,7 @@ module Ruby2JS
           @rails_current_action = nil
           @rails_controller_const = nil  # e.g., :EventController
           @rails_class_methods = Set.new  # class method names (def self.foo)
+          @rails_class_accessors = Set.new  # base names with both getter and setter
           # Model associations for preloading - set lazily from options in model_associations method
           @rails_model_associations = nil
         end
@@ -124,6 +125,7 @@ module Ruby2JS
           @rails_private_methods = {}
           @rails_private_method_calls = Set.new
           @rails_class_methods = Set.new
+          @rails_class_accessors = Set.new
           @rails_model_refs = Set.new
           @rails_path_helpers = Set.new
           @rails_needs_views = false
@@ -187,6 +189,13 @@ module Ruby2JS
           # Second pass: find which private methods are called from action bodies
           action_bodies.each do |action_body|
             collect_private_method_calls(action_body)
+          end
+
+          # Compute class accessor pairs (getter + setter)
+          @rails_class_methods.each do |method|
+            next unless method.to_s.end_with?('=')
+            base = method.to_s.chomp('=').to_sym
+            @rails_class_accessors.add(base) if @rails_class_methods.include?(base)
           end
         end
 
@@ -306,17 +315,31 @@ module Ruby2JS
               next
             end
 
-            # Handle class methods (def self.method) — transform like private methods
-            # but rename setter methods (def self.x=) to set_x since JS doesn't
-            # support = in function names outside of class getter/setter syntax.
+            # Handle class methods (def self.method) — transform like private methods.
+            # Setters (def self.x=) keep the = in their name so the module converter
+            # can emit get/set accessor syntax on the returned object literal.
             if child.type == :defs && child.children[0]&.type == :self
               method_name = child.children[1]
+              def_args = child.children[2]
+              def_body = child.children[3]
+
+              # For setters: rename parameter if it matches the class variable
+              # base name to avoid shadowing the closure variable after
+              # @@cvar -> cvar conversion (e.g., def self.logo=(logo) would
+              # produce logo = logo without this renaming)
               if method_name.to_s.end_with?('=')
-                clean_name = "set_#{method_name.to_s.chomp('=')}"
-                child = child.updated(nil, [child.children[0], clean_name.to_sym, *child.children[2..]])
+                base = method_name.to_s.chomp('=').to_sym
+                if def_args.children.any? { |a| a.children[0] == base }
+                  new_param = :"_#{base}"
+                  def_args = def_args.updated(nil, def_args.children.map { |a|
+                    a.children[0] == base ? a.updated(nil, [new_param]) : a
+                  })
+                  def_body = rename_lvar_in_tree(def_body, base, new_param) if def_body
+                end
               end
+
               transformed << transform_private_method(
-                s(:def, child.children[1], child.children[2], child.children[3])
+                s(:def, method_name, def_args, def_body)
               )
               next
             end
@@ -334,6 +357,27 @@ module Ruby2JS
         end
 
         # Replace @@var references with plain variable references in AST nodes
+        # Rename lvar/lvasgn references in an AST tree.
+        # Used to avoid parameter shadowing when a setter's parameter name
+        # matches the closure variable name (from @@cvar -> cvar conversion).
+        def rename_lvar_in_tree(node, old_name, new_name)
+          return node unless node.respond_to?(:type)
+          case node.type
+          when :lvar
+            return s(:lvar, new_name) if node.children[0] == old_name
+          when :lvasgn
+            if node.children[0] == old_name
+              new_value = node.children[1]
+              new_value = rename_lvar_in_tree(new_value, old_name, new_name) if new_value
+              return new_value ? s(:lvasgn, new_name, new_value) : s(:lvasgn, new_name)
+            end
+          end
+          new_children = node.children.map { |c|
+            c.respond_to?(:type) ? rename_lvar_in_tree(c, old_name, new_name) : c
+          }
+          node.updated(nil, new_children)
+        end
+
         def replace_cvars(node)
           return node unless node.respond_to?(:type)
 
@@ -622,10 +666,14 @@ module Ruby2JS
             elsif target&.type == :const &&
                   target.children == [nil, @rails_controller_const] &&
                   @rails_class_methods.include?(method)
-              # ControllerName.method(args) -> method(args) for class methods
-              # ControllerName.method=(value) -> set_method(value) for setters
+              # Class method calls on the controller
               new_args = args.map { |a| a.respond_to?(:type) ? transform_ivars_to_locals(a) : a }
-              if method.to_s.end_with?('=')
+              base_method = method.to_s.chomp('=').to_sym
+              if @rails_class_accessors.include?(base_method)
+                # Getter/setter — keep as ControllerName.prop / ControllerName.prop = val
+                # The module's return object has get/set accessors
+                return node.updated(nil, [target, method, *new_args])
+              elsif method.to_s.end_with?('=')
                 clean_name = "set_#{method.to_s.chomp('=')}".to_sym
                 return s(:send!, nil, clean_name, *new_args)
               else
