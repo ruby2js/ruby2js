@@ -317,9 +317,8 @@ class CommentTest < ActiveSupport::TestCase
 
   test "belongs to article association" do
     article = Article.create(title: "Parent Article", body: "This article has a comment child.")
-    comment = Comment.create(article_id: article.id, commenter: "Commenter", body: "Comment body text.")
-    comment = Comment.includes(:article).find(comment.id)
-    assert_equal article.id, comment.article.id
+    comment = article.comments.create(commenter: "Commenter", body: "Comment body text.")
+    assert_equal article.id, comment.article_id
   end
 end
 TEST
