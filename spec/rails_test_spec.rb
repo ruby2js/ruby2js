@@ -857,4 +857,176 @@ describe Ruby2JS::Filter::Rails::Test do
       refute_includes result, '@article'
     end
   end
+
+  describe "custom collection/member actions" do
+    it "converts custom action on collection (redo_heats_url)" do
+      result = to_controller_js(<<~RUBY)
+        class HeatsControllerTest < ActionDispatch::IntegrationTest
+          test "redo" do
+            post redo_heats_url
+          end
+        end
+      RUBY
+      assert_includes result, 'HeatsController.redo(context())'
+    end
+
+    it "converts custom GET action on collection (book_heats_url)" do
+      result = to_controller_js(<<~RUBY)
+        class HeatsControllerTest < ActionDispatch::IntegrationTest
+          test "book" do
+            get book_heats_url
+          end
+        end
+      RUBY
+      assert_includes result, 'HeatsController.book(context())'
+    end
+
+    it "converts multi-word custom action (reset_open_heats_url)" do
+      result = to_controller_js(<<~RUBY)
+        class HeatsControllerTest < ActionDispatch::IntegrationTest
+          test "reset_open" do
+            post reset_open_heats_url
+          end
+        end
+      RUBY
+      assert_includes result, 'HeatsController.reset_open(context())'
+    end
+  end
+
+  describe "nested resource URL helpers" do
+    it "converts nested plural URL (person_payments_url)" do
+      result = to_controller_js(<<~RUBY)
+        class PaymentsControllerTest < ActionDispatch::IntegrationTest
+          test "index" do
+            get person_payments_url(@person)
+          end
+        end
+      RUBY
+      assert_includes result, 'PaymentsController.index(context(), person.id)'
+    end
+
+    it "converts nested singular URL (person_payment_url)" do
+      result = to_controller_js(<<~RUBY)
+        class PaymentsControllerTest < ActionDispatch::IntegrationTest
+          test "show" do
+            get person_payment_url(@person, @payment)
+          end
+        end
+      RUBY
+      assert_includes result, 'PaymentsController.show('
+      assert_includes result, 'person.id'
+      assert_includes result, 'payment.id'
+    end
+
+    it "converts nested new URL (new_person_payment_url)" do
+      result = to_controller_js(<<~RUBY)
+        class PaymentsControllerTest < ActionDispatch::IntegrationTest
+          test "new" do
+            get new_person_payment_url(@person)
+          end
+        end
+      RUBY
+      assert_includes result, 'PaymentsController.$new(context(), person.id)'
+    end
+
+    it "converts nested edit URL (edit_person_payment_url)" do
+      result = to_controller_js(<<~RUBY)
+        class PaymentsControllerTest < ActionDispatch::IntegrationTest
+          test "edit" do
+            get edit_person_payment_url(@person, @payment)
+          end
+        end
+      RUBY
+      assert_includes result, 'PaymentsController.edit('
+      assert_includes result, 'person.id'
+      assert_includes result, 'payment.id'
+    end
+  end
+
+  describe "non-standard assert_response codes" do
+    it "converts assert_response with numeric code" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "303" do
+            delete item_url(@item)
+            assert_response 303
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(response.status).toBe(303)'
+    end
+
+    it "converts assert_response :unprocessable_content" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "422" do
+            post items_url, params: { item: {} }
+            assert_response :unprocessable_content
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(response.status).toBe(422)'
+    end
+
+    it "converts assert_response :no_content" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "204" do
+            delete item_url(@item)
+            assert_response :no_content
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(response.status).toBe(204)'
+    end
+
+    it "converts assert_response :created" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "201" do
+            post items_url, params: { item: { name: "x" } }
+            assert_response :created
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(response.status).toBe(201)'
+    end
+  end
+
+  describe "complex assert_difference patterns" do
+    it "handles runtime expression as diff value" do
+      result = to_controller_js(<<~RUBY)
+        class TablesControllerTest < ActionDispatch::IntegrationTest
+          test "reset" do
+            assert_difference("Table.count", -Table.count) do
+              delete reset_tables_url
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'let countBefore = await Table.count()'
+      assert_includes result, 'let countAfter = await Table.count()'
+      # The diff value should be a processed expression, not a literal
+      assert_includes result, 'toBe(-'
+    end
+
+    it "handles nested assert_difference blocks" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "nested" do
+            assert_difference("Solo.count") do
+              assert_difference("Heat.count") do
+                post heats_url, params: { heat: { dance_id: 1 } }
+              end
+            end
+          end
+        end
+      RUBY
+      # Should have unique variable names for inner and outer
+      assert_includes result, 'countBefore'
+      assert_includes result, 'countAfter'
+      assert_includes result, 'Solo.count()'
+      assert_includes result, 'Heat.count()'
+    end
+  end
 end

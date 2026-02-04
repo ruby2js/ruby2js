@@ -522,19 +522,61 @@ module Ruby2JS
 
         # Build the context() helper function for integration tests
         def build_context_helper
-          # function context(params = {}) {
-          #   return { params, flash: { get() { return '' }, set() {},
-          #     consumeNotice() { return { present: false } },
-          #     consumeAlert() { return '' } }, contentFor: {} };
-          # }
           s(:jsraw, "function context(params = {}) {\n  return {params, flash: {get() {return \"\"}, set() {}, consumeNotice() {return {present: false}}, consumeAlert() {return \"\"}}, contentFor: {}}\n}")
         end
 
-        # Parse URL helper to extract controller info
-        # Returns { controller: "Articles", action: :index, singular: false, prefix: nil }
+        # Standard REST actions — URL helpers with these names map directly
+        STANDARD_REST_ACTIONS = %w[new edit].freeze
+
+        # Map of HTTP status symbols to numeric codes
+        STATUS_CODES = {
+          success: nil, # special case: toBeDefined
+          redirect: nil, # special case: redirect.toBeDefined
+          ok: 200,
+          created: 201,
+          accepted: 202,
+          no_content: 204,
+          moved_permanently: 301,
+          found: 302,
+          see_other: 303,
+          not_modified: 304,
+          bad_request: 400,
+          unauthorized: 401,
+          forbidden: 403,
+          not_found: 404,
+          method_not_allowed: 405,
+          not_acceptable: 406,
+          conflict: 409,
+          gone: 410,
+          unprocessable_entity: 422,
+          unprocessable_content: 422,
+          too_many_requests: 429,
+          internal_server_error: 500,
+          not_implemented: 501,
+          bad_gateway: 502,
+          service_unavailable: 503
+        }.freeze
+
+        # Parse URL helper to extract controller and action info.
+        #
+        # Handles:
+        #   articles_url             -> controller: ArticlesController, plural, REST
+        #   article_url(x)           -> controller: ArticlesController, singular, REST
+        #   new_article_url          -> controller: ArticlesController, prefix: new
+        #   edit_article_url(x)      -> controller: ArticlesController, prefix: edit
+        #   redo_heats_url           -> controller: HeatsController, custom_action: redo
+        #   book_heats_url(k: v)     -> controller: HeatsController, custom_action: book
+        #   person_payments_url(p)   -> nested: person, controller: PaymentsController
+        #   person_payment_url(p,x)  -> nested: person, controller: PaymentsController, singular
+        #
+        # Ambiguity between custom actions and nested resources (e.g., redo_heats vs
+        # person_payments) is resolved in transform_http_to_action using the number
+        # of positional URL arguments: nested resources pass a parent object.
+        #
         def parse_url_helper(method_name)
           name = method_name.to_s.sub(/_url$/, '').sub(/_path$/, '')
 
+          # Check for standard REST prefixes
           prefix = nil
           if name.start_with?('new_')
             prefix = 'new'
@@ -544,12 +586,7 @@ module Ruby2JS
             name = name.sub(/^edit_/, '')
           end
 
-          # Determine if singular or plural
-          # Simple heuristic: if it ends with 's', it's plural (collection)
-          # Otherwise it's singular (member)
-          is_plural = name.end_with?('s') && name != name
-          # Better check: try to see if adding 's' would make it plural
-          singular_name = name.sub(/s$/, '')
+          # Determine if the resource name is plural or singular
           if name.end_with?('s') && name.length > 1
             is_plural = true
             controller_base = name
@@ -558,16 +595,52 @@ module Ruby2JS
             controller_base = name + 's'
           end
 
+          # Detect prefix_resource pattern (custom action or nested resource)
+          # e.g., redo_heats, book_heats, person_payments, person_payment
+          # Also handles new_person_payment, edit_person_payment (prefix already stripped)
+          # Parse both interpretations; disambiguate later using arg count.
+          action_or_parent = nil
+          if name.include?('_')
+            parts = name.split('_')
+            # Try splitting from the right: find the longest resource suffix
+            (parts.length - 1).downto(1) do |i|
+              resource_candidate = parts[i..-1].join('_')
+              prefix_candidate = parts[0...i].join('_')
+              next if prefix_candidate.empty?
+
+              # Resource must be a plausible name (at least 2 chars)
+              if resource_candidate.length > 1
+                action_or_parent = prefix_candidate
+                if resource_candidate.end_with?('s')
+                  is_plural = true
+                  controller_base = resource_candidate
+                else
+                  is_plural = false
+                  controller_base = resource_candidate + 's'
+                end
+                break
+              end
+            end
+          end
+
           controller_name = controller_base.split('_').map(&:capitalize).join
 
           { controller: "#{controller_name}Controller",
             base: controller_base,
             singular: !is_plural,
-            prefix: prefix }
+            prefix: prefix,
+            action_or_parent: action_or_parent }
         end
 
         # Determine controller action from HTTP method + URL helper info
-        def determine_action(http_method, url_info, has_args)
+        # is_nested: whether this was determined to be a nested resource
+        def determine_action(http_method, url_info, is_nested)
+          # Custom action (non-nested prefix like redo_heats)
+          if url_info[:action_or_parent] && !is_nested
+            action_name = url_info[:action_or_parent]
+            return action_name == 'new' ? :$new : action_name.to_sym
+          end
+
           if url_info[:prefix] == 'new'
             return :$new
           elsif url_info[:prefix] == 'edit'
@@ -588,6 +661,32 @@ module Ruby2JS
           end
         end
 
+        # Disambiguate action_or_parent: is it a custom action or a nested parent?
+        #
+        # Rules:
+        # - Has REST prefix (new_, edit_) = always nested (new_person_payment = nested)
+        # - Plural URL + no positional args = custom action (redo_heats_url)
+        # - Plural URL + positional args = nested resource (person_payments_url(@person))
+        # - Singular URL + 1 positional arg = could be either; if REST prefix absent,
+        #   treat as member action on singular (article_url(@article))
+        # - Singular URL + 2+ positional args = nested resource
+        #
+        def resolve_nested(url_info, url_args)
+          return false unless url_info[:action_or_parent]
+
+          # new_ and edit_ prefixed URLs with action_or_parent are always nested
+          # e.g., new_person_payment_url(@person) -> nested new on payments
+          return true if url_info[:prefix]
+
+          if url_info[:singular]
+            # Singular: nested if there are 2+ positional args
+            url_args.length >= 2
+          else
+            # Plural: nested if there are positional args (parent object)
+            url_args.length >= 1
+          end
+        end
+
         # Transform HTTP method call to controller action call
         # e.g., get articles_url -> response = await ArticlesController.index(context())
         def transform_http_to_action(http_method, args)
@@ -596,7 +695,7 @@ module Ruby2JS
           url_node = args.first
           params_node = nil
 
-          # Extract params from keyword hash
+          # Extract params and other options from keyword hash
           if args.length > 1 && args[1]&.type == :hash
             args[1].children.each do |pair|
               key = pair.children[0]
@@ -612,7 +711,10 @@ module Ruby2JS
           url_args = []
           if url_node.type == :send && url_node.children[0].nil?
             url_method = url_node.children[1]
-            url_args = url_node.children[2..-1]
+            # Collect only positional args (skip hash args like format: 'pdf')
+            url_node.children[2..-1].each do |arg|
+              url_args << arg unless arg.type == :hash
+            end
           elsif url_node.type == :lvar || url_node.type == :ivar
             # Variable reference - can't determine controller, pass through
             return super_send_node(http_method, args)
@@ -621,14 +723,21 @@ module Ruby2JS
           return super_send_node(http_method, args) unless url_method
 
           url_info = parse_url_helper(url_method)
-          action = determine_action(http_method, url_info, !url_args.empty?)
+          is_nested = resolve_nested(url_info, url_args)
+          action = determine_action(http_method, url_info, is_nested)
 
           # Build controller action call arguments
           action_args = [s(:send!, nil, :context)]
 
+          # For nested resources, pass parent id first
+          if is_nested && !url_args.empty?
+            parent_arg = url_args.shift
+            processed_parent = process(parent_arg)
+            action_args << s(:attr, processed_parent, :id)
+          end
+
           # For member actions (show, edit, update, destroy), pass id
           if url_info[:singular] && !url_args.empty?
-            # article_url(@article) -> pass article.id
             id_arg = url_args.first
             processed_id = process(id_arg)
             action_args << s(:attr, processed_id, :id)
@@ -652,25 +761,35 @@ module Ruby2JS
           process(s(:send, nil, method, *args))
         end
 
-        # Transform assert_response :success -> expect(response).toBeDefined()
+        # Transform assert_response to expect() calls
+        # Handles :success, :redirect, numeric codes, and HTTP status symbols
         def transform_assert_response(args)
           return nil if args.empty?
 
           status = args.first
           if status.type == :sym
-            case status.children.first
+            sym = status.children.first
+            case sym
             when :success
               # expect(response).toBeDefined()
               s(:send!, s(:send, nil, :expect, s(:lvar, :response)), :toBeDefined)
             when :redirect
               # expect(response.redirect).toBeDefined()
               s(:send!, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :redirect)), :toBeDefined)
-            when :not_found
-              # expect(response.status).toBe(404)
-              s(:send, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :status)), :toBe, s(:int, 404))
             else
-              nil
+              # Look up status code from symbol
+              code = STATUS_CODES[sym]
+              if code
+                # expect(response.status).toBe(code)
+                s(:send, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :status)), :toBe, s(:int, code))
+              else
+                # Unknown symbol - pass through as status check
+                s(:send, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :status)), :toBe, s(:str, sym.to_s))
+              end
             end
+          elsif status.type == :int
+            # Numeric status code: assert_response 303
+            s(:send, s(:send, nil, :expect, s(:attr, s(:lvar, :response), :status)), :toBe, status)
           else
             nil
           end
@@ -701,6 +820,13 @@ module Ruby2JS
           end
         end
 
+        # Counter for unique variable names in nested assert_difference
+        def next_count_var_suffix
+          @rails_test_count_var ||= 0
+          @rails_test_count_var += 1
+          @rails_test_count_var == 1 ? '' : @rails_test_count_var.to_s
+        end
+
         # Transform assert_difference/assert_no_difference block
         def transform_assert_difference(call, body, no_difference)
           # Extract the expression string and expected difference
@@ -710,10 +836,16 @@ module Ruby2JS
           expr_node = diff_args[0]
           # Default difference is 1 for assert_difference, 0 for assert_no_difference
           diff_value = no_difference ? 0 : 1
+          diff_node = s(:int, diff_value)
+
           if diff_args.length >= 2 && !no_difference
             val_node = diff_args[1]
             if val_node.type == :int
               diff_value = val_node.children.first
+              diff_node = s(:int, diff_value)
+            else
+              # Runtime expression (e.g., -Table.count) - process it
+              diff_node = process(val_node)
             end
           end
 
@@ -730,25 +862,30 @@ module Ruby2JS
             end
           end
 
-          return process(s(:send, nil, :assert_difference, *diff_args)) unless count_call
+          return process(s(:send, nil, no_difference ? :assert_no_difference : :assert_difference, *diff_args)) unless count_call
+
+          # Use unique suffixes for nested assert_difference blocks
+          suffix = next_count_var_suffix
+          before_var = :"countBefore#{suffix}"
+          after_var = :"countAfter#{suffix}"
 
           # Build the transformed block:
           # let countBefore = await Model.count();
           # ... body ...
           # let countAfter = await Model.count();
           # expect(countAfter - countBefore).toBe(diff_value);
-          before_assign = s(:lvasgn, :countBefore, count_call)
+          before_assign = s(:lvasgn, before_var, count_call)
 
           # Process the body
           processed_body = process(body)
 
-          after_assign = s(:lvasgn, :countAfter, count_call)
+          after_assign = s(:lvasgn, after_var, count_call)
 
           # expect(countAfter - countBefore).toBe(diff_value)
-          diff_expr = s(:send, s(:lvar, :countAfter), :-, s(:lvar, :countBefore))
+          diff_expr = s(:send, s(:lvar, after_var), :-, s(:lvar, before_var))
           expect_call = s(:send,
             s(:send, nil, :expect, diff_expr),
-            :toBe, s(:int, diff_value))
+            :toBe, diff_node)
 
           s(:begin, before_assign, processed_body, after_assign, expect_call)
         end
