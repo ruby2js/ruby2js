@@ -1288,7 +1288,11 @@ module Ruby2JS
           # await nodes inside the send child of blocks like .map { ... }.
           node_type = contains_await_nodes?(transformed_body) ? :async : :def
 
-          process(s(node_type, method_name, s(:args, *param_args), transformed_body))
+          # Wrap in autoreturn for implicit return behavior (same as action methods).
+          # Without this, a hash literal as the last expression becomes a block statement.
+          final_body = transformed_body ? s(:autoreturn, transformed_body) : nil
+
+          process(s(node_type, method_name, s(:args, *param_args), final_body))
         end
 
         # Check if an AST node contains any :await or :await! nodes.

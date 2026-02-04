@@ -883,4 +883,25 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).must_include 'await'
     end
   end
+
+  describe 'private method autoreturn' do
+    it "adds return to hash literal as last expression" do
+      source = <<~RUBY
+        class ScoresController < ApplicationController
+          def show
+            @data = student_results
+          end
+
+          private
+
+          def student_results
+            {followers: 1, leaders: 2}
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include 'return {followers: 1, leaders: 2}'
+    end
+  end
 end

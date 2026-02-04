@@ -599,4 +599,15 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, '"chat_room"'
     end
   end
+
+  describe "self-referential imports" do
+    it "does not import the model being defined" do
+      result = to_js(<<~RUBY)
+        class Person < ApplicationRecord
+          belongs_to :exclude, class_name: 'Person'
+        end
+      RUBY
+      refute_includes result, "import { Person }"
+    end
+  end
 end

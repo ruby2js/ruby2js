@@ -106,9 +106,10 @@ module Ruby2JS
             s(:array, *import_list),
             s(:str, "./#{superclass_file}.js"))
 
-          # Generate imports for associated models
+          # Generate imports for associated models (skip self-referential imports)
           model_import_nodes = []
           [*@rails_model_refs].sort.each do |model|
+            next if model == @rails_model_name
             model_file = model.downcase
             model_import_nodes.push(s(:send, nil, :import,
               s(:array, s(:const, nil, model.to_sym)),
