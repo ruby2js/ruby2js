@@ -761,6 +761,20 @@ module Ruby2JS
             end
           end
 
+        # .merge - Set: iterate and add, Hash: Object.assign / spread
+        when :merge
+          type = if pragma?(node, :set) then :set
+                 else var_type(target)
+                 end
+
+          if type == :set && args.length == 1
+            # target.merge(items) → for (let item of items) target.add(item)
+            item_var = :_item
+            return process s(:for_of, s(:lvasgn, item_var),
+              args.first,
+              s(:send, target, :add, s(:lvar, item_var)))
+          end
+
         # [] - Map: get, Proc: call, Hash/Array: bracket access
         when :[]
           # Check pragma first, then fall back to inferred type

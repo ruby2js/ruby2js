@@ -242,6 +242,9 @@ s << item # Pragma: set
 s.include?(item) # Pragma: set
 # => s.has(item)
 
+s.merge(items) # Pragma: set
+# => for (let _item of items) {s.add(_item)}
+
 s.delete(item) # Pragma: set
 # => s.delete(item)
 
@@ -252,11 +255,12 @@ s.clear() # Pragma: set
 **When to use:** When working with JavaScript `Set` or `Map` objects. By default:
 - `<<` becomes `.push()` (array behavior)
 - `.include?` becomes `.includes()` (array/string behavior)
+- `.merge()` becomes `{...a, ...b}` (hash/object behavior)
 - `.delete()` becomes `delete obj[key]` (hash/object behavior)
 - `.clear()` becomes `.length = 0` (array behavior)
 
 Use this pragma to get the correct Set methods: `.add()`, `.has()`,
-`.delete()`, and `.clear()`.
+`.merge()`, `.delete()`, and `.clear()`.
 
 ### `map`
 

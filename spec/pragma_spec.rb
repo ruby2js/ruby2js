@@ -386,6 +386,14 @@ describe Ruby2JS::Filter::Pragma do
         filters: [Ruby2JS::Filter::Pragma, Ruby2JS::Filter::Functions]
       ).to_s).must_equal 'delete h[key]'
     end
+
+    it "should convert merge to for/add loop via type inference" do
+      require 'ruby2js/filter/functions'
+      _(Ruby2JS.convert('s = Set.new; s.merge(items)',
+        eslevel: 2021,
+        filters: [Ruby2JS::Filter::Pragma, Ruby2JS::Filter::Functions]
+      ).to_s).must_equal 'let s = new Set; for (let _item of items) {s.add(_item)}'
+    end
   end
 
   describe "string pragma" do
