@@ -1108,6 +1108,20 @@ describe Ruby2JS do
       to_js( 'import("x.js")' ).
         must_equal('import("x.js")')
     end
+
+    it "should not use hash shorthand for method calls inside classes" do
+      # Inside a class with attr_reader, method calls become `this.x`
+      # Hash shorthand {x} is invalid JS when it becomes {this.x}
+      # Must output {x: this.x} instead
+      to_js('class Foo; attr_reader :x; def bar; {x: x}; end; end').
+        must_include('x: this.x')
+      # But local variables can still use shorthand
+      to_js('def bar; x = 1; {x: x}; end').
+        must_equal('function bar() {let x = 1; {x}}')
+      # And method calls outside classes can use shorthand
+      to_js('def bar; {x: x}; end').
+        must_equal('function bar() {{x}}')
+    end
   end
 
   describe 'allocation' do
@@ -1655,6 +1669,15 @@ describe Ruby2JS do
     it 'should handle rest arguments with keyword arguments in blocks' do
       to_js('proc {|q, a:, b: 2, **r|}').
         must_equal('(q, { a, b=2, ...r }) => {}')
+    end
+
+    it 'should handle double splat as only kwarg without duplicate parameter' do
+      # **attrs as the only kwarg should become a simple object parameter
+      # NOT attrs, { ...attrs } which causes "Duplicate parameter name" error
+      to_js('def foo(**attrs); attrs; end').
+        must_equal('function foo(attrs) {attrs}')
+      to_js('def foo(x, **attrs); attrs; end').
+        must_equal('function foo(x, attrs) {attrs}')
     end
   end
 

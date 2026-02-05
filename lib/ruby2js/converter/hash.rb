@@ -128,10 +128,19 @@ module Ruby2JS
                 @prop = left.children.first
                 parse right, :method
               elsif \
-                left.type == :sym and (right.type == :lvar or
-                (right.type == :send and right.children.first == nil)) and
+                left.type == :sym and right.type == :lvar and
                 left.children.last == right.children.last
               then
+                # Shorthand: {x} when x is a local variable
+                parse right
+              elsif \
+                left.type == :sym and
+                right.type == :send and right.children.first == nil and
+                left.children.last == right.children.last and
+                !@class_name
+              then
+                # Shorthand: {x} when x is a method call, but NOT inside a class
+                # (inside a class, method calls become this.x which is invalid shorthand)
                 parse right
               elsif right.type == :defm and %i[sym str].include? left.type
                 @prop = left.children.first.to_s

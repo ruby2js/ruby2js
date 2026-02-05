@@ -15,7 +15,10 @@ module Ruby2JS
 
 
       if kwargs.length == 1 and kwargs.last.type == :kwrestarg
+        # When **name is the only kwarg, treat it as a simple object parameter
+        # Don't also output { ...name } which would duplicate the parameter
         args.push s(:arg, *kwargs.last.children)
+        kwargs = []
       end
 
       parse_all(*args, join: ', ')
