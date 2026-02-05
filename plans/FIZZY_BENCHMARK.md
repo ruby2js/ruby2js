@@ -68,12 +68,13 @@ The eject command:
 
 **0 files skipped (transpilation)** - All views now transpile successfully.
 
-**~148 test files skipped** due to ENOENT (output directories don't exist for concern tests like `test/models/account/cancellable_test.rb`). This is a CLI issue, not a transpilation bug.
+**1 test file skipped** - `test/controllers/admin/mission_control_test.rb` causes stack overflow during transpilation.
 
 ### Recent Fixes
 
 | Commit | Fix |
 |--------|-----|
+| (pending) | Create parent directories for nested test files during eject |
 | (pending) | Handle ERB comments `<%# ... %>` - skip entirely instead of Ruby `#` comment |
 | (pending) | Fix nested param parsing: `article[title]` → `params.article.title` (all targets) |
 | (pending) | Fix nested resource collection path: `form_with model: [@article, Comment.new]` |
@@ -101,7 +102,7 @@ The eject command:
 
 1. **Runtime testing** - Verify transpiled code executes correctly
 2. **Functional testing** - Test CRUD operations, associations, etc.
-3. **Fix test file ENOENT issue** - CLI doesn't create output directories for concern tests
+3. **Investigate stack overflow** - `admin/mission_control_test.rb` causes infinite recursion
 
 ---
 
