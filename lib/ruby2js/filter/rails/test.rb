@@ -177,18 +177,20 @@ module Ruby2JS
           super
         end
 
-        # Transform instance variable reads in integration tests
+        # Transform instance variable reads in test context
+        # Converts @foo to foo (local variable) inside test blocks
         def on_ivar(node)
-          if @rails_test_integration && @rails_test_describe_depth > 0
+          if @rails_test_describe_depth > 0
             var_name = node.children.first.to_s.sub(/^@/, '')
             return s(:lvar, var_name.to_sym)
           end
           super
         end
 
-        # Transform instance variable assignments in integration tests
+        # Transform instance variable assignments in test context
+        # Converts @foo = x to foo = x inside test blocks
         def on_ivasgn(node)
-          if @rails_test_integration && @rails_test_describe_depth > 0
+          if @rails_test_describe_depth > 0
             var_name = node.children.first.to_s.sub(/^@/, '')
             value = node.children[1]
             return s(:lvasgn, var_name.to_sym, process(value))

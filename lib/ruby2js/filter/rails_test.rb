@@ -90,7 +90,9 @@ module Ruby2JS
         superclass_name = const_name(superclass)
         [
           'IntegrationTest',
-          'ActionDispatch::IntegrationTest'
+          'ActionDispatch::IntegrationTest',
+          'ActiveSupport::TestCase',
+          'TestCase'
         ].any? { |name| superclass_name.include?(name.split('::').last) }
       end
 
