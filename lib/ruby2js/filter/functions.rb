@@ -1843,8 +1843,10 @@ module Ruby2JS
         if cbase.nil? && value&.type == :send
           target, method, *args = value.children
 
+          # Check for Struct.new - use element comparison for JS compatibility
+          # (array == array doesn't work in JS)
           if target&.type == :const &&
-             target.children == [nil, :Struct] &&
+             target.children[0].nil? && target.children[1] == :Struct &&
              method == :new &&
              args.all? { |a| a.type == :sym }
 

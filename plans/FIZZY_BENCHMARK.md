@@ -8,7 +8,32 @@ This plan documents the approach for transpiling Basecamp's Fizzy application to
 
 ### Testing Methodology
 
-Progress is measured by running `npx juntos eject` in the Fizzy directory with local npm-linked Ruby2JS packages:
+Progress is measured by running `npx juntos eject` in the Fizzy directory with local npm-linked Ruby2JS packages.
+
+#### Setting Up npm link
+
+To test local Ruby2JS changes against Fizzy:
+
+```bash
+# 1. Build the selfhost packages (from ruby2js root)
+bundle exec rake -f demo/selfhost/Rakefile local
+
+# 2. Copy filters to the ruby2js package (required for npm link)
+cp -r demo/selfhost/filters packages/ruby2js/
+
+# 3. Link the packages globally
+cd packages/ruby2js && npm link
+cd ../ruby2js-rails && npm link
+
+# 4. Link into Fizzy
+cd /path/to/fizzy
+npm link ruby2js ruby2js-rails
+
+# 5. Verify symlinks
+ls -la node_modules/ruby2js  # Should show -> ../../ruby2js/packages/ruby2js
+```
+
+#### Running the Eject Test
 
 ```bash
 cd /path/to/fizzy
@@ -20,6 +45,8 @@ The eject command:
 2. Writes individual JavaScript files to `ejected/`
 3. Runs Node.js syntax checking on all output files
 4. Reports transformation failures and syntax errors
+
+**Note:** Fizzy's default `package.json` points to beta tarballs on ruby2js.github.io. The npm link overrides these with local packages for testing.
 
 ### Transpilation Phases: All Complete
 
