@@ -104,6 +104,10 @@ class ErbCompiler
         ruby_expr_end = ruby_expr_start + expr.length
         @position_map << [ruby_expr_start, ruby_expr_end, erb_expr_start, erb_expr_end]
         is_output_expr = true
+      elsif tag.start_with?("#")
+        # ERB comment: <%# comment %> - skip entirely (don't add to output)
+        # Comments can span multiple lines, so we can't use Ruby # comments
+        nil  # explicit no-op for transpiler
       else
         # Code block: <% code %> - use newline, not semicolon
         code = tag.strip

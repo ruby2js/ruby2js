@@ -66,11 +66,7 @@ The eject command:
 
 **0 syntax errors** - All previously reported syntax errors have been fixed.
 
-**1 file skipped (transpilation failure):**
-
-| File | Reason |
-|------|--------|
-| `cards/edit.html.erb` | View parsing issue (undefined error) |
+**0 files skipped (transpilation)** - All views now transpile successfully.
 
 **~148 test files skipped** due to ENOENT (output directories don't exist for concern tests like `test/models/account/cancellable_test.rb`). This is a CLI issue, not a transpilation bug.
 
@@ -78,6 +74,9 @@ The eject command:
 
 | Commit | Fix |
 |--------|-----|
+| (pending) | Handle ERB comments `<%# ... %>` - skip entirely instead of Ruby `#` comment |
+| (pending) | Fix nested param parsing: `article[title]` → `params.article.title` (all targets) |
+| (pending) | Fix nested resource collection path: `form_with model: [@article, Comment.new]` |
 | (pending) | Fix `broadcast_remove_to` default target (empty `${}` → `notification_${this.id}`) |
 | (pending) | Fix async render functions for views with `await` partial calls |
 | (pending) | Fix hash shorthand `{name:}` → `{name}` (not `{name()}`) |
@@ -100,9 +99,9 @@ The eject command:
 
 ### Next Steps
 
-1. **Fix remaining transpilation failure** - `cards/edit.html.erb` view parsing issue
-2. **Runtime testing** - Verify transpiled code executes correctly
-3. **Functional testing** - Test CRUD operations, associations, etc.
+1. **Runtime testing** - Verify transpiled code executes correctly
+2. **Functional testing** - Test CRUD operations, associations, etc.
+3. **Fix test file ENOENT issue** - CLI doesn't create output directories for concern tests
 
 ---
 
