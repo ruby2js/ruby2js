@@ -46,6 +46,31 @@ module Ruby2JS
         end
       end
 
+      # Check if a node contains a break statement with a value (recursively)
+      # Used to detect when a loop needs to be wrapped in an IIFE
+      def contains_break_with_value?(node)
+        return false unless Ruby2JS.ast_node?(node)
+        return true if node.type == :break && node.children.any?
+        # Don't descend into nested blocks/lambdas - they have their own break scope
+        return false if [:block, :lambda].include?(node.type)
+        node.children.any? { |c| contains_break_with_value?(c) }
+      end
+
+      # Replace break statements with return statements (recursively)
+      # Used when wrapping a loop in an IIFE to support break-with-value
+      def replace_breaks_with_returns(node)
+        return node unless Ruby2JS.ast_node?(node)
+        if node.type == :break
+          # break value -> return value; break -> return
+          s(:return, *node.children)
+        elsif [:block, :lambda].include?(node.type)
+          # Don't descend into nested blocks - they have their own break scope
+          node
+        else
+          node.updated(nil, node.children.map { |c| replace_breaks_with_returns(c) })
+        end
+      end
+
       # Convert a block arg (or nested mlhs) to lvasgn for for..of destructuring
       def args_to_lvasgn(child)
         if child.type == :mlhs
@@ -1547,7 +1572,16 @@ module Ruby2JS
         elsif node.children[0..1] == [s(:send, nil, :loop), s(:args)]
           # input: loop {statements}
           # output: while(true) {statements}
-          S(:while, s(:true), process(node.children[2]))
+          # If the loop contains break-with-value, wrap in IIFE and use return
+          body = node.children[2]
+          if contains_break_with_value?(body)
+            # Wrap in IIFE: (() => { while(true) { ... return value ... } })()
+            transformed_body = replace_breaks_with_returns(body)
+            s(:send, s(:block, s(:send, nil, :lambda), s(:args),
+              S(:while, s(:true), process(transformed_body))), :call)
+          else
+            S(:while, s(:true), process(body))
+          end
 
         elsif method == :times and call.children.length == 2
           # input: n.times { |i| ... }

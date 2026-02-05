@@ -934,6 +934,11 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'while (true) {sleep(1); break}'
     end
 
+    it 'should handle loops with break-with-value' do
+      to_js( 'x = loop { y = rand; break y if y > 0.5 }' ).
+        must_equal 'let x = (() => {while (true) {let y = Math.random(); if (y > 0.5) return y}})()'
+    end
+
     it 'should handle times with block variable' do
       to_js( '3.times { |i| console.log(i) }' ).
         must_equal 'for (let i = 0; i < 3; i++) {console.log(i)}'

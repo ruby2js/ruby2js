@@ -947,7 +947,8 @@ module Ruby2JS
         call, args, body = node.children
 
         # Check for shadowargs (block-local variables that shadow outer scope)
-        shadowargs = args.children.select { |arg| arg.type == :shadowarg }
+        # Note: args can be nil when using Ruby 3.4's `it` implicit block parameter
+        shadowargs = args&.children&.select { |arg| arg.type == :shadowarg } || []
         saved_types = {}
 
         if shadowargs.any?
