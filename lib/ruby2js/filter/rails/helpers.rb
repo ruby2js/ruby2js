@@ -25,9 +25,10 @@ module Ruby2JS
           @erb_asset_imports = [] # Track asset imports (images, videos, etc.) for Vite
         end
 
-        # No-op when used without ERB filter (ERB filter overrides this)
+        # Mark render function as async - sets flag directly since filter chain
+        # ordering may cause this method to be called instead of Erb's version
         def erb_mark_async!
-          # Stub - ERB filter provides the real implementation
+          @erb_needs_async = true
         end
 
         # Check if layout mode is enabled (options are set after initialize)

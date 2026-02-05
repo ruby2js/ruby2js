@@ -227,6 +227,8 @@ module Ruby2JS
         group   = Converter::LOGICAL.include?( expr.type ) &&
           operator_index( :not ) < operator_index( expr.type )
         group = true if expr and %i[begin in?].include? expr.type
+        # Assignment expressions need grouping: !(x = 1) not !x = 1
+        group = true if expr and %i[lvasgn ivasgn cvasgn gvasgn masgn].include? expr.type
 
         put '!'; put '(' if group; parse expr; put ')' if group
       end

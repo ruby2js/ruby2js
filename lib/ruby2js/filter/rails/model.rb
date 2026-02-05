@@ -487,11 +487,18 @@ module Ruby2JS
             elsif target_node&.type == :sym
               target_val = target_node.children[0].to_s
               return s(:str, "<turbo-stream action=\"remove\" target=\"#{target_val}\"></turbo-stream>")
-            else
-              # Dynamic target - use template literal
+            elsif target_node
+              # Dynamic target specified - use template literal
               return s(:dstr,
                 s(:str, '<turbo-stream action="remove" target="'),
                 s(:begin, process(target_node)),
+                s(:str, '"></turbo-stream>'))
+            else
+              # No target specified - use dom_id(self) pattern: model_name_id
+              model_prefix = @rails_model_name.downcase
+              return s(:dstr,
+                s(:str, "<turbo-stream action=\"remove\" target=\"#{model_prefix}_"),
+                s(:begin, s(:attr, receiver, :id)),
                 s(:str, '"></turbo-stream>'))
             end
           end
@@ -1441,13 +1448,10 @@ module Ruby2JS
           # For remove action, use dom_id for target
           if action == :remove
             # Target is dom_id($record) -> "model_123"
-            dom_id_expr = s(:dstr,
-              s(:str, "#{@rails_model_name.downcase}_"),
-              s(:begin, s(:attr, receiver, :id)))
-
+            # Inline the dom_id expression directly in the dstr to avoid nested backticks
             html = s(:dstr,
-              s(:str, '<turbo-stream action="remove" target="'),
-              s(:begin, dom_id_expr),
+              s(:str, "<turbo-stream action=\"remove\" target=\"#{@rails_model_name.downcase}_"),
+              s(:begin, s(:attr, receiver, :id)),
               s(:str, '"></turbo-stream>'))
 
             return s(:send,

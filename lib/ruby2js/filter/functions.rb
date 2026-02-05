@@ -274,9 +274,10 @@ module Ruby2JS
             return super
           end
 
-        elsif method == :call and target and 
+        elsif method == :call and target and target.type != :block and
           (%i[ivar cvar].include?(target.type) or not excluded?(:call))
-
+          # Don't convert IIFE lambdas (block targets) - the send converter
+          # already handles s(:send, <block>, :call) with proper grouping
           S(:call, process(target), nil, *process_all(args))
 
         elsif method == :keys and args.length == 0 and parens_or_included?(node, method)

@@ -64,14 +64,7 @@ The eject command:
 
 ### Remaining Issues
 
-**4 syntax errors in 4 files:**
-
-| File | Error | Issue |
-|------|-------|-------|
-| `magic_link.js` | Unexpected token '(' | IIFE syntax issue with `}()` |
-| `notification.js` | Unexpected token '}' | Empty interpolation `${}` in turbo stream |
-| `my/_menu.js` | Unexpected reserved word | `await` in non-async context |
-| `seeds.js` | Invalid assignment | Assignment to invalid target |
+**0 syntax errors** - All previously reported syntax errors have been fixed.
 
 **1 file skipped (transpilation failure):**
 
@@ -85,6 +78,10 @@ The eject command:
 
 | Commit | Fix |
 |--------|-----|
+| (pending) | Fix `broadcast_remove_to` default target (empty `${}` → `notification_${this.id}`) |
+| (pending) | Fix async render functions for views with `await` partial calls |
+| (pending) | Fix hash shorthand `{name:}` → `{name}` (not `{name()}`) |
+| (pending) | Fix assignment in conditionals `unless x = expr` → `if (!(x = expr))` |
 | (pending) | Fix duplicate path helpers for singular resources (`resource :foo` → prefixed names) |
 | (pending) | Fix duplicate controller imports in routes.js |
 | (pending) | Fix duplicate _implicitBlockYield parameter in view render functions |
@@ -103,9 +100,9 @@ The eject command:
 
 ### Next Steps
 
-1. **Fix view syntax issues** - magic_link.js IIFE issue, notification.js empty interpolation
-2. **Fix my/_menu.js await** - `await` in non-async context
-3. **Fix seeds.js assignment** - Invalid left-hand side in assignment
+1. **Fix remaining transpilation failure** - `cards/edit.html.erb` view parsing issue
+2. **Runtime testing** - Verify transpiled code executes correctly
+3. **Functional testing** - Test CRUD operations, associations, etc.
 
 ---
 

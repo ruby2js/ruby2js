@@ -136,12 +136,16 @@ module Ruby2JS
               elsif \
                 left.type == :sym and
                 right.type == :send and right.children.first == nil and
+                right.children.length == 2 and  # no args (just receiver, method)
                 left.children.last == right.children.last and
-                !@class_name
+                # Only use shorthand if: not in a class, OR the identifier is a known local/param
+                # Inside a class, method calls become `this.x` which can't use shorthand
+                # Check @vars for local variables/parameters
+                (!@class_name || @vars[right.children.last])
               then
-                # Shorthand: {x} when x is a method call, but NOT inside a class
-                # (inside a class, method calls become this.x which is invalid shorthand)
-                parse right
+                # Shorthand: {x} for Ruby's `x:` hash shorthand
+                # Output just the identifier, not a method call
+                put right.children.last
               elsif right.type == :defm and %i[sym str].include? left.type
                 @prop = left.children.first.to_s
                 parse right
