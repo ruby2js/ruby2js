@@ -1455,11 +1455,19 @@ module Ruby2JS
 
             [model_name, permitted_keys]
           elsif method == :expect
-            # params.expect(article: [:title, :body])
+            # params.expect(article: [:title, :body]) or params.expect(article: :title)
             hash_arg = args[0]
             pair = hash_arg.children[0]
             model_name = pair.children[0].children[0]
-            permitted_keys = pair.children[1].children.map { |sym| sym.children[0] }
+            value = pair.children[1]
+            # Handle both array of symbols and single symbol
+            permitted_keys = if value.type == :array
+              value.children.map { |sym| sym.children[0] }
+            elsif value.type == :sym
+              [value.children[0]]
+            else
+              []
+            end
 
             [model_name, permitted_keys]
           end

@@ -1726,9 +1726,12 @@ module Ruby2JS
             :[], call.children[0]])
 
         elsif method == :tap and call.children.length == 2
+          # Handle Ruby 3.4's `it` implicit block parameter (args is nil)
+          args = node.children[1]
+          arg_name = args&.children&.first&.children&.first || :it
           process node.updated(:send, [s(:block, s(:send, nil, :proc),
-            node.children[1], s(:begin, node.children[2],
-            s(:return, s(:lvar, node.children[1].children[0].children[0])))),
+            args, s(:begin, node.children[2],
+            s(:return, s(:lvar, arg_name)))),
             :[], call.children[0]])
 
         elsif method == :define_method and call.children.length == 3 and call.children[0]
