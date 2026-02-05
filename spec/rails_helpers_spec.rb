@@ -384,11 +384,11 @@ describe Ruby2JS::Filter::Rails::Helpers do
 
     it "should handle button_to with nested resource array path" do
       # button_to("Delete", [comment.article, comment], method: :delete)
-      # Should generate comment_path(comment.article, comment)
+      # Should generate article_comment_path(comment.article_id, comment) (Rails convention for nested resources)
       erb_src = '_erbout = +\'\'; _erbout.<<(( button_to("Delete", [comment.article, comment], method: :delete) ).to_s); _erbout'
       result = to_js(erb_src)
-      result.must_include 'comment_path('
-      result.must_include 'comment.article'
+      result.must_include 'article_comment_path('
+      result.must_include 'comment.article_id'  # Uses _id to avoid Promise from association
       result.wont_include '{ _path }'  # Should not import generic _path
       result.must_include '>Delete</button>'
     end

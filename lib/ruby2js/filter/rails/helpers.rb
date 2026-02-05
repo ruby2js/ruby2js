@@ -627,10 +627,18 @@ module Ruby2JS
               path_expr = s(:send, nil, path_helper, s(:lvar, method_name.to_sym))
             end
           elsif path_node.type == :array && path_node.children.length == 2
-            # Nested resource: [@article, comment] -> comment_path(article, comment)
+            # Nested resource: [@article, comment] -> article_comment_path(article, comment)
             parent, child = path_node.children
+            # Extract parent name from different node types
+            parent_name = case parent.type
+              when :ivar then parent.children.first.to_s.sub(/^@/, '')
+              when :lvar then parent.children.first.to_s
+              when :send then parent.children[1].to_s  # e.g., comment.article -> "article"
+              else parent.children.first.to_s
+            end
             child_name = child.type == :ivar ? child.children.first.to_s.sub(/^@/, '') : child.children.first.to_s
-            path_helper = "#{child_name}_path".to_sym
+            # Generate nested path helper: article_comment_path (Rails convention)
+            path_helper = "#{parent_name}_#{child_name}_path".to_sym
             @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
             parent_arg = parent.type == :ivar ? s(:lvar, parent.children.first.to_s.sub(/^@/, '').to_sym) : parent
             child_arg = child.type == :ivar ? s(:lvar, child.children.first.to_s.sub(/^@/, '').to_sym) : child
@@ -757,10 +765,18 @@ module Ruby2JS
             @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
             path_expr = s(:send, nil, path_helper, path_node)
           elsif path_node.type == :array && path_node.children.length == 2
-            # Nested resource: [@article, comment] -> comment_path(article, comment)
+            # Nested resource: [@article, comment] -> article_comment_path(article, comment)
             parent, child = path_node.children
+            # Extract parent name from different node types
+            parent_name = case parent.type
+              when :ivar then parent.children.first.to_s.sub(/^@/, '')
+              when :lvar then parent.children.first.to_s
+              when :send then parent.children[1].to_s  # e.g., comment.article -> "article"
+              else parent.children.first.to_s
+            end
             child_name = child.type == :ivar ? child.children.first.to_s.sub(/^@/, '') : child.children.first.to_s
-            path_helper = "#{child_name}_path".to_sym
+            # Generate nested path helper: article_comment_path (Rails convention)
+            path_helper = "#{parent_name}_#{child_name}_path".to_sym
             @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
             parent_arg = parent.type == :ivar ? s(:lvar, parent.children.first.to_s.sub(/^@/, '').to_sym) : parent
             child_arg = child.type == :ivar ? s(:lvar, child.children.first.to_s.sub(/^@/, '').to_sym) : child
@@ -884,9 +900,16 @@ module Ruby2JS
               path_expr = s(:send, nil, path_helper, s(:lvar, method_name.to_sym))
             end
           elsif path_node&.type == :array && path_node.children.length == 2
-            # Nested resource: [@article, comment] -> comment_path(article, comment)
-            # or [comment.article, comment] -> comment_path(comment.article_id, comment)
+            # Nested resource: [@article, comment] -> article_comment_path(article, comment)
+            # or [comment.article, comment] -> article_comment_path(comment.article_id, comment)
             parent, child = path_node.children
+            # Extract parent name from different node types
+            parent_name = case parent.type
+              when :ivar then parent.children.first.to_s.sub(/^@/, '')
+              when :lvar then parent.children.first.to_s
+              when :send then parent.children[1].to_s  # e.g., comment.article -> "article"
+              else parent.children.first.to_s
+            end
             # Extract child name from different node types
             child_name = case child.type
               when :ivar then child.children.first.to_s.sub(/^@/, '')
@@ -894,7 +917,8 @@ module Ruby2JS
               when :send then child.children[1].to_s  # send node: [receiver, method_name, ...]
               else child.children.first.to_s
             end
-            path_helper = "#{child_name}_path".to_sym
+            # Generate nested path helper: article_comment_path (Rails convention)
+            path_helper = "#{parent_name}_#{child_name}_path".to_sym
             @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
             # Convert ivars to lvars for ERB context
             # For association access like comment.article, use comment.article_id instead
