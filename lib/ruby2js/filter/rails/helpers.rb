@@ -2289,14 +2289,17 @@ module Ruby2JS
             if model_is_new
               # New model - POST to collection path
               # <form action="<%= articles_path() %>" method="post">
-              # For nested resources: <form action="<%= comments_path(article) %>" method="post">
+              # For nested resources: <form action="<%= article_comments_path(article) %>" method="post">
               if parent_model_name
                 # Nested resource - pass parent model to path helper
+                # Use Rails convention: parent_children_path (e.g., article_comments_path)
+                nested_plural_path = :"#{parent_model_name}_#{plural_name}_path"
+                @erb_path_helpers << nested_plural_path unless @erb_path_helpers.include?(nested_plural_path)
                 parent_var = s(:lvar, parent_model_name.to_sym)
                 statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                   s(:dstr,
                     s(:str, "<form data-model=\"#{model_name}\"#{class_attr}#{data_attr} action=\""),
-                    s(:begin, s(:send, nil, plural_path, parent_var)),
+                    s(:begin, s(:send, nil, nested_plural_path, parent_var)),
                     s(:str, "\" method=\"post\">")))
               else
                 statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
