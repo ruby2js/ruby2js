@@ -1316,4 +1316,31 @@ describe Ruby2JS::Filter::Pragma do
       end
     end
   end
+
+  describe "automatic class reopening detection" do
+    it "should treat class as extension when preceded by Struct.new" do
+      js = to_js('Color = Struct.new(:name, :value); class Color; def to_s; value; end; end')
+      # Should extend Color (no new class declaration)
+      js.wont_include 'class Color'
+      js.must_include 'Color.prototype'
+    end
+
+    it "should treat class as extension when preceded by Class.new with parent" do
+      js = to_js('Animal = Class.new(Base); class Animal; def speak; "..."; end; end')
+      js.wont_include 'class Animal'
+      js.must_include 'Animal.prototype'
+    end
+
+    it "should not treat normal classes as extensions" do
+      js = to_js('class MyClass; def foo; 1; end; end')
+      # Regular class should create a class declaration
+      js.must_include 'class MyClass'
+    end
+
+    it "should not confuse unrelated const assignments" do
+      js = to_js('MAX = 100; class MAX; def val; MAX; end; end')
+      # MAX = 100 is not Struct.new/Class.new, so class should be normal
+      js.must_include 'class MAX'
+    end
+  end
 end

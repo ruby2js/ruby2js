@@ -100,6 +100,7 @@ module Ruby2JS
         @ivar_types = {}       # Track instance variable types (class-scoped)
         @ivar_types_stack = [] # Stack for class scope management
         @in_initialize = false # Track if we're in an initialize method
+        @const_classes = {}    # Track constants assigned class-like values (Struct.new, Class.new)
       end
 
       def options=(options)
@@ -582,11 +583,42 @@ module Ruby2JS
         super
       end
 
+      # Track constant assignments that create class-like values
+      # This enables automatic detection of class reopening (e.g., Struct.new + class)
+      def on_casgn(node)
+        cbase, name, value = node.children
+
+        # Detect: Name = Struct.new(...) or Name = Class.new(...)
+        if cbase.nil? && value&.type == :send
+          target, method = value.children[0], value.children[1]
+          if target&.type == :const &&
+             target.children[0].nil? &&
+             %i[Struct Class].include?(target.children[1]) &&
+             method == :new
+            @const_classes[name] = true
+          end
+        end
+
+        super
+      end
+
       # Handle class definitions with extend pragma (monkey patching)
       # Replaces the ++class syntax with a pragma that works in standard Ruby
+      # Also auto-detects class reopening when a class was previously defined
+      # via Struct.new or Class.new
       def on_class(node)
         if pragma?(node, :extend)
           # Transform to :class_extend which signals this is extending an existing class
+          return process node.updated(:class_extend)
+        end
+
+        # Check if this class name was already assigned a class-like value
+        # (e.g., Color = Struct.new followed by class Color)
+        name_node = node.children.first
+        if name_node&.type == :const &&
+           name_node.children.first.nil? &&
+           @const_classes[name_node.children.last]
+          # Treat as class extension (reopening)
           return process node.updated(:class_extend)
         end
 

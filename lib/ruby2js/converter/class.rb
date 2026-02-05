@@ -192,11 +192,11 @@ module Ruby2JS
             if smethod.type == :def
               # Convert instance method to class method: def foo -> name.foo = function
               method_name = smethod.children[0]
-              args = smethod.children[1]
-              body = smethod.children[2]
+              method_args = smethod.children[1]
+              method_body = smethod.children[2]
               visible[method_name] = name
               s(:send, name, "#{method_name}=",
-                s(:block, s(:send, nil, :proc), args, body))
+                s(:block, s(:send, nil, :proc), method_args, method_body))
             else
               smethod
             end

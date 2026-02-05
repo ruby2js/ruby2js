@@ -564,6 +564,53 @@ like `String`, `Array`, or `Number`, or extend classes defined elsewhere.
 Since the pragma is a Ruby comment, it's ignored when code runs in Ruby,
 making it ideal for dual-target development.
 
+### Automatic Class Reopening Detection
+
+Ruby2JS automatically detects when a class is reopened after being defined via
+`Struct.new` or `Class.new`. This pattern is common in Ruby:
+
+```ruby
+# Define a Struct
+Color = Struct.new(:name, :value)
+
+# Reopen to add methods
+class Color
+  class << self
+    def for_value(v)
+      COLORS.find { |c| c.value == v }
+    end
+  end
+
+  def to_s
+    value
+  end
+end
+```
+
+Ruby2JS recognizes that the `class Color` block is reopening the existing
+`Color` constant (not defining a new class) and treats it as a class extension:
+
+```javascript
+const Color = new Struct("name", "value");
+Color.for_value = v => COLORS.find(c => c.value == v);
+
+Object.defineProperty(
+  Color.prototype,
+  "to_s",
+  {enumerable: true, configurable: true, get() {return value}}
+)
+```
+
+This automatic detection works for:
+- `Name = Struct.new(...)` followed by `class Name`
+- `Name = Class.new(...)` followed by `class Name`
+
+Without this detection, reopening a class would create a duplicate `class Name`
+declaration, causing a JavaScript syntax error.
+
+**Note:** This detection only applies when the `Struct.new` or `Class.new`
+assignment and the class reopening are in the same file and processed together.
+
 ## Target-Specific Pragmas
 
 Target pragmas allow you to conditionally include or exclude import statements
