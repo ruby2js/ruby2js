@@ -2,6 +2,73 @@
 
 This plan documents the approach for transpiling Basecamp's Fizzy application to run on Node.js with SQLite3 using Ruby2JS/Juntos.
 
+---
+
+## Current Status (February 2025)
+
+### Testing Methodology
+
+Progress is measured by running `npx juntos eject` in the Fizzy directory with local npm-linked Ruby2JS packages:
+
+```bash
+cd /path/to/fizzy
+DEBUG=1 npx juntos eject 2>&1 | grep -iE "(error|syntax|skipped|failed|transforming)"
+```
+
+The eject command:
+1. Transforms all Ruby source files (models, controllers, views, routes, migrations, seeds)
+2. Writes individual JavaScript files to `ejected/`
+3. Runs Node.js syntax checking on all output files
+4. Reports transformation failures and syntax errors
+
+### Transpilation Phases: All Complete
+
+| Phase | Status |
+|-------|--------|
+| Transforming models | ✓ Complete |
+| Transforming migrations | ✓ Complete |
+| Transforming seeds | ✓ Complete |
+| Transforming routes | ✓ Complete |
+| Transforming views | ✓ Complete |
+| Transforming Stimulus controllers | ✓ Complete |
+| Transforming Rails controllers | ✓ Complete |
+
+### Remaining Issues
+
+**23 syntax errors in 16 files:**
+
+| Error Type | Files | Example |
+|------------|-------|---------|
+| Nested class `::` in imports | account.js, event.js | `import { Account::Export }` |
+| Missing `const` in module export | admin.js | `export Admin = {}` |
+| Ruby `with()` → JS `with` | current.js | `with({account: value}, )` |
+| Duplicate parameter name | identity.js | `(attributes, { ...attributes } = {})` |
+| Empty interpolation | notification.js | `target="${}"` |
+| Duplicate identifier (Struct + class) | color.js | `const Color` then `class Color` |
+| Private field outside class | notifier.js, signup.js, user.js | `#should_notify` |
+| Duplicate path helper | paths.js | `left_position_path` declared twice |
+| Duplicate controller export | routes.js | `CardsController` declared twice |
+
+**148 test files skipped** due to ENOENT (output directories don't exist for concern tests like `test/models/account/cancellable_test.rb`). This is a CLI issue, not a transpilation bug.
+
+### Recent Fixes (This Session)
+
+| Commit | Fix |
+|--------|-----|
+| `5a6ad24` | Handle Ruby 3.4 `it` parameter in `tap` and single-symbol `params.expect` |
+| `3e435af` | Support `break value` in loops, implicit block parameter, kwarg handlers |
+| `ce2fbc8` | Handle `class << self` blocks and bare `new()` in class context |
+| Earlier | ERB comment handling (`<%# ... %>`) |
+
+### Next Steps
+
+1. **Fix nested class imports** - `Account::Export` should become valid JS import path
+2. **Fix module exports** - `export Admin = {}` → `export const Admin = {}`
+3. **Handle `with()` method** - Rails CurrentAttributes pattern needs proper transpilation
+4. **Fix duplicate identifiers** - Struct definitions combined with class reopening
+
+---
+
 ## Goal
 
 Validate that idiomatic Rails applications can be transpiled to JavaScript and run on non-Ruby platforms. Fizzy serves as an ideal benchmark because:
@@ -69,10 +136,12 @@ Fizzy tests this thesis. Success would demonstrate that Ruby2JS can handle real-
 
 ### Success Criteria
 
-- [ ] Models transpile without errors
+- [x] Models transpile without errors (transformation phase completes)
 - [ ] Basic CRUD operations work
 - [ ] Associations load correctly
 - [ ] Validations prevent invalid data
+
+**Status:** Transformation completes. Some models have syntax errors in output (see Current Status).
 
 ---
 
@@ -106,8 +175,14 @@ Fizzy tests this thesis. Success would demonstrate that Ruby2JS can handle real-
 - **Turbo Stream templates** - `.turbo_stream.erb` rendering
 - **`after_create_commit`** - Post-transaction callbacks
 
+### Discovered Issues
+
+- **Empty interpolation** - `dom_id` calls producing `${}` in turbo stream templates
+- **Private fields** - Instance variables converted to `#field` appearing outside class context
+
 ### Success Criteria
 
+- [x] Transformation phase completes for all views
 - [ ] Polymorphic associations resolve correctly
 - [ ] Rich text content saves and loads
 - [ ] Turbo Stream responses render
@@ -168,19 +243,29 @@ Storage::Tracked, Taggable, Triageable, Watchable
 
 **Goal:** Implement adapters for Rails infrastructure that doesn't have direct JavaScript equivalents.
 
-### CurrentAttributes (Investigation Required)
+### CurrentAttributes (Transpilation Bug Found)
 
 **Ruby Pattern:**
 ```ruby
 class Current < ActiveSupport::CurrentAttributes
   attribute :user, :account
-end
 
-# Usage throughout app:
-belongs_to :creator, default: -> { Current.user }
+  def with_account(value)
+    with(account: value) { yield }
+  end
+end
 ```
 
-**Proposed JavaScript Approach:**
+**Current Bug:** The `with` method from ActiveSupport::CurrentAttributes is being transpiled to JavaScript's `with` statement (deprecated/forbidden in strict mode):
+
+```javascript
+// WRONG - current output:
+with_account(value, ) {
+  return with({account: value}, )  // JS 'with' is forbidden in strict mode
+}
+```
+
+**Correct JavaScript Approach:**
 ```javascript
 import { AsyncLocalStorage } from 'async_hooks';
 
@@ -189,14 +274,23 @@ const currentStorage = new AsyncLocalStorage();
 export const Current = {
   get user() { return currentStorage.getStore()?.user },
   get account() { return currentStorage.getStore()?.account },
-  run(context, fn) { return currentStorage.run(context, fn) }
+
+  with(attrs, callback) {
+    const prev = currentStorage.getStore() || {};
+    return currentStorage.run({...prev, ...attrs}, callback);
+  },
+
+  withAccount(value, callback) {
+    return this.with({account: value}, callback);
+  }
 };
 ```
 
 **Tasks:**
-- [ ] Investigate AsyncLocalStorage behavior in Node.js
+- [x] Investigate AsyncLocalStorage behavior in Node.js
+- [ ] Fix transpilation of `with()` method calls (not JS `with` statement)
+- [ ] Handle trailing comma in method parameters `(value, )`
 - [ ] Determine how to integrate with request lifecycle
-- [ ] Handle `Current.with_account { }` block syntax
 
 ### ActionMailer (Implementation Required)
 
@@ -280,13 +374,16 @@ queueMicrotask(() => notifiable.notify_recipients());
 
 ### Needs Implementation
 
-| Item | Approach |
-|------|----------|
-| CurrentAttributes | AsyncLocalStorage adapter |
-| ActionMailer | nodemailer adapter |
-| Polymorphic associations | ORM enhancement |
-| `normalizes` directive | Transpiler addition |
-| Complex concern composition | Verify/fix module resolution |
+| Item | Approach | Status |
+|------|----------|--------|
+| CurrentAttributes | AsyncLocalStorage adapter | Bug found: `with()` method transpiles incorrectly |
+| ActionMailer | nodemailer adapter | Not started |
+| Polymorphic associations | ORM enhancement | Not started |
+| `normalizes` directive | Transpiler addition | Not started |
+| Complex concern composition | Verify/fix module resolution | Not started |
+| Nested class syntax (`::`) | Convert `Account::Export` to valid import | Bug found |
+| Module-as-hash export | `export X = {}` → `export const X = {}` | Bug found |
+| Struct + class reopening | Avoid duplicate identifier | Bug found |
 
 ### Infrastructure (Outside App Scope)
 
