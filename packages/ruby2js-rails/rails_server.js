@@ -173,8 +173,21 @@ function getHeader(req, name) {
   return req.headers[name.toLowerCase()];
 }
 
-// Extract nested Rails-style param key: article[title] -> title
+// Set a nested Rails-style param: article[title]=value -> params.article.title = value
 // Exported for use by target-specific parseBody implementations
+export function setNestedParam(params, key, value) {
+  const match = key.match(/^([^\[]+)\[([^\]]+)\]$/);
+  if (match) {
+    const [, model, field] = match;
+    if (!params[model]) params[model] = {};
+    params[model][field] = value;
+  } else {
+    params[key] = value;
+  }
+}
+
+// Legacy: Extract nested Rails-style param key: article[title] -> title
+// Deprecated - use setNestedParam instead
 export function extractNestedKey(key) {
   const match = key.match(/\[([^\]]+)\]$/);
   return match ? match[1] : key;

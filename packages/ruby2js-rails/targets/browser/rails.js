@@ -310,15 +310,21 @@ export class FormHandler {
   }
 
   // Extract form parameters
-  // Handles Rails-style nested params: article[title] -> title
+  // Handles Rails-style nested params: article[title] -> params.article.title
   static extractParams(form) {
     const params = {};
     const inputs = form.querySelectorAll('input, textarea, select');
     inputs.forEach(input => {
       if (input.name && input.type !== 'submit') {
-        const match = input.name.match(/\[([^\]]+)\]$/);
-        const key = match ? match[1] : input.name;
-        params[key] = input.value;
+        // Parse nested param names: article[title] -> {article: {title: value}}
+        const match = input.name.match(/^([^\[]+)\[([^\]]+)\]$/);
+        if (match) {
+          const [, model, key] = match;
+          if (!params[model]) params[model] = {};
+          params[model][key] = input.value;
+        } else {
+          params[input.name] = input.value;
+        }
       } else if (input.id && input.type !== 'submit') {
         params[input.id] = input.value;
       }
@@ -594,32 +600,32 @@ export class Application extends ApplicationBase {
           // Extract form params from the fetch body (body already defined above)
           let params = {};
 
+          // Helper to set nested param: article[title]=value -> params.article.title = value
+          const setNestedParam = (key, value) => {
+            if (key === '_method') return;
+            const match = key.match(/^([^\[]+)\[([^\]]+)\]$/);
+            if (match) {
+              const [, model, field] = match;
+              if (!params[model]) params[model] = {};
+              params[model][field] = value;
+            } else {
+              params[key] = value;
+            }
+          };
+
           if (body instanceof FormData) {
             for (const [key, value] of body.entries()) {
-              // Handle Rails-style nested params: article[title] -> title
-              const keyMatch = key.match(/\[([^\]]+)\]$/);
-              const paramKey = keyMatch ? keyMatch[1] : key;
-              if (paramKey !== '_method') {
-                params[paramKey] = value;
-              }
+              setNestedParam(key, value);
             }
           } else if (body instanceof URLSearchParams) {
             for (const [key, value] of body.entries()) {
-              const keyMatch = key.match(/\[([^\]]+)\]$/);
-              const paramKey = keyMatch ? keyMatch[1] : key;
-              if (paramKey !== '_method') {
-                params[paramKey] = value;
-              }
+              setNestedParam(key, value);
             }
           } else if (typeof body === 'string') {
             // URL-encoded string: article[title]=foo&article[body]=bar
             const searchParams = new URLSearchParams(body);
             for (const [key, value] of searchParams.entries()) {
-              const keyMatch = key.match(/\[([^\]]+)\]$/);
-              const paramKey = keyMatch ? keyMatch[1] : key;
-              if (paramKey !== '_method') {
-                params[paramKey] = value;
-              }
+              setNestedParam(key, value);
             }
           }
           context.params = params;
