@@ -457,8 +457,12 @@ function inlineFixtures(code, fixtures, associationMap) {
 /**
  * Add model imports to a test file based on model references found in the code.
  * Scans for Model.create, Model.find, etc. and adds import statements.
+ * @param {string} code - The test file code
+ * @param {string} modelsDir - Path to models directory
+ * @param {string} outName - Output filename (may include subdirs like 'account/export.test.mjs')
+ * @param {number} baseDepth - Base depth from test subdir to project root (2 for test/models/)
  */
-function addModelImportsToTest(code, modelsDir) {
+function addModelImportsToTest(code, modelsDir, outName = '', baseDepth = 2) {
   if (!existsSync(modelsDir)) return code;
 
   // Find all model references (PascalCase.method or extends PascalCase)
@@ -478,12 +482,18 @@ function addModelImportsToTest(code, modelsDir) {
 
   if (referencedModels.size === 0) return code;
 
+  // Calculate relative path depth based on subdirectories in outName
+  // e.g., 'user.test.mjs' -> 0 extra, 'account/export.test.mjs' -> 1 extra
+  const subdirCount = (outName.match(/\//g) || []).length;
+  const totalDepth = baseDepth + subdirCount;
+  const relativePrefix = '../'.repeat(totalDepth);
+
   // Build import statements
   const imports = [];
   for (const modelName of referencedModels) {
     const modelFile = underscore(modelName) + '.js';
     if (existsSync(join(modelsDir, modelFile))) {
-      imports.push(`import { ${modelName} } from '../../app/models/${modelFile}';`);
+      imports.push(`import { ${modelName} } from '${relativePrefix}app/models/${modelFile}';`);
     }
   }
 
@@ -496,9 +506,19 @@ function addModelImportsToTest(code, modelsDir) {
 /**
  * Add controller and path helper imports to a controller test file.
  * Scans for XxxController.method patterns and xxx_path( patterns.
+ * @param {string} code - The test file code
+ * @param {string} controllersDir - Path to controllers directory
+ * @param {string} modelsDir - Path to models directory
+ * @param {string} outName - Output filename (may include subdirs like 'cards/comments_controller.test.mjs')
+ * @param {number} baseDepth - Base depth from test subdir to project root (2 for test/controllers/)
  */
-function addControllerImportsToTest(code, controllersDir, modelsDir) {
+function addControllerImportsToTest(code, controllersDir, modelsDir, outName = '', baseDepth = 2) {
   const imports = [];
+
+  // Calculate relative path depth based on subdirectories in outName
+  const subdirCount = (outName.match(/\//g) || []).length;
+  const totalDepth = baseDepth + subdirCount;
+  const relativePrefix = '../'.repeat(totalDepth);
 
   // Find controller references: XxxController.method
   const controllerRefRegex = /\b([A-Z][a-z]\w*Controller)\.\w+/g;
@@ -512,7 +532,7 @@ function addControllerImportsToTest(code, controllersDir, modelsDir) {
   for (const controllerName of referencedControllers) {
     const controllerFile = underscore(controllerName) + '.js';
     if (existsSync(join(controllersDir, controllerFile))) {
-      imports.push(`import { ${controllerName} } from '../../app/controllers/${controllerFile}';`);
+      imports.push(`import { ${controllerName} } from '${relativePrefix}app/controllers/${controllerFile}';`);
     }
   }
 
@@ -526,7 +546,7 @@ function addControllerImportsToTest(code, controllersDir, modelsDir) {
   // Add path helper imports
   if (referencedPaths.size > 0) {
     const pathNames = [...referencedPaths].sort().join(', ');
-    imports.push(`import { ${pathNames} } from '../../config/paths.js';`);
+    imports.push(`import { ${pathNames} } from '${relativePrefix}config/paths.js';`);
   }
 
   // Add model imports (reuse existing logic)
@@ -543,7 +563,7 @@ function addControllerImportsToTest(code, controllersDir, modelsDir) {
     for (const modelName of referencedModels) {
       const modelFile = underscore(modelName) + '.js';
       if (existsSync(join(modelsDir, modelFile))) {
-        imports.push(`import { ${modelName} } from '../../app/models/${modelFile}';`);
+        imports.push(`import { ${modelName} } from '${relativePrefix}app/models/${modelFile}';`);
       }
     }
   }
@@ -1953,8 +1973,8 @@ async function runEject(options) {
               code = inlineFixtures(code, fixtures, associationMap);
             }
 
-            // Add model imports
-            code = addModelImportsToTest(code, join(outDir, 'app/models'));
+            // Add model imports (pass outName for correct relative path depth)
+            code = addModelImportsToTest(code, join(outDir, 'app/models'), outName, 2);
 
             // Ensure parent directory exists for nested test files (e.g., account/cancellable.test.mjs)
             const outPath = join(outModelTestDir, outName);
@@ -2003,11 +2023,13 @@ async function runEject(options) {
               code = inlineFixtures(code, ctrlFixtures, ctrlAssociationMap);
             }
 
-            // Add controller, model, and path helper imports
+            // Add controller, model, and path helper imports (pass outName for correct relative path depth)
             code = addControllerImportsToTest(
               code,
               join(outDir, 'app/controllers'),
-              join(outDir, 'app/models')
+              join(outDir, 'app/models'),
+              outName,
+              2
             );
 
             // Ensure parent directory exists for nested test files (e.g., cards/comments_controller.test.mjs)
