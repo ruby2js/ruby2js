@@ -10,28 +10,30 @@ This plan documents the approach for transpiling Basecamp's Fizzy application to
 
 Progress is measured by running `npx juntos eject` in the Fizzy directory with local npm-linked Ruby2JS packages.
 
-#### Setting Up npm link
-
-To test local Ruby2JS changes against Fizzy:
+#### Setting Up npm link (one-time)
 
 ```bash
-# 1. Build the selfhost packages (from ruby2js root)
-bundle exec rake -f demo/selfhost/Rakefile local
-
-# 2. Copy filters to the ruby2js package (required for npm link)
-cp -r demo/selfhost/filters packages/ruby2js/
-
-# 3. Link the packages globally
+# Link the packages globally (from ruby2js root)
 cd packages/ruby2js && npm link
 cd ../ruby2js-rails && npm link
 
-# 4. Link into Fizzy
+# Link into Fizzy
 cd /path/to/fizzy
 npm link ruby2js ruby2js-rails
 
-# 5. Verify symlinks
+# Verify symlinks
 ls -la node_modules/ruby2js  # Should show -> ../../ruby2js/packages/ruby2js
 ```
+
+#### Rebuilding After Changes
+
+After modifying filters or converters, rebuild with:
+
+```bash
+bundle exec rake -f demo/selfhost/Rakefile local
+```
+
+The `build.mjs` in ruby2js-rails uses relative imports to `demo/selfhost/`, so the npm-linked packages pick up changes automatically.
 
 #### Running the Eject Test
 
@@ -62,29 +64,40 @@ The eject command:
 
 ### Remaining Issues
 
-**12 syntax errors in 8 files:**
+**11 syntax errors in 11 files:**
 
-| Error Type | Files | Example |
-|------------|-------|---------|
-| Duplicate identifier (Struct + class) | color.js | `const Color` then `class Color` (skipped: `class << self` not supported) |
-| Unexpected token | magic_link.js, notification.js | Syntax issues in views |
-| Duplicate parameter name | filters/_settings.js | Some edge case |
-| Unexpected reserved word | my/_menu.js | Need investigation |
-| Duplicate path helper | paths.js | `left_position_path` declared twice |
-| Duplicate controller export | routes.js | `CardsController` declared twice |
-| Invalid assignment | seeds.js | Assignment issue |
-| Private field outside class | 4 test files | Test files with instance vars |
+| File | Error | Issue |
+|------|-------|-------|
+| `magic_link.js` | Unexpected token '(' | IIFE syntax issue with `}()` |
+| `notification.js` | Unexpected token '}' | Empty interpolation `${}` in turbo stream |
+| `filters/_settings.js` | Duplicate parameter | `_implicitBlockYield` appears twice |
+| `my/_menu.js` | Unexpected reserved word | `await` in non-async context |
+| `paths.js` | Duplicate identifier | `left_position_path` declared twice |
+| `routes.js` | Duplicate identifier | `CardsController` declared twice |
+| `seeds.js` | Invalid assignment | Assignment to invalid target |
+| `filter.test.mjs` | Private field outside class | `#new_board` instance var in test |
+| `notification_pusher.test.mjs` | Private field outside class | `#user` |
+| `search.test.mjs` | Private field outside class | `#board` |
+| `time_window_parser.test.mjs` | Private field outside class | `#now` |
 
-**148 test files skipped** due to ENOENT (output directories don't exist for concern tests like `test/models/account/cancellable_test.rb`). This is a CLI issue, not a transpilation bug.
+**2 files skipped (transpilation failures):**
+
+| File | Reason |
+|------|--------|
+| `color.rb` | `class << self` not supported in class_extend handler |
+| `cards/edit.html.erb` | View parsing issue (undefined error) |
+
+**~148 test files skipped** due to ENOENT (output directories don't exist for concern tests like `test/models/account/cancellable_test.rb`). This is a CLI issue, not a transpilation bug.
 
 ### Recent Fixes
 
 | Commit | Fix |
 |--------|-----|
+| `93101af` | Auto-detect Struct.new/Class.new + class reopening in pragma filter |
+| `e01761a` | Add `class << self` support to class.rb for selfhost |
 | `1b854a1` | Fix duplicate parameter (`**kwargs` only) and hash shorthand inside classes |
 | `9dc20d5` | Escape reserved words in method calls (`with()` → `$with()`) |
 | `83418cc` | Fix array comparison for JS selfhost, document npm link setup |
-| `83ebe59` | Update benchmark status |
 | `201c669` | Fix empty module const, Struct.new, nested class imports |
 | `5a6ad24` | Handle Ruby 3.4 `it` parameter in `tap` and single-symbol `params.expect` |
 | `3e435af` | Support `break value` in loops, implicit block parameter, kwarg handlers |
@@ -92,10 +105,11 @@ The eject command:
 
 ### Next Steps
 
-1. **Fix `class << self`** - color.rb is skipped because singleton classes aren't supported
-2. **Fix duplicate declarations** - paths.js and routes.js have repeated declarations
-3. **Investigate view errors** - magic_link.js, notification.js have syntax issues
-4. **Fix test file private fields** - Instance variables outside class context in tests
+1. **Add `class << self` to class_extend** - color.rb skipped because sclass not supported in class_extend handler (works in class2.rb)
+2. **Fix duplicate declarations** - paths.js and routes.js have repeated declarations (same helper/controller defined twice)
+3. **Fix view syntax issues** - magic_link.js IIFE issue, notification.js empty interpolation
+4. **Fix test file private fields** - Instance variables converted to `#field` outside class context
+5. **Fix duplicate parameter** - `_implicitBlockYield` appears twice in view rendering
 
 ---
 
@@ -406,14 +420,15 @@ queueMicrotask(() => notifiable.notify_recipients());
 
 | Item | Approach | Status |
 |------|----------|--------|
-| CurrentAttributes | AsyncLocalStorage adapter | Bug found: `with()` method transpiles incorrectly |
+| CurrentAttributes | AsyncLocalStorage adapter | Bug found: `with()` → `$with()` (escaped as reserved word) |
 | ActionMailer | nodemailer adapter | Not started |
 | Polymorphic associations | ORM enhancement | Not started |
 | `normalizes` directive | Transpiler addition | Not started |
 | Complex concern composition | Verify/fix module resolution | Not started |
 | Nested class syntax (`::`) | Convert `Account::Export` to valid import | Bug found |
 | Module-as-hash export | `export X = {}` → `export const X = {}` | Bug found |
-| Struct + class reopening | Avoid duplicate identifier | Bug found |
+| Struct + class reopening | Pragma filter auto-detects and uses class_extend | ✓ Fixed |
+| `class << self` in class_extend | Add sclass support to class.rb handler | Bug found |
 
 ### Infrastructure (Outside App Scope)
 
