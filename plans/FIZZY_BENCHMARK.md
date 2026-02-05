@@ -1,125 +1,12 @@
 # Fizzy Benchmark: Transpiling a Production Rails Application
 
-This plan documents the approach for transpiling Basecamp's Fizzy application to run on Node.js with SQLite3 using Ruby2JS/Juntos.
-
----
-
-## Current Status (February 2025)
-
-### Testing Methodology
-
-Progress is measured by running `npx juntos eject` in the Fizzy directory with local npm-linked Ruby2JS packages.
-
-#### Setting Up npm link (one-time)
-
-```bash
-# Link the packages globally (from ruby2js root)
-cd packages/ruby2js && npm link
-cd ../ruby2js-rails && npm link
-
-# Link into Fizzy
-cd /path/to/fizzy
-npm link ruby2js ruby2js-rails
-
-# Verify symlinks
-ls -la node_modules/ruby2js  # Should show -> ../../ruby2js/packages/ruby2js
-```
-
-#### Rebuilding After Changes
-
-After modifying filters or converters, rebuild with:
-
-```bash
-bundle exec rake -f demo/selfhost/Rakefile local
-```
-
-The `build.mjs` in ruby2js-rails uses relative imports to `demo/selfhost/`, so the npm-linked packages pick up changes automatically.
-
-#### Running the Eject Test
-
-```bash
-cd /path/to/fizzy
-DEBUG=1 npx juntos eject 2>&1 | grep -iE "(error|syntax|skipped|failed|transforming)"
-```
-
-The eject command:
-1. Transforms all Ruby source files (models, controllers, views, routes, migrations, seeds)
-2. Writes individual JavaScript files to `ejected/`
-3. Runs Node.js syntax checking on all output files
-4. Reports transformation failures and syntax errors
-
-**Note:** Fizzy's default `package.json` points to beta tarballs on ruby2js.github.io. The npm link overrides these with local packages for testing.
-
-### Transpilation Phases: All Complete
-
-| Phase | Status |
-|-------|--------|
-| Transforming models | ✓ Complete |
-| Transforming migrations | ✓ Complete |
-| Transforming seeds | ✓ Complete |
-| Transforming routes | ✓ Complete |
-| Transforming views | ✓ Complete |
-| Transforming Stimulus controllers | ✓ Complete |
-| Transforming Rails controllers | ✓ Complete |
-
-### Remaining Issues
-
-**572 files ejected** - Up from 439 (nested models + controller concerns now included).
-
-**2 files skipped** - `magic_link/code.rb` (sclass), `user/day_timeline/serializable.rb` (alias).
-
-**Runtime issues** - Tests load (90 tests discovered) but fail due to:
-- Nested class imports wrong path (`Identity::AccessToken` imports as `./access_token.js` instead of `./identity/access_token.js`)
-- Test helpers not yet transpiled (`SearchTestHelper`, `CardActivityTestHelper`)
-- Private field errors (`#board` must be declared in enclosing class)
-- Parent vitest config interferes when running from fizzy/ejected (workaround: test in isolated directory)
-
-### Recent Fixes
-
-| Commit | Fix |
-|--------|-----|
-| (pending) | Transpile nested model files (account/export.rb → account/export.js) |
-| (pending) | Transpile controller concerns (app/controllers/concerns/*.rb) |
-| (pending) | Fix concern import paths (`../models/boardscoped.js` → `./concerns/board_scoped.js`) |
-| `0b41fc3` | Add global stubs for `$private()`, `include()`, `ActiveSupport`, `ActionMailer` |
-| `5310712` | Fix relative import paths for nested test files during eject |
-| `a6a56b8` | Fix stack overflow in `transform_http_to_action` for literal URL paths |
-| `a6a56b8` | Fix AR association methods matching too broadly (`reader.find {}` vs `article.comments.find`) |
-| `f8721df` | Create parent directories for nested test files during eject |
-| (pending) | Handle ERB comments `<%# ... %>` - skip entirely instead of Ruby `#` comment |
-| (pending) | Fix nested param parsing: `article[title]` → `params.article.title` (all targets) |
-| (pending) | Fix nested resource collection path: `form_with model: [@article, Comment.new]` |
-| (pending) | Fix `broadcast_remove_to` default target (empty `${}` → `notification_${this.id}`) |
-| (pending) | Fix async render functions for views with `await` partial calls |
-| (pending) | Fix hash shorthand `{name:}` → `{name}` (not `{name()}`) |
-| (pending) | Fix assignment in conditionals `unless x = expr` → `if (!(x = expr))` |
-| (pending) | Fix duplicate path helpers for singular resources (`resource :foo` → prefixed names) |
-| (pending) | Fix duplicate controller imports in routes.js |
-| (pending) | Fix duplicate _implicitBlockYield parameter in view render functions |
-| (pending) | Convert test file ivars to local vars for all test classes (not just IntegrationTest) |
-| (pending) | Force underscored_private in class_extend (private fields don't work with function-style) |
-| (pending) | Fix `body.flatten!` → `body = body.flatten` for selfhost JS compatibility |
-| `93101af` | Auto-detect Struct.new/Class.new + class reopening in pragma filter |
-| `e01761a` | Add `class << self` support to class.rb for selfhost |
-| `1b854a1` | Fix duplicate parameter (`**kwargs` only) and hash shorthand inside classes |
-| `9dc20d5` | Escape reserved words in method calls (`with()` → `$with()`) |
-| `83418cc` | Fix array comparison for JS selfhost, document npm link setup |
-| `201c669` | Fix empty module const, Struct.new, nested class imports |
-| `5a6ad24` | Handle Ruby 3.4 `it` parameter in `tap` and single-symbol `params.expect` |
-| `3e435af` | Support `break value` in loops, implicit block parameter, kwarg handlers |
-| `ce2fbc8` | Handle `class << self` blocks and bare `new()` in class context |
-
-### Next Steps
-
-1. **Transpile nested model files** - Files like `account/export.rb`, `identity/access_token.rb` need to be generated as separate JS files
-2. **Transpile test helpers** - `SearchTestHelper`, `CardActivityTestHelper`, etc. need to be transpiled and exported
-3. **Functional testing** - Test CRUD operations, associations, etc.
+Validate that idiomatic Rails applications can be transpiled to JavaScript and run on non-Ruby platforms using Ruby2JS/Juntos.
 
 ---
 
 ## Goal
 
-Validate that idiomatic Rails applications can be transpiled to JavaScript and run on non-Ruby platforms. Fizzy serves as an ideal benchmark because:
+Fizzy serves as an ideal benchmark because:
 
 1. **Created by 37signals** - The company that created Rails
 2. **Production application** - Real-world complexity, not a toy example
@@ -130,7 +17,7 @@ Validate that idiomatic Rails applications can be transpiled to JavaScript and r
 
 > The more idiomatic your Rails application is, the greater likelihood that Juntos will be able to handle it properly.
 
-Fizzy tests this thesis. Success would demonstrate that Ruby2JS can handle real-world Rails applications. Failures will document specific limitations.
+Fizzy tests this thesis at scale. The [blog demo](https://ruby2js.github.io/ruby2js/blog/) already proves the concept for a simple Rails app (articles + comments with Turbo Streams, running entirely on GitHub Pages). Fizzy validates it for production complexity: 41 models, 65 controllers, 60 Stimulus controllers, 24-module concern composition, polymorphic associations, CurrentAttributes.
 
 ## Application Overview
 
@@ -143,7 +30,7 @@ Fizzy tests this thesis. Success would demonstrate that Ruby2JS can handle real-
 | Frontend | Hotwire (Turbo + Stimulus) |
 | Rails Version | 8.2 (main branch) |
 
-### Key Patterns Used
+### Key Patterns
 
 - **Concern-based composition** - Card model includes 24 modules
 - **Polymorphic associations** - eventable, reactable, source
@@ -154,291 +41,117 @@ Fizzy tests this thesis. Success would demonstrate that Ruby2JS can handle real-
 
 ---
 
-## Phase 1: Foundation (Simple Models & Controllers)
+## What's Been Accomplished
 
-**Goal:** Validate basic transpilation works with Fizzy's simplest components.
+**Transpilation is complete.** All file categories transform successfully:
 
-### Models to Transpile
+- **572 files ejected** (models, controllers, views, routes, migrations, seeds, tests, Stimulus controllers, concerns)
+- **2 files skipped** - `magic_link/code.rb` (`class << self` in non-class context), `user/day_timeline/serializable.rb` (`alias`)
+- **90 tests discovered** by vitest in the ejected output
 
-| Model | Complexity | Key Patterns |
-|-------|------------|--------------|
-| Tag | Low | `belongs_to`, `has_many`, `normalizes`, simple validations |
-| Column | Low | `belongs_to`, `has_many`, positioned concern |
-| Step | Low | `belongs_to`, validated content |
-| Pin | Low | `belongs_to` (user, card) |
-| Closure | Low | Tracks card closure state |
-| Tagging | Low | Join table |
-
-### Controllers to Transpile
-
-| Controller | Actions | Patterns |
-|------------|---------|----------|
-| TagsController | index | Simple resource |
-| ColumnsController | CRUD | Standard RESTful |
-
-### Expected Challenges
-
-- `normalizes` directive - may need transpiler support
-- Concern inclusion - verify module composition works
-- UUID primary keys - verify ORM handles non-integer IDs
-
-### Success Criteria
-
-- [x] Models transpile without errors (transformation phase completes)
-- [ ] Basic CRUD operations work
-- [ ] Associations load correctly
-- [ ] Validations prevent invalid data
-
-**Status:** Transformation completes. Some models have syntax errors in output (see Current Status).
+Dozens of transpilation bugs were found and fixed along the way (ERB comments, nested params, hash shorthand, async render, duplicate imports, private field handling, etc.). These fixes benefit all Ruby2JS users, not just Fizzy.
 
 ---
 
-## Phase 2: Intermediate Complexity
+## Remaining Work
 
-**Goal:** Handle models with callbacks, multiple associations, and richer behavior.
+The frontier has shifted from **"does it transpile?"** to **"does it run?"**
 
-### Models to Transpile
+### Runtime Issues
 
-| Model | Complexity | Key Patterns |
-|-------|------------|--------------|
-| Comment | Medium | `belongs_to`, `has_many`, `has_rich_text`, callbacks, delegate |
-| Reaction | Medium | Polymorphic (`reactable`), `after_create` callback |
-| Assignment | Medium | Multiple `belongs_to`, custom validation (LIMIT constant) |
-| Watch | Medium | Polymorphic (`watchable`) |
-| Notification | Medium | Polymorphic (`source`), broadcasting |
+These prevent the 90 discovered tests from passing:
 
-### Controllers to Transpile
+| Issue | Description |
+|-------|-------------|
+| Nested class imports | `Identity::AccessToken` imports as `./access_token.js` instead of `./identity/access_token.js` |
+| Test helpers | `SearchTestHelper`, `CardActivityTestHelper` need transpilation and export |
+| Private field scope | `#board` must be declared in enclosing class (concern methods reference fields from including class) |
+| Vitest config isolation | Parent vitest config interferes when running from fizzy/ejected |
 
-| Controller | Patterns |
-|------------|----------|
-| Cards::CommentsController | Nested resource, turbo_stream responses |
-| Cards::ReactionsController | Polymorphic creation |
-| NotificationsController | Bulk operations, respond_to blocks |
+### Infrastructure Adapters
 
-### Expected Challenges
+Rails infrastructure that needs JavaScript equivalents:
 
-- **Polymorphic associations** - `belongs_to :reactable, polymorphic: true`
-- **`has_rich_text`** - ActionText integration
-- **`delegate`** - Method delegation to associations
-- **Turbo Stream templates** - `.turbo_stream.erb` rendering
-- **`after_create_commit`** - Post-transaction callbacks
+| Adapter | Approach | Status |
+|---------|----------|--------|
+| CurrentAttributes | AsyncLocalStorage | `with()` now escapes to `$with()` (reserved word fix). Need adapter integration with request lifecycle. |
+| ActionMailer | nodemailer | Not started. `deliver_later` → async delivery, mailer view rendering. |
+| Background Jobs | Event loop | Fizzy's jobs are simple method calls. `perform_later` → `queueMicrotask`. No queue infrastructure needed. |
+| ActionText | TBD | `has_rich_text` needs a storage/rendering adapter |
+| ActiveStorage | Direct S3 or local | File uploads, image variants |
 
-### Discovered Issues
+### Functional Validation
 
-- **Empty interpolation** - `dom_id` calls producing `${}` in turbo stream templates
-- **Private fields** - Instance variables converted to `#field` appearing outside class context
-
-### Success Criteria
-
-- [x] Transformation phase completes for all views
-- [ ] Polymorphic associations resolve correctly
-- [ ] Rich text content saves and loads
-- [ ] Turbo Stream responses render
-- [ ] Callbacks fire in correct order
-
----
-
-## Phase 3: Complex Models
-
-**Goal:** Handle Fizzy's most sophisticated models with extensive concern composition.
-
-### Models to Transpile
-
-| Model | Complexity | Key Patterns |
-|-------|------------|--------------|
-| Card | High | 24 included concerns, transactions, complex scopes |
-| User | High | 8 concerns, role enum, settings association |
-| Board | Medium-High | Filterable, publishable, touch callbacks |
-| Filter | High | Complex query builder (20+ conditions) |
-| Event | Medium-High | Polymorphic, webhook dispatch |
-
-### Card Concerns to Handle
-
-```
-Accessible, Assignable, Attachments, Broadcastable, Closeable, Colored,
-Commentable, Entropic, Eventable, Exportable, Golden, Mentions, Multistep,
-Pinnable, Postponable, Promptable, Readable, Searchable, Stallable, Statuses,
-Storage::Tracked, Taggable, Triageable, Watchable
-```
-
-### Controllers to Transpile
-
-| Controller | Patterns |
-|------------|----------|
-| CardsController | FilterScoped, respond_to (html/json), etag caching |
-| BoardsController | Conditional rendering, fresh_when |
-| FiltersController | Complex domain model |
-| UsersController | Role management, admin protection |
-
-### Expected Challenges
-
-- **24-module composition** - Method resolution, callback ordering
-- **Transaction blocks** - Multi-model atomic updates
-- **Complex scopes** - Filter builds 20+ query conditions
-- **Default associations** - `belongs_to :creator, default: -> { Current.user }`
-- **Batch operations** - `update_all`, `in_batches`
-
-### Success Criteria
-
-- [ ] Card model with all concerns loads
-- [ ] Transactions maintain atomicity
-- [ ] Filter queries execute correctly
-- [ ] Default associations resolve Current context
-
----
-
-## Phase 4: Infrastructure Adapters
-
-**Goal:** Implement adapters for Rails infrastructure that doesn't have direct JavaScript equivalents.
-
-### CurrentAttributes (Transpilation Bug Found)
-
-**Ruby Pattern:**
-```ruby
-class Current < ActiveSupport::CurrentAttributes
-  attribute :user, :account
-
-  def with_account(value)
-    with(account: value) { yield }
-  end
-end
-```
-
-**Current Bug:** The `with` method from ActiveSupport::CurrentAttributes is being transpiled to JavaScript's `with` statement (deprecated/forbidden in strict mode):
-
-```javascript
-// WRONG - current output:
-with_account(value, ) {
-  return with({account: value}, )  // JS 'with' is forbidden in strict mode
-}
-```
-
-**Correct JavaScript Approach:**
-```javascript
-import { AsyncLocalStorage } from 'async_hooks';
-
-const currentStorage = new AsyncLocalStorage();
-
-export const Current = {
-  get user() { return currentStorage.getStore()?.user },
-  get account() { return currentStorage.getStore()?.account },
-
-  with(attrs, callback) {
-    const prev = currentStorage.getStore() || {};
-    return currentStorage.run({...prev, ...attrs}, callback);
-  },
-
-  withAccount(value, callback) {
-    return this.with({account: value}, callback);
-  }
-};
-```
-
-**Tasks:**
-- [x] Investigate AsyncLocalStorage behavior in Node.js
-- [ ] Fix transpilation of `with()` method calls (not JS `with` statement)
-- [ ] Handle trailing comma in method parameters `(value, )`
-- [ ] Determine how to integrate with request lifecycle
-
-### ActionMailer (Implementation Required)
-
-**Ruby Pattern:**
-```ruby
-UserMailer.welcome_email(@user).deliver_later
-```
-
-**Proposed JavaScript Approach:**
-```javascript
-import nodemailer from 'nodemailer';
-
-// Transpile to:
-await UserMailer.welcome_email(user).deliver();
-```
-
-**Tasks:**
-- [ ] Create ActionMailer adapter using nodemailer
-- [ ] Handle `deliver_later` → async delivery
-- [ ] Map mailer view rendering
-
-### Background Jobs (Pattern Mapping)
-
-**Ruby Pattern:**
-```ruby
-NotifyRecipientsJob.perform_later(notifiable)
-```
-
-**JavaScript Equivalent:**
-```javascript
-// Simple async execution (no persistence):
-setTimeout(() => notifiable.notify_recipients(), 0);
-
-// Or with queueMicrotask:
-queueMicrotask(() => notifiable.notify_recipients());
-```
-
-**Note:** Fizzy's jobs are simple method calls. JavaScript's event loop handles "fire and forget" natively. No job queue infrastructure needed for basic functionality.
-
----
-
-## Phase 5: Full Application
-
-**Goal:** Run the complete Fizzy application on Node.js with SQLite3.
-
-### Integration Tasks
-
-- [ ] Route generation from `config/routes.rb`
-- [ ] View transpilation (all ERB templates)
-- [ ] Stimulus controller copying/adaptation
-- [ ] Asset pipeline integration
-- [ ] Database migrations
-
-### Testing Strategy
-
-1. **Unit tests** - Transpile and run model specs
-2. **Controller tests** - Transpile and run with test harness
-3. **Integration tests** - End-to-end flows
-4. **Manual testing** - Browser-based verification
-
-### Success Criteria
+Once runtime issues are resolved:
 
 - [ ] Application starts without errors
-- [ ] User can create account and log in
-- [ ] CRUD operations work for boards/cards/comments
-- [ ] Real-time updates via Turbo Streams
-- [ ] Search functionality works
+- [ ] Basic CRUD operations work (create/read/update/delete cards)
+- [ ] Associations load correctly (polymorphic, has_many through)
+- [ ] Validations prevent invalid data
+- [ ] Concern composition works (Card with 24 modules)
+- [ ] Turbo Stream responses render
+- [ ] Callbacks fire in correct order
+- [ ] CurrentAttributes resolve in request context
+- [ ] Real-time updates via Turbo Streams/Action Cable
+
+---
+
+## Development Workflow
+
+### Setup (one-time)
+
+```bash
+# Link packages globally (from ruby2js root)
+cd packages/ruby2js && npm link
+cd ../ruby2js-rails && npm link
+
+# Link into Fizzy
+cd /path/to/fizzy
+npm link ruby2js ruby2js-rails
+```
+
+### Build and Test
+
+```bash
+# After modifying filters or converters
+bundle exec rake -f demo/selfhost/Rakefile local
+
+# Run the eject test
+cd /path/to/fizzy
+DEBUG=1 npx juntos eject 2>&1 | grep -iE "(error|syntax|skipped|failed|transforming)"
+```
+
+The eject command transforms all Ruby source files, writes JavaScript to `ejected/`, runs syntax checking, and reports failures.
 
 ---
 
 ## Known Considerations
 
-### Supported (Works Today or Minor Fixes)
+### Supported (Works Today)
 
 | Category | Patterns |
 |----------|----------|
-| Models | belongs_to, has_many, has_one, validations, scopes, callbacks, enums |
-| Controllers | RESTful CRUD, before_action, respond_to, strong params |
+| Models | belongs_to, has_many, has_one, validations, scopes, callbacks, enums, normalizes |
+| Controllers | RESTful CRUD, before_action, respond_to, strong params (.expect syntax) |
 | Views | ERB, partials, form helpers, Turbo Streams |
 | JavaScript | Stimulus controllers, Turbo, @rails/request.js |
+| Structure | Nested controllers, concerns, Struct.new + class reopening |
 
-### Needs Implementation
+### Needs Runtime Implementation
 
-| Item | Approach | Status |
-|------|----------|--------|
-| CurrentAttributes | AsyncLocalStorage adapter | Bug found: `with()` → `$with()` (escaped as reserved word) |
-| ActionMailer | nodemailer adapter | Not started |
-| Polymorphic associations | ORM enhancement | Not started |
-| `normalizes` directive | Transpiler addition | Not started |
-| Complex concern composition | Verify/fix module resolution | Not started |
-| Nested class syntax (`::`) | Convert `Account::Export` to valid import | Bug found |
-| Module-as-hash export | `export X = {}` → `export const X = {}` | Bug found |
-| Struct + class reopening | Pragma filter auto-detects and uses class_extend | ✓ Fixed |
-| `class << self` in class_extend | Add sclass support to class.rb handler | Bug found |
+| Item | Notes |
+|------|-------|
+| CurrentAttributes | AsyncLocalStorage adapter exists conceptually; needs request lifecycle integration |
+| ActionMailer | nodemailer adapter |
+| Polymorphic associations | ORM query enhancement |
+| Complex concern composition | Method resolution across 24 modules |
+| ActionText | Rich text storage and rendering |
 
 ### Infrastructure (Outside App Scope)
 
 | Item | Notes |
 |------|-------|
-| Rate limiting | Handle at infrastructure level (Cloudflare, nginx) |
+| Rate limiting | Cloudflare, nginx |
 | File uploads | ActiveStorage adapter or direct S3 |
 | Search | SQLite FTS or external service |
 
@@ -452,61 +165,18 @@ queueMicrotask(() => notifiable.notify_recipients());
 
 ---
 
-## Timeline Estimate
+## What We Learned
 
-| Phase | Scope | Estimate |
-|-------|-------|----------|
-| Phase 1 | Simple models | 1-2 days |
-| Phase 2 | Intermediate models | 3-5 days |
-| Phase 3 | Complex models | 1-2 weeks |
-| Phase 4 | Infrastructure adapters | 1 week |
-| Phase 5 | Full integration | 1-2 weeks |
+Key insights from the transpilation effort:
 
-**Total:** 4-6 weeks of focused effort
+1. **Idiomatic Rails transpiles well.** Standard MVC patterns, RESTful controllers, Active Record associations, ERB views — all transform mechanically. The thesis holds.
 
-**Note:** Estimates assume surprises will be discovered and fixed along the way. The value is in documenting what works and what doesn't, not in achieving 100% compatibility.
+2. **The hard part is runtime, not syntax.** Getting 572 files to produce valid JavaScript was the easy half. Making them *run* requires adapters for Rails infrastructure (CurrentAttributes, ActionMailer, ActionText) that have no direct JavaScript equivalent.
 
----
+3. **Concern composition is the biggest architectural challenge.** Ruby's `include` mixin semantics (method resolution order, `super` chains, callback ordering across 24 modules) need careful runtime support.
 
-## Appendix: Fizzy File Inventory
+4. **Private fields don't compose.** JavaScript's `#field` syntax requires declaration in the enclosing class, but concern methods reference fields from the *including* class. The workaround (underscored private: `_field`) trades encapsulation for composability.
 
-### Models (~41)
-```
-account.rb, assignment.rb, board.rb, card.rb, closure.rb, column.rb,
-comment.rb, event.rb, export.rb, filter.rb, identity.rb, magic_link.rb,
-notification.rb, pin.rb, reaction.rb, session.rb, step.rb, tag.rb,
-tagging.rb, user.rb, watch.rb, webhook.rb, ...
-```
+5. **Import path resolution for nested classes is tricky.** Ruby's `Identity::AccessToken` is a namespace convention; JavaScript needs explicit file paths. The transpiler needs to understand the directory structure, not just the class hierarchy.
 
-### Top-Level Controllers (~17)
-```
-application_controller.rb, boards_controller.rb, cards_controller.rb,
-events_controller.rb, filters_controller.rb, join_codes_controller.rb,
-landings_controller.rb, notifications_controller.rb, pwa_controller.rb,
-qr_codes_controller.rb, searches_controller.rb, sessions_controller.rb,
-signups_controller.rb, tags_controller.rb, users_controller.rb,
-webhooks_controller.rb
-```
-
-### Nested Controllers (~50)
-```
-cards/assignments_controller.rb, cards/boards_controller.rb,
-cards/closures_controller.rb, cards/columns_controller.rb,
-cards/comments_controller.rb, cards/drafts_controller.rb,
-cards/goldnesses_controller.rb, cards/images_controller.rb,
-cards/not_nows_controller.rb, cards/pins_controller.rb,
-cards/previews_controller.rb, cards/publishes_controller.rb,
-cards/reactions_controller.rb, cards/readings_controller.rb,
-cards/steps_controller.rb, cards/taggings_controller.rb,
-cards/triages_controller.rb, cards/watches_controller.rb,
-...
-```
-
-### Stimulus Controllers (~60)
-```
-auto_save_controller.js, auto_submit_controller.js, badge_controller.js,
-card_hotkeys_controller.js, collapsible_columns_controller.js,
-combobox_controller.js, details_controller.js, dialog_controller.js,
-drag_and_drop_controller.js, fetch_on_visible_controller.js,
-navigable_list_controller.js, ...
-```
+6. **Every fix benefits all users.** Bugs found via Fizzy (ERB comments, hash shorthand, async render, duplicate imports, reserved word escaping) were fixed in core Ruby2JS, improving transpilation for all applications.
