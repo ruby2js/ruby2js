@@ -445,18 +445,22 @@ module Ruby2JS
             (group_receiver ? group(receiver) : parse(receiver))
             put ".#{ method_name }"
           elsif @ast.type == :attr || @ast.type == :await_attr
-            put method_name
+            put jsvar(method_name)
           elsif @state == :statement
             # In statement context, a bare word with no receiver and no args
             # is a method call, not a variable declaration. There's no reason
             # to declare a variable you never assign to.
-            put "#{ method_name }()"
+            put "#{ jsvar(method_name) }()"
           else
             parse @ast.updated(:lvasgn, [method_name]), @state
           end
         else
           (group_receiver ? group(receiver) : parse(receiver))
-          put "#{ '.' if receiver && method_name}#{ method_name }"
+          # Escape reserved words when no receiver (e.g., with() -> $with())
+          # Property access (obj.with) doesn't need escaping
+          # Exception: import() is valid JS for dynamic imports
+          output_name = receiver || method.to_s == 'import' ? method_name : jsvar(method_name)
+          put "#{ '.' if receiver && method_name}#{ output_name }"
 
           if args.length <= 1
             put "("; parse_all(*args, join: ', '); put ')'

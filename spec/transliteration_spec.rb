@@ -1094,6 +1094,20 @@ describe Ruby2JS do
       to_js( 'module M; def self.delete(x); x; end; end' ).
         must_equal('const M = (() => {function $delete(x) {x}; return {$delete}})()')
     end
+
+    it "should escape JS reserved words in method calls without receivers" do
+      # 'with' is forbidden in strict mode; must be escaped when called without receiver
+      to_js( 'with(foo: 1) { bar }' ).
+        must_equal('$with({foo: 1}, () => bar)')
+      # But property access is valid JS, so don't escape with receiver
+      to_js( 'self.with(foo: 1) { bar }' ).
+        must_equal('this.with({foo: 1}, () => bar)')
+      to_js( 'obj.with(foo: 1) { bar }' ).
+        must_equal('obj.with({foo: 1}, () => bar)')
+      # 'import()' is special - it's valid JS for dynamic imports
+      to_js( 'import("x.js")' ).
+        must_equal('import("x.js")')
+    end
   end
 
   describe 'allocation' do
