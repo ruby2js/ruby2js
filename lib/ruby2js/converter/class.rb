@@ -181,6 +181,26 @@ module Ruby2JS
               [name, innerclass_name.children[1]])
           end
           m.updated(nil, [innerclass_name, *m.children[1..-1]])
+        elsif m.type == :sclass and m.children.first&.type == :self
+          # class << self block - convert methods to class methods
+          sclass_body = m.children[1]
+          sclass_body = sclass_body.children.dup if sclass_body&.type == :begin  # Pragma: array
+          sclass_body = [sclass_body] unless sclass_body.is_a?(Array)
+
+          # Use select instead of compact for JS compatibility
+          sclass_body.select { |x| x }.map do |smethod|
+            if smethod.type == :def
+              # Convert instance method to class method: def foo -> name.foo = function
+              method_name = smethod.children[0]
+              args = smethod.children[1]
+              body = smethod.children[2]
+              visible[method_name] = name
+              s(:send, name, "#{method_name}=",
+                s(:block, s(:send, nil, :proc), args, body))
+            else
+              smethod
+            end
+          end
         elsif @ast.type == :class_module
           m
         elsif m.type == :defineProps
