@@ -110,9 +110,17 @@ module Ruby2JS
           model_import_nodes = []
           [*@rails_model_refs].sort.each do |model|
             next if model == @rails_model_name
-            model_file = model.downcase
+            # Handle nested class names like "Account::Export" -> "./account/export.js"
+            if model.include?('::')
+              parts = model.split('::')
+              import_name = parts.last  # Just the leaf class name
+              model_file = parts.map { |p| p.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '') }.join('/')
+            else
+              import_name = model
+              model_file = model.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '')
+            end
             model_import_nodes.push(s(:send, nil, :import,
-              s(:array, s(:const, nil, model.to_sym)),
+              s(:array, s(:const, nil, import_name.to_sym)),
               s(:str, "./#{model_file}.js")))
           end
 
@@ -986,6 +994,9 @@ module Ruby2JS
           # Track model reference for import generation
           @rails_model_refs.add(class_name)
 
+          # For nested class names like "Account::Export", use just the leaf name for JS reference
+          js_class_name = class_name.include?('::') ? class_name.split('::').last : class_name
+
           # Build association metadata object: { name: 'comments', type: 'has_many', foreignKey: 'article_id' }
           assoc_metadata = s(:hash,
             s(:pair, s(:sym, :name), s(:str, association_name.to_s)),
@@ -998,7 +1009,7 @@ module Ruby2JS
             :new,
             s(:self),
             assoc_metadata,
-            s(:const, nil, class_name.to_sym))
+            s(:const, nil, js_class_name.to_sym))
 
           # Getter: returns cache if set, otherwise creates and caches new CollectionProxy
           getter = s(:defget, association_name,
@@ -1033,11 +1044,14 @@ module Ruby2JS
           # Track model reference for import generation
           @rails_model_refs.add(class_name)
 
+          # For nested class names like "Account::Export", use just the leaf name for JS reference
+          js_class_name = class_name.include?('::') ? class_name.split('::').last : class_name
+
           s(:defget, association_name,
             s(:args),
             s(:autoreturn,
               s(:send,
-                s(:const, nil, class_name.to_sym),
+                s(:const, nil, js_class_name.to_sym),
                 :find_by,
                 s(:hash,
                   s(:pair,
@@ -1060,6 +1074,9 @@ module Ruby2JS
           # Track model reference for import generation
           @rails_model_refs.add(class_name)
 
+          # For nested class names like "Account::Export", use just the leaf name for JS reference
+          js_class_name = class_name.include?('::') ? class_name.split('::').last : class_name
+
           # Access foreign key from attributes - use :attr for property access
           # Use .to_s to force bracket notation (Ruby2JS optimizes literal strings to dot notation)
           fk_access = s(:send, s(:attr, s(:self), :attributes), :[],
@@ -1068,7 +1085,7 @@ module Ruby2JS
           # Getter: return cached object or find by foreign key
           # this._article || Article.find(this.attributes['article_id'])
           find_call = s(:send,
-            s(:const, nil, class_name.to_sym),
+            s(:const, nil, js_class_name.to_sym),
             :find,
             fk_access)
 

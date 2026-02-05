@@ -64,6 +64,23 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, ', Comment)'
     end
 
+    it "supports nested class_name with :: separator" do
+      result = to_js(<<~RUBY)
+        class Account < ApplicationRecord
+          has_many :exports, class_name: 'Account::Export'
+        end
+      RUBY
+      # Import should use leaf name and nested path
+      assert_includes result, 'import { Export } from'
+      assert_includes result, './account/export.js'
+      # CollectionProxy should use leaf class name (not the :: version)
+      assert_includes result, ', Export)'
+      # Should NOT contain :: as an identifier (import or class reference)
+      # Note: "Account::Export" as a string in metadata is OK
+      refute_includes result, 'import { Account::Export'
+      refute_includes result, 's(:const, nil, :"Account::Export")'
+    end
+
     it "supports foreign_key option" do
       result = to_js(<<~RUBY)
         class Article < ApplicationRecord

@@ -1344,4 +1344,27 @@ describe Ruby2JS::Filter::Functions do
         must_include 'x.some((y) => {if (!y) return})'
     end
   end
+
+  describe 'Struct' do
+    it "should convert Struct.new to a class with constructor and accessors" do
+      to_js( 'Color = Struct.new(:name, :value)' ).
+        must_include 'class Color'
+      to_js( 'Color = Struct.new(:name, :value)' ).
+        must_include 'constructor(name, value)'
+      to_js( 'Color = Struct.new(:name, :value)' ).
+        must_include 'get name()'
+      to_js( 'Color = Struct.new(:name, :value)' ).
+        must_include 'set name(name)'
+    end
+
+    it "should allow class reopening after Struct.new" do
+      code = "Color = Struct.new(:name, :value)\nclass Color\n  def to_s; value; end\nend"
+      # Should produce valid JS (no duplicate identifier error)
+      result = to_js(code)
+      result.must_include 'class Color'
+      # Class reopening uses Object.defineProperty for added methods
+      result.must_include 'to_s'
+      result.must_include 'this.value'
+    end
+  end
 end

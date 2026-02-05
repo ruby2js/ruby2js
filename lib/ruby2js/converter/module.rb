@@ -14,7 +14,7 @@ module Ruby2JS
 
       if body.length == 1 && body.first == nil
         if @ast.type == :module and not extend
-          parse @ast.updated(:casgn, [*name.children, s(:hash)])
+          parse @ast.updated(:casgn, [*name.children, s(:hash)]), :statement
         else
           parse @ast.updated(:hash, [])
         end

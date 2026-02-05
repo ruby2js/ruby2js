@@ -1828,6 +1828,50 @@ module Ruby2JS
         end
       end
 
+      # Convert Struct.new to a class definition
+      # Color = Struct.new(:name, :value) becomes:
+      # class Color {
+      #   constructor(name, value) { this.name = name; this.value = value }
+      #   get name() { return this._name }
+      #   set name(v) { this._name = v }
+      #   ...
+      # }
+      def on_casgn(node)
+        cbase, name, value = node.children
+
+        # Only handle top-level constant assignment of Struct.new
+        if cbase.nil? && value&.type == :send
+          target, method, *args = value.children
+
+          if target&.type == :const &&
+             target.children == [nil, :Struct] &&
+             method == :new &&
+             args.all? { |a| a.type == :sym }
+
+            # Extract field names from Struct.new(:field1, :field2, ...)
+            fields = args.map { |a| a.children.first }
+
+            # Build constructor args: s(:args, s(:arg, :field1), s(:arg, :field2), ...)
+            constructor_args = s(:args, *fields.map { |f| s(:arg, f) })
+
+            # Build constructor body: this._field1 = field1; etc.
+            # Use ivars for storage so accessors can use them
+            assignments = fields.map { |f| s(:ivasgn, :"@#{f}", s(:lvar, f)) }
+            constructor_body = assignments.length == 1 ? assignments.first : s(:begin, *assignments)
+
+            # Build class with constructor and attr_accessor for each field
+            constructor = s(:def, :initialize, constructor_args, constructor_body)
+            attr_accessor = s(:send, nil, :attr_accessor, *fields.map { |f| s(:sym, f) })
+            class_node = s(:class, s(:const, nil, name), nil,
+              s(:begin, attr_accessor, constructor))
+
+            return process class_node
+          end
+        end
+
+        super
+      end
+
       # Map Ruby exception classes to JavaScript equivalents
       def on_const(node)
         # JSON::ParserError => SyntaxError (JSON.parse throws SyntaxError in JS)

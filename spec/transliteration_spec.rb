@@ -1033,7 +1033,7 @@ describe Ruby2JS do
   describe 'module definition' do
     it "should handle empty modules" do
       to_js( 'module A; end' ).
-        must_equal 'A = {}'
+        must_equal 'const A = {}'
     end
 
     it "should handle module definitions" do
