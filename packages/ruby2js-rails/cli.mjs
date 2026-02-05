@@ -33,6 +33,7 @@ import {
   generatePackageJsonForEject,
   generateViteConfigForEject,
   generateTestSetupForEject,
+  generateTestGlobalsForEject,
   generateMainJsForEject,
   generateVitestConfigForEject,
   generateBrowserIndexHtml,
@@ -2067,12 +2068,14 @@ async function runEject(options) {
   writeFileSync(join(outDir, 'vitest.config.js'), generateVitestConfigForEject(config));
   fileCount++;
 
-  // Generate test/setup.mjs
+  // Generate test/setup.mjs and test/globals.mjs
   const outTestDir = join(outDir, 'test');
   if (!existsSync(outTestDir)) {
     mkdirSync(outTestDir, { recursive: true });
   }
   writeFileSync(join(outTestDir, 'setup.mjs'), generateTestSetupForEject(config));
+  fileCount++;
+  writeFileSync(join(outTestDir, 'globals.mjs'), generateTestGlobalsForEject());
   fileCount++;
 
   // Generate entry point(s) based on target

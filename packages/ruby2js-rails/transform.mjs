@@ -574,6 +574,35 @@ beforeEach(async () => {
 }
 
 /**
+ * Generate test/globals.mjs with Ruby pattern stubs.
+ * Separate from setup.mjs so it can be imported without vitest context.
+ */
+export function generateTestGlobalsForEject() {
+  return `// Global stubs for Ruby patterns that don't have direct JS equivalents
+// These are defined here so tests can load without errors
+
+// $private() - Ruby's private method marker, no-op in JS (functions are already scoped)
+globalThis.$private = function() {};
+
+// include() - Ruby module inclusion, stubbed for now
+// TODO: Implement proper module mixin support
+globalThis.include = function(module) {
+  // No-op for now - tests that need shared setup will fail until helpers are implemented
+};
+
+// ActiveSupport stub for patterns like ActiveSupport::Concern
+globalThis.ActiveSupport = {
+  Concern: {}
+};
+
+// ActionMailer stub for ActionMailer.TestHelper
+globalThis.ActionMailer = {
+  TestHelper: { name: 'ActionMailer.TestHelper' }
+};
+`;
+}
+
+/**
  * Get the active record adapter filename for a database.
  */
 function getActiveRecordAdapterFile(database) {
@@ -679,10 +708,11 @@ export function generateVitestConfigForEject(config = {}) {
 
 export default defineConfig({${externalConfig}
   test: {
+    root: '.',
     globals: true,
     environment: 'node',
     include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
-    setupFiles: ['./test/setup.mjs']
+    setupFiles: ['./test/globals.mjs', './test/setup.mjs']
   }
 });
 `;
