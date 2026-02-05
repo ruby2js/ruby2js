@@ -144,12 +144,18 @@ module Ruby2JS
             end
 
             # Check for association methods (e.g., article.comments.create!, workflow.nodes.count)
-            if AR_ASSOCIATION_METHODS.include?(method)
-              # Wrap with await, process target and args
-              new_target = self.wrap_ar_operations(target, model_refs)
-              new_args = args.map { |a| self.wrap_ar_operations(a, model_refs) }
-              new_node = node.updated(nil, [new_target, method, *new_args])
-              return new_node.updated(:await!)
+            # Must be a chain: lvar.accessor.method (not just lvar.find which could be Array#find)
+            if target&.type == :send && AR_ASSOCIATION_METHODS.include?(method)
+              assoc_target = target.children[0]
+              assoc_method = target.children[1]
+              # Only wrap if chain starts from lvar/ivar and accessor isn't [] (hash/array access)
+              if (assoc_target&.type == :lvar || assoc_target&.type == :ivar) && assoc_method != :[]
+                # Wrap with await, process target and args
+                new_target = self.wrap_ar_operations(target, model_refs)
+                new_args = args.map { |a| self.wrap_ar_operations(a, model_refs) }
+                new_node = node.updated(nil, [new_target, method, *new_args])
+                return new_node.updated(:await!)
+              end
             end
 
             # Process children recursively

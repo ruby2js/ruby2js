@@ -796,9 +796,10 @@ module Ruby2JS
           s(:lvasgn, :response, await_call)
         end
 
-        # Helper to construct a super send node
+        # Helper to construct a passthrough send node (won't be re-processed by on_send)
+        # Uses send! to mark as already processed, avoiding infinite recursion
         def super_send_node(method, args)
-          process(s(:send, nil, method, *args))
+          s(:send!, nil, method, *process_all(args))
         end
 
         # Transform assert_response to expect() calls.

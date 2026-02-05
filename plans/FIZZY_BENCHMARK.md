@@ -64,16 +64,18 @@ The eject command:
 
 ### Remaining Issues
 
-**0 syntax errors** - All previously reported syntax errors have been fixed.
+**0 syntax errors** - All 435 JavaScript files pass syntax check.
 
 **0 files skipped (transpilation)** - All views now transpile successfully.
 
-**1 test file skipped** - `test/controllers/admin/mission_control_test.rb` causes stack overflow during transpilation.
+**0 test files skipped** - All 188 test files transpile successfully.
 
 ### Recent Fixes
 
 | Commit | Fix |
 |--------|-----|
+| (pending) | Fix stack overflow in `transform_http_to_action` for literal URL paths (`get "/admin/jobs"`) |
+| (pending) | Fix AR association methods matching too broadly (`reader.find {}` vs `article.comments.find`) |
 | (pending) | Create parent directories for nested test files during eject |
 | (pending) | Handle ERB comments `<%# ... %>` - skip entirely instead of Ruby `#` comment |
 | (pending) | Fix nested param parsing: `article[title]` → `params.article.title` (all targets) |
@@ -102,7 +104,6 @@ The eject command:
 
 1. **Runtime testing** - Verify transpiled code executes correctly
 2. **Functional testing** - Test CRUD operations, associations, etc.
-3. **Investigate stack overflow** - `admin/mission_control_test.rb` causes infinite recursion
 
 ---
 
