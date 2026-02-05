@@ -62,37 +62,40 @@ The eject command:
 
 ### Remaining Issues
 
-**23 syntax errors in 16 files:**
+**12 syntax errors in 8 files:**
 
 | Error Type | Files | Example |
 |------------|-------|---------|
-| Nested class `::` in imports | account.js, event.js | `import { Account::Export }` |
-| Missing `const` in module export | admin.js | `export Admin = {}` |
-| Ruby `with()` → JS `with` | current.js | `with({account: value}, )` |
-| Duplicate parameter name | identity.js | `(attributes, { ...attributes } = {})` |
-| Empty interpolation | notification.js | `target="${}"` |
-| Duplicate identifier (Struct + class) | color.js | `const Color` then `class Color` |
-| Private field outside class | notifier.js, signup.js, user.js | `#should_notify` |
+| Duplicate identifier (Struct + class) | color.js | `const Color` then `class Color` (skipped: `class << self` not supported) |
+| Unexpected token | magic_link.js, notification.js | Syntax issues in views |
+| Duplicate parameter name | filters/_settings.js | Some edge case |
+| Unexpected reserved word | my/_menu.js | Need investigation |
 | Duplicate path helper | paths.js | `left_position_path` declared twice |
 | Duplicate controller export | routes.js | `CardsController` declared twice |
+| Invalid assignment | seeds.js | Assignment issue |
+| Private field outside class | 4 test files | Test files with instance vars |
 
 **148 test files skipped** due to ENOENT (output directories don't exist for concern tests like `test/models/account/cancellable_test.rb`). This is a CLI issue, not a transpilation bug.
 
-### Recent Fixes (This Session)
+### Recent Fixes
 
 | Commit | Fix |
 |--------|-----|
+| `1b854a1` | Fix duplicate parameter (`**kwargs` only) and hash shorthand inside classes |
+| `9dc20d5` | Escape reserved words in method calls (`with()` → `$with()`) |
+| `83418cc` | Fix array comparison for JS selfhost, document npm link setup |
+| `83ebe59` | Update benchmark status |
+| `201c669` | Fix empty module const, Struct.new, nested class imports |
 | `5a6ad24` | Handle Ruby 3.4 `it` parameter in `tap` and single-symbol `params.expect` |
 | `3e435af` | Support `break value` in loops, implicit block parameter, kwarg handlers |
 | `ce2fbc8` | Handle `class << self` blocks and bare `new()` in class context |
-| Earlier | ERB comment handling (`<%# ... %>`) |
 
 ### Next Steps
 
-1. **Fix nested class imports** - `Account::Export` should become valid JS import path
-2. **Fix module exports** - `export Admin = {}` → `export const Admin = {}`
-3. **Handle `with()` method** - Rails CurrentAttributes pattern needs proper transpilation
-4. **Fix duplicate identifiers** - Struct definitions combined with class reopening
+1. **Fix `class << self`** - color.rb is skipped because singleton classes aren't supported
+2. **Fix duplicate declarations** - paths.js and routes.js have repeated declarations
+3. **Investigate view errors** - magic_link.js, notification.js have syntax issues
+4. **Fix test file private fields** - Instance variables outside class context in tests
 
 ---
 
