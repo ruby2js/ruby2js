@@ -1956,7 +1956,13 @@ async function runEject(options) {
             // Add model imports
             code = addModelImportsToTest(code, join(outDir, 'app/models'));
 
-            writeFileSync(join(outModelTestDir, outName), code);
+            // Ensure parent directory exists for nested test files (e.g., account/cancellable.test.mjs)
+            const outPath = join(outModelTestDir, outName);
+            const outParentDir = dirname(outPath);
+            if (!existsSync(outParentDir)) {
+              mkdirSync(outParentDir, { recursive: true });
+            }
+            writeFileSync(outPath, code);
             fileCount++;
           } catch (err) {
             errors.push({ file: relativePath, error: err.message, stack: err.stack });
@@ -2004,7 +2010,13 @@ async function runEject(options) {
               join(outDir, 'app/models')
             );
 
-            writeFileSync(join(outControllerTestDir, outName), code);
+            // Ensure parent directory exists for nested test files (e.g., cards/comments_controller.test.mjs)
+            const outPath = join(outControllerTestDir, outName);
+            const outParentDir = dirname(outPath);
+            if (!existsSync(outParentDir)) {
+              mkdirSync(outParentDir, { recursive: true });
+            }
+            writeFileSync(outPath, code);
             fileCount++;
           } catch (err) {
             errors.push({ file: relativePath, error: err.message, stack: err.stack });
