@@ -80,11 +80,10 @@ The eject command:
 | `search.test.mjs` | Private field outside class | `#board` |
 | `time_window_parser.test.mjs` | Private field outside class | `#now` |
 
-**2 files skipped (transpilation failures):**
+**1 file skipped (transpilation failure):**
 
 | File | Reason |
 |------|--------|
-| `color.rb` | `class << self` not supported in class_extend handler |
 | `cards/edit.html.erb` | View parsing issue (undefined error) |
 
 **~148 test files skipped** due to ENOENT (output directories don't exist for concern tests like `test/models/account/cancellable_test.rb`). This is a CLI issue, not a transpilation bug.
@@ -93,6 +92,8 @@ The eject command:
 
 | Commit | Fix |
 |--------|-----|
+| (pending) | Force underscored_private in class_extend (private fields don't work with function-style) |
+| (pending) | Fix `body.flatten!` → `body = body.flatten` for selfhost JS compatibility |
 | `93101af` | Auto-detect Struct.new/Class.new + class reopening in pragma filter |
 | `e01761a` | Add `class << self` support to class.rb for selfhost |
 | `1b854a1` | Fix duplicate parameter (`**kwargs` only) and hash shorthand inside classes |
@@ -105,11 +106,10 @@ The eject command:
 
 ### Next Steps
 
-1. **Add `class << self` to class_extend** - color.rb skipped because sclass not supported in class_extend handler (works in class2.rb)
-2. **Fix duplicate declarations** - paths.js and routes.js have repeated declarations (same helper/controller defined twice)
-3. **Fix view syntax issues** - magic_link.js IIFE issue, notification.js empty interpolation
-4. **Fix test file private fields** - Instance variables converted to `#field` outside class context
-5. **Fix duplicate parameter** - `_implicitBlockYield` appears twice in view rendering
+1. **Fix duplicate declarations** - paths.js and routes.js have repeated declarations (same helper/controller defined twice)
+2. **Fix view syntax issues** - magic_link.js IIFE issue, notification.js empty interpolation
+3. **Fix test file private fields** - Instance variables converted to `#field` outside class context
+4. **Fix duplicate parameter** - `_implicitBlockYield` appears twice in view rendering
 
 ---
 

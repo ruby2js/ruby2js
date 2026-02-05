@@ -228,7 +228,7 @@ module Ruby2JS
         node
       end
 
-      body.flatten!
+      body = body.flatten
 
       # merge property definitions
       combine_properties(body)
@@ -355,6 +355,11 @@ module Ruby2JS
         # inhibit ivar substitution within a class definition.  See ivars.rb
         ivars, self.ivars = self.ivars, nil
 
+        # Force underscored_private for class_extend since function-style
+        # constructors can't use ES2022 private fields (#foo syntax)
+        saved_underscored_private = @underscored_private
+        @underscored_private = true if @ast.type == :class_extend
+
         # add locally visible interfaces to rbstack.  See send.rb, const.rb
         @rbstack.push visible
         @rbstack.last.merge!(@namespace.find(inheritance)) if inheritance
@@ -364,6 +369,7 @@ module Ruby2JS
         self.ivars = ivars
         @class_name = class_name
         @class_parent = class_parent
+        @underscored_private = saved_underscored_private
         @namespace.defineProps @rbstack.pop
         @namespace.leave() unless @ast.type == :class_module
       end
