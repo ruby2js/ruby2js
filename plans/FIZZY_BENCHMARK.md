@@ -64,13 +64,12 @@ The eject command:
 
 ### Remaining Issues
 
-**7 syntax errors in 7 files:**
+**6 syntax errors in 6 files:**
 
 | File | Error | Issue |
 |------|-------|-------|
 | `magic_link.js` | Unexpected token '(' | IIFE syntax issue with `}()` |
 | `notification.js` | Unexpected token '}' | Empty interpolation `${}` in turbo stream |
-| `filters/_settings.js` | Duplicate parameter | `_implicitBlockYield` appears twice |
 | `my/_menu.js` | Unexpected reserved word | `await` in non-async context |
 | `paths.js` | Duplicate identifier | `left_position_path` declared twice |
 | `routes.js` | Duplicate identifier | `CardsController` declared twice |
@@ -88,6 +87,7 @@ The eject command:
 
 | Commit | Fix |
 |--------|-----|
+| (pending) | Fix duplicate _implicitBlockYield parameter in view render functions |
 | (pending) | Convert test file ivars to local vars for all test classes (not just IntegrationTest) |
 | (pending) | Force underscored_private in class_extend (private fields don't work with function-style) |
 | (pending) | Fix `body.flatten!` → `body = body.flatten` for selfhost JS compatibility |
@@ -105,7 +105,7 @@ The eject command:
 
 1. **Fix duplicate declarations** - paths.js and routes.js have repeated declarations (same helper/controller defined twice)
 2. **Fix view syntax issues** - magic_link.js IIFE issue, notification.js empty interpolation
-3. **Fix duplicate parameter** - `_implicitBlockYield` appears twice in view rendering
+3. **Fix my/_menu.js await** - `await` in non-async context
 4. **Fix seeds.js assignment** - Invalid left-hand side in assignment
 
 ---

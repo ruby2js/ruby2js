@@ -155,9 +155,17 @@ module Ruby2JS
       walk.call(body)
 
       if add_implicit_block
-        children = args.children.dup # Pragma: array
-        children.push s(:optarg, "_implicitBlockYield", s(:nil))
-        args = s(:args, *children)
+        # Check if _implicitBlockYield is already in args (e.g., added by ERB filter)
+        has_implicit_block = args.children.any? do |arg|
+          arg_name = arg.children.first
+          arg_name == :_implicitBlockYield || arg_name == :"_implicitBlockYield"
+        end
+
+        unless has_implicit_block
+          children = args.children.dup # Pragma: array
+          children.push s(:optarg, "_implicitBlockYield", s(:nil))
+          args = s(:args, *children)
+        end
       end
 
       vars = {}
