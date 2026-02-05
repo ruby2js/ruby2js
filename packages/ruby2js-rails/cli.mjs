@@ -175,6 +175,29 @@ function loadEjectConfig(appRoot) {
 }
 
 // ============================================
+// File finding helpers
+// ============================================
+
+/**
+ * Recursively find Ruby model files (*.rb) in a directory.
+ * Returns relative paths like 'account.rb' or 'account/export.rb'.
+ */
+function findRubyModelFiles(dir) {
+  const files = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      // Skip concerns directory - those are handled separately via mixins
+      if (entry.name === 'concerns') continue;
+      const subFiles = findRubyModelFiles(join(dir, entry.name));
+      files.push(...subFiles.map(f => join(entry.name, f)));
+    } else if (entry.name.endsWith('.rb') && !entry.name.startsWith('._')) {
+      files.push(entry.name);
+    }
+  }
+  return files;
+}
+
+// ============================================
 // Test file transpilation helpers
 // ============================================
 
@@ -1615,11 +1638,10 @@ async function runEject(options) {
   let fileCount = 0;
   const errors = [];  // Track errors but continue processing
 
-  // Transform models
+  // Transform models (including nested subdirectories like account/export.rb)
   const modelsDir = join(APP_ROOT, 'app/models');
   if (existsSync(modelsDir)) {
-    const modelFiles = readdirSync(modelsDir)
-      .filter(f => f.endsWith('.rb') && !f.startsWith('._'))
+    const modelFiles = findRubyModelFiles(modelsDir)
       .filter(f => shouldInclude(`app/models/${f}`));
 
     if (modelFiles.length > 0) {
@@ -1633,6 +1655,11 @@ async function runEject(options) {
           const relativeOutPath = `app/models/${file.replace('.rb', '.js')}`;
           let code = fixImportsForEject(result.code, relativeOutPath, config);
           const outFile = join(outDir, 'app/models', file.replace('.rb', '.js'));
+          // Ensure parent directory exists for nested models (e.g., account/export.js)
+          const outParentDir = dirname(outFile);
+          if (!existsSync(outParentDir)) {
+            mkdirSync(outParentDir, { recursive: true });
+          }
           writeFileSync(outFile, code);
           fileCount++;
         } catch (err) {
@@ -1907,6 +1934,38 @@ async function runEject(options) {
         } catch (err) {
           errors.push({ file: relativePath, error: err.message, stack: err.stack });
           console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+        }
+      }
+    }
+
+    // Transform controller concerns (app/controllers/concerns/*.rb)
+    const concernsDir = join(appControllersDir, 'concerns');
+    if (existsSync(concernsDir)) {
+      const concernFiles = findRubyModelFiles(concernsDir)  // Reuse recursive finder
+        .filter(f => shouldInclude(`app/controllers/concerns/${f}`));
+
+      if (concernFiles.length > 0) {
+        console.log('  Transforming controller concerns...');
+        for (const file of concernFiles) {
+          const relativePath = `app/controllers/concerns/${file}`;
+          try {
+            const source = readFileSync(join(concernsDir, file), 'utf-8');
+            // Use 'model' type for concerns (they're module-like)
+            const result = await transformRuby(source, join(concernsDir, file), null, config, APP_ROOT);
+            const relativeOutPath = `app/controllers/concerns/${file.replace('.rb', '.js')}`;
+            let code = fixImportsForEject(result.code, relativeOutPath, config);
+            const outFile = join(outDir, 'app/controllers/concerns', file.replace('.rb', '.js'));
+            // Ensure parent directory exists for nested concerns
+            const outParentDir = dirname(outFile);
+            if (!existsSync(outParentDir)) {
+              mkdirSync(outParentDir, { recursive: true });
+            }
+            writeFileSync(outFile, code);
+            fileCount++;
+          } catch (err) {
+            errors.push({ file: relativePath, error: err.message, stack: err.stack });
+            console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+          }
         }
       }
     }

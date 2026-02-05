@@ -64,21 +64,23 @@ The eject command:
 
 ### Remaining Issues
 
-**0 syntax errors** - All 861 JavaScript files pass syntax check.
+**572 files ejected** - Up from 439 (nested models + controller concerns now included).
 
-**0 files skipped (transpilation)** - All views now transpile successfully.
-
-**0 test files skipped** - All 188 test files transpile successfully.
+**2 files skipped** - `magic_link/code.rb` (sclass), `user/day_timeline/serializable.rb` (alias).
 
 **Runtime issues** - Tests load (90 tests discovered) but fail due to:
-- Missing nested model files (`account/export.js`, `boardscoped.js`, `access_token.js`)
+- Nested class imports wrong path (`Identity::AccessToken` imports as `./access_token.js` instead of `./identity/access_token.js`)
 - Test helpers not yet transpiled (`SearchTestHelper`, `CardActivityTestHelper`)
+- Private field errors (`#board` must be declared in enclosing class)
 - Parent vitest config interferes when running from fizzy/ejected (workaround: test in isolated directory)
 
 ### Recent Fixes
 
 | Commit | Fix |
 |--------|-----|
+| (pending) | Transpile nested model files (account/export.rb → account/export.js) |
+| (pending) | Transpile controller concerns (app/controllers/concerns/*.rb) |
+| (pending) | Fix concern import paths (`../models/boardscoped.js` → `./concerns/board_scoped.js`) |
 | `0b41fc3` | Add global stubs for `$private()`, `include()`, `ActiveSupport`, `ActionMailer` |
 | `5310712` | Fix relative import paths for nested test files during eject |
 | `a6a56b8` | Fix stack overflow in `transform_http_to_action` for literal URL paths |

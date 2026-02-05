@@ -389,6 +389,21 @@ export function fixImportsForEject(js, fromFile, config = {}) {
   // Model imports: .js extension for ejected files
   js = js.replace(/from ['"]\.\/(\w+)\.js['"]/g, "from './$1.js'");
 
+  // Controller concerns: redirect from ../models/boardscoped.js to ./concerns/board_scoped.js
+  // The controller filter lowercases (BoardScoped -> boardscoped) but concerns use underscores
+  // Common concern naming patterns: BoardScoped, CardScoped, Authentication, Authorization, etc.
+  const concernPatterns = ['scoped', 'authentication', 'authorization', 'current'];
+  js = js.replace(/from ['"]\.\.\/models\/(\w+)\.js['"]/g, (match, name) => {
+    const isLikelyConcern = concernPatterns.some(pattern => name.toLowerCase().includes(pattern));
+    if (isLikelyConcern) {
+      // Convert camelCase/PascalCase to snake_case: boardscoped -> board_scoped
+      const snakeName = name.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase()
+        .replace(/scoped$/, '_scoped');  // Handle boardscoped -> board_scoped
+      return `from './concerns/${snakeName}.js'`;
+    }
+    return match;
+  });
+
   // Path helper → ruby2js-rails package
   js = js.replace(/from ['"]ruby2js-rails\/path_helper\.mjs['"]/g, "from 'ruby2js-rails/path_helper.mjs'");
 
