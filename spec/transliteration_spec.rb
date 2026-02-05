@@ -864,6 +864,22 @@ describe Ruby2JS do
         must_equal 'class Person {static search(name) {}}'
     end
 
+    it "should parse class << self blocks as static methods" do
+      to_js('class Foo; class << self; def bar; 1; end; end; end').
+        must_equal 'class Foo {static get bar() {return 1}}'
+      to_js('class Foo; class << self; def bar(x); x + 1; end; end; end').
+        must_equal 'class Foo {static bar(x) {x + 1}}'
+      to_js('class Foo; class << self; def bar; 1; end; def baz(x); x; end; end; end').
+        must_equal 'class Foo {static get bar() {return 1}; static baz(x) {x}}'
+    end
+
+    it "should parse bare new() inside class context" do
+      to_js('class Color; ITEMS = [1,2].map { |x| new(x) }; end').
+        must_equal 'class Color {}; Color.ITEMS = [1, 2].map(x => new Color(x))'
+      to_js('class Foo; class << self; def create; new; end; end; end').
+        must_equal 'class Foo {static get create() {return new Foo()}}'
+    end
+
     it "should parse class with alias" do
       to_js('class Person; def f(name); end; alias :g :f; end').
         must_equal 'class Person {f(name) {}; }; Person.prototype.g = Person.prototype.f'

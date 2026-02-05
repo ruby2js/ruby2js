@@ -394,6 +394,10 @@ module Ruby2JS
           # accommodation for JavaScript like new syntax with block
           parse s(:send, s(:const, nil, args.first.children[1]), :new,
             *args.first.children[2..-1], args.last), @state
+        elsif @class_name
+          # bare new() inside a class context - use the current class
+          put "new "; parse @class_name
+          put '('; parse_all(*args, join: ', '); put ')'
         else
           raise Error.new("use of JavaScript keyword new", @ast)
         end

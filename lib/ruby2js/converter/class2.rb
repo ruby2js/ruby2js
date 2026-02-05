@@ -396,6 +396,47 @@ module Ruby2JS
             parse m.updated(:lvasgn, [m.children[1].to_s.sub('=', ''),
               m.children[2]])
 
+          elsif m.type == :sclass and m.children.first&.type == :self
+            # class << self ... end - convert methods to static methods
+            sclass_body = m.children[1]
+            sclass_body = sclass_body.children if sclass_body&.type == :begin
+            sclass_body = [sclass_body] unless sclass_body.is_a?(Array)
+
+            sclass_body.compact.each_with_index do |smethod, sindex|
+              put @sep unless sindex == 0
+
+              if smethod.type == :def
+                # Convert def to static method (defs with self receiver)
+                static_method = smethod.updated(:defs, [s(:self), *smethod.children])
+
+                @prop = "static #{smethod.children.first}"
+                if not smethod.is_method?
+                  @prop = "static get #{smethod.children.first}"
+                  static_method = static_method.updated(:defs, [s(:self), smethod.children[0], smethod.children[1],
+                    s(:autoreturn, smethod.children[2])])
+                elsif @prop.to_s.end_with? '!'
+                  method_name = smethod.children.first.to_s.sub('!', '')
+                  static_method = static_method.updated(:defs, [s(:self), method_name, *smethod.children[1..2]])
+                  @prop = "static #{method_name}"
+                elsif @prop.to_s.end_with? '?'
+                  method_name = smethod.children.first.to_s.sub('?', '')
+                  static_method = static_method.updated(:defs, [s(:self), method_name, *smethod.children[1..2]])
+                  @prop = "static #{method_name}"
+                end
+
+                begin
+                  @instance_method = nil
+                  @class_method = static_method
+                  parse static_method.updated(:def, static_method.children[1..3])
+                ensure
+                  @class_method = nil
+                end
+              else
+                # Other statements in class << self (like constants)
+                parse smethod
+              end
+            end
+
           elsif m.type == :defineProps
             skipped = true
             @namespace.defineProps m.children.first
