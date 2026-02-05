@@ -64,19 +64,24 @@ The eject command:
 
 ### Remaining Issues
 
-**0 syntax errors** - All 435 JavaScript files pass syntax check.
+**0 syntax errors** - All 861 JavaScript files pass syntax check.
 
 **0 files skipped (transpilation)** - All views now transpile successfully.
 
 **0 test files skipped** - All 188 test files transpile successfully.
 
+**Runtime issues** - Tests load but fail due to missing runtime support:
+- `include()` not defined - Ruby mixin pattern in test files
+- `$private()` not defined - private methods transpiled outside class context
+
 ### Recent Fixes
 
 | Commit | Fix |
 |--------|-----|
-| (pending) | Fix stack overflow in `transform_http_to_action` for literal URL paths (`get "/admin/jobs"`) |
-| (pending) | Fix AR association methods matching too broadly (`reader.find {}` vs `article.comments.find`) |
-| (pending) | Create parent directories for nested test files during eject |
+| `5310712` | Fix relative import paths for nested test files during eject |
+| `a6a56b8` | Fix stack overflow in `transform_http_to_action` for literal URL paths |
+| `a6a56b8` | Fix AR association methods matching too broadly (`reader.find {}` vs `article.comments.find`) |
+| `f8721df` | Create parent directories for nested test files during eject |
 | (pending) | Handle ERB comments `<%# ... %>` - skip entirely instead of Ruby `#` comment |
 | (pending) | Fix nested param parsing: `article[title]` → `params.article.title` (all targets) |
 | (pending) | Fix nested resource collection path: `form_with model: [@article, Comment.new]` |
@@ -102,7 +107,10 @@ The eject command:
 
 ### Next Steps
 
-1. **Runtime testing** - Verify transpiled code executes correctly
+1. **Runtime testing** - Add missing test harness functions:
+   - `include()` - for Ruby mixin pattern (`include SearchTestHelper`)
+   - `$private()` - for private methods in test files
+   - Other missing helpers as discovered
 2. **Functional testing** - Test CRUD operations, associations, etc.
 
 ---
