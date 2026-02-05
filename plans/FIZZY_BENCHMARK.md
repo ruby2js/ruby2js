@@ -70,14 +70,16 @@ The eject command:
 
 **0 test files skipped** - All 188 test files transpile successfully.
 
-**Runtime issues** - Tests load but fail due to missing runtime support:
-- `include()` not defined - Ruby mixin pattern in test files
-- `$private()` not defined - private methods transpiled outside class context
+**Runtime issues** - Tests load (90 tests discovered) but fail due to:
+- Missing nested model files (`account/export.js`, `boardscoped.js`, `access_token.js`)
+- Test helpers not yet transpiled (`SearchTestHelper`, `CardActivityTestHelper`)
+- Parent vitest config interferes when running from fizzy/ejected (workaround: test in isolated directory)
 
 ### Recent Fixes
 
 | Commit | Fix |
 |--------|-----|
+| `0b41fc3` | Add global stubs for `$private()`, `include()`, `ActiveSupport`, `ActionMailer` |
 | `5310712` | Fix relative import paths for nested test files during eject |
 | `a6a56b8` | Fix stack overflow in `transform_http_to_action` for literal URL paths |
 | `a6a56b8` | Fix AR association methods matching too broadly (`reader.find {}` vs `article.comments.find`) |
@@ -107,11 +109,9 @@ The eject command:
 
 ### Next Steps
 
-1. **Runtime testing** - Add missing test harness functions:
-   - `include()` - for Ruby mixin pattern (`include SearchTestHelper`)
-   - `$private()` - for private methods in test files
-   - Other missing helpers as discovered
-2. **Functional testing** - Test CRUD operations, associations, etc.
+1. **Transpile nested model files** - Files like `account/export.rb`, `identity/access_token.rb` need to be generated as separate JS files
+2. **Transpile test helpers** - `SearchTestHelper`, `CardActivityTestHelper`, etc. need to be transpiled and exported
+3. **Functional testing** - Test CRUD operations, associations, etc.
 
 ---
 
