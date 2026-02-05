@@ -267,7 +267,8 @@ describe Ruby2JS::Filter::Rails::Routes do
           end
         end
       RUBY
-      assert_includes result, 'function comments_path(article)'
+      # Rails convention: nested resources are prefixed with parent name
+      assert_includes result, 'function article_comments_path(article)'
       assert_includes result, '/articles/'
       assert_includes result, '/comments'
     end

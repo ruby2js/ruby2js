@@ -114,9 +114,12 @@ module Ruby2JS
             process_root(args)
           when :get, :post, :patch, :put, :delete
             process_custom_route(method, args)
-          when :resources, :resource
+          when :resources
             # resources without block
             process_resources(args, nil)
+          when :resource
+            # singular resource without block
+            process_resource_singular(args, nil)
           end
         end
 
@@ -331,6 +334,9 @@ module Ruby2JS
             }
           end
 
+          # Generate path helpers for singular resource (no :id)
+          generate_singular_path_helpers(resource_name, resource_path, actions)
+
           # Process nested resources
           if body
             @rails_route_nesting.push({
@@ -403,45 +409,90 @@ module Ruby2JS
         end
 
         def generate_path_helpers(resource_name, singular_name, resource_path, actions)
-          # Collection path: articles_path
+          prefix = nesting_prefix
+
+          # Collection path: articles_path or board_articles_path (nested)
           if actions.include?(:index) || actions.include?(:create)
             @rails_path_helpers << {
-              name: "#{resource_name}_path".to_sym,
+              name: "#{prefix}#{resource_name}_path".to_sym,
               path: resource_path,
               params: nesting_params
             }
           end
 
-          # New path: new_article_path
+          # New path: new_article_path or new_board_article_path (nested)
           if actions.include?(:new)
             @rails_path_helpers << {
-              name: "new_#{singular_name}_path".to_sym,
+              name: "new_#{prefix}#{singular_name}_path".to_sym,
               path: "#{resource_path}/new",
               params: nesting_params
             }
           end
 
-          # Member path: article_path(article)
+          # Member path: article_path(article) or board_article_path(board, article)
           if actions.include?(:show) || actions.include?(:update) || actions.include?(:destroy)
             @rails_path_helpers << {
-              name: "#{singular_name}_path".to_sym,
+              name: "#{prefix}#{singular_name}_path".to_sym,
               path: "#{resource_path}/:id",
               params: nesting_params + [singular_name.to_sym]
             }
           end
 
-          # Edit path: edit_article_path(article)
+          # Edit path: edit_article_path(article) or edit_board_article_path(board, article)
           if actions.include?(:edit)
             @rails_path_helpers << {
-              name: "edit_#{singular_name}_path".to_sym,
+              name: "edit_#{prefix}#{singular_name}_path".to_sym,
               path: "#{resource_path}/:id/edit",
               params: nesting_params + [singular_name.to_sym]
             }
           end
         end
 
+        def generate_singular_path_helpers(resource_name, resource_path, actions)
+          # Singular resources don't have :id in paths
+          # resource :profile generates profile_path, new_profile_path, edit_profile_path
+          # Nested: column_left_position_path (singular under columns)
+          prefix = nesting_prefix
+
+          # Main path: profile_path (for show/update/destroy)
+          if actions.include?(:show) || actions.include?(:update) || actions.include?(:destroy)
+            @rails_path_helpers << {
+              name: "#{prefix}#{resource_name}_path".to_sym,
+              path: resource_path,
+              params: nesting_params
+            }
+          end
+
+          # New path: new_profile_path
+          if actions.include?(:new)
+            @rails_path_helpers << {
+              name: "new_#{prefix}#{resource_name}_path".to_sym,
+              path: "#{resource_path}/new",
+              params: nesting_params
+            }
+          end
+
+          # Edit path: edit_profile_path
+          if actions.include?(:edit)
+            @rails_path_helpers << {
+              name: "edit_#{prefix}#{resource_name}_path".to_sym,
+              path: "#{resource_path}/edit",
+              params: nesting_params
+            }
+          end
+        end
+
         def nesting_params
           @rails_route_nesting.map { |n| n[:param].sub(/_id$/, '').to_sym }
+        end
+
+        # Build prefix for nested resource path helper names
+        # e.g., for cards nested under boards, returns "board_"
+        def nesting_prefix
+          prefix = @rails_route_nesting.map { |n|
+            Ruby2JS::Inflector.singularize(n[:path].to_s)
+          }.join('_')
+          prefix.empty? ? '' : "#{prefix}_"
         end
 
         def build_routes_module
@@ -476,9 +527,12 @@ module Ruby2JS
               [s(:const, nil, :layout)])
           end
 
-          # Import controllers - collect all controllers from resources
+          # Import controllers - collect all controllers from resources (deduplicated)
           all_controllers = collect_all_controllers(@rails_resources)
+          seen_controllers = {}
           all_controllers.each do |ctrl|
+            next if seen_controllers[ctrl[:controller_name]]
+            seen_controllers[ctrl[:controller_name]] = true
             statements << s(:import, "../app/controllers/#{ctrl[:controller_file]}.js",
               [s(:const, nil, ctrl[:controller_name].to_sym)])
           end
