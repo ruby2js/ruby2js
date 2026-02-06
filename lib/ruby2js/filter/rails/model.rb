@@ -56,6 +56,7 @@ module Ruby2JS
           # Note: use plain hash for JS compatibility (Hash.new with block doesn't transpile)
           @rails_callbacks = {}
           @rails_scopes = []
+          @rails_enums = []
           @rails_broadcasts_to = []  # broadcasts_to declarations
           @rails_attachments = []    # Active Storage attachments
           @rails_model_private_methods = {}
@@ -203,6 +204,7 @@ module Ruby2JS
           # Note: use plain hash for JS compatibility (Hash.new with block doesn't transpile)
           @rails_callbacks = {}
           @rails_scopes = []
+          @rails_enums = []
           @rails_broadcasts_to = []
           @rails_attachments = []
           @rails_model_private_methods = {}
@@ -262,15 +264,42 @@ module Ruby2JS
           end
         end
 
-        # Handle broadcast_*_to method calls inside model callbacks
+        # Handle broadcast_*_to method calls and enum predicates/mutators inside model
         def on_send(node)
           target, method, *args = node.children
 
-          # Only handle broadcast methods when processing a model
+          # Only handle when processing a model
           return super unless @rails_model
 
           # Only handle unqualified (implicit self) calls
           return super unless target.nil?
+
+          # Inline-transform enum predicate and bang calls
+          if @rails_enums.any?
+            method_str = method.to_s
+            if method_str.end_with?('?') || method_str.end_with?('!')
+              base = method_str[0..-2]
+              @rails_enums.each do |enum_data|
+                prefix = enum_data[:options][:prefix]
+                enum_vals = enum_data[:values]
+                # Note: use keys loop for JS compatibility
+                enum_vals.keys.each do |name|
+                  val = enum_vals[name]
+                  method_name = prefix ? "#{prefix}_#{name}" : name
+                  if base == method_name
+                    if method_str.end_with?('?')
+                      # published? → this.status === "published"
+                      return s(:send, s(:attr, s(:self), enum_data[:field]), :===, val)
+                    else
+                      # published! → this.update({status: "published"})
+                      return s(:send, s(:self), :update,
+                        s(:hash, s(:pair, s(:sym, enum_data[:field]), val)))
+                    end
+                  end
+                end
+              end
+            end
+          end
 
           # Check if this is a broadcast method
           return super unless BROADCAST_METHODS.include?(method)
@@ -641,10 +670,81 @@ module Ruby2JS
               collect_scope(args)
             when :broadcasts_to
               collect_broadcasts_to(args)
+            when :enum
+              collect_enum(args)
             when *CALLBACKS
               collect_callback(method_name, args)
             end
           end
+        end
+
+        # Collect enum declarations
+        # Supports: enum :field, %w[...].index_by(&:itself)  (string values)
+        #           enum :field, %i[...].index_by(&:itself)  (string values)
+        #           enum :field, %i[...]                      (integer values)
+        #           enum :field, %w[...]                      (integer values)
+        # Options:  prefix: :name / prefix: true, scopes: false, default: :value
+        def collect_enum(args)
+          return if args.size < 2
+          field = args[0].children[0] if args[0].type == :sym
+          return unless field
+
+          values_node = args[1]
+          values = extract_enum_values(field, values_node)
+          return unless values
+
+          options = {}
+          # Check for trailing hash of options
+          last_arg = args.last
+          if last_arg.type == :hash
+            last_arg.children.each do |pair|
+              next unless pair.type == :pair
+              key_node = pair.children[0]
+              val_node = pair.children[1]
+              next unless key_node.type == :sym
+              key = key_node.children[0]
+
+              case key
+              when :prefix
+                if val_node.type == :true
+                  options[:prefix] = field.to_s
+                elsif val_node.type == :sym || val_node.type == :str
+                  options[:prefix] = val_node.children[0].to_s
+                end
+              when :scopes
+                options[:scopes] = !(val_node.type == :false)
+              when :default
+                if val_node.type == :sym || val_node.type == :str
+                  options[:default] = val_node.children[0]
+                end
+              end
+            end
+          end
+
+          @rails_enums.push({ field: field, values: values, options: options })
+        end
+
+        def extract_enum_values(field, node)
+          # Pattern 1: array.index_by(&:itself) → string values
+          if node.type == :send && node.children[1] == :index_by
+            array_node = node.children[0]
+            if array_node&.type == :array
+              names = array_node.children.map { |c| c.children[0].to_s }
+              result = {}
+              names.each { |n| result[n] = s(:str, n) }
+              return result
+            end
+          end
+
+          # Pattern 2: bare array → integer values (0, 1, 2, ...)
+          if node.type == :array
+            names = node.children.map { |c| c.children[0].to_s }
+            result = {}
+            names.each_with_index { |n, i| result[n] = s(:int, i) }
+            return result
+          end
+
+          nil
         end
 
         # Collect Active Storage attachments
@@ -852,7 +952,7 @@ module Ruby2JS
             # Skip DSL declarations (already collected)
             if child.type == :send && child.children[0].nil?
               method = child.children[1]
-              next if %i[has_many has_one belongs_to validates scope broadcasts_to has_one_attached has_many_attached].include?(method)
+              next if %i[has_many has_one belongs_to validates scope broadcasts_to has_one_attached has_many_attached enum].include?(method)
               next if CALLBACKS.include?(method)
             end
 
@@ -924,6 +1024,14 @@ module Ruby2JS
           # Generate scope methods
           @rails_scopes.each do |scope|
             transformed << generate_scope_method(scope)
+          end
+
+          # Generate enum methods (predicates, scopes, frozen values)
+          # Note: use push loop instead of concat for JS compatibility (JS concat returns new array)
+          @rails_enums.each do |enum_data|
+            generate_enum_methods(enum_data, children).each do |node|
+              transformed.push(node)
+            end
           end
 
           # Generate callbacks from broadcasts_to declarations
@@ -1270,6 +1378,56 @@ module Ruby2JS
           s(:defm, callback_type,
             s(:args),
             body)
+        end
+
+        # Generate enum methods: frozen values constant, instance predicates, static scopes
+        def generate_enum_methods(enum_data, children)
+          result = []
+          field = enum_data[:field]
+          enum_values = enum_data[:values]
+          prefix = enum_data[:options][:prefix]
+          generate_scopes = enum_data[:options][:scopes] != false
+
+          # Collect explicitly defined method names to avoid conflicts
+          explicit_methods = Set.new
+          children.each do |child|
+            next unless child
+            if child.type == :def
+              explicit_methods.add(child.children[0].to_s.sub(/[?!]$/, ''))
+            end
+          end
+
+          # Frozen values static property (e.g., Export.statuses = Object.freeze({...}))
+          # Note: use keys loop for JS compatibility (hash.each doesn't work with for...of)
+          pairs = []
+          enum_values.keys.each do |name|
+            val = enum_values[name]
+            pairs.push(s(:pair, s(:sym, name.to_sym), val))
+          end
+          plural_field = Ruby2JS::Inflector.pluralize(field.to_s)
+          result << s(:send, s(:self), :"#{plural_field}=",
+            s(:send, s(:const, nil, :Object), :freeze, s(:hash, *pairs)))
+
+          # Note: use keys loop for JS compatibility (hash.each doesn't work with for...of)
+          enum_values.keys.each do |name|
+            val = enum_values[name]
+            method_name = prefix ? "#{prefix}_#{name}" : name
+            next if explicit_methods.include?(method_name)
+
+            # Instance predicate method: drafted() { return this.status === "drafted" }
+            result << s(:defm, method_name.to_sym, s(:args),
+              s(:autoreturn,
+                s(:send, s(:attr, s(:self), field), :===, val)))
+
+            # Static scope method: static drafted() { return this.where({status: "drafted"}) }
+            if generate_scopes
+              result << s(:defs, s(:self), method_name.to_sym, s(:args),
+                s(:autoreturn, s(:send, s(:self), :where,
+                  s(:hash, s(:pair, s(:sym, field), val)))))
+            end
+          end
+
+          result
         end
 
         def generate_scope_method(scope)

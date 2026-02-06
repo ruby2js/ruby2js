@@ -243,6 +243,77 @@ export class Article extends ApplicationRecord {
 }
 ```
 
+### Enums
+
+Rails `enum` declarations are transpiled to instance predicate methods, static scope methods, and a frozen values constant.
+
+```ruby
+class Export < ApplicationRecord
+  enum :status, %w[drafted published].index_by(&:itself), default: :pending
+end
+```
+
+```javascript
+export class Export extends ApplicationRecord {
+  drafted() { return this.status === "drafted" }
+  static drafted() { return this.where({status: "drafted"}) }
+
+  published() { return this.status === "published" }
+  static published() { return this.where({status: "published"}) }
+};
+
+Export.statuses = Object.freeze({
+  drafted: "drafted",
+  published: "published"
+})
+```
+
+**Value types:**
+
+| Ruby Form | Values | Comparison |
+|-----------|--------|------------|
+| `%w[...].index_by(&:itself)` | Strings | `this.status === "drafted"` |
+| `%i[...].index_by(&:itself)` | Strings | `this.role === "owner"` |
+| `%i[pending processing]` | Integers | `this.status === 0` |
+| `%w[sign_in sign_up]` | Integers | `this.purpose === 0` |
+
+**Options:**
+
+| Option | Example | Effect |
+|--------|---------|--------|
+| `prefix: :for` | `enum :purpose, ..., prefix: :for` | Methods named `for_sign_in`, `for_sign_up` |
+| `prefix: true` | `enum :status, ..., prefix: true` | Methods named `status_drafted`, `status_published` |
+| `scopes: false` | `enum :role, ..., scopes: false` | Only instance predicates, no static scope methods |
+| `default:` | `enum :status, ..., default: :pending` | Stored for reference (DB-level concern) |
+
+**Inline `?` and `!` transforms:**
+
+Within the model class, enum predicate and mutator calls are inlined:
+
+```ruby
+class Export < ApplicationRecord
+  enum :status, %w[drafted published].index_by(&:itself)
+
+  def done?
+    published?
+  end
+
+  def finish
+    published!
+  end
+end
+```
+
+```javascript
+export class Export extends ApplicationRecord {
+  done() { return this.status === "published" }     // published? inlined
+  get finish() { return this.update({status: "published"}) }  // published! inlined
+  // ... generated predicates and scopes
+}
+```
+
+If a method with the same name as an enum value is explicitly defined in the class, the generated predicate is skipped for that value (the user-defined method takes precedence).
+
 ## Controllers
 
 Transforms Rails controllers to JavaScript modules with async action functions.
@@ -878,6 +949,7 @@ The goal is enabling offline-first applications and static deployment, not repla
 {% rendercontent "docs/note", extra_margin: true %}
 Spec files for each sub-filter:
 - [rails_model_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_model_spec.rb)
+- [rails_enum_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_enum_spec.rb)
 - [rails_controller_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_controller_spec.rb)
 - [rails_routes_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_routes_spec.rb)
 - [rails_migration_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_migration_spec.rb)
