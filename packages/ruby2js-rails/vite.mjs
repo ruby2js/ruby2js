@@ -48,6 +48,8 @@ import {
   singularize,
   getBuildOptions,
   findModels,
+  findLeafCollisions,
+  modelClassName,
   findMigrations,
   findViewResources,
   fixImports,
@@ -713,13 +715,16 @@ export class ApplicationRecord extends ActiveRecord {}
       // Also registers for RPC when dual bundle mode is enabled (hydration needs RPC)
       if (id === '\0juntos:models') {
         const models = findModels(appRoot);
+        const collisions = findLeafCollisions(models);
         const imports = models.map(m => {
-          const className = m.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('');
-          return `import { ${className} } from 'app/models/${m}.rb';`;
+          const leafClass = m.split('/').pop().split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+          const alias = modelClassName(m, collisions);
+          if (alias !== leafClass) {
+            return `import { ${leafClass} as ${alias} } from 'app/models/${m}.rb';`;
+          }
+          return `import { ${alias} } from 'app/models/${m}.rb';`;
         });
-        const classNames = models.map(m =>
-          m.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('')
-        );
+        const classNames = models.map(m => modelClassName(m, collisions));
         // Register for RPC if dual bundle mode (client needs to call server for model ops)
         const rpcRegistration = rpcState.dualBundleEnabled
           ? `\nApplication.registerModelsForRPC(models);`

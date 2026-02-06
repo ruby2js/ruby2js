@@ -1222,18 +1222,34 @@ module Ruby2JS
         def collect_model_references(node)
           return unless node.respond_to?(:type) && node.respond_to?(:children)
 
-          # Look for constant references that look like model names (capitalized, no namespace)
-          if node.type == :const && node.children[0].nil?
-            const_name = node.children[1].to_s
+          if node.type == :const
+            # Build the full constant name by walking the namespace chain
+            # e.g., s(:const, s(:const, nil, :Identity), :AccessToken) -> "Identity::AccessToken"
+            const_name = resolve_const_name(node)
+
             # Skip known non-model constants
             # Note: use .add() for JS Set compatibility (Ruby Set supports both << and add)
             # Skip Ruby/Node globals that other filters transform (e.g., ENV -> process.env)
             unless %w[ApplicationController ENV ARGV STDIN STDOUT STDERR].include?(const_name) || const_name.end_with?('Controller', 'Views')
               @rails_model_refs.add(const_name)
+              # Don't recurse into children of this const node (already resolved)
+              return
             end
           end
 
           node.children.each { |child| collect_model_references(child) }
+        end
+
+        # Resolve a :const node to its full name, e.g., "Identity::AccessToken"
+        def resolve_const_name(node)
+          return node.children[1].to_s if node.children[0].nil?
+
+          parent = node.children[0]
+          if parent.respond_to?(:type) && parent.type == :const
+            "#{resolve_const_name(parent)}::#{node.children[1]}"
+          else
+            node.children[1].to_s
+          end
         end
 
         def generate_imports
@@ -1267,9 +1283,17 @@ module Ruby2JS
           # Import each referenced model (skip if already imported via require/require_relative)
           [*@rails_model_refs].sort.each do |model|
             next if @rails_required_constants.include?(model)
-            model_file = model.downcase
+            # Handle nested class names like "Identity::AccessToken" -> "../models/identity/access_token.js"
+            if model.include?('::')
+              parts = model.split('::')
+              import_name = parts.last  # Just the leaf class name
+              model_file = parts.map { |p| p.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '') }.join('/')
+            else
+              import_name = model
+              model_file = model.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '')
+            end
             imports << s(:send, nil, :import,
-              s(:array, s(:const, nil, model.to_sym)),
+              s(:array, s(:const, nil, import_name.to_sym)),
               s(:str, "../models/#{model_file}.js"))
           end
 

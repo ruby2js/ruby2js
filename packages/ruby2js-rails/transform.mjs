@@ -200,15 +200,64 @@ function normalizeFilterNames(filters) {
 // ============================================================
 
 /**
- * Find all model files in app/models/.
- * Returns array of model names (without .rb extension).
+ * Find all model files in app/models/ (recursive).
+ * Returns array of model paths (without .rb extension), e.g. ['account', 'identity/access_token'].
+ * Skips concerns/ subdirectory (handled separately via mixins).
  */
 export function findModels(appRoot) {
   const modelsDir = path.join(appRoot, 'app/models');
   if (!fs.existsSync(modelsDir)) return [];
-  return fs.readdirSync(modelsDir)
-    .filter(f => f.endsWith('.rb') && f !== 'application_record.rb' && !f.startsWith('._'))
-    .map(f => f.replace('.rb', ''));
+
+  function walk(dir, prefix) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const results = [];
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (entry.name === 'concerns') continue;
+        results.push(...walk(path.join(dir, entry.name), prefix ? `${prefix}/${entry.name}` : entry.name));
+      } else if (entry.name.endsWith('.rb') && entry.name !== 'application_record.rb' && !entry.name.startsWith('._')) {
+        const name = entry.name.replace('.rb', '');
+        results.push(prefix ? `${prefix}/${name}` : name);
+      }
+    }
+    return results;
+  }
+
+  return walk(modelsDir, '');
+}
+
+/**
+ * Derive a JavaScript class name from a model path.
+ * 'account' → 'Account', 'identity/access_token' → 'AccessToken'
+ * If leafCollisions is provided (Set of leaf names appearing more than once),
+ * nested models with colliding leaves get prefixed: 'identity/access_token' → 'IdentityAccessToken'
+ */
+export function modelClassName(modelPath, leafCollisions) {
+  const parts = modelPath.split('/');
+  const leaf = parts[parts.length - 1];
+  const leafClass = leaf.split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+
+  if (parts.length === 1 || !leafCollisions || !leafCollisions.has(leafClass)) {
+    return leafClass;
+  }
+
+  // Collision: prefix with namespace segments
+  return parts.map(p => p.split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('')).join('');
+}
+
+/**
+ * Find leaf class name collisions among a list of model paths.
+ * Returns a Set of leaf class names that appear more than once.
+ */
+export function findLeafCollisions(models) {
+  const counts = {};
+  for (const m of models) {
+    const parts = m.split('/');
+    const leaf = parts[parts.length - 1];
+    const leafClass = leaf.split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+    counts[leafClass] = (counts[leafClass] || 0) + 1;
+  }
+  return new Set(Object.keys(counts).filter(k => counts[k] > 1));
 }
 
 /**
@@ -270,14 +319,14 @@ export function fixImports(js, fromFile) {
   // ApplicationRecord → virtual module
   js = js.replace(/from ['"]\.\/application_record\.js['"]/g, "from 'juntos:application-record'");
 
-  // Model imports: .js → .rb (same directory)
-  js = js.replace(/from ['"]\.\/(\w+)\.js['"]/g, (match, name) => {
+  // Model imports: .js → .rb (same directory, including nested paths like identity/access_token)
+  js = js.replace(/from ['"]\.\/([\w/]+)\.js['"]/g, (match, name) => {
     if (name === 'application_record') return "from 'juntos:application-record'";
     return `from './${name}.rb'`;
   });
 
-  // Model imports from controllers: ../models/*.js → ../models/*.rb
-  js = js.replace(/from ['"]\.\.\/models\/(\w+)\.js['"]/g, "from '../models/$1.rb'");
+  // Model imports from controllers: ../models/*.js → ../models/*.rb (including nested paths)
+  js = js.replace(/from ['"]\.\.\/models\/([\w/]+)\.js['"]/g, "from '../models/$1.rb'");
 
   // Views: ../views/*.js → juntos:views/*
   js = js.replace(/from ['"]\.\.\/views\/(\w+)\.js['"]/g, "from 'juntos:views/$1'");
@@ -386,14 +435,17 @@ export function fixImportsForEject(js, fromFile, config = {}) {
   // ApplicationRecord → local file (generated separately)
   js = js.replace(/from ['"]\.\/application_record\.js['"]/g, "from './application_record.js'");
 
-  // Model imports: .js extension for ejected files
-  js = js.replace(/from ['"]\.\/(\w+)\.js['"]/g, "from './$1.js'");
+  // Model imports: .js extension for ejected files (including nested paths)
+  js = js.replace(/from ['"]\.\/([\w/]+)\.js['"]/g, "from './$1.js'");
 
   // Controller concerns: redirect from ../models/boardscoped.js to ./concerns/board_scoped.js
   // The controller filter lowercases (BoardScoped -> boardscoped) but concerns use underscores
   // Common concern naming patterns: BoardScoped, CardScoped, Authentication, Authorization, etc.
+  // Note: nested model paths (../models/identity/access_token.js) pass through unchanged
   const concernPatterns = ['scoped', 'authentication', 'authorization', 'current'];
-  js = js.replace(/from ['"]\.\.\/models\/(\w+)\.js['"]/g, (match, name) => {
+  js = js.replace(/from ['"]\.\.\/models\/([\w/]+)\.js['"]/g, (match, name) => {
+    // Nested paths (containing /) are real model imports, not concerns
+    if (name.includes('/')) return match;
     const isLikelyConcern = concernPatterns.some(pattern => name.toLowerCase().includes(pattern));
     if (isLikelyConcern) {
       // Convert camelCase/PascalCase to snake_case: boardscoped -> board_scoped
@@ -419,13 +471,16 @@ export function fixImportsForEject(js, fromFile, config = {}) {
  */
 export function generateModelsModule(appRoot) {
   const models = findModels(appRoot);
+  const collisions = findLeafCollisions(models);
   const imports = models.map(m => {
-    const className = m.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('');
-    return `import { ${className} } from 'app/models/${m}.rb';`;
+    const leafClass = m.split('/').pop().split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+    const alias = modelClassName(m, collisions);
+    if (alias !== leafClass) {
+      return `import { ${leafClass} as ${alias} } from 'app/models/${m}.rb';`;
+    }
+    return `import { ${alias} } from 'app/models/${m}.rb';`;
   });
-  const classNames = models.map(m =>
-    m.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('')
-  );
+  const classNames = models.map(m => modelClassName(m, collisions));
   return `${imports.join('\n')}
 import { Application } from 'juntos:rails';
 import { modelRegistry } from 'juntos:active-record';
@@ -442,6 +497,7 @@ export { ${classNames.join(', ')} };
  */
 export function generateModelsModuleForEject(appRoot, config = {}) {
   const models = findModels(appRoot);
+  const collisions = findLeafCollisions(models);
   const adapterFile = getActiveRecordAdapterFile(config.database);
 
   // Determine target for importing Application
@@ -452,12 +508,14 @@ export function generateModelsModuleForEject(appRoot, config = {}) {
   const railsModule = `ruby2js-rails/targets/${target}/rails.js`;
 
   const imports = models.map(m => {
-    const className = m.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('');
-    return `import { ${className} } from './${m}.js';`;
+    const leafClass = m.split('/').pop().split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+    const alias = modelClassName(m, collisions);
+    if (alias !== leafClass) {
+      return `import { ${leafClass} as ${alias} } from './${m}.js';`;
+    }
+    return `import { ${alias} } from './${m}.js';`;
   });
-  const classNames = models.map(m =>
-    m.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('')
-  );
+  const classNames = models.map(m => modelClassName(m, collisions));
   return `${imports.join('\n')}
 import { Application } from '${railsModule}';
 import { modelRegistry, attr_accessor } from 'ruby2js-rails/adapters/${adapterFile}';
