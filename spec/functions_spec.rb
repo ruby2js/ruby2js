@@ -728,6 +728,11 @@ describe Ruby2JS::Filter::Functions do
         must_equal  "{...a.b, b: 1}"
     end
 
+    it "should handle merge without receiver" do
+      to_js( 'merge(other)' ).
+        must_equal '{...other}'
+    end
+
     it "should handle merge!" do
       to_js( 'b={}; a.merge!(b)' ).
         must_equal "let b = {}; Object.assign(a, b)"

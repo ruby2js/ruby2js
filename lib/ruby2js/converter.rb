@@ -51,7 +51,7 @@ module Ruby2JS
     # Using array instead of Set for selfhost compatibility (JS Set uses .has() not .includes())
     JS_RESERVED = %w[
       catch const continue debugger default delete enum export extends finally
-      function import instanceof new switch throw try typeof var void with
+      for function import instanceof new switch throw try typeof var void with
       let static implements interface package private protected public
     ].freeze
 

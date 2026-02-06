@@ -61,6 +61,13 @@ describe "ES2022 support" do
         must_equal 'class C {#name; constructor(name) {this.#name = name.upcase}}'
     end
 
+    it "should not declare field for private method with matching ivar" do
+      to_js( 'class C; def foo; @bar; end; private; def bar; @bar ||= compute; end; end' ).
+        wont_include '#bar; '
+      to_js( 'class C; def foo; @bar; end; private; def bar; @bar ||= compute; end; end' ).
+        must_include 'get #bar()'
+    end
+
     it "should do short circuit assign - nullish (default)" do
       to_js( '@a ||= 1').must_equal 'this.#a ??= 1'
       to_js( '@@a ||= 1').must_equal 'this.constructor.#$a ??= 1'

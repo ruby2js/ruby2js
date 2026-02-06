@@ -407,7 +407,10 @@ module Ruby2JS
         if @state == :expression
           put '(() => { '
         end
-        if args.length == 1
+        if args.length == 0
+          # bare raise re-throws the current exception ($EXCEPTION in catch blocks)
+          put 'throw $EXCEPTION'
+        elsif args.length == 1
           put 'throw '; parse args.first
         else
           put 'throw new '; parse args.first; put '('; parse args[1]; put ')'

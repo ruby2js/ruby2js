@@ -410,7 +410,7 @@ module Ruby2JS
           process S(:send, target, :splice, start, len, s(:splat, value))
 
         elsif method == :merge
-          args.unshift target
+          args.unshift target if target
           process S(:hash, *args.map {|arg| s(:kwsplat, arg)})
 
         elsif method == :merge!

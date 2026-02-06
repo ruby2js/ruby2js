@@ -108,7 +108,11 @@ module Ruby2JS
 
           sput '}'
         else
-          put 'switch ('; parse expr; puts ') {'
+          if expr
+            put 'switch ('; parse expr; puts ') {'
+          else
+            puts 'switch (true) {'
+          end
 
           whens.each_with_index do |node, index|
             puts '' unless index == 0

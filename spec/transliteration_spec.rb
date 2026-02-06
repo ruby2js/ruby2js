@@ -470,6 +470,11 @@ describe Ruby2JS do
         must_equal 'if (a == 1) {let b = 0; c.forEach((d) => {if (d) b += d})}'
     end
     
+    it "should pre-declare masgn variables in conditional assignment" do
+      to_js( 'x, y = start if start' ).
+        must_equal 'let x, y; if (start) [x, y] = start'
+    end
+
     it "should handle while loop" do
       to_js( 'a = 0; while true; a += 1; end' ).
         must_equal 'let a = 0; while (true) {a++}'
@@ -552,6 +557,11 @@ describe Ruby2JS do
     it "should hoist multiple variables from case branches" do
       to_js( 'case x; when :a; foo = 1; bar = 2; when :b; foo = 3; baz = 4; end' ).
         must_equal 'let foo, bar, baz; switch (x) {case "a": foo = 1; bar = 2; break; case "b": foo = 3; baz = 4}'
+    end
+
+    it "should handle case without expression" do
+      to_js( 'case; when a; b; when c; d; end' ).
+        must_equal 'switch (true) {case a: b(); break; case c: d()}'
     end
 
     it "should not hoist already declared variables in case" do
@@ -807,6 +817,13 @@ describe Ruby2JS do
         must_equal 'class A {}; class B extends A {static foo(x) {super.foo(3)}}'
       to_js('class A; end; class B < A; def self.bar; super; end; end').
         must_equal 'class A {}; class B extends A {static get bar() {return super.bar}}'
+    end
+
+    it "should handle super in module context" do
+      to_js( 'module M; X = 1; def foo(); super || bar(); end; end' ).
+        must_include 'undefined'
+      to_js( 'module M; X = 1; def foo(); super || bar(); end; end' ).
+        wont_include 'return  ??'
     end
 
     it "should parse class with class variables" do
@@ -1080,6 +1097,18 @@ describe Ruby2JS do
         must_equal('const M = {clear() {x()}}')
     end
 
+    it "should use underscored_private in module IIFEs" do
+      to_js( 'module M; def foo; @bar; end; end' ).
+        must_include 'this._bar'
+      to_js( 'module M; def foo; @bar; end; end' ).
+        wont_include 'this.#bar'
+    end
+
+    it "should strip = from setter names in module context" do
+      to_js( 'module M; X = 1; def foo=(v); end; end' ).
+        wont_include 'foo=('
+    end
+
     it "should convert module singleton methods to functions" do
       # def self.X in a module should become a function in the returned object
       # (not this.X = ... which fails in IIFE strict mode context)
@@ -1093,6 +1122,8 @@ describe Ruby2JS do
         must_equal('const M = (() => {function $new() {1}; return {$new}})()')
       to_js( 'module M; def self.delete(x); x; end; end' ).
         must_equal('const M = (() => {function $delete(x) {x}; return {$delete}})()')
+      to_js( 'module M; def self.for(x); x; end; end' ).
+        must_equal('const M = (() => {function $for(x) {x}; return {$for}})()')
     end
 
     it "should escape JS reserved words in method calls without receivers" do
@@ -1369,6 +1400,11 @@ describe Ruby2JS do
     it "should handle raise with a class and string" do
       to_js( 'raise Exception, "heck"' ).
         must_equal 'throw new Exception("heck")'
+    end
+
+    it "should handle bare raise" do
+      to_js( 'begin; a; rescue; raise; end' ).
+        must_include 'throw $EXCEPTION'
     end
 
     it "should handle raise in expression context" do

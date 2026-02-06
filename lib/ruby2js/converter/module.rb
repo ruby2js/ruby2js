@@ -44,6 +44,11 @@ module Ruby2JS
         return
       end
 
+      # Force underscored_private for module IIFEs since IIFEs can't use
+      # ES2022 private fields (#foo syntax) - same as class_extend in class.rb
+      saved_underscored_private = @underscored_private
+      @underscored_private = true
+
       symbols = []
       visibility = :public
       omit = []
@@ -205,6 +210,7 @@ module Ruby2JS
         parse s(:send, name.children.first, "#{name.children.last}=", body)
       end
 
+      @underscored_private = saved_underscored_private
       @namespace.leave()
     end
   end

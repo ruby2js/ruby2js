@@ -8,9 +8,10 @@ module Ruby2JS
     handle :super, :zsuper do |*args|
       method = @instance_method || @class_method
 
-      # If no class parent (e.g., in a module), skip super call
-      # This allows transpiling modules that use super in initialize
+      # If no class parent (e.g., in a module/concern), emit undefined
+      # to avoid empty expressions like "return  || foo" becoming syntax errors
       unless @class_parent
+        put 'undefined'
         return
       end
 

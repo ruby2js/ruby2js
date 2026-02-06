@@ -229,6 +229,21 @@ module Ruby2JS
             ivars.delete statement.children.first
           end
 
+          # Pre-scan body for private methods that will use # prefix,
+          # to avoid conflicting field declarations (#foo + get #foo())
+          unless underscored_private
+            scan_vis = :public
+            body.each do |node|
+              if node.type == :send && node.children.first.nil?
+                if [:private, :public, :protected].include?(node.children[1]) && node.children.length == 2
+                  scan_vis = node.children[1]
+                end
+              elsif node.type == :def && scan_vis == :private
+                ivars.delete :"@#{node.children.first.to_s.sub(/[?!=]$/, '')}"
+              end
+            end
+          end
+
           # emit additional instance declarations
           [*ivars].sort.each do |ivar|
             put(index == 0 ? @nl : @sep)

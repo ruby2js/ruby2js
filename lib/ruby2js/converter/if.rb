@@ -82,6 +82,15 @@ module Ruby2JS
             # "Lexical declaration cannot appear in a single-statement context"
             if [:lvasgn, :gvasgn].include? then_block.type
               @vars[then_block.children.first] ||= :pending
+            elsif then_block.type == :masgn
+              # Pre-declare all lvasgn vars from the mlhs so masgn
+              # doesn't emit `let` (which is invalid in single-statement if)
+              lhs = then_block.children.first
+              lhs.children.each do |child|
+                if child.type == :lvasgn
+                  @vars[child.children.first] ||= :pending
+                end
+              end
             end
 
             put "if ("
