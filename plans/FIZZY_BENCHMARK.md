@@ -43,13 +43,13 @@ Fizzy tests this thesis at scale. The [blog demo](https://ruby2js.github.io/ruby
 
 ## What's Been Accomplished
 
-**Transpilation is complete.** All file categories transform successfully:
+**Transpilation is complete with zero syntax errors.** All file categories transform successfully:
 
-- **572 files ejected** (models, controllers, views, routes, migrations, seeds, tests, Stimulus controllers, concerns)
+- **995 JavaScript files pass syntax check** (models, controllers, views, routes, migrations, seeds, tests, Stimulus controllers, concerns)
 - **2 files skipped** - `magic_link/code.rb` (`class << self` in non-class context), `user/day_timeline/serializable.rb` (`alias`)
 - **90 tests discovered** by vitest in the ejected output
 
-Dozens of transpilation bugs were found and fixed along the way (ERB comments, nested params, hash shorthand, async render, duplicate imports, private field handling, etc.). These fixes benefit all Ruby2JS users, not just Fizzy.
+Dozens of transpilation bugs were found and fixed along the way (ERB comments, nested params, hash shorthand, async render, duplicate imports, private field handling, nested class imports, namespaced exports, concern private fields, reserved word escaping, bare case/raise, etc.). These fixes benefit all Ruby2JS users, not just Fizzy.
 
 ---
 
@@ -63,9 +63,7 @@ These prevent the 90 discovered tests from passing:
 
 | Issue | Description |
 |-------|-------------|
-| Nested class imports | `Identity::AccessToken` imports as `./access_token.js` instead of `./identity/access_token.js` |
 | Test helpers | `SearchTestHelper`, `CardActivityTestHelper` need transpilation and export |
-| Private field scope | `#board` must be declared in enclosing class (concern methods reference fields from including class) |
 | Vitest config isolation | Parent vitest config interferes when running from fizzy/ejected |
 
 ### Infrastructure Adapters
@@ -177,6 +175,8 @@ Key insights from the transpilation effort:
 
 4. **Private fields don't compose.** JavaScript's `#field` syntax requires declaration in the enclosing class, but concern methods reference fields from the *including* class. The workaround (underscored private: `_field`) trades encapsulation for composability.
 
-5. **Import path resolution for nested classes is tricky.** Ruby's `Identity::AccessToken` is a namespace convention; JavaScript needs explicit file paths. The transpiler needs to understand the directory structure, not just the class hierarchy.
+5. **Import path resolution for nested classes is tricky.** Ruby's `Identity::AccessToken` is a namespace convention; JavaScript needs explicit file paths. The transpiler needs recursive model discovery, collision-aware class naming, and wider regex patterns for nested paths. Fixed: `findModels` is now recursive, controller filter resolves namespaced constants, and import regexes match `/` in paths.
 
-6. **Every fix benefits all users.** Bugs found via Fizzy (ERB comments, hash shorthand, async render, duplicate imports, reserved word escaping) were fixed in core Ruby2JS, improving transpilation for all applications.
+6. **Nine categories of syntax errors can hide in plain sight.** Fizzy exposed issues across 9 converters/filters (module private fields, `for` as reserved word, super in module context, bare case/raise, duplicate field+getter, setter names, masgn in if, receiverless merge). All 50 errors were eliminated with targeted fixes.
+
+7. **Every fix benefits all users.** Bugs found via Fizzy were fixed in core Ruby2JS, improving transpilation for all applications.
