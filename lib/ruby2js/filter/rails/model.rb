@@ -88,8 +88,12 @@ module Ruby2JS
           transformed_body = transform_model_body(body)
 
           # Build the exported class
+          # For namespaced classes like Identity::AccessToken, use just the leaf name
+          # for export. JS doesn't support `export X.Y = class`, only `export class Y`.
+          export_class_name = class_name.children.first ?
+            s(:const, nil, class_name.children.last) : class_name
           exported_class = s(:send, nil, :export,
-            node.updated(nil, [class_name, superclass, transformed_body]))
+            node.updated(nil, [export_class_name, superclass, transformed_body]))
 
           # Generate import for superclass (ApplicationRecord or ActiveRecord::Base)
           superclass_name = superclass.children.last.to_s
