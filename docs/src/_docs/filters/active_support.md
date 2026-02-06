@@ -113,6 +113,27 @@ title.length > 50 ? title.slice(0, 47) + "..." : title
 description.length > 100 ? description.slice(0, 99) + "…" : description
 ```
 
+### Enumerable Methods
+
+#### index_by
+
+Creates a hash (object) where keys are determined by the given block or method, with the original elements as values. This is the ActiveSupport `Enumerable#index_by` method.
+
+```ruby
+# With symbol (block_pass)
+%w[drafted published].index_by(&:itself)
+users.index_by(&:id)
+
+# With block
+records.index_by { |r| r.name }
+```
+
+```javascript
+Object.fromEntries(["drafted", "published"].map(item => [item, item]))
+Object.fromEntries(users.map(item => [item.id(), item]))
+Object.fromEntries(records.map(r => [r.name, r]))
+```
+
 ### Array Methods
 
 #### to_sentence

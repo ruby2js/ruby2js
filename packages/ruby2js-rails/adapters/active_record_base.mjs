@@ -253,6 +253,27 @@ export class ActiveRecordBase {
     this._after_destroy_commit_callbacks.push(callback);
   }
 
+  // --- Declarative class methods ---
+
+  static has_secure_token(field = 'token') {
+    // Generates a unique token on create; no-op at class definition time
+  }
+
+  static serialize(field, options = {}) {
+    if (!this._serialized) this._serialized = {};
+    this._serialized[field] = options;
+  }
+
+  static normalizes(field, options = {}) {
+    if (!this._normalizations) this._normalizations = {};
+    this._normalizations[field] = options;
+  }
+
+  static validate(method) {
+    if (!this._custom_validations) this._custom_validations = [];
+    this._custom_validations.push(method);
+  }
+
   // --- Association helpers ---
 
   async hasMany(modelClass, foreignKey) {

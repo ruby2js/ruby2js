@@ -90,6 +90,23 @@ module Ruby2JS
           return s(:if, condition, truncated, target)
         end
 
+        if method == :index_by && args.length == 1 && target &&
+           args[0].type == :block_pass
+          # arr.index_by(&:attr) => Object.fromEntries(arr.map(item => [item.attr, item]))
+          target = process(target)
+          sym = args[0].children[0]
+          if sym.type == :sym
+            attr = sym.children.first
+            item = s(:lvar, :item)
+            key_expr = (attr == :itself) ? item : s(:send, item, attr)
+            map_block = s(:block,
+              s(:send, target, :map),
+              s(:args, s(:arg, :item)),
+              s(:array, key_expr, item))
+            return s(:send, s(:const, nil, :Object), :fromEntries, map_block)
+          end
+        end
+
         if method == :to_sentence && args.empty? && target
           # arr.to_sentence => arr.length === 0 ? '' :
           #   arr.length === 1 ? arr[0] :
@@ -111,6 +128,24 @@ module Ruby2JS
 
           return s(:if, empty_check, s(:str, ''),
             s(:if, single_check, single_result, multi_result))
+        end
+
+        super
+      end
+
+      def on_block(node)
+        call = node.children[0]
+        if call.type == :send && call.children[1] == :index_by && call.children[0]
+          # arr.index_by { |item| expr } => Object.fromEntries(arr.map(item => [expr, item]))
+          target = process(call.children[0])
+          args = node.children[1]
+          body = process(node.children[2])
+          item_name = args.children[0].children[0]
+          map_block = s(:block,
+            s(:send, target, :map),
+            args,
+            s(:array, body, s(:lvar, item_name)))
+          return s(:send, s(:const, nil, :Object), :fromEntries, map_block)
         end
 
         super

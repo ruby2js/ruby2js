@@ -105,7 +105,7 @@ export function getBuildOptions(section, target, sectionConfig = null) {
     stimulus: ['Pragma', 'Stimulus', 'Functions', 'ESM', 'Return'],
     controllers: ['Pragma', 'Rails_Controller', ...nodeFilter, 'Functions', 'ESM', 'Return'],
     jsx: ['Pragma', 'Rails_Helpers', 'React', 'Functions', 'ESM', 'Return'],
-    default: ['Pragma', 'Rails_Concern', 'Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', ...nodeFilter, 'Functions', 'ESM', 'Return']
+    default: ['Pragma', 'Rails_Concern', 'Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', ...nodeFilter, 'ActiveSupport', 'Functions', 'ESM', 'Return']
   };
 
   // Use filters from sectionConfig if provided, otherwise use defaults
@@ -144,7 +144,7 @@ export function getBuildOptions(section, target, sectionConfig = null) {
         ...baseOptions,
         filters: sectionConfig?.filters
           ? normalizeFilterNames(sectionConfig.filters)
-          : ['Pragma', 'Rails_Concern', 'Rails_Test', 'Rails_Model', ...nodeFilter, 'Functions', 'ESM', 'Return'],
+          : ['Pragma', 'Rails_Concern', 'Rails_Test', 'Rails_Model', ...nodeFilter, 'ActiveSupport', 'Functions', 'ESM', 'Return'],
         target
       };
 
@@ -189,7 +189,9 @@ function normalizeFilterNames(filters) {
     'rails/migration': 'Rails_Migration',
     'rails/helpers': 'Rails_Helpers',
     'rails_test': 'Rails_Test',
-    'rails/test': 'Rails_Test'
+    'rails/test': 'Rails_Test',
+    'activesupport': 'ActiveSupport',
+    'active_support': 'ActiveSupport'
   };
 
   return filters.map(f => filterMap[f.toLowerCase()] || f);
@@ -1149,6 +1151,7 @@ export async function ensureRuby2jsReady() {
   // Load all filters needed for Rails apps (used by both Vite and eject)
   if (!filtersLoaded) {
     // Core filters
+    await import('ruby2js/filters/active_support.js');
     await import('ruby2js/filters/functions.js');
     await import('ruby2js/filters/esm.js');
     await import('ruby2js/filters/return.js');

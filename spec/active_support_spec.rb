@@ -95,6 +95,28 @@ describe Ruby2JS::Filter::ActiveSupport do
     end
   end
 
+  describe 'index_by' do
+    it "should convert index_by with &:itself" do
+      result = to_js('%w[drafted published].index_by(&:itself)')
+      _(result).must_equal 'Object.fromEntries(["drafted", "published"].map(item => ([item, item])))'
+    end
+
+    it "should convert index_by with &:attribute" do
+      result = to_js('users.index_by(&:id)')
+      _(result).must_equal 'Object.fromEntries(users.map(item => ([item.id(), item])))'
+    end
+
+    it "should convert index_by with block" do
+      result = to_js('records.index_by { |r| r.name }')
+      _(result).must_equal 'Object.fromEntries(records.map(r => ([r.name, r])))'
+    end
+
+    it "should convert index_by with complex block body" do
+      result = to_js('records.index_by { |r| [r.class.name, r.id] }')
+      _(result).must_equal 'Object.fromEntries(records.map(r => ([[r.class.name, r.id], r])))'
+    end
+  end
+
   describe 'non-ActiveSupport methods' do
     it "should not affect regular method calls" do
       _(to_js('x.foo')).must_equal 'x.foo'
