@@ -151,7 +151,7 @@ module Ruby2JS
         (
           node.children[0].type == :const ||
           node.children[0].type == :send ||
-          (node.children[0].type == :hash && node.children[0].children[0].children[0].children[0] == :default )
+          node.children[0].type == :hash
         )
         final_export = true
         put '{ '

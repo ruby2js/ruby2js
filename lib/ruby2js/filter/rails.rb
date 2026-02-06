@@ -24,6 +24,7 @@
 #   require 'ruby2js/filter/rails/helpers'
 
 require 'ruby2js/filter/rails/active_record'
+require 'ruby2js/filter/rails/concern'
 require 'ruby2js/filter/rails/model'
 require 'ruby2js/filter/rails/controller'
 require 'ruby2js/filter/rails/routes'

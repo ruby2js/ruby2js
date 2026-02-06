@@ -155,6 +155,12 @@ module Ruby2JS
       word
     end
 
+    # Convert underscored string to PascalCase class name
+    # 'access_token' -> 'AccessToken', 'article' -> 'Article'
+    def self.classify(word)
+      word.split('_').map { |s| s.empty? ? '' : s[0].upcase + s[1..-1] }.join
+    end
+
     def self.pluralize(word)
       lower = word.downcase
       return word if UNCOUNTABLES.include?(lower)

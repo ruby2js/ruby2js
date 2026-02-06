@@ -999,11 +999,13 @@ module Ruby2JS
           # Also generates set comments(val) for preloading
           association_name = assoc[:name]
           cache_name = "_#{association_name}".to_sym
-          class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.singularize(association_name.to_s).capitalize
+          class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.classify(Ruby2JS::Inflector.singularize(association_name.to_s))
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
 
-          # Track model reference for import generation
-          @rails_model_refs.add(class_name)
+          # Skip import for :through associations (they reuse already-imported models)
+          unless assoc[:options][:through]
+            @rails_model_refs.add(class_name)
+          end
 
           # For nested class names like "Account::Export", use just the leaf name for JS reference
           js_class_name = class_name.include?('::') ? class_name.split('::').last : class_name
@@ -1049,7 +1051,7 @@ module Ruby2JS
           # Use :defget for getter (no parentheses needed when accessing)
           # Use :attr for property access (no parentheses) to access inherited property
           association_name = assoc[:name]
-          class_name = assoc[:options][:class_name] || association_name.to_s.capitalize
+          class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.classify(association_name.to_s)
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
 
           # Track model reference for import generation
@@ -1079,11 +1081,13 @@ module Ruby2JS
           #   }
           association_name = assoc[:name]
           cache_name = "_#{association_name}".to_sym
-          class_name = assoc[:options][:class_name] || association_name.to_s.capitalize
+          class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.classify(association_name.to_s)
           foreign_key = assoc[:options][:foreign_key] || "#{association_name}_id"
 
-          # Track model reference for import generation
-          @rails_model_refs.add(class_name)
+          # Skip import for polymorphic associations (no single model class to import)
+          unless assoc[:options][:polymorphic]
+            @rails_model_refs.add(class_name)
+          end
 
           # For nested class names like "Account::Export", use just the leaf name for JS reference
           js_class_name = class_name.include?('::') ? class_name.split('::').last : class_name

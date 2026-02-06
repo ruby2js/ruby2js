@@ -131,6 +131,39 @@ module Ruby2JS
             child.children.first.children.first == nil \
           then
             replacement = s(:export, child)
+          elsif [:module, :class].include?(child.type) and
+            child.children.first.type == :const and
+            child.children.first.children.first.respond_to?(:type) and
+            child.children.first.children.first.type == :const \
+          then
+            # Namespaced class (e.g., Account::Export < Export)
+            # Unwrap namespace for export: export class Export extends Export {}
+            # Then assign to parent: Account.Export = Export;
+            parent_const = child.children.first.children.first  # (const nil :Account)
+            leaf_name = child.children.first.children.last       # :Export
+            superclass = child.children[1]
+            body = child.children[2..-1]
+
+            # Create unnested class with just the leaf name
+            leaf_const = s(:const, nil, leaf_name)
+            unnested = child.updated(child.type, [leaf_const, superclass, *body])
+
+            # If leaf name == superclass name, use internal name to avoid TDZ
+            # e.g., class Account::Export < Export becomes:
+            #   class _Export extends Export {}
+            #   export { _Export as Export }
+            if superclass and superclass.type == :const and
+               superclass.children.last == leaf_name
+              internal_name = :"_#{leaf_name}"
+              internal_const = s(:const, nil, internal_name)
+              unnested = child.updated(child.type, [internal_const, superclass, *body])
+              export_as = s(:export, s(:array,
+                s(:hash, s(:pair, s(:sym, leaf_name), internal_const))
+              ))
+              replacement = s(:begin, unnested, export_as)
+            else
+              replacement = s(:export, unnested)
+            end
           elsif child.type == :casgn and child.children.first == nil
             replacement = s(:export, child)
           elsif child.type == :def

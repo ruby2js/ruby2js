@@ -1614,6 +1614,9 @@ async function runEject(options) {
 
   console.log(`Ejecting transpiled files to ${relative(APP_ROOT, outDir) || outDir}/\n`);
 
+  // Build models list for nested model path resolution during import fixing
+  config.models = findModels(APP_ROOT);
+
   // Ensure ruby2js is ready
   await ensureRuby2jsReady();
 
@@ -1668,10 +1671,50 @@ async function runEject(options) {
         }
       }
 
-      // Generate models index (only if we have models)
-      const modelsIndex = generateModelsModuleForEject(APP_ROOT, config);
+      // Generate models index, excluding:
+      // 1. Models that failed to transpile
+      // 2. Models that don't have exports (e.g., nested classes like Account.Export = class)
+      const failedModels = new Set(errors
+        .filter(e => e.file.startsWith('app/models/'))
+        .map(e => e.file.replace('app/models/', '').replace('.rb', '')));
+      // Check ejected JS files for export statements
+      for (const m of config.models) {
+        if (failedModels.has(m)) continue;
+        const jsFile = join(outDir, 'app/models', m + '.js');
+        if (existsSync(jsFile)) {
+          const content = readFileSync(jsFile, 'utf-8');
+          if (!content.includes('export ')) {
+            failedModels.add(m);
+          }
+        }
+      }
+      const modelsIndex = generateModelsModuleForEject(APP_ROOT, { ...config, excludeModels: failedModels });
       writeFileSync(join(outDir, 'app/models/index.js'), modelsIndex);
       fileCount++;
+
+      // Post-process: remove imports of excluded models from other model files.
+      // e.g., account.js imports from './account/export.js' but that file has no exports.
+      if (failedModels.size > 0) {
+        for (const file of modelFiles) {
+          const jsPath = join(outDir, 'app/models', file.replace('.rb', '.js'));
+          if (!existsSync(jsPath)) continue;
+          let content = readFileSync(jsPath, 'utf-8');
+          let changed = false;
+          for (const excluded of failedModels) {
+            // Match import lines referencing the excluded model path
+            const escapedPath = excluded.replace(/\//g, '\\/');
+            const re = new RegExp(`^import\\s+\\{[^}]*\\}\\s+from\\s+['"]\\.\\.?\\/${escapedPath}\\.js['"];?\\s*\\n?`, 'gm');
+            const newContent = content.replace(re, '');
+            if (newContent !== content) {
+              content = newContent;
+              changed = true;
+            }
+          }
+          if (changed) {
+            writeFileSync(jsPath, content);
+          }
+        }
+      }
     }
   }
 

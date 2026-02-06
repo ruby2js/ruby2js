@@ -107,7 +107,7 @@ end
 
 # Extra filter dependencies (not tied to specs)
 # These are shared modules required by other filters
-EXTRA_FILTERS = ['rails/active_record'].freeze
+EXTRA_FILTERS = ['rails/active_record', 'rails/concern'].freeze
 
 # Get filters needed for ready + partial specs (only those with actual filter files)
 def manifest_filters

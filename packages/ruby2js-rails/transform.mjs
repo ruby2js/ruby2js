@@ -105,7 +105,7 @@ export function getBuildOptions(section, target, sectionConfig = null) {
     stimulus: ['Pragma', 'Stimulus', 'Functions', 'ESM', 'Return'],
     controllers: ['Pragma', 'Rails_Controller', ...nodeFilter, 'Functions', 'ESM', 'Return'],
     jsx: ['Pragma', 'Rails_Helpers', 'React', 'Functions', 'ESM', 'Return'],
-    default: ['Pragma', 'Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', ...nodeFilter, 'Functions', 'ESM', 'Return']
+    default: ['Pragma', 'Rails_Concern', 'Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', ...nodeFilter, 'Functions', 'ESM', 'Return']
   };
 
   // Use filters from sectionConfig if provided, otherwise use defaults
@@ -144,7 +144,7 @@ export function getBuildOptions(section, target, sectionConfig = null) {
         ...baseOptions,
         filters: sectionConfig?.filters
           ? normalizeFilterNames(sectionConfig.filters)
-          : ['Pragma', 'Rails_Test', 'Rails_Model', ...nodeFilter, 'Functions', 'ESM', 'Return'],
+          : ['Pragma', 'Rails_Concern', 'Rails_Test', 'Rails_Model', ...nodeFilter, 'Functions', 'ESM', 'Return'],
         target
       };
 
@@ -416,6 +416,9 @@ export function fixImportsForEject(js, fromFile, config = {}) {
   js = js.replace(/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, "from 'ruby2js-rails/adapters/active_record.mjs'");
   js = js.replace(/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, "from 'ruby2js-rails/adapters/active_record.mjs'");
 
+  // ActiveStorage virtual module → adapter
+  js = js.replace(/from ['"]juntos:active-storage['"]/g, "from 'ruby2js-rails/adapters/active_storage_base.mjs'");
+
   // Virtual module @config/paths.js → config/paths.js with correct relative path
   // Path helpers are in a separate file to avoid circular dependency with routes.js
   if (fromFile) {
@@ -432,26 +435,103 @@ export function fixImportsForEject(js, fromFile, config = {}) {
   // This is used for controllers: ../../config/paths.js → ../../config/paths.js
   // No change needed - paths.js is the correct target
 
-  // ApplicationRecord → local file (generated separately)
-  js = js.replace(/from ['"]\.\/application_record\.js['"]/g, "from './application_record.js'");
+  // For nested model files (in subdirectories), adjust ./ imports to point back to models root.
+  // The model filter generates all paths relative to app/models/, but nested files are in subdirs.
+  // e.g., identity/access_token.js has './application_record.js' → '../application_record.js'
+  if (fromFile && fromFile.startsWith('app/models/')) {
+    const modelRelPath = fromFile.replace('app/models/', '');
+    const depth = modelRelPath.split('/').length - 1; // 0 for top-level, 1 for identity/x.js, etc.
+    if (depth > 0) {
+      const prefix = '../'.repeat(depth);
+      js = js.replace(/from ['"]\.\/([\w/]+\.js)['"]/g, `from '${prefix}$1'`);
+    }
+  }
 
-  // Model imports: .js extension for ejected files (including nested paths)
-  js = js.replace(/from ['"]\.\/([\w/]+)\.js['"]/g, "from './$1.js'");
+  // Add missing superclass imports for nested model files.
+  // When ESM autoexport unnests a namespaced class (e.g., Account::Export < Export),
+  // the model filter may not generate an import for the superclass if it doesn't recognize
+  // the class as an ActiveRecord model. We detect `extends ClassName` without a matching
+  // import and add it, using the models list to find the correct path.
+  if (fromFile && fromFile.startsWith('app/models/') && config.models) {
+    const modelRelPath = fromFile.replace('app/models/', '').replace(/\.js$/, '');
+    const depth = modelRelPath.split('/').length - 1;
+    if (depth > 0) {
+      // Check for extends clause without a corresponding import
+      const extendsMatch = js.match(/(?:class \w+ extends |class extends )(\w+)\s*\{/);
+      if (extendsMatch) {
+        const superclassName = extendsMatch[1];
+        // Check if this superclass is already imported
+        const importPattern = new RegExp(`import\\s+\\{[^}]*\\b${superclassName}\\b[^}]*\\}\\s+from`);
+        if (!importPattern.test(js) && superclassName !== 'ApplicationRecord') {
+          // Convert PascalCase to snake_case to find the model file
+          const snakeName = superclassName.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
+          if (config.models.includes(snakeName)) {
+            const prefix = '../'.repeat(depth);
+            js = `import { ${superclassName} } from '${prefix}${snakeName}.js';\n${js}`;
+          }
+        }
+      }
+    }
+  }
 
-  // Controller concerns: redirect from ../models/boardscoped.js to ./concerns/board_scoped.js
-  // The controller filter lowercases (BoardScoped -> boardscoped) but concerns use underscores
-  // Common concern naming patterns: BoardScoped, CardScoped, Authentication, Authorization, etc.
-  // Note: nested model paths (../models/identity/access_token.js) pass through unchanged
-  const concernPatterns = ['scoped', 'authentication', 'authorization', 'current'];
+  // Add missing imports for included concerns (Object.getOwnPropertyDescriptors references).
+  // The class2 converter translates `include Foo` to Object.defineProperties(..., Object.getOwnPropertyDescriptors(Foo))
+  // but doesn't generate the import for Foo. We detect unimported references and add them.
+  if (fromFile && fromFile.startsWith('app/models/') && config.models) {
+    const modelRelPath = fromFile.replace('app/models/', '').replace(/\.js$/, '');
+    const depth = modelRelPath.split('/').length - 1;
+    const descriptorRefs = [...js.matchAll(/Object\.getOwnPropertyDescriptors\((\w+)\)/g)];
+    for (const match of descriptorRefs) {
+      const refName = match[1];
+      const importPattern = new RegExp(`import\\s+\\{[^}]*\\b${refName}\\b[^}]*\\}\\s+from`);
+      if (!importPattern.test(js)) {
+        // Convert PascalCase to snake_case to find the model/concern file
+        const snakeName = refName.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
+        // Try namespace-prefixed path first (e.g., webhook/triggerable for Triggerable in webhook.js)
+        const nested = `${modelRelPath}/${snakeName}`;
+        const prefix = '../'.repeat(depth);
+        if (config.models.includes(nested)) {
+          js = `import { ${refName} } from '${prefix || './'}${nested}.js';\n${js}`;
+        } else if (config.models.includes(snakeName)) {
+          js = `import { ${refName} } from '${prefix || './'}${snakeName}.js';\n${js}`;
+        }
+      }
+    }
+  }
+
+  // Model imports: resolve nested model paths using actual models list.
+  // For top-level model files, resolve association imports to nested paths when needed.
+  // e.g., in identity.js: import { AccessToken } from './access_token.js'
+  //   → import { AccessToken } from './identity/access_token.js'
+  // This handles Rails' namespace convention where Identity has_many :access_tokens
+  // maps to Identity::AccessToken at app/models/identity/access_token.rb
+  if (fromFile && fromFile.startsWith('app/models/') && config.models) {
+    const modelRelPath = fromFile.replace('app/models/', '').replace(/\.js$/, '');
+    const depth = modelRelPath.split('/').length - 1;
+    if (depth === 0) {
+      // Top-level model: resolve flat imports to nested paths when the model doesn't exist at top level
+      const topLevelModels = new Set(config.models.filter(m => !m.includes('/')));
+      js = js.replace(/from ['"]\.\/([\w]+)\.js['"]/g, (match, name) => {
+        if (name === 'application_record') return match;
+        if (topLevelModels.has(name)) return match;
+        // Try namespace-prefixed path (e.g., identity/access_token)
+        const nested = `${modelRelPath}/${name}`;
+        if (config.models.includes(nested)) {
+          return `from './${nested}.js'`;
+        }
+        return match;
+      });
+    }
+  }
+  // Controller concerns: redirect from ../models/board_scoped.js to ./concerns/board_scoped.js
+  // The controller filter generates proper snake_case names (BoardScoped -> board_scoped)
+  const concernPatterns = ['scoped', 'authentication', 'authorization'];
   js = js.replace(/from ['"]\.\.\/models\/([\w/]+)\.js['"]/g, (match, name) => {
     // Nested paths (containing /) are real model imports, not concerns
     if (name.includes('/')) return match;
     const isLikelyConcern = concernPatterns.some(pattern => name.toLowerCase().includes(pattern));
     if (isLikelyConcern) {
-      // Convert camelCase/PascalCase to snake_case: boardscoped -> board_scoped
-      const snakeName = name.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase()
-        .replace(/scoped$/, '_scoped');  // Handle boardscoped -> board_scoped
-      return `from './concerns/${snakeName}.js'`;
+      return `from './concerns/${name}.js'`;
     }
     return match;
   });
@@ -496,7 +576,11 @@ export { ${classNames.join(', ')} };
  * Uses ruby2js-rails package for runtime, local paths for app code.
  */
 export function generateModelsModuleForEject(appRoot, config = {}) {
-  const models = findModels(appRoot);
+  let models = findModels(appRoot);
+  // Exclude models that failed to transpile (e.g., unsupported syntax like class << self)
+  if (config.excludeModels) {
+    models = models.filter(m => !config.excludeModels.has(m));
+  }
   const collisions = findLeafCollisions(models);
   const adapterFile = getActiveRecordAdapterFile(config.database);
 
@@ -663,10 +747,21 @@ globalThis.include = function(module) {
   // No-op for now - tests that need shared setup will fail until helpers are implemented
 };
 
-// ActiveSupport stub for patterns like ActiveSupport::Concern
+// ActiveSupport stub for patterns like ActiveSupport::Concern and CurrentAttributes
 globalThis.ActiveSupport = {
-  Concern: {}
+  Concern: {},
+  CurrentAttributes: class CurrentAttributes {
+    static attribute() {} // no-op: Rails current attributes declaration
+  }
 };
+
+// delegate() - Rails delegation DSL, no-op stub
+// In Rails: Model.delegate(:method, to: :association)
+// Make available on all classes
+Function.prototype.delegate = Function.prototype.delegate || function() {};
+
+// Rails namespace stub
+globalThis.Rails = { application: { config: {} } };
 
 // ActionMailer stub for ActionMailer.TestHelper
 globalThis.ActionMailer = {
@@ -778,14 +873,18 @@ export function generateVitestConfigForEject(config = {}) {
     : '';
 
   return `import { defineConfig } from 'vitest/config';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({${externalConfig}
   test: {
-    root: '.',
+    root: __dirname,
     globals: true,
     environment: 'node',
     include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
-    setupFiles: ['./test/globals.mjs', './test/setup.mjs']
+    setupFiles: [resolve(__dirname, 'test/globals.mjs'), resolve(__dirname, 'test/setup.mjs')]
   }
 });
 `;
@@ -1057,6 +1156,7 @@ export async function ensureRuby2jsReady() {
     await import('ruby2js/filters/polyfill.js');
 
     // Rails filters
+    await import('ruby2js/filters/rails/concern.js');
     await import('ruby2js/filters/rails/model.js');
     await import('ruby2js/filters/rails/controller.js');
     await import('ruby2js/filters/rails/routes.js');

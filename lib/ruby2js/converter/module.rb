@@ -179,7 +179,10 @@ module Ruby2JS
         # @prop mechanism provides the output name (get/set).
         accessor_list.each do |info|
           if info[1]
-            info[1] = info[1].updated(nil, [nil, *info[1].children[1..-1]])
+            # Wrap getter body in autoreturn for proper return statement
+            getter_args = info[1].children[1]
+            getter_body = s(:autoreturn, *info[1].children[2..-1])
+            info[1] = info[1].updated(nil, [nil, getter_args, getter_body])
           end
           info[2] = info[2].updated(nil, [nil, *info[2].children[1..-1]])
         end

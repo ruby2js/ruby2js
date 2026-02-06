@@ -122,7 +122,7 @@ end
 
 # Extra filter dependencies (not tied to specs)
 # These are shared modules required by other filters
-EXTRA_FILTERS = ['rails/active_record'].freeze
+EXTRA_FILTERS = ['rails/active_record', 'rails/concern'].freeze
 
 # Get list of filters to build
 def filters_to_build(target = nil)
