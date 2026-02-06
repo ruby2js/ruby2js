@@ -43,7 +43,8 @@
     "./svelte": "./dist/svelte_component_transformer.mjs",
     "./vue": "./dist/vue_component_transformer.mjs",
     "./testing": "./testing.mjs",
-    "./testing.mjs": "./testing.mjs"
+    "./testing.mjs": "./testing.mjs",
+    "./url_helpers.mjs": "./url_helpers.mjs"
   },
   "files": [
     "adapters/",
@@ -69,7 +70,8 @@
     "vite-models.mjs",
     "vite-ssr-dev.mjs",
     "testing.mjs",
-    "transform.mjs"
+    "transform.mjs",
+    "url_helpers.mjs"
   ],
   "keywords": [
     "ruby2js",

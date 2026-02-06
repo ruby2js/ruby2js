@@ -59,6 +59,7 @@ module Ruby2JS
           @rails_enums = []
           @rails_broadcasts_to = []  # broadcasts_to declarations
           @rails_attachments = []    # Active Storage attachments
+          @rails_url_helpers = false  # include Rails.application.routes.url_helpers
           @rails_model_private_methods = {}
           @rails_model_refs = Set.new
           @in_callback_block = false  # Track when processing callback body
@@ -76,7 +77,20 @@ module Ruby2JS
           return super if @rails_model_processing
 
           # Check if this is an ActiveRecord model
-          return super unless model_class?(class_name, superclass)
+          unless model_class?(class_name, superclass)
+            # For non-model classes, still handle include Rails.application.routes.url_helpers
+            if body && body_has_url_helpers_include?(body)
+              new_body = strip_url_helpers_include(body)
+              new_class = node.updated(nil, [class_name, superclass, new_body])
+              url_helpers_import = s(:send, nil, :import,
+                s(:array,
+                  s(:const, nil, :polymorphic_url),
+                  s(:const, nil, :polymorphic_path)),
+                s(:str, "juntos:url-helpers"))
+              return process(s(:begin, url_helpers_import, new_class))
+            end
+            return super
+          end
 
           @rails_model_name = class_name.children.last.to_s
           @rails_model = true
@@ -176,6 +190,16 @@ module Ruby2JS
             model_import_nodes.push(active_storage_import)
           end
 
+          # Check if model includes url_helpers (for polymorphic_url/polymorphic_path import)
+          if @rails_url_helpers
+            url_helpers_import = s(:send, nil, :import,
+              s(:array,
+                s(:const, nil, :polymorphic_url),
+                s(:const, nil, :polymorphic_path)),
+              s(:str, "juntos:url-helpers"))
+            model_import_nodes.push(url_helpers_import)
+          end
+
           # Add Model.renderPartial = render assignment so broadcast_replace_to
           # can use the partial at runtime when called from other models
           render_partial_assignment = nil
@@ -207,6 +231,7 @@ module Ruby2JS
           @rails_enums = []
           @rails_broadcasts_to = []
           @rails_attachments = []
+          @rails_url_helpers = false
           @rails_model_private_methods = {}
           @rails_model_refs = Set.new
 
@@ -672,9 +697,48 @@ module Ruby2JS
               collect_broadcasts_to(args)
             when :enum
               collect_enum(args)
+            when :include
+              if args.length == 1 && is_url_helpers_include?(args[0])
+                @rails_url_helpers = true
+              end
             when *CALLBACKS
               collect_callback(method_name, args)
             end
+          end
+        end
+
+        # Check if an AST node matches Rails.application.routes.url_helpers
+        def is_url_helpers_include?(node)
+          node.type == :send &&
+            node.children[1] == :url_helpers &&
+            node.children[0]&.type == :send &&
+            node.children[0].children[1] == :routes
+        end
+
+        # Check if class body contains include Rails.application.routes.url_helpers
+        def body_has_url_helpers_include?(body)
+          children = body.type == :begin ? body.children : [body]
+          children.any? do |child|
+            child.type == :send && child.children[0].nil? &&
+              child.children[1] == :include &&
+              child.children.length == 3 &&
+              is_url_helpers_include?(child.children[2])
+          end
+        end
+
+        # Strip include Rails.application.routes.url_helpers from class body
+        def strip_url_helpers_include(body)
+          children = body.type == :begin ? body.children : [body]
+          filtered = children.reject do |child|
+            child.type == :send && child.children[0].nil? &&
+              child.children[1] == :include &&
+              child.children.length == 3 &&
+              is_url_helpers_include?(child.children[2])
+          end
+          if filtered.length == 1
+            filtered[0]
+          else
+            body.updated(:begin, filtered)
           end
         end
 
@@ -952,7 +1016,7 @@ module Ruby2JS
             # Skip DSL declarations (already collected)
             if child.type == :send && child.children[0].nil?
               method = child.children[1]
-              next if %i[has_many has_one belongs_to validates scope broadcasts_to has_one_attached has_many_attached enum].include?(method)
+              next if %i[has_many has_one belongs_to validates scope broadcasts_to has_one_attached has_many_attached enum include].include?(method)
               next if CALLBACKS.include?(method)
             end
 

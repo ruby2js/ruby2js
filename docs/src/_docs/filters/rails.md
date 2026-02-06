@@ -314,6 +314,32 @@ export class Export extends ApplicationRecord {
 
 If a method with the same name as an enum value is explicitly defined in the class, the generated predicate is skipped for that value (the user-defined method takes precedence).
 
+### URL Helpers
+
+`include Rails.application.routes.url_helpers` is recognized and stripped from the class body. An import for `polymorphic_url` and `polymorphic_path` is generated instead, providing URL resolution from model instances at runtime.
+
+```ruby
+class Webhook::Delivery < ApplicationRecord
+  include Rails.application.routes.url_helpers
+
+  def deliver
+    url = polymorphic_url(event.eventable)
+  end
+end
+```
+
+```javascript
+import { polymorphic_url, polymorphic_path } from "juntos:url-helpers";
+
+export class Delivery extends ApplicationRecord {
+  async deliver() {
+    let url = polymorphic_url(await this.event().eventable())
+  }
+}
+```
+
+`polymorphic_url(record)` resolves a model instance to its URL path using `constructor.tableName` and `id` (e.g., `"/cards/42"`). Arrays produce nested paths: `polymorphic_url([board, card])` → `"/boards/1/cards/2"`.
+
 ## Controllers
 
 Transforms Rails controllers to JavaScript modules with async action functions.

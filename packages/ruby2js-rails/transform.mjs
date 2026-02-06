@@ -421,6 +421,9 @@ export function fixImportsForEject(js, fromFile, config = {}) {
   // ActiveStorage virtual module → adapter
   js = js.replace(/from ['"]juntos:active-storage['"]/g, "from 'ruby2js-rails/adapters/active_storage_base.mjs'");
 
+  // URL helpers virtual module → url_helpers
+  js = js.replace(/from ['"]juntos:url-helpers['"]/g, "from 'ruby2js-rails/url_helpers.mjs'");
+
   // Virtual module @config/paths.js → config/paths.js with correct relative path
   // Path helpers are in a separate file to avoid circular dependency with routes.js
   if (fromFile) {
