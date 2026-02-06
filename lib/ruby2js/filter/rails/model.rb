@@ -117,32 +117,20 @@ module Ruby2JS
 
           # Check if model has has_many associations (need CollectionProxy)
           has_has_many = @rails_associations.any? { |a| a[:type] == :has_many }
+          has_associations = @rails_associations.any?
 
-          # Build import list: always include superclass, add CollectionProxy if needed
+          # Build import list: always include superclass, add CollectionProxy/modelRegistry if needed
           import_list = [s(:const, nil, superclass_name.to_sym)]
           import_list.push(s(:const, nil, :CollectionProxy)) if has_has_many
+          import_list.push(s(:const, nil, :modelRegistry)) if has_associations
 
           import_node = s(:send, nil, :import,
             s(:array, *import_list),
             s(:str, "./#{superclass_file}.js"))
 
-          # Generate imports for associated models (skip self-referential imports)
+          # No cross-model imports needed — association methods use modelRegistry
+          # for lazy resolution, avoiding circular dependencies
           model_import_nodes = []
-          [*@rails_model_refs].sort.each do |model|
-            next if model == @rails_model_name
-            # Handle nested class names like "Account::Export" -> "./account/export.js"
-            if model.include?('::')
-              parts = model.split('::')
-              import_name = parts.last  # Just the leaf class name
-              model_file = parts.map { |p| p.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '') }.join('/')
-            else
-              import_name = model
-              model_file = model.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '')
-            end
-            model_import_nodes.push(s(:send, nil, :import,
-              s(:array, s(:const, nil, import_name.to_sym)),
-              s(:str, "./#{model_file}.js")))
-          end
 
           # Check if model uses broadcast methods (for BroadcastChannel import)
           # Include both explicit broadcast_*_to calls and broadcasts_to declarations
@@ -1175,27 +1163,20 @@ module Ruby2JS
           class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.classify(Ruby2JS::Inflector.singularize(association_name.to_s))
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
 
-          # Skip import for :through associations (they reuse already-imported models)
-          unless assoc[:options][:through]
-            @rails_model_refs.add(class_name)
-          end
-
-          # For nested class names like "Account::Export", use just the leaf name for JS reference
-          js_class_name = class_name.include?('::') ? class_name.split('::').last : class_name
-
           # Build association metadata object: { name: 'comments', type: 'has_many', foreignKey: 'article_id' }
           assoc_metadata = s(:hash,
             s(:pair, s(:sym, :name), s(:str, association_name.to_s)),
             s(:pair, s(:sym, :type), s(:str, 'has_many')),
             s(:pair, s(:sym, :foreignKey), s(:str, foreign_key)))
 
-          # Build: new CollectionProxy(this, metadata, Comment)
+          # Build: new CollectionProxy(this, metadata, modelRegistry["Comment"])
+          model_ref = s(:send, s(:lvar, :modelRegistry), :[], s(:str, class_name))
           collection_proxy = s(:send,
             s(:const, nil, :CollectionProxy),
             :new,
             s(:self),
             assoc_metadata,
-            s(:const, nil, js_class_name.to_sym))
+            model_ref)
 
           # Getter: returns cache if set, otherwise creates and caches new CollectionProxy
           getter = s(:defget, association_name,
@@ -1227,17 +1208,12 @@ module Ruby2JS
           class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.classify(association_name.to_s)
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
 
-          # Track model reference for import generation
-          @rails_model_refs.add(class_name)
-
-          # For nested class names like "Account::Export", use just the leaf name for JS reference
-          js_class_name = class_name.include?('::') ? class_name.split('::').last : class_name
-
+          model_ref = s(:send, s(:lvar, :modelRegistry), :[], s(:str, class_name))
           s(:defget, association_name,
             s(:args),
             s(:autoreturn,
               s(:send,
-                s(:const, nil, js_class_name.to_sym),
+                model_ref,
                 :find_by,
                 s(:hash,
                   s(:pair,
@@ -1257,23 +1233,16 @@ module Ruby2JS
           class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.classify(association_name.to_s)
           foreign_key = assoc[:options][:foreign_key] || "#{association_name}_id"
 
-          # Skip import for polymorphic associations (no single model class to import)
-          unless assoc[:options][:polymorphic]
-            @rails_model_refs.add(class_name)
-          end
-
-          # For nested class names like "Account::Export", use just the leaf name for JS reference
-          js_class_name = class_name.include?('::') ? class_name.split('::').last : class_name
-
           # Access foreign key from attributes - use :attr for property access
           # Use .to_s to force bracket notation (Ruby2JS optimizes literal strings to dot notation)
           fk_access = s(:send, s(:attr, s(:self), :attributes), :[],
             s(:send, s(:str, foreign_key), :to_s))
 
           # Getter: return cached object or find by foreign key
-          # this._article || Article.find(this.attributes['article_id'])
+          # this._article || modelRegistry["Article"].find(this.attributes['article_id'])
+          model_ref = s(:send, s(:lvar, :modelRegistry), :[], s(:str, class_name))
           find_call = s(:send,
-            s(:const, nil, js_class_name.to_sym),
+            model_ref,
             :find,
             fk_access)
 

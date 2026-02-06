@@ -41,16 +41,16 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'name: "comments"'
       assert_includes result, 'type: "has_many"'
       assert_includes result, 'foreignKey: "article_id"'
-      assert_includes result, ', Comment)'
+      assert_includes result, ', modelRegistry.Comment)'
     end
 
-    it "imports CollectionProxy for has_many associations" do
+    it "imports CollectionProxy and modelRegistry for has_many associations" do
       result = to_js(<<~RUBY)
         class Article < ApplicationRecord
           has_many :comments
         end
       RUBY
-      assert_includes result, 'import { ApplicationRecord, CollectionProxy }'
+      assert_includes result, 'import { ApplicationRecord, CollectionProxy, modelRegistry }'
     end
 
     it "supports class_name option" do
@@ -61,7 +61,7 @@ describe Ruby2JS::Filter::Rails::Model do
       RUBY
       assert_includes result, 'get reviews()'
       assert_includes result, 'name: "reviews"'
-      assert_includes result, ', Comment)'
+      assert_includes result, ', modelRegistry.Comment)'
     end
 
     it "supports nested class_name with :: separator" do
@@ -70,15 +70,10 @@ describe Ruby2JS::Filter::Rails::Model do
           has_many :exports, class_name: 'Account::Export'
         end
       RUBY
-      # Import should use leaf name and nested path
-      assert_includes result, 'import { Export } from'
-      assert_includes result, './account/export.js'
-      # CollectionProxy should use leaf class name (not the :: version)
-      assert_includes result, ', Export)'
-      # Should NOT contain :: as an identifier (import or class reference)
-      # Note: "Account::Export" as a string in metadata is OK
-      refute_includes result, 'import { Account::Export'
-      refute_includes result, 's(:const, nil, :"Account::Export")'
+      # No cross-model import — uses modelRegistry for lazy resolution
+      refute_includes result, 'import { Export } from'
+      # CollectionProxy uses registry lookup with full class name
+      assert_includes result, 'modelRegistry["Account::Export"]'
     end
 
     it "supports foreign_key option" do

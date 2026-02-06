@@ -634,13 +634,13 @@ export { ${classNames.join(', ')} };
  */
 export function generateApplicationRecordForEject(config = {}) {
   const adapterFile = getActiveRecordAdapterFile(config.database);
-  return `import { ActiveRecord as Base, CollectionProxy } from 'ruby2js-rails/adapters/${adapterFile}';
+  return `import { ActiveRecord as Base, CollectionProxy, modelRegistry } from 'ruby2js-rails/adapters/${adapterFile}';
 
 export class ApplicationRecord extends Base {
   static primaryAbstractClass = true;
 }
 
-export { CollectionProxy };
+export { CollectionProxy, modelRegistry };
 `;
 }
 
