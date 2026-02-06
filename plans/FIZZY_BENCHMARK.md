@@ -46,10 +46,30 @@ Fizzy tests this thesis at scale. The [blog demo](https://ruby2js.github.io/ruby
 **Transpilation is complete with zero syntax errors.** All file categories transform successfully:
 
 - **995 JavaScript files pass syntax check** (models, controllers, views, routes, migrations, seeds, tests, Stimulus controllers, concerns)
-- **2 files skipped** - `magic_link/code.rb` (`class << self` in non-class context), `user/day_timeline/serializable.rb` (`alias`)
-- **90 tests discovered** by vitest in the ejected output
+- **1 file skipped** - `magic_link/code.rb` (`class << self` in non-class context)
+- **188 test files discovered** by vitest in the ejected output (91 individual test cases)
 
-Dozens of transpilation bugs were found and fixed along the way (ERB comments, nested params, hash shorthand, async render, duplicate imports, private field handling, nested class imports, namespaced exports, concern private fields, reserved word escaping, bare case/raise, etc.). These fixes benefit all Ruby2JS users, not just Fizzy.
+### Concern-Aware Filter (New)
+
+ActiveSupport::Concern modules are now handled at the AST level by a dedicated Rails filter (`lib/ruby2js/filter/rails/concern.rb`), replacing the previous runtime stub approach. The filter:
+
+- **Strips** DSL calls: `extend ActiveSupport::Concern`, `included do...end`, `class_methods do...end`, `delegate`, `include`
+- **Transforms** `attr_accessor`/`reader`/`writer` into def pairs that the module converter's existing getter/setter detection produces correct `get`/`set` accessors from
+- **Transforms** `alias_method` into delegating defs (strips when names differ only by `?`/`!`)
+- **Forces the IIFE path** to ensure underscore-prefix ivars (`this._x`) instead of ES2022 private fields (`this.#x`) which are invalid in object literal context
+
+This fixed several ejected output bugs: `prototype is not defined` in concern modules, `#field` syntax errors in object literals, and circular reference errors from namespace assignments.
+
+### Other Fixes This Round
+
+- **Module converter IIFE getter return** — Getter bodies in the IIFE path were missing `return` statements; fixed by adding `autoreturn` wrapping
+- **ESM autoexport for namespaced classes** — `Account::Export < Export` now unnests correctly with TDZ avoidance (`_Export` internal name + `export { _Export as Export }`)
+- **Classify inflector** — New `classify` method for proper PascalCase (`access_tokens` → `AccessToken` not `Access_token`)
+- **Polymorphic/through association imports** — Skip import generation for polymorphic and `:through` associations that don't map to single model classes
+- **Nested model import resolution** — Flat imports in model files resolve to nested paths using the actual models list
+- **Vitest config isolation** — Absolute paths prevent parent project vitest config from leaking into ejected test runner
+
+Dozens of earlier transpilation bugs were also fixed (ERB comments, nested params, hash shorthand, async render, duplicate imports, private field handling, nested class imports, reserved word escaping, bare case/raise, etc.). These fixes benefit all Ruby2JS users, not just Fizzy.
 
 ---
 
@@ -59,12 +79,19 @@ The frontier has shifted from **"does it transpile?"** to **"does it run?"**
 
 ### Runtime Issues
 
-These prevent the 90 discovered tests from passing:
+All 188 test files currently fail, cascading from a small set of root errors in the models index (which eagerly imports every model — one failure breaks all tests):
 
-| Issue | Description |
-|-------|-------------|
-| Test helpers | `SearchTestHelper`, `CardActivityTestHelper` need transpilation and export |
-| Vitest config isolation | Parent vitest config interferes when running from fizzy/ejected |
+| Root Error | Impact | Category |
+|-----------|--------|----------|
+| `Webhook.has_secure_token` is not a function | Cascades widely via model index | ActiveRecord adapter gap |
+| `[...].index_by` is not a function | 2 models (Card::Statuses, Identity::AccessToken) | Ruby Array method not polyfilled |
+| `Color is not defined` | Column::Colored concern | Missing import for constant reference |
+| `Attachments is not defined` | 2 models | Missing import |
+| `url_helpers` undefined | 2 models (Webhook::Delivery) | Rails.application.routes stub incomplete |
+| `SearchTestHelper` not defined | 3 test files | Test helper not imported |
+| Broken view import paths | 5 controllers/views | `m_a_x__u_n_r_e_a_d_...`, `_partials.js` |
+
+**Key insight:** These are all runtime/adapter gaps, not transpilation issues. The generated JavaScript is syntactically correct. Fixing `has_secure_token` (a no-op static method on the ActiveRecord base class) would likely unblock the majority of test files.
 
 ### Infrastructure Adapters
 
@@ -72,6 +99,8 @@ Rails infrastructure that needs JavaScript equivalents:
 
 | Adapter | Approach | Status |
 |---------|----------|--------|
+| `has_secure_token` | Static no-op on ActiveRecord base | Missing from adapter — highest impact fix |
+| `index_by` | Array prototype extension | Missing polyfill |
 | CurrentAttributes | AsyncLocalStorage | `with()` now escapes to `$with()` (reserved word fix). Need adapter integration with request lifecycle. |
 | ActionMailer | nodemailer | Not started. `deliver_later` → async delivery, mailer view rendering. |
 | Background Jobs | Event loop | Fizzy's jobs are simple method calls. `perform_later` → `queueMicrotask`. No queue infrastructure needed. |
@@ -133,7 +162,8 @@ The eject command transforms all Ruby source files, writes JavaScript to `ejecte
 | Controllers | RESTful CRUD, before_action, respond_to, strong params (.expect syntax) |
 | Views | ERB, partials, form helpers, Turbo Streams |
 | JavaScript | Stimulus controllers, Turbo, @rails/request.js |
-| Structure | Nested controllers, concerns, Struct.new + class reopening |
+| Concerns | extend ActiveSupport::Concern, included, class_methods, attr_accessor, alias_method, delegate — all handled at AST level |
+| Structure | Nested controllers, namespaced models, Struct.new + class reopening |
 
 ### Needs Runtime Implementation
 
@@ -142,7 +172,6 @@ The eject command transforms all Ruby source files, writes JavaScript to `ejecte
 | CurrentAttributes | AsyncLocalStorage adapter exists conceptually; needs request lifecycle integration |
 | ActionMailer | nodemailer adapter |
 | Polymorphic associations | ORM query enhancement |
-| Complex concern composition | Method resolution across 24 modules |
 | ActionText | Rich text storage and rendering |
 
 ### Infrastructure (Outside App Scope)
@@ -171,12 +200,14 @@ Key insights from the transpilation effort:
 
 2. **The hard part is runtime, not syntax.** Getting 572 files to produce valid JavaScript was the easy half. Making them *run* requires adapters for Rails infrastructure (CurrentAttributes, ActionMailer, ActionText) that have no direct JavaScript equivalent.
 
-3. **Concern composition is the biggest architectural challenge.** Ruby's `include` mixin semantics (method resolution order, `super` chains, callback ordering across 24 modules) need careful runtime support.
+3. **Concern composition works via AST transformation, not runtime emulation.** Rather than stubbing concern DSL methods (`attr_accessor`, `included`, `class_methods`) at runtime, a dedicated filter transforms them at transpile time. `attr_accessor :x` becomes getter/setter def pairs that the existing module converter handles naturally. This produces clean JavaScript (proper `get`/`set` accessors in IIFE return objects) with zero converter changes needed.
 
-4. **Private fields don't compose.** JavaScript's `#field` syntax requires declaration in the enclosing class, but concern methods reference fields from the *including* class. The workaround (underscored private: `_field`) trades encapsulation for composability.
+4. **Private fields don't compose.** JavaScript's `#field` syntax requires declaration in the enclosing class, but concern methods reference fields from the *including* class. The workaround (underscored private: `_field`) trades encapsulation for composability. The concern filter forces the IIFE path (which uses `_` prefix) by injecting a `public` marker that the module converter processes and omits.
 
 5. **Import path resolution for nested classes is tricky.** Ruby's `Identity::AccessToken` is a namespace convention; JavaScript needs explicit file paths. The transpiler needs recursive model discovery, collision-aware class naming, and wider regex patterns for nested paths. Fixed: `findModels` is now recursive, controller filter resolves namespaced constants, and import regexes match `/` in paths.
 
 6. **Nine categories of syntax errors can hide in plain sight.** Fizzy exposed issues across 9 converters/filters (module private fields, `for` as reserved word, super in module context, bare case/raise, duplicate field+getter, setter names, masgn in if, receiverless merge). All 50 errors were eliminated with targeted fixes.
 
 7. **Every fix benefits all users.** Bugs found via Fizzy were fixed in core Ruby2JS, improving transpilation for all applications.
+
+8. **Cascading failures mask progress.** All 188 test files fail, but from only ~7 distinct root causes. The models index eagerly imports every model; one failure (e.g., `has_secure_token` not implemented) cascades to everything. Fixing a handful of adapter gaps would likely unblock the majority of tests.
