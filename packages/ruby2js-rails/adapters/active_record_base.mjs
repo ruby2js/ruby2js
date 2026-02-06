@@ -259,9 +259,17 @@ export class ActiveRecordBase {
     // Generates a unique token on create; no-op at class definition time
   }
 
+  static has_rich_text(field) {
+    // ActionText: declares a rich text attribute; no-op at class definition time
+  }
+
   static serialize(field, options = {}) {
     if (!this._serialized) this._serialized = {};
     this._serialized[field] = options;
+  }
+
+  static store(field, options = {}) {
+    // ActiveRecord::Store: key-value store in a single column; no-op at class definition time
   }
 
   static normalizes(field, options = {}) {

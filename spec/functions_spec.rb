@@ -107,6 +107,14 @@ describe Ruby2JS::Filter::Functions do
     it "should map JSON::ParserError to SyntaxError" do
       to_js( 'begin; rescue JSON::ParserError; end' ).must_equal 'try {} catch ($EXCEPTION) {if ($EXCEPTION instanceof SyntaxError) {} else {throw $EXCEPTION}}'
     end
+
+    it "should map StandardError to Error" do
+      to_js( 'class MyError < StandardError; end' ).must_equal 'class MyError extends Error {}'
+    end
+
+    it "should map RuntimeError to Error" do
+      to_js( 'begin; rescue RuntimeError; end' ).must_equal 'try {} catch ($EXCEPTION) {if ($EXCEPTION instanceof Error) {} else {throw $EXCEPTION}}'
+    end
   end
 
   describe :irange do

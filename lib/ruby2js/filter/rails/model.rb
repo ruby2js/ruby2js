@@ -16,6 +16,7 @@ module Ruby2JS
           before_destroy after_destroy
           after_commit
           after_create_commit after_update_commit after_destroy_commit after_save_commit
+          after_touch
         ].freeze
 
         # Turbo broadcast methods
@@ -1016,7 +1017,7 @@ module Ruby2JS
             # Skip DSL declarations (already collected)
             if child.type == :send && child.children[0].nil?
               method = child.children[1]
-              next if %i[has_many has_one belongs_to validates scope broadcasts_to has_one_attached has_many_attached enum include].include?(method)
+              next if %i[has_many has_one belongs_to validates scope broadcasts_to has_one_attached has_many_attached has_rich_text store enum include].include?(method)
               next if CALLBACKS.include?(method)
             end
 

@@ -1883,6 +1883,15 @@ module Ruby2JS
            node.children[0] == s(:const, nil, :JSON) &&
            node.children[1] == :ParserError
           s(:const, nil, :SyntaxError)
+
+        # StandardError => Error (Ruby's base exception maps to JS Error)
+        elsif node.children[0].nil? && node.children[1] == :StandardError
+          s(:const, nil, :Error)
+
+        # RuntimeError => Error
+        elsif node.children[0].nil? && node.children[1] == :RuntimeError
+          s(:const, nil, :Error)
+
         else
           super
         end
