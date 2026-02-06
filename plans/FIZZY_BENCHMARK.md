@@ -60,6 +60,24 @@ ActiveSupport::Concern modules are now handled at the AST level by a dedicated R
 
 This fixed several ejected output bugs: `prototype is not defined` in concern modules, `#field` syntax errors in object literals, and circular reference errors from namespace assignments.
 
+### Enum Transpilation (New)
+
+Rails `enum` declarations are now fully transpiled by the model filter:
+
+- **Frozen values constant** — `Export.statuses = Object.freeze({drafted: "drafted", ...})`
+- **Instance predicate methods** — `get drafted() { return this.status === "drafted" }`
+- **Static scope methods** — `static drafted() { return this.where({status: "drafted"}) }`
+- **Inline transforms** — `record.drafted?` → `record.drafted`, `record.published!` → `record.update({status: "published"})`
+- **Options** — `prefix:`, `scopes: false`, explicit hash overrides
+
+### URL Helpers (New)
+
+`include Rails.application.routes.url_helpers` is now recognized in both model and non-model classes:
+
+- **Strips the include** — Prevents the crashing `Object.defineProperties(... url_helpers)` pattern
+- **Generates import** — `import { polymorphic_url, polymorphic_path } from "ruby2js-rails/url_helpers.mjs"`
+- **Runtime module** — `polymorphic_url(record)` resolves model instances to URL paths via `constructor.tableName` + `id`
+
 ### Other Fixes This Round
 
 - **Module converter IIFE getter return** — Getter bodies in the IIFE path were missing `return` statements; fixed by adding `autoreturn` wrapping
@@ -81,17 +99,15 @@ The frontier has shifted from **"does it transpile?"** to **"does it run?"**
 
 All 188 test files currently fail, cascading from a small set of root errors in the models index (which eagerly imports every model — one failure breaks all tests):
 
-| Root Error | Impact | Category |
-|-----------|--------|----------|
-| `Webhook.has_secure_token` is not a function | Cascades widely via model index | ActiveRecord adapter gap |
-| `[...].index_by` is not a function | 2 models (Card::Statuses, Identity::AccessToken) | Ruby Array method not polyfilled |
-| `Color is not defined` | Column::Colored concern | Missing import for constant reference |
-| `Attachments is not defined` | 2 models | Missing import |
-| `url_helpers` undefined | 2 models (Webhook::Delivery) | Rails.application.routes stub incomplete |
-| `SearchTestHelper` not defined | 3 test files | Test helper not imported |
-| Broken view import paths | 5 controllers/views | `m_a_x__u_n_r_e_a_d_...`, `_partials.js` |
+| Root Error | Count | Category |
+|-----------|-------|----------|
+| `StandardError is not defined` | 2 | Ruby exception class needs global stub |
+| `has_rich_text` is not a function | 2 | ActionText adapter not implemented |
+| `SearchTestHelper` not defined | 3 | Test helper not imported |
+| Broken view import paths | 4 | `_partials.js`, nested partial resolution |
+| Mangled constant name | 1 | `m_a_x__u_n_r_e_a_d__n_o_t_i_f_i_c_a_t_i_o_n_s` |
 
-**Key insight:** These are all runtime/adapter gaps, not transpilation issues. The generated JavaScript is syntactically correct. Fixing `has_secure_token` (a no-op static method on the ActiveRecord base class) would likely unblock the majority of test files.
+**Key insight:** These are all runtime/adapter gaps, not transpilation issues. The generated JavaScript is syntactically correct. The `StandardError` stub (mapping to JS `Error`) would likely unblock the majority of test files.
 
 ### Infrastructure Adapters
 
@@ -99,12 +115,17 @@ Rails infrastructure that needs JavaScript equivalents:
 
 | Adapter | Approach | Status |
 |---------|----------|--------|
-| `has_secure_token` | Static no-op on ActiveRecord base | Missing from adapter — highest impact fix |
-| `index_by` | Array prototype extension | Missing polyfill |
+| `has_secure_token` | Static no-op on ActiveRecord base | Done — stub in adapter |
+| `normalizes` | Static class method | Done — stub in adapter |
+| `serialize` | Static class method | Done — stub in adapter |
+| `index_by` | ActiveSupport filter transpilation | Done — transpiles to JS equivalent |
+| `enum` | Rails model filter | Done — predicates, scopes, frozen values |
+| `url_helpers` | Model filter + runtime module | Done — strips include, imports polymorphic_url/path |
+| `StandardError` | Global stub mapping to Error | Needed — 2 models reference it |
 | CurrentAttributes | AsyncLocalStorage | `with()` now escapes to `$with()` (reserved word fix). Need adapter integration with request lifecycle. |
 | ActionMailer | nodemailer | Not started. `deliver_later` → async delivery, mailer view rendering. |
 | Background Jobs | Event loop | Fizzy's jobs are simple method calls. `perform_later` → `queueMicrotask`. No queue infrastructure needed. |
-| ActionText | TBD | `has_rich_text` needs a storage/rendering adapter |
+| ActionText | TBD | `has_rich_text` needs a storage/rendering adapter — 2 models use it |
 | ActiveStorage | Direct S3 or local | File uploads, image variants |
 
 ### Functional Validation
@@ -158,7 +179,7 @@ The eject command transforms all Ruby source files, writes JavaScript to `ejecte
 
 | Category | Patterns |
 |----------|----------|
-| Models | belongs_to, has_many, has_one, validations, scopes, callbacks, enums, normalizes |
+| Models | belongs_to, has_many, has_one, validations, scopes, callbacks, enums (predicates + scopes + inline transforms), normalizes, url_helpers (polymorphic_url/path) |
 | Controllers | RESTful CRUD, before_action, respond_to, strong params (.expect syntax) |
 | Views | ERB, partials, form helpers, Turbo Streams |
 | JavaScript | Stimulus controllers, Turbo, @rails/request.js |
@@ -210,4 +231,14 @@ Key insights from the transpilation effort:
 
 7. **Every fix benefits all users.** Bugs found via Fizzy were fixed in core Ruby2JS, improving transpilation for all applications.
 
-8. **Cascading failures mask progress.** All 188 test files fail, but from only ~7 distinct root causes. The models index eagerly imports every model; one failure (e.g., `has_secure_token` not implemented) cascades to everything. Fixing a handful of adapter gaps would likely unblock the majority of tests.
+8. **Cascading failures mask progress.** All 188 test files fail, but from only ~12 distinct root causes (down from ~7 categories with more items each). The models index eagerly imports every model; one failure cascades to everything. Fixing a handful of adapter gaps would likely unblock the majority of tests.
+
+9. **Rails DSL transpilation is tractable.** `enum`, `scope`, `has_secure_token`, `normalizes`, `serialize`, `include url_helpers` — each is a distinct DSL pattern, but they all follow the same approach: detect in metadata collection, skip in body transform, generate equivalent JS. The pattern is repeatable.
+
+10. **Ruby→JS filter code requires careful idiom choices.** Filter code (Ruby) must also work when transpiled to JS for selfhost. Key traps: `hash.each { |k,v| }` fails on plain JS objects (use `hash.keys.each`), `concat` returns a new array in JS (use `push` in a loop), and `each_with_index.map.to_h` chains don't transpile (use explicit loops).
+
+---
+
+## Next Phase: External Annotations
+
+When runtime adapters are substantially complete and type disambiguation becomes the bottleneck, see [EXTERNAL_ANNOTATIONS.md](./EXTERNAL_ANNOTATIONS.md) for the plan to support **RBS files** (type information) and **ruby2js.yml directives** (method-level skip/semantic overrides) as external overlays — enabling transpilation of unmodified Rails applications.
