@@ -178,11 +178,41 @@ Dozens of earlier transpilation bugs were also fixed (ERB comments, nested param
 
 The frontier has shifted from **"does it transpile?"** to **"does it run?"**
 
-### Current Status: 1/747 Tests Passing
+### Current Status: 38/747 Tests Passing
 
-All 33 migrations now run successfully. The cascade of model-loading errors has been broken. Test failures are now at the model/controller logic level — real test assertions failing, not infrastructure crashes.
+All 33 migrations run successfully. Test infrastructure (fixtures, stubs, globals) is now functional. The frontier is model/controller business logic.
 
-**Breakdown:** 188 test files, 747 individual tests. 1 passing (account slug test), 746 failing from model-level issues (e.g. `find_by` expects hash conditions but `CollectionProxy.find_by` treats argument as a function predicate).
+**Breakdown:** 188 test files, 747 individual tests. 38 passing (34 model + 4 controller). The remaining 709 failures are ORM features (association proxies, collection queries), transpilation gaps (missing `self.` receivers, `$with` escaping), and mock framework behavior.
+
+### Fixture Resolution (New)
+
+Rails fixture loading auto-resolves association references. Implemented matching behavior:
+
+| Feature | Details |
+|---------|---------|
+| UUID v5 generation | `fixtureIdentifyUUID(label)` matches Rails' `FixtureSet.identify(label, :uuid)` using OID namespace |
+| `_uuid` suffix stripping | `board: writebook_uuid` → strips `_uuid`, looks up `writebook` in `boards` fixtures |
+| Association `_id` suffixing | `board: writebook_uuid` → `board_id: <resolved_uuid>` (appends `_id` for FK columns) |
+| Convention-based FK inference | If `pluralize(col)` matches a fixture table, treat as FK even without explicit `belongs_to` |
+| Association map via `new Function()` | Parses `static associations = {...}` from JS model files using brace-balanced extraction + evaluation |
+| Transitive dependency resolution | Fixture references are followed transitively to ensure all dependent fixtures are created |
+| Topological sorting | Fixtures are created in dependency order (accounts before users, users before cards) |
+
+### Test Infrastructure (New)
+
+| Feature | Details |
+|---------|---------|
+| Global model exposure | All exported models available as globals (Rails autoloading behavior) |
+| Model namespace nesting | `Search.Highlighter`, `ZipFile.Writer`, `Storage.Entry` — nested classes attached to parent |
+| `CurrentAttributes` functional | `attribute()` creates static getter/setters, `$with()` saves/restores, instance methods promoted to static |
+| `beforeEach` variable hoisting | `let x = ...` inside `beforeEach` → hoisted to describe scope (Rails `setup` → JS scoping fix) |
+| `assert_difference` / `assert_changes` | Functional stubs with `::` → `.` conversion for Ruby namespace syntax |
+| Mock/stub framework | `mock()`, `stub()`, `.stubs()`, `.expects()`, `.returns()`, `.yields()` — Mocha-compatible |
+| `Object.prototype.stubs/expects` | All objects support Mocha-style mocking via prototype extension |
+| Time helpers | `freeze_time`, `travel_to`, `travel_back` — pass-through stubs |
+| Job helpers | `perform_enqueued_jobs`, `assert_enqueued_with` — pass-through stubs |
+| IO/Net stubs | `StringIO`, `Tempfile`, `Net.HTTP`, `Resolv.DNS` — minimal stubs |
+| Turbo helpers | `assert_turbo_stream_broadcasts` — no-op stub |
 
 ### Migration Filter Improvements
 
@@ -209,14 +239,20 @@ The migration filter (`lib/ruby2js/filter/rails/migration.rb`) now handles sever
 
 ### Runtime Issues (Next Phase)
 
-The remaining 746 test failures are model/controller-level issues, not migration or loading problems:
+The remaining 709 test failures cluster into distinct categories:
 
-| Category | Description |
-|----------|-------------|
-| `find_by` with hash conditions | `CollectionProxy.find_by` treats arg as function, not conditions hash |
-| `ActionController` not defined | Controller test globals need expansion |
-| Association query methods | Complex queries via associations need ORM query builder work |
-| Test helper imports | `SearchTestHelper`, `CardActivityTestHelper` not imported |
+| Category | Count | Description |
+|----------|-------|-------------|
+| Association proxy `.create()` | 35 | `board.cards.create(...)` — CollectionProxy needs `.create()` method |
+| Bare `create` in models | 21 | Model methods call `create(...)` without `self.` prefix |
+| Hook timeouts | 27 | Mock framework `yields()` doesn't invoke callbacks |
+| Missing model methods | ~35 | `.access_for`, `.cancel`, `.filters`, `.ago`, `.attach` — business logic |
+| `expected undefined` | ~35 | ORM returns undefined instead of null/value (getter/query gaps) |
+| `#private` setter errors | 11 | ZipFile uses `#streamer` private field in module context |
+| `no such column: description` | 8 | ActionText `has_rich_text` creates virtual column |
+| `$with` not defined | 6 | Ruby `with()` → `$with()` escaping needs global availability |
+| Controller tests (`sign_in_as`) | 212 | Full HTTP session flow — needs controller test adapter |
+| Remaining misc | ~30 | Various transpilation and runtime gaps |
 
 ### Infrastructure Adapters
 
@@ -376,6 +412,16 @@ Key insights from the transpilation effort:
 15. **Vite intercepts `node:` built-in imports.** Dynamic `import('node:sqlite')` in Vitest gets resolved as bare `'sqlite'` by Vite's module system. Neither `server.deps.external` nor `ssr.external` configuration prevents this. The workaround: `createRequire` from `node:module` bypasses Vite's module interception entirely. This is a known footgun when using Node built-ins in Vite-based test runners.
 
 16. **SQLite DROP COLUMN requires index cleanup.** Unlike PostgreSQL/MySQL, SQLite fails on `ALTER TABLE ... DROP COLUMN` if any index references the column. Rails handles this automatically; the built-in SQLite adapter must query `sqlite_master` for referencing indexes and drop them before the column removal.
+
+17. **Rails fixtures use convention over configuration for FK resolution.** A fixture column `board: writebook_uuid` auto-resolves to `board_id: <uuid>` even without an explicit `belongs_to :board` declaration. Rails checks if `board_id` exists in the schema and pluralizes the column name to find the fixture table. The eject tool replicates this with `inferTargetTable()` — check the association map first, then fall back to `pluralize(col)` matching fixture tables.
+
+18. **UUID v5 generation must match Rails exactly.** Rails' `FixtureSet.identify(label, :uuid)` uses the OID namespace (`6ba7b812-9dad-11d1-80b4-00c04fd430c8`) with SHA-1 hashing. The JS implementation must set version 5 bits (`hash[6] = (hash[6] & 0x0f) | 0x50`) and variant bits (`hash[8] = (hash[8] & 0x3f) | 0x80`) identically, or fixture cross-references break.
+
+19. **`new Function()` beats regex for parsing JS object literals.** The `static associations = {...}` blocks in ejected model files are valid JS object literals we just generated. Extracting with brace-balanced substring + `new Function('return ' + literal)()` is more robust than nested regex matching and handles any valid JS syntax.
+
+20. **Rails autoloading makes every model globally available.** Tests reference `Current`, `Search`, `ZipFile` without imports because Rails autoloads them. The eject test setup must expose all models as globals after import. Similarly, `ZipFile::Writer` (nested class) needs `ZipFile.Writer = Writer` — generated from the directory structure (`zip_file/writer.js`).
+
+21. **`let` inside `beforeEach` is invisible to tests.** Ruby's `setup do @x = ... end` creates instance variables accessible everywhere. After transpilation, `let x = ...` inside `beforeEach(() => {...})` is block-scoped. The hoisting transform must extract `let` declarations to the enclosing `describe` scope using brace-balanced parsing, not simple regex.
 
 ---
 

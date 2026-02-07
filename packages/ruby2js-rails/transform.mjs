@@ -751,6 +751,26 @@ export function generateModelsModuleForEject(appRoot, config = {}) {
     return `import { ${alias} } from './${m}.js';`;
   });
   const classNames = models.map(m => modelClassName(m, collisions));
+
+  // Build nesting map: models in subdirectories nest under parent model
+  // e.g., search/highlighter -> Search.Highlighter
+  const nestingPairs = [];
+  for (const m of models) {
+    const parts = m.split('/');
+    if (parts.length >= 2) {
+      const parentPath = parts.slice(0, -1).join('/');
+      const parentName = modelClassName(parentPath, collisions);
+      const childName = modelClassName(m, collisions);
+      // Only nest if parent model exists
+      if (models.includes(parentPath)) {
+        nestingPairs.push(`["${parentName}", "${childName}"]`);
+      }
+    }
+  }
+  const nestingCode = nestingPairs.length > 0
+    ? `\n// Model nesting for Ruby namespace resolution (e.g., Search::Highlighter -> Search.Highlighter)\nglobalThis._modelNesting = [${nestingPairs.join(', ')}];\n`
+    : '';
+
   return `${imports.join('\n')}
 import { Application } from '${railsModule}';
 import { modelRegistry, attr_accessor } from 'ruby2js-rails/adapters/${adapterFile}';
@@ -769,7 +789,7 @@ for (const migration of migrations) {
     attr_accessor(model, ...columns);
   }
 }
-
+${nestingCode}
 export { ${classNames.join(', ')} };
 `;
 }
@@ -863,7 +883,26 @@ import { beforeAll, beforeEach } from 'vitest';
 
 beforeAll(async () => {
   // Import models (registers them with Application and modelRegistry)
-  await import('../app/models/index.js');
+  const models = await import('../app/models/index.js');
+
+  // Make all models globally available (Rails autoloads all models)
+  // Also detect nested model patterns (e.g. ZipFile + Writer -> ZipFile.Writer)
+  const modelNames = Object.keys(models);
+  for (const [name, value] of Object.entries(models)) {
+    if (typeof value === 'function' || typeof value === 'object') {
+      globalThis[name] = value;
+    }
+  }
+  // Attach nested classes to parent namespaces (generated from model paths)
+  // e.g., Search.Highlighter = Highlighter, ZipFile.Writer = Writer
+  const _nesting = (globalThis._modelNesting || []);
+  for (const [parent, child] of _nesting) {
+    if (globalThis[parent] && globalThis[child]) {
+      globalThis[parent][child] = globalThis[child];
+    }
+  }
+  // Promote CurrentAttributes instance methods to static on Current
+  if (globalThis.Current?._promoteInstanceMethods) Current._promoteInstanceMethods();
 
   // Configure migrations
   const { Application } = await import('${railsModule}');
@@ -908,7 +947,35 @@ globalThis.extend = function(target) {
 globalThis.ActiveSupport = {
   Concern: {},
   CurrentAttributes: class CurrentAttributes {
-    static attribute() {} // no-op: Rails current attributes declaration
+    static _attributes = {};
+    static attribute(...names) {
+      for (const name of names) {
+        if (!(name in this)) {
+          Object.defineProperty(this, name, {
+            get() { return this._attributes[name]; },
+            set(v) { this._attributes[name] = v; },
+            configurable: true
+          });
+        }
+      }
+    }
+    static reset() { this._attributes = {}; }
+    static $with(attrs, fn) {
+      const prev = { ...this._attributes };
+      Object.assign(this._attributes, attrs);
+      try { return fn?.(); } finally { this._attributes = prev; }
+    }
+    // Promote instance methods to static on subclasses
+    static _promoteInstanceMethods() {
+      const proto = this.prototype;
+      for (const name of Object.getOwnPropertyNames(proto)) {
+        if (name === 'constructor') continue;
+        const desc = Object.getOwnPropertyDescriptor(proto, name);
+        if (desc && typeof desc.value === 'function' && !(name in this)) {
+          this[name] = desc.value.bind(this);
+        }
+      }
+    }
   }
 };
 
@@ -1128,6 +1195,177 @@ globalThis.ActionView = {
     }
   }
 };
+
+// --- Rails test helper stubs ---
+
+// assert_difference(expression, difference, fn) - verify a numeric change
+globalThis.assert_difference = async function(expr, diff, fn) {
+  if (typeof diff === 'function') { fn = diff; diff = 1; }
+  const evalExpr = (e) => typeof e === 'function' ? e() : eval(e.replace(/::/g, '.'));
+  const before = await evalExpr(expr);
+  await fn();
+  const after = await evalExpr(expr);
+  const { expect } = await import('vitest');
+  expect(after - before).toBe(diff);
+};
+
+// assert_no_difference(expression, fn)
+globalThis.assert_no_difference = async function(expr, fn) {
+  return assert_difference(expr, 0, fn);
+};
+
+// assert_changes(expression, opts_or_fn, fn) - verify a value change
+globalThis.assert_changes = async function(expr, ...args) {
+  let fn = args.pop();
+  const evalExpr = (e) => typeof e === 'function' ? e() : eval(e.replace(/::/g, '.'));
+  const before = await evalExpr(expr);
+  await fn();
+  const after = await evalExpr(expr);
+  const { expect } = await import('vitest');
+  expect(after).not.toEqual(before);
+};
+
+// assert_no_changes(expression, fn)
+globalThis.assert_no_changes = async function(expr, fn) {
+  const evalExpr = (e) => typeof e === 'function' ? e() : eval(e.replace(/::/g, '.'));
+  const before = await evalExpr(expr);
+  await fn();
+  const after = await evalExpr(expr);
+  const { expect } = await import('vitest');
+  expect(after).toEqual(before);
+};
+
+// mock()/stub() - Minitest/Mocha mock+stub framework
+function _createStubChain(returnVal) {
+  const chain = {
+    _returnVal: returnVal,
+    _yieldFn: null,
+    _multiYields: null,
+    returns(val) { chain._returnVal = val; return chain; },
+    yields(...args) { chain._yieldFn = args; return chain; },
+    multiple_yields(...args) { chain._multiYields = args; return chain; },
+    with(...args) { return chain; },
+    once() { return chain; },
+    twice() { return chain; },
+    at_least_once() { return chain; },
+    never() { return chain; },
+    then() { return chain; }
+  };
+  return chain;
+}
+
+globalThis.mock = function(name) {
+  const obj = {
+    _name: name || 'mock',
+    stubs(method) { return _createStubChain(undefined); },
+    expects(method) { return _createStubChain(undefined); },
+    verify() { return true; }
+  };
+  return new Proxy(obj, {
+    get(target, prop) {
+      if (prop in target) return target[prop];
+      return function() { return undefined; };
+    }
+  });
+};
+
+globalThis.stub = function(attrs) {
+  if (attrs && typeof attrs === 'object') {
+    const obj = { ...attrs };
+    obj.stubs = function(method) { return _createStubChain(undefined); };
+    obj.expects = function(method) { return _createStubChain(undefined); };
+    return obj;
+  }
+  return _createStubChain(undefined);
+};
+
+// Add stubs/expects to all objects and classes for Mocha-style mocking
+if (!Object.prototype.stubs) {
+  Object.defineProperty(Object.prototype, 'stubs', {
+    value: function(method) { return _createStubChain(undefined); },
+    writable: true, configurable: true, enumerable: false
+  });
+}
+if (!Object.prototype.expects) {
+  Object.defineProperty(Object.prototype, 'expects', {
+    value: function(method) { return _createStubChain(undefined); },
+    writable: true, configurable: true, enumerable: false
+  });
+}
+
+// stub_request - WebMock-style HTTP stubbing
+globalThis.stub_request = function(method, url) {
+  return _createStubChain({ code: '200', body: '' });
+};
+globalThis.assert_requested = function(stub) { /* no-op */ };
+
+// freeze_time / travel_to / travel_back - time helpers (no-op stubs)
+globalThis.freeze_time = async function(fn) { if (fn) await fn(); };
+globalThis.travel_to = async function(time, fn) { if (fn) await fn(); };
+globalThis.travel_back = function() {};
+
+// perform_enqueued_jobs - ActiveJob test helper (runs block immediately)
+globalThis.perform_enqueued_jobs = async function(fn) { if (fn) await fn(); };
+
+// file_fixture - Rails test file fixture (stub)
+globalThis.file_fixture = function(name) {
+  return {
+    read() { return ''; },
+    path: name,
+    toString() { return name; }
+  };
+};
+
+// Tempfile stub
+globalThis.Tempfile = class Tempfile {
+  constructor(args) {
+    this._name = Array.isArray(args) ? args[0] : args;
+    this._content = '';
+  }
+  write(data) { this._content += data; }
+  rewind() {}
+  read() { return this._content; }
+  close() {}
+  unlink() {}
+  get path() { return '/tmp/' + this._name; }
+};
+
+// StringIO stub - Ruby stdlib in-memory IO
+globalThis.StringIO = class StringIO {
+  constructor(str) { this._str = str || ''; this._pos = 0; }
+  write(data) { this._str += data; return data.length; }
+  read() { return this._str; }
+  rewind() { this._pos = 0; }
+  string() { return this._str; }
+  toString() { return this._str; }
+};
+
+// Net namespace - Ruby stdlib networking
+globalThis.Net = {
+  HTTP: Object.assign(function() {}, {
+    get(url) { return ''; },
+    post(url, body) { return ''; },
+    new(...args) { return mock('http'); },
+    start(...args) { return mock('http'); }
+  })
+};
+
+// Resolv namespace - Ruby stdlib DNS resolution
+globalThis.Resolv = {
+  DNS: Object.assign(function() {}, {
+    open(...args) { return []; },
+    new() { return { getaddress() { return '127.0.0.1'; } }; }
+  })
+};
+
+// assert_turbo_stream_broadcasts - Turbo test helper (no-op)
+globalThis.assert_turbo_stream_broadcasts = function() {};
+globalThis.assert_no_turbo_stream_broadcasts = function() {};
+
+// ActiveJob test helpers
+globalThis.assert_enqueued_with = function() {};
+globalThis.assert_enqueued_jobs = function(count, fn) { if (fn) return fn(); };
+globalThis.assert_no_enqueued_jobs = function(fn) { if (fn) return fn(); };
 `;
 }
 

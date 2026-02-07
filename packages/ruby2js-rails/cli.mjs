@@ -18,6 +18,7 @@ import { spawn, spawnSync, execSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, chmodSync, readdirSync, copyFileSync, cpSync, statSync } from 'fs';
 import { join, basename, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
 
 // Import shared transformation logic
 import {
@@ -220,6 +221,46 @@ function findRubyTestFiles(dir) {
 }
 
 /**
+ * Generate a deterministic UUID v5 from a fixture label, matching Rails'
+ * ActiveRecord::FixtureSet.identify(label, :uuid).
+ * Uses the OID namespace (6ba7b812-9dad-11d1-80b4-00c04fd430c8) per Rails source.
+ */
+function fixtureIdentifyUUID(label) {
+  // OID namespace UUID as bytes
+  const ns = Buffer.from('6ba7b8129dad11d180b400c04fd430c8', 'hex');
+  const name = Buffer.from(String(label), 'utf-8');
+  const hash = createHash('sha1').update(Buffer.concat([ns, name])).digest();
+
+  // Set version 5 (byte 6 high nibble)
+  hash[6] = (hash[6] & 0x0f) | 0x50;
+  // Set variant RFC 4122 (byte 8 high bits = 10)
+  hash[8] = (hash[8] & 0x3f) | 0x80;
+
+  const hex = hash.toString('hex');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`;
+}
+
+/**
+ * Resolve a fixture reference value, stripping the _uuid suffix used by
+ * Rails' UUID fixture convention. E.g., "writebook_uuid" -> "writebook".
+ * Returns { fixtureName, isUuid } or null if not resolvable.
+ */
+function resolveFixtureRef(value, targetTable, fixtures) {
+  // Direct match
+  if (fixtures[targetTable]?.[value]) {
+    return { fixtureName: value, isUuid: false };
+  }
+  // Strip _uuid suffix (Rails convention for UUID FK references)
+  if (value.endsWith('_uuid')) {
+    const stripped = value.slice(0, -5);
+    if (fixtures[targetTable]?.[stripped]) {
+      return { fixtureName: stripped, isUuid: true };
+    }
+  }
+  return null;
+}
+
+/**
  * Parse all fixture YAML files from test/fixtures/.
  * Returns a map: { table_name: { fixture_name: { column: value, ... }, ... }, ... }
  */
@@ -245,6 +286,12 @@ function parseFixtureFiles(appRoot) {
 
       const parsed = yaml.load(content);
       if (parsed && typeof parsed === 'object') {
+        // Generate deterministic UUIDs for fixture IDs (replaces stripped ERB)
+        for (const [fixtureName, data] of Object.entries(parsed)) {
+          if (data && typeof data === 'object' && (!data.id || data.id === '')) {
+            data.id = fixtureIdentifyUUID(fixtureName);
+          }
+        }
         fixtures[tableName] = parsed;
       }
     } catch (err) {
@@ -271,22 +318,47 @@ function buildAssociationMap(modelsDir) {
   for (const file of modelFiles) {
     try {
       const content = readFileSync(join(modelsDir, file), 'utf-8');
-      // Match: ModelName.associations = {key: {type: "belongs_to", model: "ModelName"}, ...}
-      const match = content.match(/(\w+)\.associations\s*=\s*(\{[^}]+(?:\{[^}]*\}[^}]*)*\})/);
-      if (match) {
-        const className = match[1];
-        const tableName = underscore(pluralize(className));
 
-        // Parse the associations object (simplified — extract key: {model: "X"} pairs)
-        const assocStr = match[2];
-        const assocRegex = /(\w+):\s*\{[^}]*model:\s*"(\w+)"/g;
-        let assocMatch;
+      // Extract class name
+      const classMatch = content.match(/(?:export\s+)?class\s+(\w+)/);
+      if (!classMatch) continue;
+      const className = classMatch[1];
+
+      // Find the associations object literal by locating the marker and
+      // extracting the balanced braces that follow it
+      const markers = ['static associations = ', `${className}.associations = `];
+      let assocObj = null;
+
+      for (const marker of markers) {
+        const idx = content.indexOf(marker);
+        if (idx === -1) continue;
+
+        const braceStart = content.indexOf('{', idx + marker.length);
+        if (braceStart === -1) continue;
+
+        // Walk forward counting braces to find the matching close
+        let depth = 0;
+        let end = -1;
+        for (let i = braceStart; i < content.length; i++) {
+          if (content[i] === '{') depth++;
+          else if (content[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+        }
+        if (end === -1) continue;
+
+        const literal = content.slice(braceStart, end + 1);
+        try {
+          assocObj = new Function('return ' + literal)();
+        } catch { /* skip malformed */ }
+        if (assocObj) break;
+      }
+
+      if (assocObj) {
+        const tableName = underscore(pluralize(className));
         const tableAssocs = {};
-        while ((assocMatch = assocRegex.exec(assocStr)) !== null) {
-          const assocName = assocMatch[1];
-          const targetModel = assocMatch[2];
-          const targetTable = underscore(pluralize(targetModel));
-          tableAssocs[assocName] = targetTable;
+        for (const [assocName, meta] of Object.entries(assocObj)) {
+          if (meta && meta.model) {
+            tableAssocs[assocName] = underscore(pluralize(meta.model));
+          }
         }
         if (Object.keys(tableAssocs).length > 0) {
           assocMap[tableName] = tableAssocs;
@@ -297,6 +369,26 @@ function buildAssociationMap(modelsDir) {
     }
   }
   return assocMap;
+}
+
+/**
+ * Infer the target table for a fixture column.
+ * First checks the association map, then falls back to Rails convention:
+ * if pluralize(col) exists as a fixture table, treat col as a FK reference.
+ * This handles cases like `column: writebook_triage_uuid` where there's no
+ * explicit belongs_to but the DB has a column_id FK.
+ */
+function inferTargetTable(col, table, associationMap, fixtures) {
+  // Check explicit association map first
+  const assocTarget = (associationMap[table] || {})[col];
+  if (assocTarget) return assocTarget;
+
+  // Convention-based: pluralize the column name and check if that table exists in fixtures
+  if (!col.endsWith('_id') && col !== 'id') {
+    const conventionTable = pluralize(col);
+    if (fixtures[conventionTable]) return conventionTable;
+  }
+  return null;
 }
 
 /**
@@ -320,8 +412,8 @@ function topologicalSortTables(referencedTables, fixtures, associationMap) {
           // Explicit ID - no dependency
           continue;
         }
-        // Check if column matches an association
-        const targetTable = tableAssocs[col];
+        // Check if column matches an association (explicit or convention-based)
+        const targetTable = inferTargetTable(col, table, associationMap, fixtures);
         if (targetTable && referencedTables.has(targetTable) && typeof value === 'string') {
           deps[table].add(targetTable);
         }
@@ -399,14 +491,16 @@ function inlineFixtures(code, fixtures, associationMap) {
     const fixtureData = fixtures[table]?.[fixture];
     if (!fixtureData || typeof fixtureData !== 'object') continue;
 
-    const tableAssocs = associationMap[table] || {};
     for (const [col, value] of Object.entries(fixtureData)) {
-      const targetTable = tableAssocs[col];
-      if (targetTable && typeof value === 'string' && fixtures[targetTable]?.[value]) {
-        const key = `${targetTable}_${value}`;
-        if (!allFixtures.has(key)) {
-          allFixtures.set(key, { table: targetTable, fixture: value });
-          toResolve.push({ table: targetTable, fixture: value });
+      const targetTable = inferTargetTable(col, table, associationMap, fixtures);
+      if (targetTable && typeof value === 'string') {
+        const ref = resolveFixtureRef(value, targetTable, fixtures);
+        if (ref) {
+          const key = `${targetTable}_${ref.fixtureName}`;
+          if (!allFixtures.has(key)) {
+            allFixtures.set(key, { table: targetTable, fixture: ref.fixtureName });
+            toResolve.push({ table: targetTable, fixture: ref.fixtureName });
+          }
         }
       }
     }
@@ -428,15 +522,23 @@ function inlineFixtures(code, fixtures, associationMap) {
 
       const key = `${table}_${fixture}`;
       const modelName = camelize(singularize(table));
-      const tableAssocs = associationMap[table] || {};
 
       // Build create attributes
       const attrs = [];
       for (const [col, value] of Object.entries(fixtureData)) {
-        const targetTable = tableAssocs[col];
-        if (targetTable && typeof value === 'string' && allFixtures.has(`${targetTable}_${value}`)) {
-          // Foreign key reference - use _fixtures ref
-          attrs.push(`${col}_id: _fixtures.${targetTable}_${value}.id`);
+        const targetTable = inferTargetTable(col, table, associationMap, fixtures);
+        if (targetTable && typeof value === 'string') {
+          const ref = resolveFixtureRef(value, targetTable, fixtures);
+          if (ref && allFixtures.has(`${targetTable}_${ref.fixtureName}`)) {
+            // Foreign key reference - use _fixtures ref
+            attrs.push(`${col}_id: _fixtures.${targetTable}_${ref.fixtureName}.id`);
+          } else if (ref) {
+            // Known fixture but not in allFixtures - use generated UUID
+            attrs.push(`${col}_id: ${JSON.stringify(fixtureIdentifyUUID(ref.fixtureName))}`);
+          } else {
+            // Association column with unresolvable value - still use _id suffix
+            attrs.push(`${col}_id: ${JSON.stringify(value)}`);
+          }
         } else if (col.endsWith('_id') || col === 'id') {
           // Explicit ID
           attrs.push(`${col}: ${JSON.stringify(value)}`);
@@ -735,21 +837,44 @@ function addControllerImportsVirtual(code) {
  *   let article; beforeEach(async () => { article = expr });
  */
 function hoistBeforeEachVars(code) {
-  // Match: beforeEach(async () => { ... }) blocks containing let declarations
-  // Look for the pattern: beforeEach(async () => {\n  let var = expr\n});
-  // This handles single and multiple let declarations inside beforeEach
-  return code.replace(
-    /beforeEach\(async \(\) => \{([^}]*)\}\)/g,
-    (match, body) => {
-      const hoisted = [];
-      const newBody = body.replace(/\n(\s*)let (\w+)( = [^;\n]+)/g, (m, indent, name, assignment) => {
-        hoisted.push(`let ${name};`);
-        return `\n${indent}${name}${assignment}`;
-      });
-      if (hoisted.length === 0) return match;
-      return hoisted.join('\n') + '\n' + `beforeEach(async () => {${newBody}})`;
+  // Find all beforeEach blocks using brace matching, then hoist let declarations
+  const marker = 'beforeEach(async () => {';
+  let result = code;
+  let searchFrom = 0;
+
+  while (true) {
+    const idx = result.indexOf(marker, searchFrom);
+    if (idx === -1) break;
+
+    const braceStart = idx + marker.length - 1; // position of opening {
+    let depth = 1;
+    let end = -1;
+    for (let i = braceStart + 1; i < result.length; i++) {
+      if (result[i] === '{') depth++;
+      else if (result[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
     }
-  );
+    if (end === -1) break;
+
+    // Extract body between braces
+    const body = result.slice(braceStart + 1, end);
+    const hoisted = [];
+    const newBody = body.replace(/\n(\s*)let (\w+)( = [^;\n]+)/g, (m, indent, name, assignment) => {
+      hoisted.push(`let ${name};`);
+      return `\n${indent}${name}${assignment}`;
+    });
+
+    if (hoisted.length > 0) {
+      const replacement = hoisted.join('\n') + '\n' + marker + newBody + '})';
+      // Find the closing ");" or ")" after the block
+      const afterBlock = result.indexOf(')', end + 1);
+      const replaceEnd = afterBlock !== -1 ? afterBlock + 1 : end + 2;
+      result = result.slice(0, idx) + replacement + result.slice(replaceEnd);
+      searchFrom = idx + replacement.length;
+    } else {
+      searchFrom = end + 1;
+    }
+  }
+  return result;
 }
 
 /**
@@ -2092,6 +2217,9 @@ async function runEject(options) {
               code = inlineFixtures(code, fixtures, associationMap);
             }
 
+            // Hoist let declarations from beforeEach to describe scope
+            code = hoistBeforeEachVars(code);
+
             // Add model imports (pass outName for correct relative path depth)
             code = addModelImportsToTest(code, join(outDir, 'app/models'), outName, 2);
 
@@ -2141,6 +2269,9 @@ async function runEject(options) {
             if (Object.keys(ctrlFixtures).length > 0) {
               code = inlineFixtures(code, ctrlFixtures, ctrlAssociationMap);
             }
+
+            // Hoist let declarations from beforeEach to describe scope
+            code = hoistBeforeEachVars(code);
 
             // Add controller, model, and path helper imports (pass outName for correct relative path depth)
             code = addControllerImportsToTest(
