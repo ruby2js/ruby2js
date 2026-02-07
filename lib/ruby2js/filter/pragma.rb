@@ -999,7 +999,10 @@ module Ruby2JS
             return process s(call.type, *call.children, function)
           end
 
-          if pragma?(node, :entries) && call.type == :send
+          if call.type == :send &&
+            (pragma?(node, :entries) ||
+             var_type(call.children[0]) == :hash ||
+             infer_type(call.children[0]) == :hash)
           target, method = call.children[0], call.children[1]
 
           if [:each, :each_pair].include?(method) && target
@@ -1022,8 +1025,8 @@ module Ruby2JS
               body
             )
 
-          elsif method == :map && target
-            # Transform: hash.map { |k,v| expr }
+          elsif [:map, :collect].include?(method) && target
+            # Transform: hash.map { |k,v| expr } or hash.collect { |k,v| expr }
             # Into: Object.entries(hash).map(([k,v]) => expr)
             entries_call = s(:send,
               s(:const, nil, :Object), :entries, target)
