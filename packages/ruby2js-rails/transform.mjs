@@ -470,11 +470,68 @@ export function fixImportsForEject(js, fromFile, config = {}) {
         if (!importPattern.test(js) && superclassName !== 'ApplicationRecord') {
           // Convert PascalCase to snake_case to find the model file
           const snakeName = superclassName.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
-          if (config.models.includes(snakeName)) {
+          // Try same-namespace path first (e.g., account/data_transfer/record_set for RecordSet
+          // in account/data_transfer/account_record_set.js), then top-level.
+          // Skip self-references (account/export shouldn't import from itself).
+          const currentNamespace = modelRelPath.split('/').slice(0, -1).join('/');
+          const namespacedPath = currentNamespace ? `${currentNamespace}/${snakeName}` : snakeName;
+          if (namespacedPath !== modelRelPath && config.models.includes(namespacedPath)) {
+            const prefix = '../'.repeat(depth);
+            js = `import { ${superclassName} } from '${prefix}${namespacedPath}.js';\n${js}`;
+          } else if (config.models.includes(snakeName)) {
             const prefix = '../'.repeat(depth);
             js = `import { ${superclassName} } from '${prefix}${snakeName}.js';\n${js}`;
           }
         }
+      }
+    }
+  }
+
+  // Handle dotted superclass references from Ruby's :: namespace operator.
+  // Ruby's Account::DataTransfer::RecordSet becomes Account.DataTransfer.RecordSet in JS,
+  // but that's a property chain requiring Account to exist. Instead, resolve the full
+  // namespace path to a direct import of the leaf class.
+  // e.g., extends Account.DataTransfer.RecordSet → import { RecordSet } from './record_set.js'
+  if (fromFile && fromFile.startsWith('app/models/') && config.models) {
+    const dottedMatch = js.match(/class \w+ extends ((\w+\.)+\w+)\s*\{/);
+    if (dottedMatch) {
+      const dottedName = dottedMatch[1]; // e.g., "Account.DataTransfer.RecordSet"
+      const parts = dottedName.split('.'); // ['Account', 'DataTransfer', 'RecordSet']
+      const leafName = parts[parts.length - 1]; // 'RecordSet'
+
+      // Convert PascalCase parts to snake_case path
+      const pathParts = parts.map(p => p.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, ''));
+      const superModelPath = pathParts.join('/'); // 'account/data_transfer/record_set'
+
+      if (config.models.includes(superModelPath)) {
+        // Compute relative path from current file to superclass file
+        const modelRelPath = fromFile.replace('app/models/', '').replace(/\.js$/, '');
+        const currentDir = modelRelPath.split('/').slice(0, -1);
+        const superDir = pathParts.slice(0, -1);
+        const superFile = pathParts[pathParts.length - 1];
+
+        // Find common directory prefix
+        let common = 0;
+        while (common < currentDir.length && common < superDir.length &&
+               currentDir[common] === superDir[common]) {
+          common++;
+        }
+
+        // Build relative path
+        const up = currentDir.length - common;
+        const down = superDir.slice(common);
+        let relativePath;
+        if (up === 0 && down.length === 0) {
+          relativePath = `./${superFile}.js`;
+        } else if (up === 0) {
+          relativePath = `./${[...down, superFile + '.js'].join('/')}`;
+        } else {
+          relativePath = [...Array(up).fill('..'), ...down, superFile + '.js'].join('/');
+        }
+
+        // Replace dotted extends with leaf name and add import
+        js = js.replace(`extends ${dottedName}`, `extends ${leafName}`);
+        js = `import { ${leafName} } from '${relativePath}';\n${js}`;
       }
     }
   }
@@ -689,7 +746,8 @@ export function generatePackageJsonForEject(appName, config = {}) {
   }
 
   // Add database adapter dependency based on config
-  if (config.database === 'sqlite3' || config.database === 'sqlite' || config.database === 'better_sqlite3') {
+  // sqlite/sqlite3 use built-in node:sqlite (no dependency needed)
+  if (config.database === 'better_sqlite3') {
     pkg.dependencies['better-sqlite3'] = '^11.10.0';
   } else if (config.database === 'dexie') {
     pkg.dependencies['dexie'] = '^4.0.0';
@@ -772,6 +830,13 @@ globalThis.Rails = { application: { config: {} } };
 globalThis.ActionMailer = {
   TestHelper: { name: 'ActionMailer.TestHelper' }
 };
+
+// PlatformAgent stub (from platform_agent gem - not available in JS)
+globalThis.PlatformAgent = class PlatformAgent {
+  constructor(userAgent) { this._userAgent = userAgent || ''; }
+  get user_agent() { return { browser: this._userAgent, platform: this._userAgent }; }
+  match(pattern) { return pattern.test(this._userAgent); }
+};
 `;
 }
 
@@ -780,8 +845,8 @@ globalThis.ActionMailer = {
  */
 function getActiveRecordAdapterFile(database) {
   const adapterMap = {
-    'sqlite': 'active_record_better_sqlite3.mjs',
-    'sqlite3': 'active_record_better_sqlite3.mjs',
+    'sqlite': 'active_record_sqlite.mjs',
+    'sqlite3': 'active_record_sqlite.mjs',
     'better_sqlite3': 'active_record_better_sqlite3.mjs',
     'dexie': 'active_record_dexie.mjs',
     'pg': 'active_record_pg.mjs',
@@ -868,13 +933,13 @@ main().catch(console.error);
 export function generateVitestConfigForEject(config = {}) {
   const externals = [];
 
-  // Native modules need to be externalized
-  if (config.database === 'sqlite3') {
+  // Native modules need to be externalized (better_sqlite3 only; built-in sqlite needs nothing)
+  if (config.database === 'better_sqlite3') {
     externals.push('better-sqlite3');
   }
 
-  const externalConfig = externals.length > 0
-    ? `\n  server: {\n    deps: {\n      external: ${JSON.stringify(externals)}\n    }\n  },`
+  const serverDepsConfig = externals.length > 0
+    ? `\n    server: {\n      deps: {\n        external: ${JSON.stringify(externals)}\n      }\n    },`
     : '';
 
   return `import { defineConfig } from 'vitest/config';
@@ -883,11 +948,11 @@ import { dirname, resolve } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig({${externalConfig}
+export default defineConfig({
   test: {
     root: __dirname,
     globals: true,
-    environment: 'node',
+    environment: 'node',${serverDepsConfig}
     include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
     setupFiles: [resolve(__dirname, 'test/globals.mjs'), resolve(__dirname, 'test/setup.mjs')]
   }
