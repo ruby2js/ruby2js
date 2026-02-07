@@ -69,12 +69,21 @@ module Ruby2JS
           return unless body
 
           children = body.type == :begin ? body.children : [body]
+          @migration_constants = {}
 
           children.each do |child|
             next unless child
 
+            # Collect constant assignments: CONST = %w[...] or CONST = [...]
+            if child.type == :casgn
+              const_name = child.children[1]
+              const_value = child.children[2]
+              if const_value&.type == :array
+                values = const_value.children.map { |c| extract_string_value(c) }.compact
+                @migration_constants[const_name] = values
+              end
             # Look for def change or def up
-            if child.type == :def
+            elsif child.type == :def
               method_name = child.children[0]
               if method_name == :change || method_name == :up
                 process_migration_method(child.children[2])
@@ -93,6 +102,16 @@ module Ruby2JS
 
             case child.type
             when :block
+              call = child.children[0]
+              # Handle CONST.each { |var| ... } pattern
+              if call.type == :send && call.children[1] == :each
+                const_node = call.children[0]
+                if const_node&.type == :const &&
+                    @migration_constants&.key?(const_node.children[1])
+                  expand_const_each(child)
+                  next
+                end
+              end
               process_migration_block(child)
             when :send
               process_migration_send(child)
@@ -122,11 +141,59 @@ module Ruby2JS
             process_add_index(args)
           when :add_column
             process_add_column(args)
+          when :add_reference
+            process_add_reference(args)
           when :remove_column
             process_remove_column(args)
           when :drop_table
             process_drop_table(args)
+          when :rename_table
+            process_rename_table(args)
+          when :change_column
+            nil # SQLite doesn't support ALTER COLUMN; skip silently
           end
+        end
+
+        # Expand CONST.each { |var| migration_call(var, ...) } into individual calls
+        def expand_const_each(block_node)
+          call, block_args, body = block_node.children
+          const_name = call.children[0].children[1]
+          values = @migration_constants[const_name]
+          var_name = block_args.children[0].children[0]
+
+          body_children = body.type == :begin ? body.children : [body]
+
+          values.each do |value|
+            body_children.each do |child|
+              substituted = substitute_lvar(child, var_name, value)
+
+              case substituted.type
+              when :send
+                process_migration_send(substituted)
+              when :block
+                process_migration_block(substituted)
+              end
+            end
+          end
+        end
+
+        # Recursively replace :lvar nodes matching var_name with s(:str, value)
+        def substitute_lvar(node, var_name, value)
+          return node unless node.respond_to?(:type)
+
+          if node.type == :lvar && node.children[0] == var_name
+            return s(:str, value)
+          end
+
+          new_children = node.children.map do |child|
+            if child.respond_to?(:type)
+              substitute_lvar(child, var_name, value)
+            else
+              child
+            end
+          end
+
+          node.updated(nil, new_children)
         end
 
         def process_create_table(args, block_args, body)
@@ -141,13 +208,13 @@ module Ruby2JS
 
           # Add primary key unless id: false
           unless options[:id] == false
-            columns << {
-              name: 'id',
-              type: 'integer',
-              primaryKey: true,
-              autoIncrement: true
-            }
+            pk_type = options[:id_type] || 'integer'
+            pk = { name: 'id', type: pk_type, primaryKey: true }
+            pk[:autoIncrement] = true if pk_type == 'integer'
+            columns << pk
           end
+
+          inline_indexes = []
 
           # Process column definitions
           if body
@@ -161,6 +228,7 @@ module Ruby2JS
                 columns << result[:column] if result[:column]
                 columns.push(*result[:columns]) if result[:columns]
                 foreign_keys << result[:foreign_key] if result[:foreign_key]
+                inline_indexes << result[:index] if result[:index]
               end
             end
           end
@@ -171,6 +239,11 @@ module Ruby2JS
             columns: columns,
             foreign_keys: foreign_keys
           })
+
+          # Emit inline t.index calls after the createTable
+          inline_indexes.each do |idx|
+            process_add_index([s(:str, idx[:table]), *idx[:args]])
+          end
         end
 
         def process_column(node, table_name)
@@ -189,6 +262,9 @@ module Ruby2JS
             }
           when :references, :belongs_to
             return process_references(args, table_name)
+          when :index
+            # Inline index inside create_table — emit as separate add_index statement
+            return { index: { table: table_name, args: args } }
           else
             return process_regular_column(method, args)
           end
@@ -245,6 +321,8 @@ module Ruby2JS
             null: false
           }
           foreign_key = nil
+          polymorphic = false
+          nullable = false
 
           args[1..-1].each do |arg|
             next unless arg.type == :hash
@@ -256,7 +334,13 @@ module Ruby2JS
 
               case key.children[0]
               when :null
+                nullable = true if value.type == :true
                 column[:null] = true if value.type == :true
+              when :type
+                col_type = extract_string_value(value)
+                column[:type] = col_type if col_type
+              when :polymorphic
+                polymorphic = true if value.type == :true
               when :foreign_key
                 if value.type == :true
                   ref_table = Ruby2JS::Inflector.pluralize(ref_name)
@@ -270,10 +354,19 @@ module Ruby2JS
             end
           end
 
-          {
-            column: column,
-            foreign_key: foreign_key
-          }
+          result = { column: column, foreign_key: foreign_key }
+
+          # Polymorphic adds a _type string column
+          if polymorphic
+            type_column = {
+              name: "#{ref_name}_type",
+              type: 'string',
+              null: nullable
+            }
+            result[:columns] = [type_column]
+          end
+
+          result
         end
 
         def process_add_index(args)
@@ -333,6 +426,38 @@ module Ruby2JS
           })
         end
 
+        # add_reference :table, :name, type: :uuid => addColumn(table, name_id, type)
+        def process_add_reference(args)
+          return if args.length < 2
+
+          table_name = extract_string_value(args[0])
+          ref_name = extract_string_value(args[1])
+          return unless table_name && ref_name
+
+          column_name = "#{ref_name}_id"
+          column_type = 'integer'
+
+          # Check for type: option
+          args[2..-1].each do |arg|
+            next unless arg&.type == :hash
+            arg.children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              next unless key.type == :sym
+              if key.children[0] == :type
+                column_type = extract_string_value(value) || 'integer'
+              end
+            end
+          end
+
+          @migration_statements.push({
+            type: :add_column,
+            table: table_name,
+            column: column_name,
+            column_type: column_type
+          })
+        end
+
         def process_remove_column(args)
           return if args.length < 2
 
@@ -360,6 +485,21 @@ module Ruby2JS
           })
         end
 
+        def process_rename_table(args)
+          return if args.length < 2
+
+          old_name = extract_string_value(args[0])
+          new_name = extract_string_value(args[1])
+
+          return unless old_name && new_name
+
+          @migration_statements.push({
+            type: :rename_table,
+            old_name: old_name,
+            new_name: new_name
+          })
+        end
+
         def extract_table_options(args)
           options = {}
 
@@ -373,7 +513,12 @@ module Ruby2JS
 
               case key.children[0]
               when :id
-                options[:id] = value.type != :false
+                if value.type == :false
+                  options[:id] = false
+                elsif value.type == :sym
+                  # id: :uuid — use uuid as primary key type
+                  options[:id_type] = value.children[0].to_s
+                end
               end
             end
           end
@@ -460,6 +605,8 @@ module Ruby2JS
             build_remove_column_call(stmt)
           when :drop_table
             build_drop_table_call(stmt)
+          when :rename_table
+            build_rename_table_call(stmt)
           end
         end
 
@@ -522,6 +669,13 @@ module Ruby2JS
           s(:send, nil, :await,
             s(:send, s(:lvar, :adapter), :dropTable,
               s(:str, stmt[:table])))
+        end
+
+        def build_rename_table_call(stmt)
+          s(:send, nil, :await,
+            s(:send, s(:lvar, :adapter), :renameTable,
+              s(:str, stmt[:old_name]),
+              s(:str, stmt[:new_name])))
         end
 
         def value_to_ast(value)

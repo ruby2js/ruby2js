@@ -178,22 +178,45 @@ Dozens of earlier transpilation bugs were also fixed (ERB comments, nested param
 
 The frontier has shifted from **"does it transpile?"** to **"does it run?"**
 
-### Runtime Issues
+### Current Status: 1/747 Tests Passing
 
-All 188 test files still fail, but the cascade is now much shallower. The models index eagerly imports every model — each remaining load-time error blocks all tests. Current distinct root errors:
+All 33 migrations now run successfully. The cascade of model-loading errors has been broken. Test failures are now at the model/controller logic level — real test assertions failing, not infrastructure crashes.
 
-| Root Error | Count | Category |
-|-----------|-------|----------|
-| `ERB.Util` not defined | 1 | Framework namespace stub needed |
-| `ActiveStorage.Blob` / `ActionText.RichText` | 6 | Framework namespace references in model code |
-| `ActiveRecord.Type` / `ActiveModel` | 2 | Framework namespace references |
-| `ZipKit.RemoteIO` / `ZipKit.Streamer` | 3 | Gem class (zip_kit) not available |
-| `SearchTestHelper` not defined | 5 | Test helper not imported |
-| `CardActivityTestHelper` not defined | 2 | Test helper not imported |
-| Broken view import paths | 5 | `_partials.js`, nested partial resolution |
-| Mangled constant name | 1 | `m_a_x__u_n_r_e_a_d__n_o_t_i_f_i_c_a_t_i_o_n_s` |
+**Breakdown:** 188 test files, 747 individual tests. 1 passing (account slug test), 746 failing from model-level issues (e.g. `find_by` expects hash conditions but `CollectionProxy.find_by` treats argument as a function predicate).
 
-**Key insight:** These are all runtime/adapter gaps, not transpilation issues. The generated JavaScript is syntactically correct. Adding framework namespace stubs (`ERB`, `ActiveStorage`, `ActionText`, `ActiveRecord`, `ZipKit`) to the test globals would unblock the cascade and reveal which tests can actually pass.
+### Migration Filter Improvements
+
+The migration filter (`lib/ruby2js/filter/rails/migration.rb`) now handles several patterns that Fizzy's migrations require:
+
+| Pattern | Example | Status |
+|---------|---------|--------|
+| `CONST.each { \|var\| add_column ... }` | `MISSING_TABLES.each { \|t\| add_column t, "account_id", :uuid }` | Done — constant array expansion with AST variable substitution |
+| `add_reference` | `add_reference :users, :identity, type: :uuid` | Done — generates `addColumn(table, name_id, type)` |
+| `polymorphic: true` | `t.references :owner, polymorphic: true` | Done — generates both `_id` and `_type` columns |
+| `rename_table` | `rename_table :account_exports, :exports` | Done — `ALTER TABLE ... RENAME TO` |
+| `t.index` inside `create_table` | `t.index [:col1, :col2], unique: true` | Done — emitted as `addIndex` after `createTable` |
+| `id: :uuid` on `create_table` | `create_table :entries, id: :uuid` | Done — UUID primary key without autoincrement |
+| `change_column` | `change_column :table, :col, :type` | Silently skipped (SQLite limitation) |
+| `type:` on `t.references` | `t.references :account, type: :uuid` | Done — overrides default integer type |
+
+### SQLite Adapter Improvements
+
+| Fix | Details |
+|-----|---------|
+| `node:sqlite` in Vitest | Vite strips `node:` prefix from dynamic imports; fixed via `createRequire` from `node:module` |
+| `removeColumn` index cleanup | Auto-drops indexes referencing the column before `DROP COLUMN` (SQLite requirement) |
+| `renameTable` | `ALTER TABLE ... RENAME TO` support |
+
+### Runtime Issues (Next Phase)
+
+The remaining 746 test failures are model/controller-level issues, not migration or loading problems:
+
+| Category | Description |
+|----------|-------------|
+| `find_by` with hash conditions | `CollectionProxy.find_by` treats arg as function, not conditions hash |
+| `ActionController` not defined | Controller test globals need expansion |
+| Association query methods | Complex queries via associations need ORM query builder work |
+| Test helper imports | `SearchTestHelper`, `CardActivityTestHelper` not imported |
 
 ### Infrastructure Adapters
 
@@ -214,6 +237,14 @@ Rails infrastructure that needs JavaScript equivalents:
 | Circular imports | modelRegistry for associations | Done — lazy resolution via `modelRegistry["ClassName"]` |
 | `::` namespace in extends | Eject tool import resolution | Done — `Account::DataTransfer::RecordSet` → `import { RecordSet }` |
 | SQLite adapter | Built-in `node:sqlite` / `bun:sqlite` | Done — no native dependency, cross-runtime |
+| Migration constant loops | AST expansion of `CONST.each` | Done — variable substitution in migration bodies |
+| `add_reference` / polymorphic | Migration filter | Done — generates `_id` + `_type` columns |
+| `rename_table` | Migration filter + adapter | Done — `ALTER TABLE ... RENAME TO` |
+| `id: :uuid` primary keys | Migration filter | Done — UUID PKs without autoincrement |
+| `t.index` inside `create_table` | Migration filter | Done — inline indexes emitted after table creation |
+| Eject cascade breakers | Framework stubs + import fixes | Done — `ActionView`, `extend`, `IPAddr`, `Mittens`, `validates` stubs |
+| `alias_method` prototype | Prototype chain walking | Done — `Object.getOwnPropertyDescriptor` with chain traversal |
+| Model name collisions | Export name reading | Done — reads actual export names from transpiled files |
 | CurrentAttributes | AsyncLocalStorage | `with()` now escapes to `$with()` (reserved word fix). Need adapter integration with request lifecycle. |
 | ActionMailer | nodemailer | Not started. `deliver_later` → async delivery, mailer view rendering. |
 | Background Jobs | Event loop | Fizzy's jobs are simple method calls. `perform_later` → `queueMicrotask`. No queue infrastructure needed. |
@@ -328,7 +359,7 @@ Key insights from the transpilation effort:
 
 7. **Every fix benefits all users.** Bugs found via Fizzy were fixed in core Ruby2JS, improving transpilation for all applications.
 
-8. **Cascading failures mask progress.** All 188 test files fail, but from only ~16 distinct root causes. The models index eagerly imports every model; one failure cascades to everything. The cascade is now much shallower — most remaining errors are framework namespace stubs (`ActiveStorage`, `ActionText`, `ERB`, `ZipKit`).
+8. **Cascading failures mask progress.** All 188 test files initially failed from ~16 distinct root causes. The models index eagerly imports every model; one failure cascades to everything. Breaking the cascade required framework stubs, import resolution fixes, and name collision guards — each fix unblocking dozens of tests. Now all models load and all 33 migrations run; failures are at the test assertion level.
 
 9. **Rails DSL transpilation is tractable.** `enum`, `scope`, `has_secure_token`, `normalizes`, `serialize`, `include url_helpers` — each is a distinct DSL pattern, but they all follow the same approach: detect in metadata collection, skip in body transform, generate equivalent JS. The pattern is repeatable.
 
@@ -339,6 +370,12 @@ Key insights from the transpilation effort:
 12. **Ruby `::` is a namespace, not a property chain.** `Account::DataTransfer::RecordSet` transpiled to `Account.DataTransfer.RecordSet` (a property chain requiring `Account` to exist), but JS classes don't have nested namespace properties. The fix: resolve the full `::` path to a direct import of the leaf class with a computed relative file path.
 
 13. **Built-in SQLite eliminates dependency friction.** `node:sqlite` (Node 25+) and `bun:sqlite` provide the same synchronous SQLite API as `better-sqlite3` without native compilation. This removes npm link resolution issues, cross-platform build failures, and binary compatibility problems. The adapter API surface is only 6 methods (`exec`, `prepare`, `all`, `run`, `close`, constructor), making the switch trivial.
+
+14. **Migration transpilation requires pattern expansion, not just direct translation.** Rails migrations use Ruby patterns like constant array iteration (`TABLES.each { |t| add_column t, ... }`) and polymorphic references (`t.references :owner, polymorphic: true`). These can't be translated line-by-line; the migration filter must expand loops by substituting variables with each constant value, and expand `polymorphic: true` into two column definitions (`_id` + `_type`). The selfhost build then transpiles this filter to JS, so Ruby code that manipulates AST nodes must itself be transpilable.
+
+15. **Vite intercepts `node:` built-in imports.** Dynamic `import('node:sqlite')` in Vitest gets resolved as bare `'sqlite'` by Vite's module system. Neither `server.deps.external` nor `ssr.external` configuration prevents this. The workaround: `createRequire` from `node:module` bypasses Vite's module interception entirely. This is a known footgun when using Node built-ins in Vite-based test runners.
+
+16. **SQLite DROP COLUMN requires index cleanup.** Unlike PostgreSQL/MySQL, SQLite fails on `ALTER TABLE ... DROP COLUMN` if any index references the column. Rails handles this automatically; the built-in SQLite adapter must query `sqlite_master` for referencing indexes and drop them before the column removal.
 
 ---
 

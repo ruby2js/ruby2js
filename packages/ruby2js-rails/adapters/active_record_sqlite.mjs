@@ -30,11 +30,15 @@ export async function initDatabase(options = {}) {
   }
 
   // Runtime detection: use bun:sqlite on Bun, node:sqlite elsewhere
+  // Uses createRequire for Node to bypass Vite/Vitest module interception
+  // (dynamic import('node:sqlite') gets resolved as bare 'sqlite' by Vite)
   let DatabaseClass;
   if (typeof Bun !== 'undefined') {
     DatabaseClass = (await import('bun:sqlite')).Database;
   } else {
-    DatabaseClass = (await import('node:sqlite')).DatabaseSync;
+    const { createRequire } = await import('node:module');
+    const require = createRequire(import.meta.url);
+    DatabaseClass = require('node:sqlite').DatabaseSync;
   }
 
   db = new DatabaseClass(dbPath);
@@ -100,6 +104,16 @@ export function addColumn(tableName, columnName, columnType) {
 }
 
 export function removeColumn(tableName, columnName) {
+  // Drop any indexes referencing this column first (SQLite requires this)
+  const indexes = db.prepare(
+    `SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name=? AND sql IS NOT NULL`
+  ).all(tableName);
+  for (const idx of indexes) {
+    if (idx.sql && idx.sql.includes(columnName)) {
+      db.exec(`DROP INDEX IF EXISTS ${idx.name}`);
+    }
+  }
+
   // SQLite 3.35.0+ (2021-03-12) supports DROP COLUMN
   const sql = `ALTER TABLE ${tableName} DROP COLUMN ${columnName}`;
   return db.exec(sql);
@@ -107,6 +121,11 @@ export function removeColumn(tableName, columnName) {
 
 export function dropTable(tableName) {
   const sql = `DROP TABLE IF EXISTS ${tableName}`;
+  return db.exec(sql);
+}
+
+export function renameTable(oldName, newName) {
+  const sql = `ALTER TABLE ${oldName} RENAME TO ${newName}`;
   return db.exec(sql);
 }
 
