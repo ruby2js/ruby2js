@@ -41,6 +41,89 @@ Fizzy tests this thesis at scale. The [blog demo](https://ruby2js.github.io/ruby
 
 ---
 
+## Dependency Landscape
+
+Porting a Rails application to JavaScript is more than porting the application itself — every gem dependency needs a JavaScript equivalent. Fizzy's Gemfile has 45 entries (32 production + 13 dev/test). They fall into five categories, each with a different strategy.
+
+### Already JavaScript
+
+These gems wrap JavaScript libraries. The ejected app uses the JS originals directly.
+
+| Gem | JS Original | Notes |
+|-----|-------------|-------|
+| `stimulus-rails` | `@hotwired/stimulus` | Rails gem wraps the JS package |
+| `turbo-rails` | `@hotwired/turbo` | Rails gem wraps the JS package |
+| `importmap-rails` | ESM `import` | Native browser/Node module resolution |
+| `lexxy` | `lexical` (Meta) | Rich text editor; built on Lexical, [standalone JS package planned](https://github.com/basecamp/lexxy) |
+
+### Direct npm Equivalents
+
+Ruby gems with well-known JavaScript counterparts. Drop-in replacement at the API boundary.
+
+| Gem | npm Equivalent | Fizzy Usage |
+|-----|---------------|-------------|
+| `bcrypt` | `bcryptjs` | Password hashing (`has_secure_password`) |
+| `rqrcode` | `qrcode` | QR code generation for 2FA |
+| `redcarpet` | `marked` or `markdown-it` | Markdown → HTML (via ActionText) |
+| `rouge` | `highlight.js` or `shiki` | Code syntax highlighting (via ActionText) |
+| `web-push` | `web-push` | Browser push notifications (same API name) |
+| `image_processing` | `sharp` | Image variants (resize, crop) |
+| `aws-sdk-s3` | `@aws-sdk/client-s3` | S3 file storage (AWS publishes both) |
+| `zip_kit` | `fflate` or `archiver` | Streaming ZIP exports (3 classes: Writer, Reader, RemoteIO) |
+| `platform_agent` / `useragent` | `ua-parser-js` | Browser/device detection (`ApplicationPlatform` model) |
+| `mittens` | `stemmer` or `natural` | Word stemming for search index |
+| `geared_pagination` | Custom | Keyset pagination (pattern, not library — ~20 lines) |
+| `jbuilder` | Native JSON | 28 `.json.jbuilder` templates → plain object serialization |
+| `net-http-persistent` | `fetch` / `undici` | HTTP keep-alive for push notification delivery |
+
+### Rails Framework (ruby2js-rails adapters)
+
+Core Rails infrastructure. These need purpose-built adapters in the `ruby2js-rails` package.
+
+| Gem / Component | Adapter Approach | Status |
+|----------------|-----------------|--------|
+| `sqlite3` | `node:sqlite` / `bun:sqlite` | Done — built-in, no native dependency |
+| ActiveRecord | ORM with SQLite adapter | Done — query builder, migrations, associations |
+| ActiveSupport::Concern | AST filter | Done — transpile-time transformation |
+| ActionController | Express/Hono-style routing | Partial — RESTful CRUD transpiles, needs HTTP adapter |
+| CurrentAttributes | `AsyncLocalStorage` | Partial — `$with()` escape done, needs request lifecycle |
+| ActionMailer | `nodemailer` | Not started — `deliver_later` → async delivery |
+| ActionText | Lexical + storage adapter | Not started — `has_rich_text` stub done, needs rendering |
+| ActiveStorage | S3 direct / local filesystem | Not started — file upload, image variant pipeline |
+| ActionCable / `solid_cable` | WebSocket server | Not started — Turbo Stream broadcasting |
+| `solid_cache` | In-memory `Map` or Redis | Not started — `json.cache!` blocks in jbuilder views |
+| `solid_queue` | Event loop / `queueMicrotask` | Not started — Fizzy's jobs are simple method calls |
+
+### Deployment / Operations (not needed in ejected app)
+
+These gems handle Ruby-specific deployment, optimization, or monitoring. The ejected JavaScript app uses its own stack (Node/Bun process, reverse proxy, etc.).
+
+`bootsnap` · `kamal` · `puma` · `thruster` · `propshaft` · `trilogy` · `autotuner` · `mission_control-jobs` · `benchmark`
+
+### Dev / Test (framework equivalents)
+
+| Ruby Gem | JS Equivalent | Notes |
+|----------|--------------|-------|
+| `minitest` / `mocha` | `vitest` | Already configured in ejected output |
+| `capybara` / `selenium-webdriver` | Playwright | Browser integration tests |
+| `webmock` / `vcr` | `msw` (Mock Service Worker) | HTTP request mocking/recording |
+| `faker` | `@faker-js/faker` | Test data generation |
+| `debug` | Node inspector | `--inspect` flag |
+| `brakeman` / `bundler-audit` | `npm audit` / ESLint security plugins | Static analysis |
+
+### Key Insight
+
+Of Fizzy's 45 gem dependencies:
+- **4** are already JavaScript — the gem just wraps a JS package (Hotwire, Lexical)
+- **14** have direct npm equivalents — swap at the API boundary
+- **9** are deployment/operations — not needed in the ejected app
+- **13** are dev/test tools — vitest + Playwright replaces the Ruby test stack
+- **5** are Rails framework gems — these need purpose-built adapters
+
+The `rails` gem alone provides 7 sub-frameworks used by Fizzy (ActiveRecord, ActionController, CurrentAttributes, ActionMailer, ActionText, ActiveStorage, ActionCable). Combined with `sqlite3`, `solid_cable`, `solid_cache`, and `solid_queue`, that's 11 distinct adapter concerns — the core of the remaining work. Several (SQLite, ActiveRecord ORM, Concerns) are already done.
+
+---
+
 ## What's Been Accomplished
 
 **Transpilation is complete with zero syntax errors.** All file categories transform successfully:
@@ -97,17 +180,20 @@ The frontier has shifted from **"does it transpile?"** to **"does it run?"**
 
 ### Runtime Issues
 
-All 188 test files currently fail, cascading from a small set of root errors in the models index (which eagerly imports every model — one failure breaks all tests):
+All 188 test files still fail, but the cascade is now much shallower. The models index eagerly imports every model — each remaining load-time error blocks all tests. Current distinct root errors:
 
 | Root Error | Count | Category |
 |-----------|-------|----------|
-| `StandardError is not defined` | 2 | Ruby exception class needs global stub |
-| `has_rich_text` is not a function | 2 | ActionText adapter not implemented |
-| `SearchTestHelper` not defined | 3 | Test helper not imported |
-| Broken view import paths | 4 | `_partials.js`, nested partial resolution |
+| `ERB.Util` not defined | 1 | Framework namespace stub needed |
+| `ActiveStorage.Blob` / `ActionText.RichText` | 6 | Framework namespace references in model code |
+| `ActiveRecord.Type` / `ActiveModel` | 2 | Framework namespace references |
+| `ZipKit.RemoteIO` / `ZipKit.Streamer` | 3 | Gem class (zip_kit) not available |
+| `SearchTestHelper` not defined | 5 | Test helper not imported |
+| `CardActivityTestHelper` not defined | 2 | Test helper not imported |
+| Broken view import paths | 5 | `_partials.js`, nested partial resolution |
 | Mangled constant name | 1 | `m_a_x__u_n_r_e_a_d__n_o_t_i_f_i_c_a_t_i_o_n_s` |
 
-**Key insight:** These are all runtime/adapter gaps, not transpilation issues. The generated JavaScript is syntactically correct. The `StandardError` stub (mapping to JS `Error`) would likely unblock the majority of test files.
+**Key insight:** These are all runtime/adapter gaps, not transpilation issues. The generated JavaScript is syntactically correct. Adding framework namespace stubs (`ERB`, `ActiveStorage`, `ActionText`, `ActiveRecord`, `ZipKit`) to the test globals would unblock the cascade and reveal which tests can actually pass.
 
 ### Infrastructure Adapters
 
@@ -118,10 +204,16 @@ Rails infrastructure that needs JavaScript equivalents:
 | `has_secure_token` | Static no-op on ActiveRecord base | Done — stub in adapter |
 | `normalizes` | Static class method | Done — stub in adapter |
 | `serialize` | Static class method | Done — stub in adapter |
+| `has_rich_text` | Static class method | Done — stub in adapter |
+| `store` | Static class method | Done — stub in adapter |
+| `after_touch` | Callback registration | Done — added to CALLBACKS list |
 | `index_by` | ActiveSupport filter transpilation | Done — transpiles to JS equivalent |
 | `enum` | Rails model filter | Done — predicates, scopes, frozen values |
 | `url_helpers` | Model filter + runtime module | Done — strips include, imports polymorphic_url/path |
-| `StandardError` | Global stub mapping to Error | Needed — 2 models reference it |
+| `StandardError` / `RuntimeError` | Functions filter → `Error` | Done — mapped in `on_const` |
+| Circular imports | modelRegistry for associations | Done — lazy resolution via `modelRegistry["ClassName"]` |
+| `::` namespace in extends | Eject tool import resolution | Done — `Account::DataTransfer::RecordSet` → `import { RecordSet }` |
+| SQLite adapter | Built-in `node:sqlite` / `bun:sqlite` | Done — no native dependency, cross-runtime |
 | CurrentAttributes | AsyncLocalStorage | `with()` now escapes to `$with()` (reserved word fix). Need adapter integration with request lifecycle. |
 | ActionMailer | nodemailer | Not started. `deliver_later` → async delivery, mailer view rendering. |
 | Background Jobs | Event loop | Fizzy's jobs are simple method calls. `perform_later` → `queueMicrotask`. No queue infrastructure needed. |
@@ -164,12 +256,17 @@ npm link ruby2js ruby2js-rails
 # After modifying filters or converters
 bundle exec rake -f demo/selfhost/Rakefile local
 
-# Run the eject test
+# Eject with built-in SQLite (no native dependency, no npm link issues)
 cd /path/to/fizzy
-DEBUG=1 npx juntos eject 2>&1 | grep -iE "(error|syntax|skipped|failed|transforming)"
+npx juntos eject -d sqlite
+
+# Link and test
+cd ejected
+npm link ruby2js-rails
+NODE_OPTIONS=--no-warnings npx vitest run
 ```
 
-The eject command transforms all Ruby source files, writes JavaScript to `ejected/`, runs syntax checking, and reports failures.
+Use `-d sqlite` for built-in `node:sqlite` (Node 25+) or `bun:sqlite`. Use `-d better_sqlite3` if you need the native addon. The eject command transforms all Ruby source files, writes JavaScript to `ejected/`, and reports failures.
 
 ---
 
@@ -179,7 +276,7 @@ The eject command transforms all Ruby source files, writes JavaScript to `ejecte
 
 | Category | Patterns |
 |----------|----------|
-| Models | belongs_to, has_many, has_one, validations, scopes, callbacks, enums (predicates + scopes + inline transforms), normalizes, url_helpers (polymorphic_url/path) |
+| Models | belongs_to, has_many, has_one, validations, scopes, callbacks, enums (predicates + scopes + inline transforms), normalizes, url_helpers (polymorphic_url/path), has_rich_text, store, after_touch |
 | Controllers | RESTful CRUD, before_action, respond_to, strong params (.expect syntax) |
 | Views | ERB, partials, form helpers, Turbo Streams |
 | JavaScript | Stimulus controllers, Turbo, @rails/request.js |
@@ -231,11 +328,17 @@ Key insights from the transpilation effort:
 
 7. **Every fix benefits all users.** Bugs found via Fizzy were fixed in core Ruby2JS, improving transpilation for all applications.
 
-8. **Cascading failures mask progress.** All 188 test files fail, but from only ~12 distinct root causes (down from ~7 categories with more items each). The models index eagerly imports every model; one failure cascades to everything. Fixing a handful of adapter gaps would likely unblock the majority of tests.
+8. **Cascading failures mask progress.** All 188 test files fail, but from only ~16 distinct root causes. The models index eagerly imports every model; one failure cascades to everything. The cascade is now much shallower — most remaining errors are framework namespace stubs (`ActiveStorage`, `ActionText`, `ERB`, `ZipKit`).
 
 9. **Rails DSL transpilation is tractable.** `enum`, `scope`, `has_secure_token`, `normalizes`, `serialize`, `include url_helpers` — each is a distinct DSL pattern, but they all follow the same approach: detect in metadata collection, skip in body transform, generate equivalent JS. The pattern is repeatable.
 
 10. **Ruby→JS filter code requires careful idiom choices.** Filter code (Ruby) must also work when transpiled to JS for selfhost. Key traps: `hash.each { |k,v| }` fails on plain JS objects (use `hash.keys.each`), `concat` returns a new array in JS (use `push` in a loop), and `each_with_index.map.to_h` chains don't transpile (use explicit loops).
+
+11. **Circular imports require lazy resolution, not eager imports.** Rails uses autoloading (lazy name resolution); the transpiler was converting to eager ESM imports, creating cycles. The fix: `modelRegistry["ClassName"]` for association lookups — the registry is populated by `models/index.js` after all imports complete.
+
+12. **Ruby `::` is a namespace, not a property chain.** `Account::DataTransfer::RecordSet` transpiled to `Account.DataTransfer.RecordSet` (a property chain requiring `Account` to exist), but JS classes don't have nested namespace properties. The fix: resolve the full `::` path to a direct import of the leaf class with a computed relative file path.
+
+13. **Built-in SQLite eliminates dependency friction.** `node:sqlite` (Node 25+) and `bun:sqlite` provide the same synchronous SQLite API as `better-sqlite3` without native compilation. This removes npm link resolution issues, cross-platform build failures, and binary compatibility problems. The adapter API surface is only 6 methods (`exec`, `prepare`, `all`, `run`, `close`, constructor), making the switch trivial.
 
 ---
 
