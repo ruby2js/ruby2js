@@ -436,6 +436,19 @@ export function fixImportsForEject(js, fromFile, config = {}) {
     js = js.replace(/from ['"]@config\/paths\.js['"]/g, "from '../config/paths.js'");
   }
 
+  // Fix selfhost converter Struct.new pattern: [(X = function X(...) {...}).prototype] = [X.prototype]
+  // The right side references X before assignment completes. Simplify to plain let declaration.
+  // ESM strict mode requires variable declaration (no implicit globals).
+  js = js.replace(/^\[\((\w+ = function \w+\([^)]*\) \{[\s\S]*?\})\)\.prototype\] = \[\w+\.prototype\];?/m,
+    'let $1;');
+
+  // Fix alias_method pattern: X.prototype.alias = X.prototype.original
+  // This fails at load time when original is a getter accessing private fields.
+  // Use a helper that walks the prototype chain to find the descriptor.
+  js = js.replace(
+    /^(\w+)\.prototype\.(\w+) = \1\.prototype\.(\w+)$/gm,
+    '{ let _p = $1.prototype; while (_p && !Object.getOwnPropertyDescriptor(_p, "$3")) _p = Object.getPrototypeOf(_p); if (_p) Object.defineProperty($1.prototype, "$2", Object.getOwnPropertyDescriptor(_p, "$3")); }');
+
   // Handle relative paths to config/paths.js (keep as paths.js, not routes.js)
   // This is used for controllers: ../../config/paths.js → ../../config/paths.js
   // No change needed - paths.js is the correct target
@@ -561,6 +574,62 @@ export function fixImportsForEject(js, fromFile, config = {}) {
     }
   }
 
+  // General model reference imports: scan for bare ClassName.method or new ClassName(
+  // references to known model classes that aren't imported. This handles cases like
+  // concern modules referencing Color.COLORS or Color.for_value() without an import.
+  if (fromFile && fromFile.startsWith('app/models/') && config.models && config.modelClassMap) {
+    const modelRelPath = fromFile.replace('app/models/', '').replace(/\.js$/, '');
+    const depth = modelRelPath.split('/').length - 1;
+
+    for (const [className, modelPath] of Object.entries(config.modelClassMap)) {
+      // Skip if already imported
+      const importPattern = new RegExp(`import\\s+\\{[^}]*\\b${className}\\b[^}]*\\}\\s+from`);
+      if (importPattern.test(js)) continue;
+
+      // Skip self-references
+      if (modelPath === modelRelPath) continue;
+
+      // Skip if this file defines/exports a class with the same name (name collision between namespaces)
+      // e.g., card/entropy.js exports class Entropy — don't import Entropy from ../entropy.js
+      const definesClass = new RegExp(`(export\\s+)?(class|const|let|var|function)\\s+${className}\\b`);
+      if (definesClass.test(js)) continue;
+
+      // Skip references to models in a subdirectory named after this file.
+      // e.g., notifier.js should not import from notifier/mention_notifier.js
+      // because those subclasses typically extend the parent, creating a circular dependency.
+      const baseName = modelRelPath.split('/').pop();
+      if (modelPath.startsWith(modelRelPath.replace(/[^/]+$/, baseName + '/'))) continue;
+
+      // Check if this class name is referenced (ClassName.something or new ClassName)
+      const refPattern = new RegExp(`\\b${className}\\b\\.\\w|\\bnew\\s+${className}\\b`);
+      if (!refPattern.test(js)) continue;
+
+      // Compute relative path
+      const currentDir = modelRelPath.split('/').slice(0, -1);
+      const targetParts = modelPath.split('/');
+      const targetDir = targetParts.slice(0, -1);
+      const targetFile = targetParts[targetParts.length - 1];
+
+      let common = 0;
+      while (common < currentDir.length && common < targetDir.length &&
+             currentDir[common] === targetDir[common]) {
+        common++;
+      }
+      const up = currentDir.length - common;
+      const down = targetDir.slice(common);
+      let relativePath;
+      if (up === 0 && down.length === 0) {
+        relativePath = `./${targetFile}.js`;
+      } else if (up === 0) {
+        relativePath = `./${[...down, targetFile + '.js'].join('/')}`;
+      } else {
+        relativePath = [...Array(up).fill('..'), ...down, targetFile + '.js'].join('/');
+      }
+
+      js = `import { ${className} } from '${relativePath}';\n${js}`;
+    }
+  }
+
   // Model imports: resolve nested model paths using actual models list.
   // For top-level model files, resolve association imports to nested paths when needed.
   // e.g., in identity.js: import { AccessToken } from './access_token.js'
@@ -653,11 +722,31 @@ export function generateModelsModuleForEject(appRoot, config = {}) {
   }
   const railsModule = `ruby2js-rails/targets/${target}/rails.js`;
 
+  // Read actual exported class names from transpiled files when outDir is available.
+  // This handles cases like IO (Ruby) vs Io (PascalCase from filename).
+  function getActualExportName(modelPath) {
+    if (config.outDir) {
+      try {
+        const jsPath = path.join(config.outDir, 'app/models', modelPath + '.js');
+        const content = fs.readFileSync(jsPath, 'utf-8');
+        // Look for export class X, export const X, or export { X } or export { Y as X }
+        const classMatch = content.match(/export\s+(?:class|const|function)\s+(\w+)/);
+        if (classMatch) return classMatch[1];
+        const aliasMatch = content.match(/export\s*\{\s*\w+\s+as\s+(\w+)\s*\}/);
+        if (aliasMatch) return aliasMatch[1];
+        const namedMatch = content.match(/export\s*\{\s*(\w+)\s*\}/);
+        if (namedMatch) return namedMatch[1];
+      } catch {}
+    }
+    return null;
+  }
+
   const imports = models.map(m => {
-    const leafClass = m.split('/').pop().split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+    const actualName = getActualExportName(m);
     const alias = modelClassName(m, collisions);
-    if (alias !== leafClass) {
-      return `import { ${leafClass} as ${alias} } from './${m}.js';`;
+    const importName = actualName || m.split('/').pop().split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+    if (alias !== importName) {
+      return `import { ${importName} as ${alias} } from './${m}.js';`;
     }
     return `import { ${alias} } from './${m}.js';`;
   });
@@ -810,6 +899,11 @@ globalThis.include = function(module) {
   // No-op for now - tests that need shared setup will fail until helpers are implemented
 };
 
+// extend() - Ruby module extension (extend self makes module methods callable on the module itself)
+globalThis.extend = function(target) {
+  // No-op - in IIFE module pattern, methods are already accessible
+};
+
 // ActiveSupport stub for patterns like ActiveSupport::Concern and CurrentAttributes
 globalThis.ActiveSupport = {
   Concern: {},
@@ -817,6 +911,12 @@ globalThis.ActiveSupport = {
     static attribute() {} // no-op: Rails current attributes declaration
   }
 };
+
+// validates/validate - ActiveModel class-level validation DSL
+// In Rails these come from ActiveModel::Validations::ClassMethods via include
+// The transpiled code calls them as static methods (e.g., Signup.validates(...))
+Function.prototype.validates = Function.prototype.validates || function() {};
+Function.prototype.validate = Function.prototype.validate || function() {};
 
 // delegate() - Rails delegation DSL, no-op stub
 // In Rails: Model.delegate(:method, to: :association)
@@ -836,6 +936,197 @@ globalThis.PlatformAgent = class PlatformAgent {
   constructor(userAgent) { this._userAgent = userAgent || ''; }
   get user_agent() { return { browser: this._userAgent, platform: this._userAgent }; }
   match(pattern) { return pattern.test(this._userAgent); }
+};
+
+// URI namespace — Ruby stdlib, used for URI::MailTo::EMAIL_REGEXP etc.
+globalThis.URI = {
+  MailTo: {
+    EMAIL_REGEXP: /\\A[a-zA-Z0-9.!#$%&'*+\\/=?^_\`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\\z/
+  },
+  parse(str) { try { return new URL(str); } catch { return null; } },
+  encode_www_form_component(s) { return encodeURIComponent(String(s)); }
+};
+
+// --- Framework namespace stubs ---
+// These allow models to load without crashing. The stubs provide the right
+// shape (classes, static methods, exception types) but not real behavior.
+
+// Helper: stub class with common ActiveRecord-style static methods
+function _stubModelClass(name) {
+  return class StubModel {
+    static _name = name;
+    constructor(attrs) { Object.assign(this, attrs || {}); }
+    static where() { return []; }
+    static find_by() { return null; }
+    static exists() { return false; }
+    static create() { return new this(); }
+    static create_and_upload() { return new this(); }
+    static insert_all() {}
+    static column_names = [];
+    update(attrs) { Object.assign(this, attrs); return this; }
+  };
+}
+
+// ERB namespace — ERB.Util is mixed in via Object.getOwnPropertyDescriptors
+globalThis.ERB = {
+  Util: {
+    html_escape(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
+    url_encode(s) { return encodeURIComponent(String(s)); }
+  }
+};
+
+// ActiveStorage namespace
+globalThis.ActiveStorage = {
+  Blob: Object.assign(_stubModelClass('ActiveStorage::Blob'), {
+    service: { name: 'local' },
+    services: { fetch(name) { return { name }; } }
+  }),
+  Attachment: _stubModelClass('ActiveStorage::Attachment'),
+  FileNotFoundError: class FileNotFoundError extends Error { name = 'ActiveStorage::FileNotFoundError' },
+  PurgeJob: class PurgeJob {},
+  Service: {
+    S3Service: class S3Service {}
+  }
+};
+
+// ActionText namespace
+globalThis.ActionText = {
+  RichText: _stubModelClass('ActionText::RichText'),
+  Attachment: Object.assign(_stubModelClass('ActionText::Attachment'), {
+    from_attachable(blob) { return { to_html: '<div></div>' }; }
+  }),
+  Content: class Content {
+    constructor(html) { this._html = html || ''; }
+    append_attachables() { return this; }
+    toString() { return this._html; }
+  },
+  Attachables: {
+    RemoteImage: class RemoteImage {}
+  }
+};
+
+// ActiveRecord namespace additions (extends existing ActiveRecord from adapter)
+if (!globalThis.ActiveRecord) globalThis.ActiveRecord = {};
+Object.assign(globalThis.ActiveRecord, {
+  FixtureSet: {
+    identify(name, count) {
+      // Simple hash for deterministic fixture IDs (matches Rails behavior loosely)
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+      return Math.abs(hash);
+    }
+  },
+  Type: {
+    Boolean: class BooleanType {
+      cast(val) {
+        if (val === 'true' || val === '1' || val === 1 || val === true) return true;
+        if (val === 'false' || val === '0' || val === 0 || val === false || val == null) return false;
+        return !!val;
+      }
+    },
+    Uuid: Object.assign(
+      class UuidType {
+        serialize(val) { return String(val); }
+      },
+      { generate: crypto.randomUUID ? crypto.randomUUID.bind(crypto) : () => Math.random().toString(36).slice(2) }
+    ),
+    lookup(name) {
+      if (name === 'boolean') return new this.Boolean();
+      if (name === 'uuid') return new this.Uuid();
+      return { cast(v) { return v; }, serialize(v) { return v; } };
+    }
+  },
+  RecordNotFound: class RecordNotFound extends Error { name = 'ActiveRecord::RecordNotFound' },
+  RecordInvalid: class RecordInvalid extends Error { name = 'ActiveRecord::RecordInvalid' },
+  RecordNotUnique: class RecordNotUnique extends Error { name = 'ActiveRecord::RecordNotUnique' },
+  RecordNotSaved: class RecordNotSaved extends Error { name = 'ActiveRecord::RecordNotSaved' },
+  ValueTooLong: class ValueTooLong extends Error { name = 'ActiveRecord::ValueTooLong' },
+  CheckViolation: class CheckViolation extends Error { name = 'ActiveRecord::CheckViolation' },
+  Base: {
+    connection_pool: {
+      with_connection(fn) { return fn(); }
+    }
+  }
+});
+
+// ActiveModel namespace — mixed in via Object.getOwnPropertyDescriptors
+globalThis.ActiveModel = {
+  Model: {},
+  Attributes: {
+    attribute() {}
+  },
+  Validations: {
+    validates() {},
+    validate() {}
+  }
+};
+
+// ZipKit namespace — RemoteIO is used as a superclass (extends ZipKit.RemoteIO)
+globalThis.ZipKit = {
+  RemoteIO: class RemoteIO {
+    constructor(uri) { this._uri = uri; }
+  },
+  FileReader: Object.assign(
+    class FileReader {},
+    {
+      read_zip_structure(opts) { return []; },
+      InvalidStructure: class InvalidStructure extends Error { name = 'ZipKit::FileReader::InvalidStructure' }
+    }
+  ),
+  Streamer: class Streamer {
+    constructor(io) { this._io = io; }
+    write_deflated_file() {}
+    write_stored_file() {}
+    close() {}
+  }
+};
+
+// Mittens stub — snowball stemmer gem (mittens-ruby), used for search
+globalThis.Mittens = {
+  Stemmer: class Stemmer {
+    stem(word) { return String(word || '').toLowerCase(); }
+  }
+};
+
+// IPAddr stub — Ruby stdlib class for IP address parsing/matching
+globalThis.IPAddr = class IPAddr {
+  constructor(str) { this._str = str; }
+  include(addr) { return false; }
+  to_s() { return this._str; }
+};
+
+// App helper stubs — Rails helpers mixed into models via include/Object.getOwnPropertyDescriptors.
+// These are app-specific but referenced at model load time, so we stub them here.
+globalThis.ExcerptHelper = {
+  format_excerpt(content, opts) { return String(content || '').slice(0, (opts?.length || 200)); }
+};
+globalThis.TimeHelper = {
+  local_datetime_tag(datetime, opts) { return ''; }
+};
+
+// ActionView namespace — helpers mixed in via Object.getOwnPropertyDescriptors
+globalThis.ActionView = {
+  Helpers: {
+    TagHelper: {
+      tag: Object.assign(function tag(name, opts) { return ''; }, {
+        div(content, opts) { return '<div>' + (content || '') + '</div>'; },
+        span(content, opts) { return '<span>' + (content || '') + '</span>'; },
+        p(content, opts) { return '<p>' + (content || '') + '</p>'; }
+      }),
+      content_tag(name, content, opts) { return '<' + name + '>' + (content || '') + '</' + name + '>'; }
+    },
+    OutputSafetyHelper: {
+      safe_join(arr, sep) { return arr.join(sep || ''); },
+      raw(s) { return String(s); }
+    }
+  },
+  RecordIdentifier: {
+    dom_id(record, prefix) {
+      const name = (record?.constructor?.name || 'record').replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+      const id = record?.id || 'new';
+      return prefix ? prefix + '_' + name + '_' + id : name + '_' + id;
+    }
+  }
 };
 `;
 }
@@ -933,9 +1224,11 @@ main().catch(console.error);
 export function generateVitestConfigForEject(config = {}) {
   const externals = [];
 
-  // Native modules need to be externalized (better_sqlite3 only; built-in sqlite needs nothing)
+  // Native/built-in modules need to be externalized for Vite/Vitest
   if (config.database === 'better_sqlite3') {
     externals.push('better-sqlite3');
+  } else if (config.database === 'sqlite' || config.database === 'sqlite3') {
+    externals.push('node:sqlite');
   }
 
   const serverDepsConfig = externals.length > 0

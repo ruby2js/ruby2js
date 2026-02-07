@@ -277,6 +277,12 @@ export class ActiveRecordBase {
     this._normalizations[field] = options;
   }
 
+  static attribute(name, type, options = {}) {
+    // Rails attribute DSL: declares typed virtual attributes
+    if (!this._attributes) this._attributes = {};
+    this._attributes[name] = { type, ...options };
+  }
+
   static validate(method) {
     if (!this._custom_validations) this._custom_validations = [];
     this._custom_validations.push(method);

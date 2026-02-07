@@ -22,6 +22,8 @@ import { fileURLToPath } from 'url';
 // Import shared transformation logic
 import {
   findModels,
+  findLeafCollisions,
+  modelClassName,
   findMigrations,
   findViewResources,
   findControllers,
@@ -1614,8 +1616,13 @@ async function runEject(options) {
 
   console.log(`Ejecting transpiled files to ${relative(APP_ROOT, outDir) || outDir}/\n`);
 
-  // Build models list for nested model path resolution during import fixing
+  // Build models list and class name map for import resolution during eject
   config.models = findModels(APP_ROOT);
+  const collisions = findLeafCollisions(config.models);
+  config.modelClassMap = {};
+  for (const m of config.models) {
+    config.modelClassMap[modelClassName(m, collisions)] = m;
+  }
 
   // Ensure ruby2js is ready
   await ensureRuby2jsReady();
@@ -1677,18 +1684,27 @@ async function runEject(options) {
       const failedModels = new Set(errors
         .filter(e => e.file.startsWith('app/models/'))
         .map(e => e.file.replace('app/models/', '').replace('.rb', '')));
-      // Check ejected JS files for export statements
+      // Check ejected JS files for export statements.
+      // If a model file defines a top-level class/function but has no export,
+      // add one. This handles Struct.new + class reopening patterns where the
+      // selfhost converter doesn't merge into a single `export class`.
       for (const m of config.models) {
         if (failedModels.has(m)) continue;
         const jsFile = join(outDir, 'app/models', m + '.js');
         if (existsSync(jsFile)) {
-          const content = readFileSync(jsFile, 'utf-8');
+          let content = readFileSync(jsFile, 'utf-8');
           if (!content.includes('export ')) {
-            failedModels.add(m);
+            const className = modelClassName(m, collisions);
+            if (new RegExp(`\\b${className}\\b`).test(content)) {
+              content += `\nexport { ${className} }\n`;
+              writeFileSync(jsFile, content);
+            } else {
+              failedModels.add(m);
+            }
           }
         }
       }
-      const modelsIndex = generateModelsModuleForEject(APP_ROOT, { ...config, excludeModels: failedModels });
+      const modelsIndex = generateModelsModuleForEject(APP_ROOT, { ...config, excludeModels: failedModels, outDir });
       writeFileSync(join(outDir, 'app/models/index.js'), modelsIndex);
       fileCount++;
 
