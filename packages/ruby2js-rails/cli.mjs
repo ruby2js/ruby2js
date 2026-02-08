@@ -19,6 +19,7 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, chmodSy
 import { join, basename, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { createHash } from 'crypto';
+import { crc32 } from 'zlib';
 
 // Import shared transformation logic
 import {
@@ -241,6 +242,16 @@ function fixtureIdentifyUUID(label) {
 }
 
 /**
+ * Generate a deterministic integer from a fixture label, matching Rails'
+ * ActiveRecord::FixtureSet.identify(label).
+ * Uses CRC32 modulo MAX_ID (2^30-1) per Rails source.
+ */
+function fixtureIdentifyInteger(label) {
+  const MAX_ID = 2 ** 30 - 1;
+  return (crc32(Buffer.from(String(label))) >>> 0) % MAX_ID;
+}
+
+/**
  * Resolve a fixture reference value, stripping the _uuid suffix used by
  * Rails' UUID fixture convention. E.g., "writebook_uuid" -> "writebook".
  * Returns { fixtureName, isUuid } or null if not resolvable.
@@ -277,6 +288,11 @@ function parseFixtureFiles(appRoot) {
     const tableName = file.replace('.yml', '');
     try {
       let content = readFileSync(join(fixturesDir, file), 'utf-8');
+      // Evaluate ActiveRecord::FixtureSet.identify() calls before generic ERB strip
+      content = content.replace(/<%=\s*ActiveRecord::FixtureSet\.identify\(["']([^"']+)["'],\s*:uuid\)\s*%>/g,
+        (m, label) => fixtureIdentifyUUID(label));
+      content = content.replace(/<%=\s*ActiveRecord::FixtureSet\.identify\(["']([^"']+)["']\)\s*%>/g,
+        (m, label) => fixtureIdentifyInteger(label));
       // Handle simple ERB expressions (e.g., <%= Date.current.iso8601 %>)
       content = content.replace(/<%=\s*Date\.current\.iso8601\s*%>/g, new Date().toISOString().split('T')[0]);
       content = content.replace(/<%=\s*Date\.today\.iso8601\s*%>/g, new Date().toISOString().split('T')[0]);
@@ -286,14 +302,6 @@ function parseFixtureFiles(appRoot) {
 
       const parsed = yaml.load(content);
       if (parsed && typeof parsed === 'object') {
-        // Generate deterministic UUIDs for fixture IDs where ERB was stripped
-        // Only when id was explicitly present but stripped to "" (had ERB like identify(:uuid))
-        // Don't generate for fixtures with no id field — those use DB auto-increment
-        for (const [fixtureName, data] of Object.entries(parsed)) {
-          if (data && typeof data === 'object' && 'id' in data && (data.id === '' || data.id === '""')) {
-            data.id = fixtureIdentifyUUID(fixtureName);
-          }
-        }
         fixtures[tableName] = parsed;
       }
     } catch (err) {
