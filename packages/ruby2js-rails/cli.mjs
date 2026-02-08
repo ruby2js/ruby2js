@@ -633,8 +633,9 @@ function inlineFixtures(code, fixtures, associationMap) {
         if (targetTable && typeof value === 'string') {
           const ref = resolveFixtureRef(value, targetTable, fixtures);
           if (ref && allFixtures.has(`${targetTable}_${ref.fixtureName}`)) {
-            // Foreign key reference - use _fixtures ref
-            attrs.push(`${col}_id: _fixtures.${targetTable}_${ref.fixtureName}.id`);
+            // Association reference - pass the object so the setter populates the instance cache
+            // This enables synchronous access via the Reference pattern
+            attrs.push(`${col}: _fixtures.${targetTable}_${ref.fixtureName}`);
           } else if (ref) {
             // Known fixture but not in allFixtures - use generated UUID
             attrs.push(`${col}_id: ${JSON.stringify(fixtureIdentifyUUID(ref.fixtureName))}`);

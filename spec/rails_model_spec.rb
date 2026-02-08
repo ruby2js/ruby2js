@@ -128,7 +128,7 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'get article()'
       # Access via attributes property with bracket notation
       assert_includes result, 'this.attributes["article_id"'
-      assert_includes result, 'Article.find('
+      assert_includes result, 'new Reference(modelRegistry.Article'
     end
 
     it "handles optional: true" do
@@ -151,7 +151,7 @@ describe Ruby2JS::Filter::Rails::Model do
       RUBY
       assert_includes result, 'get creator()'
       assert_includes result, 'this.attributes["creator_id"'
-      assert_includes result, 'User.find('
+      assert_includes result, 'new Reference(modelRegistry.User'
     end
   end
 

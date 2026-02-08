@@ -801,12 +801,13 @@ export { ${classNames.join(', ')} };
 export function generateApplicationRecordForEject(config = {}) {
   const adapterFile = getActiveRecordAdapterFile(config.database);
   return `import { ActiveRecord as Base, CollectionProxy, modelRegistry } from 'ruby2js-rails/adapters/${adapterFile}';
+import { Reference, HasOneReference } from 'ruby2js-rails/adapters/reference.mjs';
 
 export class ApplicationRecord extends Base {
   static primaryAbstractClass = true;
 }
 
-export { CollectionProxy, modelRegistry };
+export { CollectionProxy, modelRegistry, Reference, HasOneReference };
 `;
 }
 

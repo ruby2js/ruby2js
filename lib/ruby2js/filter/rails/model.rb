@@ -117,12 +117,16 @@ module Ruby2JS
 
           # Check if model has has_many associations (need CollectionProxy)
           has_has_many = @rails_associations.any? { |a| a[:type] == :has_many }
+          has_belongs_to = @rails_associations.any? { |a| a[:type] == :belongs_to }
+          has_has_one = @rails_associations.any? { |a| a[:type] == :has_one }
           has_associations = @rails_associations.any?
 
           # Build import list: always include superclass, add CollectionProxy/modelRegistry if needed
           import_list = [s(:const, nil, superclass_name.to_sym)]
           import_list.push(s(:const, nil, :CollectionProxy)) if has_has_many
           import_list.push(s(:const, nil, :modelRegistry)) if has_associations
+          import_list.push(s(:const, nil, :Reference)) if has_belongs_to
+          import_list.push(s(:const, nil, :HasOneReference)) if has_has_one
 
           import_node = s(:send, nil, :import,
             s(:array, *import_list),
@@ -1201,29 +1205,58 @@ module Ruby2JS
         end
 
         def generate_has_one_method(assoc)
-          # has_one :profile -> get profile() { return Profile.find_by({user_id: this._id}) }
-          # Use :defget for getter (no parentheses needed when accessing)
-          # Use :attr for property access (no parentheses) to access inherited property
+          # has_one :profile generates:
+          #   get profile() {
+          #     if (this._profile_loaded) return this._profile;
+          #     return new HasOneReference(modelRegistry["Profile"],
+          #       {user_id: this.id}, v => { this._profile = v; this._profile_loaded = true; });
+          #   }
           association_name = assoc[:name]
+          cache_name = "_#{association_name}".to_sym
+          loaded_flag = "_#{association_name}_loaded".to_sym
           class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.classify(association_name.to_s)
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
 
           model_ref = s(:send, s(:lvar, :modelRegistry), :[], s(:str, class_name))
+
+          # Conditions hash: {user_id: this.id}
+          conditions = s(:hash,
+            s(:pair,
+              s(:sym, foreign_key.to_sym),
+              s(:attr, s(:self), :id)))
+
+          # Cache callback: v => { this._profile = v; this._profile_loaded = true; }
+          cache_callback = s(:block,
+            s(:send, nil, :proc),
+            s(:args, s(:arg, :v)),
+            s(:begin,
+              s(:send, s(:self), "#{cache_name}=".to_sym, s(:lvar, :v)),
+              s(:send, s(:self), "#{loaded_flag}=".to_sym, s(:true))))
+
+          # HasOneReference constructor
+          reference_call = s(:send, s(:const, nil, :HasOneReference), :new,
+            model_ref, conditions, cache_callback)
+
+          # Getter: return cached value if loaded flag is set, otherwise Reference
+          # The loaded flag distinguishes "never loaded" from "loaded but null"
           s(:defget, association_name,
             s(:args),
-            s(:autoreturn,
-              s(:send,
-                model_ref,
-                :find_by,
-                s(:hash,
-                  s(:pair,
-                    s(:sym, foreign_key.to_sym),
-                    s(:attr, s(:self), :id))))))
+            s(:begin,
+              s(:if,
+                s(:attr, s(:self), loaded_flag),
+                s(:return, s(:attr, s(:self), cache_name)),
+                nil),
+              s(:return, reference_call)))
         end
 
         def generate_belongs_to_method(assoc)
           # belongs_to :article generates:
-          #   get article() { return this._article || Article.find(this._attributes['article_id']) }
+          #   get article() {
+          #     if (this._article) return this._article;
+          #     if (!this.attributes['article_id']) return null;
+          #     return new Reference(modelRegistry["Article"], this.attributes['article_id'],
+          #       v => this._article = v);
+          #   }
           #   set article(value) {
           #     this._article = value;
           #     this._attributes['article_id'] = value ? value.id : null;
@@ -1238,33 +1271,35 @@ module Ruby2JS
           fk_access = s(:send, s(:attr, s(:self), :attributes), :[],
             s(:send, s(:str, foreign_key), :to_s))
 
-          # Getter: return cached object or find by foreign key
-          # this._article || modelRegistry["Article"].find(this.attributes['article_id'])
+          # Model reference via registry for lazy resolution
           model_ref = s(:send, s(:lvar, :modelRegistry), :[], s(:str, class_name))
-          find_call = s(:send,
-            model_ref,
-            :find,
-            fk_access)
 
-          if assoc[:options][:optional]
-            # Return nil if foreign key is nil: this._article || (fk && Model.find(fk))
-            getter = s(:defget, association_name,
-              s(:args),
-              s(:autoreturn,
-                s(:or,
-                  s(:attr, s(:self), cache_name),
-                  s(:if,
-                    fk_access,
-                    find_call,
-                    s(:nil)))))
-          else
-            getter = s(:defget, association_name,
-              s(:args),
-              s(:autoreturn,
-                s(:or,
-                  s(:attr, s(:self), cache_name),
-                  find_call)))
-          end
+          # Cache callback: v => this._article = v
+          cache_callback = s(:block,
+            s(:send, nil, :proc),
+            s(:args, s(:arg, :v)),
+            s(:send, s(:self), "#{cache_name}=".to_sym, s(:lvar, :v)))
+
+          # Reference constructor: new Reference(modelRegistry["Article"], fk, callback)
+          reference_call = s(:send, s(:const, nil, :Reference), :new,
+            model_ref, fk_access, cache_callback)
+
+          # Getter: return cached instance, null if no FK, or Reference
+          getter = s(:defget, association_name,
+            s(:args),
+            s(:begin,
+              # if (this._article) return this._article;
+              s(:if,
+                s(:attr, s(:self), cache_name),
+                s(:return, s(:attr, s(:self), cache_name)),
+                nil),
+              # if (!this.attributes['article_id']) return null;
+              s(:if,
+                s(:send, fk_access, :!),
+                s(:return, s(:nil)),
+                nil),
+              # return new Reference(...)
+              s(:return, reference_call)))
 
           # Setter: set article(value) {
           #   this._article = value;
