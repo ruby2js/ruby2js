@@ -46,6 +46,21 @@ module Ruby2JS
           broadcast_after_to: :after
         }.freeze
 
+        # ActiveRecord class methods that need self. prefix when called
+        # bare inside class methods (def self.X)
+        AR_CLASS_METHODS = %i[
+          create create! new build
+          find find_by find_by! find_each find_in_batches find_or_create_by
+          find_or_create_by! find_or_initialize_by find_sole_by
+          where all first last take count sum average minimum maximum
+          exists? any? none? many? one?
+          order group limit offset select distinct joins includes
+          left_outer_joins preload eager_load
+          pluck pick ids
+          destroy_all delete_all update_all
+          transaction
+        ].freeze
+
         def initialize(*args)
           # Note: super must come first for JS compatibility (derived class constructor rule)
           super
@@ -65,6 +80,7 @@ module Ruby2JS
           @rails_model_refs = Set.new
           @in_callback_block = false  # Track when processing callback body
           @uses_broadcast = false  # Track if model uses broadcast methods
+          @inside_class_method = false  # Track when inside def self.X
         end
 
         # Detect model class and transform
@@ -282,6 +298,17 @@ module Ruby2JS
           end
         end
 
+        # Track when inside a class method (def self.X) so bare class method
+        # calls like `create(...)` get prefixed with `self.` → `this.create(...)`
+        def on_defs(node)
+          return super unless @rails_model
+
+          @inside_class_method = true
+          result = super
+          @inside_class_method = false
+          result
+        end
+
         # Handle broadcast_*_to method calls and enum predicates/mutators inside model
         def on_send(node)
           target, method, *args = node.children
@@ -316,6 +343,15 @@ module Ruby2JS
                   end
                 end
               end
+            end
+          end
+
+          # Inside class methods (def self.X), bare calls to AR class methods
+          # and scopes need self. prefix: create(...) → self.create(...)
+          if @inside_class_method
+            scope_names = @rails_scopes.map { |sc| sc[:name] }
+            if AR_CLASS_METHODS.include?(method) || scope_names.include?(method)
+              return process s(:send, s(:self), method, *args)
             end
           end
 
