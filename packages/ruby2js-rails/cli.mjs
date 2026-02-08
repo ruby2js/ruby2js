@@ -286,9 +286,11 @@ function parseFixtureFiles(appRoot) {
 
       const parsed = yaml.load(content);
       if (parsed && typeof parsed === 'object') {
-        // Generate deterministic UUIDs for fixture IDs (replaces stripped ERB)
+        // Generate deterministic UUIDs for fixture IDs where ERB was stripped
+        // Only when id was explicitly present but stripped to "" (had ERB like identify(:uuid))
+        // Don't generate for fixtures with no id field — those use DB auto-increment
         for (const [fixtureName, data] of Object.entries(parsed)) {
-          if (data && typeof data === 'object' && (!data.id || data.id === '')) {
+          if (data && typeof data === 'object' && 'id' in data && (data.id === '' || data.id === '""')) {
             data.id = fixtureIdentifyUUID(fixtureName);
           }
         }
