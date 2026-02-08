@@ -7,9 +7,10 @@ import { ActiveRecordBase, attr_accessor, initTimePolyfill } from 'ruby2js-rails
 import { parseCondition, applyToDexie, toFilterFunction, canParse } from 'ruby2js-rails/adapters/sql_parser.mjs';
 import { Relation } from 'ruby2js-rails/adapters/relation.mjs';
 import { CollectionProxy } from 'ruby2js-rails/adapters/collection_proxy.mjs';
+import { Reference, HasOneReference } from 'ruby2js-rails/adapters/reference.mjs';
 
 // Re-export shared utilities
-export { attr_accessor, CollectionProxy };
+export { attr_accessor, CollectionProxy, Reference, HasOneReference };
 
 // Model registry for association resolution (populated by Application.registerModels)
 export const modelRegistry = {};

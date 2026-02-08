@@ -8,9 +8,10 @@ import { rpc, RPCError } from 'ruby2js-rails/rpc/client.mjs';
 import { ActiveRecordBase, attr_accessor, initTimePolyfill } from 'ruby2js-rails/adapters/active_record_base.mjs';
 import { Relation } from 'ruby2js-rails/adapters/relation.mjs';
 import { CollectionProxy } from 'ruby2js-rails/adapters/collection_proxy.mjs';
+import { Reference, HasOneReference } from 'ruby2js-rails/adapters/reference.mjs';
 
 // Re-export shared utilities
-export { attr_accessor, CollectionProxy, RPCError };
+export { attr_accessor, CollectionProxy, Reference, HasOneReference, RPCError };
 
 // Model registry for association resolution (populated by Application.registerModels)
 export const modelRegistry = {};

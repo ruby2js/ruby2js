@@ -245,9 +245,39 @@ function mergeConcernDeclarations(source, modelsDir) {
     concernNames.push(...names);
   }
 
-  if (concernNames.length === 0) return source;
+  // Track which concern files we've already processed (from explicit includes)
+  const processedFiles = new Set();
 
-  // For each concern, try to find its file and extract included do body
+  // Helper: extract declarations from a concern file's included-do block
+  function extractDeclarationsFromFile(filePath) {
+    const lines = [];
+    try {
+      const concernSource = readFileSync(filePath, 'utf-8');
+      const body = extractIncludedDoBody(concernSource);
+      if (body) {
+        // Only inject declarations that define model structure:
+        // - Associations: has_many, has_one, belongs_to
+        // - Scopes and enums: scope, enum
+        // Skip callbacks — the concern's methods are mixed in at runtime
+        // and callbacks reference methods that may be private in the concern
+        for (const line of body.split('\n')) {
+          const trimmed = line.trim();
+          if (trimmed.length === 0 || trimmed.startsWith('#')) continue;
+          if (/^(has_many|has_one|belongs_to|scope|enum)\b/.test(trimmed)) {
+            // Skip multi-line block openers (incomplete without body + end)
+            // e.g., "has_many :accesses do", "scope :foo, -> do"
+            if (/\bdo\s*(\|[^|]*\|)?\s*$/.test(trimmed)) continue;
+            lines.push('  ' + trimmed);
+          }
+        }
+      }
+    } catch (err) {
+      // Skip concerns that can't be read
+    }
+    return lines;
+  }
+
+  // Phase 1: Process explicitly included concerns
   const injectedLines = [];
   for (const name of concernNames) {
     // Concern file path: Card includes Closeable => card/closeable.rb
@@ -256,27 +286,33 @@ function mergeConcernDeclarations(source, modelsDir) {
     const concernFile = join(modelsDir, className.toLowerCase(), snakeName + '.rb');
 
     if (!existsSync(concernFile)) continue;
+    processedFiles.add(concernFile);
+    injectedLines.push(...extractDeclarationsFromFile(concernFile));
+  }
 
+  // Phase 2: Auto-discover concerns from the model's subdirectory
+  // Rails convention: files in app/models/card/ are Card:: concerns
+  // Some may not be explicitly included (e.g., stripped benchmark repos)
+  const modelSubdir = join(modelsDir, className.toLowerCase());
+  if (existsSync(modelSubdir)) {
     try {
-      const concernSource = readFileSync(concernFile, 'utf-8');
-      const body = extractIncludedDoBody(concernSource);
-      if (body) {
-        // Only inject declarations that define model structure:
-        // - Associations: has_many, has_one, belongs_to
-        // - Scopes and enums: scope, enum
-        // Skip callbacks — the concern's methods are mixed in at runtime
-        // and callbacks reference methods that may be private in the concern
-        const lines = body.split('\n');
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.length === 0 || trimmed.startsWith('#')) continue;
-          if (/^(has_many|has_one|belongs_to|scope|enum)\b/.test(trimmed)) {
-            injectedLines.push('  ' + trimmed);
-          }
+      for (const entry of readdirSync(modelSubdir, { withFileTypes: true })) {
+        if (!entry.isFile() || !entry.name.endsWith('.rb')) continue;
+        const filePath = join(modelSubdir, entry.name);
+        if (processedFiles.has(filePath)) continue;
+
+        // Only process ActiveSupport::Concern modules (skip sub-models and plain classes)
+        try {
+          const content = readFileSync(filePath, 'utf-8');
+          if (!/extend\s+ActiveSupport::Concern/.test(content)) continue;
+          processedFiles.add(filePath);
+          injectedLines.push(...extractDeclarationsFromFile(filePath));
+        } catch (err) {
+          // Skip unreadable files
         }
       }
     } catch (err) {
-      // Skip concerns that can't be read
+      // Skip if directory can't be read
     }
   }
 

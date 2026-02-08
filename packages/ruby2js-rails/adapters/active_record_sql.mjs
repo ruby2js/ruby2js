@@ -16,13 +16,14 @@
 import { ActiveRecordBase } from 'ruby2js-rails/adapters/active_record_base.mjs';
 import { Relation } from 'ruby2js-rails/adapters/relation.mjs';
 import { CollectionProxy } from 'ruby2js-rails/adapters/collection_proxy.mjs';
+import { Reference, HasOneReference } from 'ruby2js-rails/adapters/reference.mjs';
 import { singularize } from 'ruby2js-rails/adapters/inflector.mjs';
 
 // Model registry for association resolution (populated by Application.registerModels)
 export const modelRegistry = {};
 
 // Re-export CollectionProxy for use by models
-export { CollectionProxy };
+export { CollectionProxy, Reference, HasOneReference };
 
 export class ActiveRecordSQL extends ActiveRecordBase {
   // --- Dialect hooks (override in dialect subclass) ---
