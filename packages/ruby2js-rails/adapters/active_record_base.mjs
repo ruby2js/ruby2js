@@ -195,15 +195,42 @@ export class ActiveRecordBase {
     this.attributes.updated_at = now;
     this.updated_at = now;
 
+    // Run before_save instance method and registered callbacks
+    if (typeof this.before_save === 'function') await this.before_save();
+    await this._runCallbacks('before_save');
+
     if (this._persisted) {
+      // Run before_update callbacks
+      await this._runCallbacks('before_update');
+
       const result = await this._update();
-      if (result) await this._runCallbacks('after_update_commit');
+
+      if (result) {
+        // Run after_update instance method and callbacks
+        if (typeof this.after_update === 'function') await this.after_update();
+        await this._runCallbacks('after_update');
+        await this._runCallbacks('after_save');
+        if (typeof this.after_save === 'function') await this.after_save();
+        await this._runCallbacks('after_update_commit');
+      }
       return result;
     } else {
-      this.attributes.created_at = now;
-      this.created_at = now;
+      this.attributes.created_at ??= now;
+      this.created_at ??= now;
+
+      // Run before_create instance method and registered callbacks
+      if (typeof this.before_create === 'function') await this.before_create();
+      await this._runCallbacks('before_create');
+
       const result = await this._insert();
-      if (result) await this._runCallbacks('after_create_commit');
+
+      if (result) {
+        // Run after_create callbacks
+        await this._runCallbacks('after_create');
+        await this._runCallbacks('after_save');
+        if (typeof this.after_save === 'function') await this.after_save();
+        await this._runCallbacks('after_create_commit');
+      }
       return result;
     }
   }
@@ -229,6 +256,14 @@ export class ActiveRecordBase {
     return await this.save();
   }
 
+  // Increment a counter column and save, returns self for chaining
+  async increment(field, by = 1) {
+    this.attributes[field] = (this.attributes[field] || 0) + by;
+    this[field] = this.attributes[field];
+    await this.save();
+    return this;
+  }
+
   // --- Class Methods ---
 
   static async create(attributes) {
@@ -238,6 +273,36 @@ export class ActiveRecordBase {
   }
 
   // --- Callback registration ---
+  static before_save(callback) {
+    if (!this._before_save_callbacks) this._before_save_callbacks = [];
+    this._before_save_callbacks.push(callback);
+  }
+
+  static before_create(callback) {
+    if (!this._before_create_callbacks) this._before_create_callbacks = [];
+    this._before_create_callbacks.push(callback);
+  }
+
+  static before_update(callback) {
+    if (!this._before_update_callbacks) this._before_update_callbacks = [];
+    this._before_update_callbacks.push(callback);
+  }
+
+  static after_create(callback) {
+    if (!this._after_create_callbacks) this._after_create_callbacks = [];
+    this._after_create_callbacks.push(callback);
+  }
+
+  static after_save(callback) {
+    if (!this._after_save_callbacks) this._after_save_callbacks = [];
+    this._after_save_callbacks.push(callback);
+  }
+
+  static after_update(callback) {
+    if (!this._after_update_callbacks) this._after_update_callbacks = [];
+    this._after_update_callbacks.push(callback);
+  }
+
   static after_create_commit(callback) {
     if (!this._after_create_commit_callbacks) this._after_create_commit_callbacks = [];
     this._after_create_commit_callbacks.push(callback);

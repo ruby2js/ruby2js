@@ -893,12 +893,21 @@ beforeAll(async () => {
       globalThis[name] = value;
     }
   }
-  // Attach nested classes to parent namespaces (generated from model paths)
-  // e.g., Search.Highlighter = Highlighter, ZipFile.Writer = Writer
+  // Attach nested classes to parent namespaces and mix in concern methods
+  // e.g., Card.Closeable = Closeable, then mix Closeable methods into Card.prototype
   const _nesting = (globalThis._modelNesting || []);
   for (const [parent, child] of _nesting) {
     if (globalThis[parent] && globalThis[child]) {
       globalThis[parent][child] = globalThis[child];
+
+      // If child is a plain object (concern module), mix its methods into parent prototype
+      const childVal = globalThis[child];
+      if (typeof childVal === 'object' && childVal !== null && typeof globalThis[parent] === 'function') {
+        Object.defineProperties(
+          globalThis[parent].prototype,
+          Object.getOwnPropertyDescriptors(childVal)
+        );
+      }
     }
   }
   // Promote CurrentAttributes instance methods to static on Current

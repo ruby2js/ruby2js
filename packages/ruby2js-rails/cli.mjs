@@ -202,6 +202,99 @@ function findRubyModelFiles(dir) {
 }
 
 // ============================================
+// Concern merging for model transpilation
+// ============================================
+
+/**
+ * Extract the body of `included do ... end` from a concern file.
+ * Returns the lines inside the block, or empty string if not found.
+ */
+function extractIncludedDoBody(concernSource) {
+  // Match `included do\n ... \n  end` — the `end` that closes `included do`
+  // is at the same indentation level as `included`
+  const match = concernSource.match(/^(\s*)included\s+do\s*\n([\s\S]*?)\n\1end/m);
+  if (!match) return '';
+  return match[2];
+}
+
+/**
+ * Pre-process a model's Ruby source to merge in declarations from its
+ * included concerns' `included do` blocks.
+ *
+ * This ensures that `has_many`, `belongs_to`, `has_one`, `scope`, `enum`,
+ * and callback declarations that live in concerns are visible to the
+ * Rails model filter during transpilation.
+ *
+ * @param {string} source - The model's Ruby source code
+ * @param {string} modelsDir - Path to app/models directory
+ * @returns {string} Modified source with concern declarations injected
+ */
+function mergeConcernDeclarations(source, modelsDir) {
+  // Find the class declaration and its include statement
+  const classMatch = source.match(/^(class\s+(\w+)\s*<[^\n]*\n)/m);
+  if (!classMatch) return source;
+  const className = classMatch[2];
+
+  // Find include statements: `include Foo, Bar, Baz`
+  const includeRegex = /^\s*include\s+([A-Z][\w:, ]+)/gm;
+  let includeMatch;
+  const concernNames = [];
+  while ((includeMatch = includeRegex.exec(source)) !== null) {
+    // Split comma-separated concern names
+    const names = includeMatch[1].split(',').map(n => n.trim()).filter(n => n.length > 0);
+    concernNames.push(...names);
+  }
+
+  if (concernNames.length === 0) return source;
+
+  // For each concern, try to find its file and extract included do body
+  const injectedLines = [];
+  for (const name of concernNames) {
+    // Concern file path: Card includes Closeable => card/closeable.rb
+    // Board includes Cards => board/cards.rb
+    const snakeName = name.replace(/([A-Z])/g, (m, c, i) => (i > 0 ? '_' : '') + c.toLowerCase());
+    const concernFile = join(modelsDir, className.toLowerCase(), snakeName + '.rb');
+
+    if (!existsSync(concernFile)) continue;
+
+    try {
+      const concernSource = readFileSync(concernFile, 'utf-8');
+      const body = extractIncludedDoBody(concernSource);
+      if (body) {
+        // Only inject declarations that define model structure:
+        // - Associations: has_many, has_one, belongs_to
+        // - Scopes and enums: scope, enum
+        // Skip callbacks — the concern's methods are mixed in at runtime
+        // and callbacks reference methods that may be private in the concern
+        const lines = body.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.length === 0 || trimmed.startsWith('#')) continue;
+          if (/^(has_many|has_one|belongs_to|scope|enum)\b/.test(trimmed)) {
+            injectedLines.push('  ' + trimmed);
+          }
+        }
+      }
+    } catch (err) {
+      // Skip concerns that can't be read
+    }
+  }
+
+  if (injectedLines.length === 0) return source;
+
+  // Inject after the include statement (or after the class declaration if no include)
+  const insertionPoint = source.match(/^\s*include\s+[^\n]+\n/m);
+  if (insertionPoint) {
+    const pos = insertionPoint.index + insertionPoint[0].length;
+    return source.slice(0, pos) + '\n  # [merged from concerns]\n' + injectedLines.join('\n') + '\n' + source.slice(pos);
+  }
+
+  // Fallback: insert after class declaration
+  const classEnd = classMatch.index + classMatch[0].length;
+  return source.slice(0, classEnd) + '\n  # [merged from concerns]\n' + injectedLines.join('\n') + '\n' + source.slice(classEnd);
+}
+
+// ============================================
 // Test file transpilation helpers
 // ============================================
 
@@ -729,7 +822,10 @@ function buildAssociationMapFromRuby(modelsDir) {
 
   for (const file of modelFiles) {
     try {
-      const content = readFileSync(join(modelsDir, file), 'utf-8');
+      let content = readFileSync(join(modelsDir, file), 'utf-8');
+
+      // Merge concern declarations so belongs_to in concerns are found
+      content = mergeConcernDeclarations(content, modelsDir);
 
       // Extract class name
       const classMatch = content.match(/class\s+(\w+)\s*</);
@@ -1794,7 +1890,12 @@ async function runEject(options) {
       for (const file of modelFiles) {
         const relativePath = `app/models/${file}`;
         try {
-          const source = readFileSync(join(modelsDir, file), 'utf-8');
+          let source = readFileSync(join(modelsDir, file), 'utf-8');
+          // Merge association/scope/callback declarations from included concerns
+          // so the Rails model filter generates proper getters and metadata
+          if (!file.includes('/')) {
+            source = mergeConcernDeclarations(source, modelsDir);
+          }
           const result = await transformRuby(source, join(modelsDir, file), null, config, APP_ROOT);
           // Pass relative output path for correct import resolution
           const relativeOutPath = `app/models/${file.replace('.rb', '.js')}`;
