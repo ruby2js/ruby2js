@@ -203,7 +203,7 @@ describe Ruby2JS::Filter::Rails::Model do
           scope :published, -> { where(status: 'published') }
         end
       RUBY
-      assert_includes result, 'static published()'
+      assert_includes result, 'static get published()'
       assert_includes result, 'this.where({status: "published"})'
     end
 
@@ -213,7 +213,7 @@ describe Ruby2JS::Filter::Rails::Model do
           scope :recent, -> { order(created_at: :desc).limit(10) }
         end
       RUBY
-      assert_includes result, 'static recent()'
+      assert_includes result, 'static get recent()'
       assert_includes result, 'this.order({created_at: "desc"}).limit(10)'
     end
   end

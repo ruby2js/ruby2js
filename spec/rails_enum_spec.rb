@@ -41,9 +41,9 @@ describe "Rails enum transpilation" do
           enum :status, %w[drafted published].index_by(&:itself)
         end
       RUBY
-      assert_includes result, 'static drafted() {'
+      assert_includes result, 'static get drafted() {'
       assert_includes result, 'return this.where({status: "drafted"})'
-      assert_includes result, 'static published() {'
+      assert_includes result, 'static get published() {'
       assert_includes result, 'return this.where({status: "published"})'
     end
   end
@@ -103,9 +103,9 @@ describe "Rails enum transpilation" do
         end
       RUBY
       assert_includes result, 'for_sign_in() {'
-      assert_includes result, 'static for_sign_in() {'
+      assert_includes result, 'static get for_sign_in() {'
       assert_includes result, 'for_sign_up() {'
-      assert_includes result, 'static for_sign_up() {'
+      assert_includes result, 'static get for_sign_up() {'
       # Should not generate unprefixed methods
       refute_match(/[^_]sign_in\(\)/, result)
     end

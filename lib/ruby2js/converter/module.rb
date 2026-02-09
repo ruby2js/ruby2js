@@ -207,6 +207,20 @@ module Ruby2JS
         end
       end
 
+      # Wrap predicate function bodies in autoreturn so the inner function
+      # returns its last expression (the getter calls fn.call(this)).
+      unless predicate_symbols.empty?
+        body.each_with_index do |node, i|
+          next unless node.respond_to?(:type) && node.type == :def
+          fn_name = node.children[0].to_s.sub(/[?!]$/, '').to_sym
+          next unless predicate_symbols.include?(fn_name)
+          fn_body = node.children[2]
+          next unless fn_body
+          body[i] = node.updated(nil, [node.children[0], node.children[1],
+            s(:autoreturn, fn_body)])
+        end
+      end
+
       # Split regular symbols from predicate (formerly ?) symbols.
       # Predicates become getters that call the inner function with this,
       # so card.closed evaluates the predicate instead of returning the function.

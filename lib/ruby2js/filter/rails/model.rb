@@ -66,6 +66,7 @@ module Ruby2JS
           super
           @rails_model = nil
           @rails_model_name = nil
+          @rails_model_class_name = nil
           @rails_model_processing = false
           @rails_associations = []
           @rails_validations = []
@@ -110,6 +111,7 @@ module Ruby2JS
           end
 
           @rails_model_name = class_name.children.last.to_s
+          @rails_model_class_name = class_name
           @rails_model = true
           @rails_model_processing = true
 
@@ -231,6 +233,7 @@ module Ruby2JS
 
           @rails_model = nil
           @rails_model_name = nil
+          @rails_model_class_name = nil
           @rails_model_processing = false
           @rails_associations = []
           @rails_validations = []
@@ -1028,7 +1031,17 @@ module Ruby2JS
           transformed = []
 
           # Add table_name as a static getter (not a method) so it can be accessed as this.table_name
-          table_name = Ruby2JS::Inflector.pluralize(@rails_model_name.downcase)
+          # Use underscore for proper CamelCase handling (NotNow -> not_now -> not_nows)
+          leaf_name = Ruby2JS::Inflector.underscore(@rails_model_name)
+          # For namespaced models (Card::NotNow), Rails prefixes with parent table name
+          # when parent is an AR model: card_not_nows
+          parent_const = @rails_model_class_name.children.first
+          if parent_const && parent_const.type == :const
+            parent_name = Ruby2JS::Inflector.underscore(parent_const.children.last.to_s)
+            table_name = Ruby2JS::Inflector.pluralize("#{parent_name}_#{leaf_name}")
+          else
+            table_name = Ruby2JS::Inflector.pluralize(leaf_name)
+          end
           transformed << s(:send, s(:self), :table_name=,
             s(:str, table_name))
 
@@ -1275,7 +1288,7 @@ module Ruby2JS
 
           # Getter: return cached value if loaded flag is set, otherwise Reference
           # The loaded flag distinguishes "never loaded" from "loaded but null"
-          s(:defget, association_name,
+          getter = s(:defget, association_name,
             s(:args),
             s(:begin,
               s(:if,
@@ -1283,6 +1296,30 @@ module Ruby2JS
                 s(:return, s(:attr, s(:self), cache_name)),
                 nil),
               s(:return, reference_call)))
+
+          # Setter: set closure(value) { this._closure = value; this._closure_loaded = true; }
+          setter_name = "#{association_name}=".to_sym
+          setter = s(:def, setter_name,
+            s(:args, s(:arg, :value)),
+            s(:begin,
+              s(:send, s(:self), "#{cache_name}=".to_sym, s(:lvar, :value)),
+              s(:send, s(:self), "#{loaded_flag}=".to_sym, s(:true))))
+
+          # create_X method: Rails auto-generates create_X! for has_one
+          # async create_closure(attrs={}) { this.closure = await Closure.create({...attrs, fk: this.id}); return this.closure; }
+          create_method_name = "create_#{association_name}".to_sym
+          create_method = s(:async, create_method_name,
+            s(:args, s(:optarg, :attrs, s(:hash))),
+            s(:begin,
+              s(:send, s(:self), "#{association_name}=".to_sym,
+                s(:send, nil, :await,
+                  s(:send, model_ref, :create,
+                    s(:hash,
+                      s(:kwsplat, s(:lvar, :attrs)),
+                      s(:pair, s(:sym, foreign_key.to_sym), s(:attr, s(:self), :id)))))),
+              s(:return, s(:attr, s(:self), cache_name))))
+
+          s(:begin, getter, setter, create_method)
         end
 
         def generate_belongs_to_method(assoc)
@@ -1524,9 +1561,10 @@ module Ruby2JS
               s(:autoreturn,
                 s(:send, s(:attr, s(:self), field), :===, val)))
 
-            # Static scope method: static drafted() { return this.where({status: "drafted"}) }
+            # Static scope getter: static get drafted() { return this.where({status: "drafted"}) }
+            # Use :defp to force getter (synthesized nodes lack location for is_method? check)
             if generate_scopes
-              result << s(:defs, s(:self), method_name.to_sym, s(:args),
+              result << s(:defp, s(:self), method_name.to_sym, s(:args),
                 s(:autoreturn, s(:send, s(:self), :where,
                   s(:hash, s(:pair, s(:sym, field), val)))))
             end
@@ -1537,7 +1575,7 @@ module Ruby2JS
 
         def generate_scope_method(scope)
           # scope :published, -> { where(status: 'published') }
-          # becomes: def self.published; self.where({status: 'published'}); end
+          # becomes: static get published() { return this.where({status: 'published'}) }
 
           body = if scope[:body].type == :block
                    # -> { where(...) } is a block with lambda send
@@ -1546,9 +1584,23 @@ module Ruby2JS
                    s(:nil)
                  end
 
-          s(:defs, s(:self), scope[:name],
-            s(:args),
-            s(:autoreturn, body))
+          # Check if lambda has parameters
+          lambda_args = scope[:body].type == :block ? scope[:body].children[1] : nil
+          has_params = lambda_args && lambda_args.children.any?
+
+          if has_params
+            # Scope with params: static method (called with arguments)
+            s(:defs, s(:self), scope[:name],
+              lambda_args,
+              s(:autoreturn, body))
+          else
+            # Zero-arg scope: static getter (property access, e.g. Card.closed)
+            # Use :defp to force getter in class2 converter (synthesized nodes
+            # lack location info, so is_method? returns true for :defs)
+            s(:defp, s(:self), scope[:name],
+              s(:args),
+              s(:autoreturn, body))
+          end
         end
 
         def transform_scope_body(node)

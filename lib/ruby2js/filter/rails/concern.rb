@@ -230,12 +230,14 @@ module Ruby2JS
           if node.type == :def
             name, args, body = node.children
             return node unless body
-            new_body = rewrite_node(body, locals)
+            method_name = name.to_s.sub(/[?!=]$/, '')
+            new_body = rewrite_node(body, locals, method_name)
             node.updated(nil, [name, args, new_body])
           elsif node.type == :defs
             target, name, args, body = node.children
             return node unless body
-            new_body = rewrite_node(body, locals)
+            method_name = name.to_s.sub(/[?!=]$/, '')
+            new_body = rewrite_node(body, locals, method_name)
             node.updated(nil, [target, name, args, new_body])
           else
             node
@@ -281,8 +283,34 @@ module Ruby2JS
         # Recursively rewrite bare sends to use self. prefix.
         # In concerns, ALL s(:send, nil, :name) are implicit self calls
         # that must become this.name for prototype mixing to work.
-        def rewrite_node(node, locals)
+        def rewrite_node(node, locals, method_name = nil)
           return node unless node.respond_to?(:type)
+
+          # Handle super/zsuper in concern methods.
+          # In Rails, super on an attribute method returns the raw DB value.
+          # In concerns (IIFEs), there's no class hierarchy for super to call.
+          # Rewrite to this.attributes["method_name"] for raw attribute access.
+          if method_name && (node.type == :zsuper || node.type == :super)
+            return s(:send,
+              s(:attr, s(:self), :attributes),
+              :[],
+              s(:send, s(:str, method_name), :to_s))
+          end
+
+          # Handle .present? / .blank? / .nil? on bare sends (association checks).
+          # closure.present? → self.closure != null (not ?.length > 0)
+          # Must intercept before the functions filter converts .present? to ?.length > 0.
+          if node.type == :send && [:present?, :blank?, :nil?].include?(node.children[1])
+            receiver = node.children[0]
+            if receiver&.respond_to?(:type) && receiver.type == :send && receiver.children[0].nil?
+              method = receiver.children[1]
+              unless locals.include?(method) || CONCERN_SELF_EXCEPTIONS.include?(method)
+                self_send = receiver.updated(nil, [s(:self), method])
+                op = (node.children[1] == :present?) ? :!= : :==
+                return node.updated(nil, [self_send, op, s(:nil)])
+              end
+            end
+          end
 
           # Match: s(:send, nil, :name, *args) — bare method call
           if node.type == :send && node.children[0].nil?
@@ -291,7 +319,7 @@ module Ruby2JS
             # Skip local variables and known exceptions
             unless locals.include?(method) || CONCERN_SELF_EXCEPTIONS.include?(method)
               new_children = [s(:self), method, *node.children[2..-1].map { |c|
-                rewrite_node(c, locals)
+                rewrite_node(c, locals, method_name)
               }]
               return node.updated(nil, new_children)
             end
@@ -308,7 +336,7 @@ module Ruby2JS
                 end
                 child
               else
-                rewrite_node(child, locals)
+                rewrite_node(child, locals, method_name)
               end
             else
               child

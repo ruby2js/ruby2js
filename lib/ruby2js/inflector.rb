@@ -161,6 +161,25 @@ module Ruby2JS
       word.split('_').map { |s| s.empty? ? '' : s[0].upcase + s[1..-1] }.join
     end
 
+    # Convert CamelCase to snake_case
+    # 'NotNow' -> 'not_now', 'AccessToken' -> 'access_token'
+    # Uses character-by-character loop for JS transpilation compatibility
+    def self.underscore(word)
+      result = ''
+      i = 0
+      while i < word.length
+        ch = word[i]
+        if ch == ch.upcase && ch != ch.downcase
+          result += '_' if i > 0
+          result += ch.downcase
+        else
+          result += ch
+        end
+        i += 1
+      end
+      result
+    end
+
     def self.pluralize(word)
       lower = word.downcase
       return word if UNCOUNTABLES.include?(lower)
