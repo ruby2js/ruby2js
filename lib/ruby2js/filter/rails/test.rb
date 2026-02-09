@@ -521,6 +521,11 @@ module Ruby2JS
             collection, item = args[0], args[1]
             s(:send, s(:send, nil, :expect, process(collection)), :toContain, process(item))
 
+          when :assert_not_includes, :refute_includes
+            # assert_not_includes collection, item -> expect(collection).not.toContain(item)
+            collection, item = args[0], args[1]
+            s(:send, s(:attr, s(:send, nil, :expect, process(collection)), :not), :toContain, process(item))
+
           when :assert_respond_to
             # assert_respond_to obj, method -> expect(typeof obj.method).toBe('function')
             obj, meth = args[0], args[1]

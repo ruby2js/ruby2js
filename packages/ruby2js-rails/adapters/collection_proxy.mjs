@@ -10,10 +10,22 @@
 export class CollectionProxy {
   constructor(owner, association, AssocModel) {
     this._owner = owner;
-    this._association = association;  // { name, type, foreignKey, className }
+    this._association = association;  // { name, type, foreignKey, foreignType?, ownerType? }
     this._model = AssocModel;
     this._loaded = false;
     this._records = null;
+  }
+
+  // Build scope conditions for this association
+  // Normal: { article_id: owner.id }
+  // Polymorphic: { eventable_id: owner.id, eventable_type: "Card" }
+  _scopeConditions() {
+    const fk = this._association.foreignKey;
+    const conditions = { [fk]: this._owner.id };
+    if (this._association.foreignType) {
+      conditions[this._association.foreignType] = this._association.ownerType;
+    }
+    return conditions;
   }
 
   // --- Counting ---
@@ -22,15 +34,13 @@ export class CollectionProxy {
   // Usage: await article.comments.size()
   size() {
     if (this._records) return this._records.length;
-    const fk = this._association.foreignKey;
-    return this._model.where({ [fk]: this._owner.id }).count();
+    return this._model.where(this._scopeConditions()).count();
   }
 
   // count() - always does COUNT query (ignores cache), like Rails
   // Usage: await article.comments.count()
   async count() {
-    const fk = this._association.foreignKey;
-    return this._model.where({ [fk]: this._owner.id }).count();
+    return this._model.where(this._scopeConditions()).count();
   }
 
   // length property - for (await proxy).length after loading records
@@ -56,8 +66,7 @@ export class CollectionProxy {
   // --- Building ---
 
   build(params = {}) {
-    const fk = this._association.foreignKey;
-    return new this._model({ ...params, [fk]: this._owner.id });
+    return new this._model({ ...params, ...this._scopeConditions() });
   }
 
   async create(params = {}) {
@@ -72,8 +81,7 @@ export class CollectionProxy {
 
   async find(id) {
     // Find within association scope
-    const fk = this._association.foreignKey;
-    return this._model.where({ [fk]: this._owner.id, id }).first();
+    return this._model.where({ ...this._scopeConditions(), id }).first();
   }
 
   async first() {
@@ -119,8 +127,7 @@ export class CollectionProxy {
 
   // Convert to a scoped Relation for chaining
   toRelation() {
-    const fk = this._association.foreignKey;
-    return this._model.where({ [fk]: this._owner.id });
+    return this._model.where(this._scopeConditions());
   }
 
   // Alias for toRelation

@@ -1083,6 +1083,8 @@ module Ruby2JS
               # For has_many, singularize and capitalize: comments -> Comment
               # For belongs_to, just capitalize: article -> Article
               class_name = assoc[:options][:class_name]
+              # Strip Ruby's :: namespace prefix (e.g., "::Card" → "Card")
+              class_name = class_name.sub(/^::/, '') if class_name
               unless class_name
                 name_str = assoc[:name].to_s
                 if assoc[:type] == :has_many
@@ -1099,6 +1101,13 @@ module Ruby2JS
               ]
               if assoc[:options][:foreign_key]
                 props << s(:pair, s(:sym, :foreignKey), s(:str, assoc[:options][:foreign_key]))
+              end
+              # Polymorphic associations: include foreignType and ownerType
+              if assoc[:options][:as]
+                poly_name = assoc[:options][:as].to_s
+                props << s(:pair, s(:sym, :foreignKey), s(:str, "#{poly_name}_id"))
+                props << s(:pair, s(:sym, :foreignType), s(:str, "#{poly_name}_type"))
+                props << s(:pair, s(:sym, :ownerType), s(:str, @rails_model_name))
               end
               s(:pair, s(:sym, assoc[:name]), s(:hash, *props))
             end
@@ -1213,14 +1222,26 @@ module Ruby2JS
           # Also generates set comments(val) for preloading
           association_name = assoc[:name]
           cache_name = "_#{association_name}".to_sym
-          class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.classify(Ruby2JS::Inflector.singularize(association_name.to_s))
-          foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
+          class_name = (assoc[:options][:class_name] || '').sub(/^::/, '')
+          class_name = Ruby2JS::Inflector.classify(Ruby2JS::Inflector.singularize(association_name.to_s)) if class_name.empty?
+          # Polymorphic: has_many :events, as: :eventable → foreignKey: "eventable_id"
+          polymorphic_name = assoc[:options][:as]
+          foreign_key = assoc[:options][:foreign_key] ||
+            (polymorphic_name ? "#{polymorphic_name}_id" : "#{@rails_model_name.downcase}_id")
 
           # Build association metadata object: { name: 'comments', type: 'has_many', foreignKey: 'article_id' }
-          assoc_metadata = s(:hash,
+          # For polymorphic: also includes foreignType and ownerType
+          metadata_pairs = [
             s(:pair, s(:sym, :name), s(:str, association_name.to_s)),
             s(:pair, s(:sym, :type), s(:str, 'has_many')),
-            s(:pair, s(:sym, :foreignKey), s(:str, foreign_key)))
+            s(:pair, s(:sym, :foreignKey), s(:str, foreign_key))
+          ]
+          if polymorphic_name
+            metadata_pairs.push(
+              s(:pair, s(:sym, :foreignType), s(:str, "#{polymorphic_name}_type")),
+              s(:pair, s(:sym, :ownerType), s(:str, @rails_model_name)))
+          end
+          assoc_metadata = s(:hash, *metadata_pairs)
 
           # Build: new CollectionProxy(this, metadata, modelRegistry["Comment"])
           model_ref = s(:send, s(:lvar, :modelRegistry), :[], s(:str, class_name))
@@ -1263,7 +1284,8 @@ module Ruby2JS
           association_name = assoc[:name]
           cache_name = "_#{association_name}".to_sym
           loaded_flag = "_#{association_name}_loaded".to_sym
-          class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.classify(association_name.to_s)
+          class_name = (assoc[:options][:class_name] || '').sub(/^::/, '')
+          class_name = Ruby2JS::Inflector.classify(association_name.to_s) if class_name.empty?
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
 
           model_ref = s(:send, s(:lvar, :modelRegistry), :[], s(:str, class_name))
@@ -1336,7 +1358,8 @@ module Ruby2JS
           #   }
           association_name = assoc[:name]
           cache_name = "_#{association_name}".to_sym
-          class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.classify(association_name.to_s)
+          class_name = (assoc[:options][:class_name] || '').sub(/^::/, '')
+          class_name = Ruby2JS::Inflector.classify(association_name.to_s) if class_name.empty?
           foreign_key = assoc[:options][:foreign_key] || "#{association_name}_id"
 
           # Access foreign key from attributes - use :attr for property access
