@@ -264,6 +264,24 @@ export class ActiveRecordBase {
     return this;
   }
 
+  // Transaction wrapper — executes callback and returns result.
+  // For single-connection in-memory SQLite this is a simple pass-through.
+  async transaction(callback) {
+    return await callback.call(this);
+  }
+
+  // Track an event on this record (from Eventable concern).
+  // Creates an Event record linked to this eventable and its board.
+  async track_event(action, { creator, board, ...particulars } = {}) {
+    if (!creator) creator = globalThis.Current?.user;
+    if (!board && this.board) board = this.board;
+    const prefix = this.constructor.name.replace(/([A-Z])/g, (m, c, i) => (i > 0 ? '_' : '') + c.toLowerCase());
+    const eventAction = `${prefix}_${action}`;
+    if (board?.events) {
+      return await board.events.create({ action: eventAction, creator, board, eventable: this, particulars });
+    }
+  }
+
   // --- Class Methods ---
 
   static async create(attributes) {

@@ -21,6 +21,8 @@ export class Relation {
     this._select = null;
     this._distinct = false;
     this._includes = [];
+    this._joins = [];      // INNER JOIN associations
+    this._missing = [];    // LEFT JOIN ... WHERE id IS NULL (where().missing())
   }
 
   // --- Chainable methods (return new Relation) ---
@@ -77,6 +79,21 @@ export class Relation {
   includes(...associations) {
     const rel = this._clone();
     rel._includes = [...rel._includes, ...associations];
+    return rel;
+  }
+
+  // INNER JOIN on an association: Card.joins("closure")
+  joins(...associations) {
+    const rel = this._clone();
+    rel._joins = [...rel._joins, ...associations];
+    return rel;
+  }
+
+  // LEFT JOIN ... WHERE id IS NULL: Card.where().missing("closure")
+  // Finds records that do NOT have the associated record.
+  missing(...associations) {
+    const rel = this._clone();
+    rel._missing = [...rel._missing, ...associations];
     return rel;
   }
 
@@ -185,6 +202,8 @@ export class Relation {
     rel._select = this._select;
     rel._distinct = this._distinct;
     rel._includes = [...this._includes];
+    rel._joins = [...this._joins];
+    rel._missing = [...this._missing];
     return rel;
   }
 

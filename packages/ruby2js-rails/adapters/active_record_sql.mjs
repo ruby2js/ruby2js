@@ -92,6 +92,11 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     return new Relation(this).includes(...associations);
   }
 
+  // Returns a Relation with INNER JOIN on associations
+  static joins(...associations) {
+    return new Relation(this).joins(...associations);
+  }
+
   // --- Class Methods (terminal - execute immediately) ---
 
   static async find(id) {
@@ -391,14 +396,47 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     } else {
       // Regular query
       const distinct = rel._distinct ? 'DISTINCT ' : '';
+      const hasJoins = (rel._joins && rel._joins.length > 0) || (rel._missing && rel._missing.length > 0);
       const cols = rel._select && rel._select.length > 0
         ? rel._select.join(', ')
-        : '*';
+        : hasJoins ? `${this.tableName}.*` : '*';
       sql = `SELECT ${distinct}${cols} FROM ${this.tableName}`;
+    }
+
+    // Build JOIN clauses from joins() and missing()
+    const joinClauses = [];
+
+    if (rel._joins && rel._joins.length > 0) {
+      for (const assocName of rel._joins) {
+        const joinSQL = this._buildJoinClause(assocName, 'INNER JOIN');
+        if (joinSQL) joinClauses.push(joinSQL);
+      }
+    }
+
+    if (rel._missing && rel._missing.length > 0) {
+      for (const assocName of rel._missing) {
+        const joinSQL = this._buildJoinClause(assocName, 'LEFT JOIN');
+        if (joinSQL) joinClauses.push(joinSQL);
+      }
+    }
+
+    if (joinClauses.length > 0) {
+      sql += ' ' + joinClauses.join(' ');
     }
 
     // Collect all WHERE clause parts
     const allWhereParts = [];
+
+    // Add IS NULL conditions for missing() associations
+    if (rel._missing && rel._missing.length > 0) {
+      for (const assocName of rel._missing) {
+        const assoc = this.associations?.[assocName];
+        if (assoc) {
+          const AssocModel = this._resolveModel(assoc.model);
+          allWhereParts.push(`${AssocModel.tableName}.id IS NULL`);
+        }
+      }
+    }
 
     // Build AND conditions (from where())
     if (rel._conditions.length > 0) {
@@ -492,6 +530,27 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     }
 
     return { sql, values };
+  }
+
+  // Build a JOIN clause for an association name.
+  // Uses the model's static associations map to resolve the target table and FK.
+  static _buildJoinClause(assocName, joinType) {
+    const assoc = this.associations?.[assocName];
+    if (!assoc) return null;
+
+    const AssocModel = this._resolveModel(assoc.model);
+    const assocTable = AssocModel.tableName;
+
+    if (assoc.type === 'has_one' || assoc.type === 'has_many') {
+      // has_one/has_many: FK is on the associated table
+      const fk = singularize(this.tableName) + '_id';
+      return `${joinType} ${assocTable} ON ${assocTable}.${fk} = ${this.tableName}.id`;
+    } else if (assoc.type === 'belongs_to') {
+      // belongs_to: FK is on this table
+      const fk = assocName + '_id';
+      return `${joinType} ${assocTable} ON ${this.tableName}.${fk} = ${assocTable}.id`;
+    }
+    return null;
   }
 
   // Build SQL clauses from an array of condition objects
