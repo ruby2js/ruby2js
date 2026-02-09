@@ -756,6 +756,11 @@ export class ActiveRecordSQL extends ActiveRecordBase {
   // Format a value for binding (override in dialect for booleans)
   static _formatValue(val) {
     if (val instanceof Date) return val.toISOString();
+    // Serialize plain objects/arrays to JSON for storage (e.g., JSON columns like particulars)
+    if (val !== null && typeof val === 'object' && !Array.isArray(val) && !(val instanceof Buffer)) {
+      return JSON.stringify(val);
+    }
+    if (Array.isArray(val)) return JSON.stringify(val);
     return val;
   }
 

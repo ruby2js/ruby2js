@@ -1083,8 +1083,8 @@ module Ruby2JS
               # For has_many, singularize and capitalize: comments -> Comment
               # For belongs_to, just capitalize: article -> Article
               class_name = assoc[:options][:class_name]
-              # Strip Ruby's :: namespace prefix (e.g., "::Card" → "Card")
-              class_name = class_name.sub(/^::/, '') if class_name
+              # Strip Ruby namespace qualifiers (e.g., "Card::NotNow" → "NotNow", "::Card" → "Card")
+              class_name = class_name.split('::').last if class_name
               unless class_name
                 name_str = assoc[:name].to_s
                 if assoc[:type] == :has_many
@@ -1222,7 +1222,7 @@ module Ruby2JS
           # Also generates set comments(val) for preloading
           association_name = assoc[:name]
           cache_name = "_#{association_name}".to_sym
-          class_name = (assoc[:options][:class_name] || '').sub(/^::/, '')
+          class_name = (assoc[:options][:class_name] || '').split('::').last || ''
           class_name = Ruby2JS::Inflector.classify(Ruby2JS::Inflector.singularize(association_name.to_s)) if class_name.empty?
           # Polymorphic: has_many :events, as: :eventable → foreignKey: "eventable_id"
           polymorphic_name = assoc[:options][:as]
@@ -1284,7 +1284,7 @@ module Ruby2JS
           association_name = assoc[:name]
           cache_name = "_#{association_name}".to_sym
           loaded_flag = "_#{association_name}_loaded".to_sym
-          class_name = (assoc[:options][:class_name] || '').sub(/^::/, '')
+          class_name = (assoc[:options][:class_name] || '').split('::').last || ''
           class_name = Ruby2JS::Inflector.classify(association_name.to_s) if class_name.empty?
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
 
@@ -1345,69 +1345,90 @@ module Ruby2JS
         end
 
         def generate_belongs_to_method(assoc)
-          # belongs_to :article generates:
-          #   get article() {
-          #     if (this._article) return this._article;
-          #     if (!this.attributes['article_id']) return null;
-          #     return new Reference(modelRegistry["Article"], this.attributes['article_id'],
-          #       v => this._article = v);
-          #   }
-          #   set article(value) {
-          #     this._article = value;
-          #     this._attributes['article_id'] = value ? value.id : null;
-          #   }
           association_name = assoc[:name]
           cache_name = "_#{association_name}".to_sym
-          class_name = (assoc[:options][:class_name] || '').sub(/^::/, '')
+          class_name = (assoc[:options][:class_name] || '').split('::').last || ''
           class_name = Ruby2JS::Inflector.classify(association_name.to_s) if class_name.empty?
           foreign_key = assoc[:options][:foreign_key] || "#{association_name}_id"
+          is_polymorphic = assoc[:options][:polymorphic] == true
 
-          # Access foreign key from attributes - use :attr for property access
-          # Use .to_s to force bracket notation (Ruby2JS optimizes literal strings to dot notation)
+          # Access foreign key from attributes
           fk_access = s(:send, s(:attr, s(:self), :attributes), :[],
             s(:send, s(:str, foreign_key), :to_s))
 
-          # Model reference via registry for lazy resolution
+          if is_polymorphic
+            # Polymorphic belongs_to: model type determined by _type column at runtime
+            type_column = "#{association_name}_type"
+            type_access = s(:send, s(:attr, s(:self), :attributes), :[],
+              s(:send, s(:str, type_column), :to_s))
+
+            # Getter: returns cached value or looks up model via _type column
+            getter = s(:defget, association_name,
+              s(:args),
+              s(:begin,
+                s(:if,
+                  s(:attr, s(:self), cache_name),
+                  s(:return, s(:attr, s(:self), cache_name)),
+                  nil),
+                s(:return, s(:nil))))
+
+            # Setter: sets _id, _type, and cache
+            setter_name = "#{association_name}=".to_sym
+            setter = s(:def, setter_name,
+              s(:args, s(:arg, :value)),
+              s(:begin,
+                s(:send, s(:self), "#{cache_name}=".to_sym, s(:lvar, :value)),
+                s(:send, s(:attr, s(:self), :attributes), :[]=,
+                  s(:send, s(:str, foreign_key), :to_s),
+                  s(:if, s(:lvar, :value),
+                    s(:attr, s(:lvar, :value), :id),
+                    s(:nil))),
+                s(:send, s(:attr, s(:self), :attributes), :[]=,
+                  s(:send, s(:str, type_column), :to_s),
+                  s(:if, s(:lvar, :value),
+                    s(:attr, s(:attr, s(:lvar, :value), :constructor), :name),
+                    s(:nil)))))
+
+            fk_getter = s(:defget, foreign_key.to_sym,
+              s(:args),
+              s(:autoreturn, fk_access))
+
+            type_getter = s(:defget, type_column.to_sym,
+              s(:args),
+              s(:autoreturn, type_access))
+
+            return s(:begin, getter, setter, fk_getter, type_getter)
+          end
+
+          # Non-polymorphic belongs_to
           model_ref = s(:send, s(:lvar, :modelRegistry), :[], s(:str, class_name))
 
-          # Cache callback: v => this._article = v
           cache_callback = s(:block,
             s(:send, nil, :proc),
             s(:args, s(:arg, :v)),
             s(:send, s(:self), "#{cache_name}=".to_sym, s(:lvar, :v)))
 
-          # Reference constructor: new Reference(modelRegistry["Article"], fk, callback)
           reference_call = s(:send, s(:const, nil, :Reference), :new,
             model_ref, fk_access, cache_callback)
 
-          # Getter: return cached instance, null if no FK, or Reference
           getter = s(:defget, association_name,
             s(:args),
             s(:begin,
-              # if (this._article) return this._article;
               s(:if,
                 s(:attr, s(:self), cache_name),
                 s(:return, s(:attr, s(:self), cache_name)),
                 nil),
-              # if (!this.attributes['article_id']) return null;
               s(:if,
                 s(:send, fk_access, :!),
                 s(:return, s(:nil)),
                 nil),
-              # return new Reference(...)
               s(:return, reference_call)))
 
-          # Setter: set article(value) {
-          #   this._article = value;
-          #   this.attributes['article_id'] = value ? value.id : null;
-          # }
           setter_name = "#{association_name}=".to_sym
           setter = s(:def, setter_name,
             s(:args, s(:arg, :value)),
             s(:begin,
-              # this._article = value
               s(:send, s(:self), "#{cache_name}=".to_sym, s(:lvar, :value)),
-              # this.attributes['article_id'] = value ? value.id : null
               s(:send,
                 s(:attr, s(:self), :attributes),
                 :[]=,
@@ -1416,7 +1437,6 @@ module Ruby2JS
                   s(:attr, s(:lvar, :value), :id),
                   s(:nil)))))
 
-          # Foreign key getter: get article_id() { return this.attributes['article_id'] }
           fk_getter = s(:defget, foreign_key.to_sym,
             s(:args),
             s(:autoreturn, fk_access))

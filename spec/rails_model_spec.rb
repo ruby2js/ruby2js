@@ -72,8 +72,8 @@ describe Ruby2JS::Filter::Rails::Model do
       RUBY
       # No cross-model import — uses modelRegistry for lazy resolution
       refute_includes result, 'import { Export } from'
-      # CollectionProxy uses registry lookup with full class name
-      assert_includes result, 'modelRegistry["Account::Export"]'
+      # CollectionProxy uses registry lookup with leaf class name (:: stripped)
+      assert_includes result, 'modelRegistry.Export'
     end
 
     it "supports foreign_key option" do
