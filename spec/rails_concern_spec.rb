@@ -209,7 +209,7 @@ describe Ruby2JS::Filter::Rails::Concern do
       assert_includes result, 'function bar()'
       assert_includes result, 'function check()'
       # bar should be in return object, check should not
-      assert_match(/return \{bar\}/, result)
+      assert_match(/return \{get bar\(\)/, result)
     end
   end
 

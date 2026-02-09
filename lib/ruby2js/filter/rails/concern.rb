@@ -7,6 +7,14 @@ module Ruby2JS
       module Concern
         include SEXP
 
+        # Bare sends that should NOT get self. prefix in concerns.
+        # These are globals, constructors, or framework references.
+        CONCERN_SELF_EXCEPTIONS = %i[
+          require require_relative puts print p pp raise fail
+          Array Hash String Integer Float
+          lambda proc
+        ].freeze
+
         def initialize(*args)
           super
           @rails_concern = nil
@@ -36,7 +44,11 @@ module Ruby2JS
           # This ensures concerns use underscored_private (@x -> this._x) instead of
           # ES2022 private fields (#x) which are invalid in object literals.
           # The module converter omits bare public markers from output.
-          new_body.unshift(s(:send, nil, :public)) unless new_body.empty?
+          # Also mark as concern so module converter makes zero-arg methods getters.
+          unless new_body.empty?
+            new_body.unshift(s(:send, nil, :public))
+            new_body.unshift(s(:send, nil, :__concern__))
+          end
 
           # Rebuild module with cleaned body
           if new_body.empty?
@@ -69,6 +81,7 @@ module Ruby2JS
 
         def transform_concern_body(body)
           result = []
+          host_names = []  # Names from included do block (associations, scopes)
 
           body.each do |node|
             next unless node.respond_to?(:type)
@@ -148,6 +161,8 @@ module Ruby2JS
               if node.children[0].type == :send &&
                  node.children[0].children[0].nil? &&
                  [:included, :class_methods].include?(node.children[0].children[1])
+                # Extract association/scope names before stripping
+                extract_included_names(node, host_names)
                 next
               end
               result << node
@@ -162,7 +177,145 @@ module Ruby2JS
             end
           end
 
+          # Rewrite bare method calls in concern methods to use self. prefix.
+          # In Ruby, any s(:send, nil, :name) is an implicit self call. In JS
+          # concerns (IIFEs), these must be explicit this. so they resolve on
+          # the host model prototype after mixing.
+          result.map! do |n|
+            if n.respond_to?(:type) && (n.type == :def || n.type == :defs)
+              rewrite_concern_sends(n)
+            else
+              n
+            end
+          end
+
           result
+        end
+
+        # Extract association and scope names from the included do...end block
+        def extract_included_names(block_node, names)
+          block_body = block_node.children[2]
+          return unless block_body
+
+          children = block_body.type == :begin ? block_body.children : [block_body]
+          children.each do |child|
+            next unless child.respond_to?(:type) && child.type == :send
+            method = child.children[1]
+            case method
+            when :has_many, :has_one, :belongs_to
+              # First arg is association name symbol
+              if child.children[2]&.type == :sym
+                names << child.children[2].children[0]
+              end
+            when :scope
+              # First arg is scope name symbol
+              if child.children[2]&.type == :sym
+                names << child.children[2].children[0]
+              end
+            when :enum
+              # enum :status, ... — extract the attribute name
+              if child.children[2]&.type == :sym
+                names << child.children[2].children[0]
+              end
+            end
+          end
+        end
+
+        # Rewrite bare sends in a def node to use self. prefix
+        def rewrite_concern_sends(node)
+          # Collect local variable names (params + assignments) to avoid rewriting
+          locals = collect_locals(node)
+
+          # Rewrite the method body (children[2] for def, children[3] for defs)
+          if node.type == :def
+            name, args, body = node.children
+            return node unless body
+            new_body = rewrite_node(body, locals)
+            node.updated(nil, [name, args, new_body])
+          elsif node.type == :defs
+            target, name, args, body = node.children
+            return node unless body
+            new_body = rewrite_node(body, locals)
+            node.updated(nil, [target, name, args, new_body])
+          else
+            node
+          end
+        end
+
+        # Collect local variable names from a def node
+        def collect_locals(node)
+          locals = []
+
+          # Add parameter names
+          args_node = node.type == :def ? node.children[1] : node.children[2]
+          if args_node
+            args_node.children.each do |arg|
+              next unless arg.respond_to?(:children)
+              case arg.type
+              when :arg, :optarg, :kwarg, :kwoptarg, :restarg, :kwrestarg, :blockarg
+                locals << arg.children[0] if arg.children[0]
+              end
+            end
+          end
+
+          # Walk body to find local variable assignments
+          body = node.type == :def ? node.children[2] : node.children[3]
+          collect_lvasgn(body, locals) if body
+
+          locals
+        end
+
+        # Recursively find lvasgn nodes to track local variables
+        def collect_lvasgn(node, locals)
+          return unless node.respond_to?(:type)
+
+          if node.type == :lvasgn
+            locals << node.children[0]
+          end
+
+          node.children.each do |child|
+            collect_lvasgn(child, locals) if child.respond_to?(:type)
+          end
+        end
+
+        # Recursively rewrite bare sends to use self. prefix.
+        # In concerns, ALL s(:send, nil, :name) are implicit self calls
+        # that must become this.name for prototype mixing to work.
+        def rewrite_node(node, locals)
+          return node unless node.respond_to?(:type)
+
+          # Match: s(:send, nil, :name, *args) — bare method call
+          if node.type == :send && node.children[0].nil?
+            method = node.children[1]
+
+            # Skip local variables and known exceptions
+            unless locals.include?(method) || CONCERN_SELF_EXCEPTIONS.include?(method)
+              new_children = [s(:self), method, *node.children[2..-1].map { |c|
+                rewrite_node(c, locals)
+              }]
+              return node.updated(nil, new_children)
+            end
+          end
+
+          # Recurse into children (but track new locals from block args)
+          new_children = node.children.map do |child|
+            if child.respond_to?(:type)
+              # Block args introduce new locals
+              if node.type == :block && child.type == :args
+                child.children.each do |arg|
+                  locals = locals.dup
+                  locals << arg.children[0] if arg.respond_to?(:children) && arg.children[0]
+                end
+                child
+              else
+                rewrite_node(child, locals)
+              end
+            else
+              child
+            end
+          end
+
+          node.updated(nil, new_children)
         end
       end
     end

@@ -50,6 +50,8 @@ module Ruby2JS
       @underscored_private = true
 
       symbols = []
+      predicate_symbols = []  # Track methods originally named with ? suffix
+      is_concern = false  # Set by __concern__ marker from rails/concern filter
       visibility = :public
       omit = []
       body = [*body]  # Copy array so we can modify defs nodes (works in Ruby and JS)
@@ -66,6 +68,9 @@ module Ruby2JS
                 symbols << sym.children.first if sym.type == :sym
               end
             end
+          elsif node.children[1] == :__concern__
+            is_concern = true
+            omit << node
           end
         end
 
@@ -75,13 +80,24 @@ module Ruby2JS
           symbols << node.children[1]
         elsif node.type == :def
           # Strip ? and ! from method names (they're stripped in def transpilation)
-          method_name = node.children.first.to_s.sub(/[?!]$/, '').to_sym
+          original_name = node.children.first.to_s
+          method_name = original_name.sub(/[?!]$/, '').to_sym
           symbols << method_name
+          # In concerns, zero-arg methods become getters (get x() { return x.call(this) })
+          # so property-style access (card.closed, card.color) works after mixing.
+          # ?-suffix methods always become getters regardless of concern status.
+          args = node.children[1]
+          has_no_args = !args || args.children.empty?
+          predicate_symbols << method_name if original_name.end_with?('?') || (is_concern && has_no_args)
         elsif node.type == :defs and node.children.first.type == :self
           # Convert singleton method (def self.X) to regular function
           # In IIFE context, this.X = ... fails because this is undefined
-          method_name = node.children[1].to_s.sub(/[?!]$/, '').to_sym
+          original_name = node.children[1].to_s
+          method_name = original_name.sub(/[?!]$/, '').to_sym
           symbols << method_name
+          args = node.children[2]
+          has_no_args = !args || args.children.empty?
+          predicate_symbols << method_name if original_name.end_with?('?') || (is_concern && has_no_args)
           # Transform defs to def for IIFE-safe output
           new_node = node.updated(:def, [node.children[1], *node.children[2..-1]])
           # Transfer comments from original defs node to new def node
@@ -121,8 +137,10 @@ module Ruby2JS
         elsif node.type == :asyncs and node.children.first.type == :self
           # Convert async singleton method (async def self.X) to regular async function
           # In IIFE context, this.X = ... fails because this is undefined
-          method_name = node.children[1].to_s.sub(/[?!]$/, '').to_sym
+          original_name = node.children[1].to_s
+          method_name = original_name.sub(/[?!]$/, '').to_sym
           symbols << method_name
+          predicate_symbols << method_name if original_name.end_with?('?')
           # Transform asyncs to async for IIFE-safe output
           body[i] = node.updated(:async, [node.children[1], *node.children[2..-1]])
         elsif node.type == :class and node.children.first.children.first == nil
@@ -158,6 +176,7 @@ module Ruby2JS
           excluded_syms.push :"#{info[0]}="
         end
         symbols = symbols.reject { |sym| excluded_syms.include?(sym) }
+        predicate_symbols = predicate_symbols.reject { |sym| excluded_syms.include?(sym) }
 
         # Ensure closure variables used by getter/setter are declared in IIFE
         # scope.  When @@logo is only used inside methods (no top-level
@@ -188,7 +207,19 @@ module Ruby2JS
         end
       end
 
-      regular_pairs = symbols.map {|sym| s(:pair, s(:sym, sym), s(:lvar, sym))}
+      # Split regular symbols from predicate (formerly ?) symbols.
+      # Predicates become getters that call the inner function with this,
+      # so card.closed evaluates the predicate instead of returning the function.
+      regular_syms = symbols.reject { |sym| predicate_symbols.include?(sym) }
+      regular_pairs = regular_syms.map {|sym| s(:pair, s(:sym, sym), s(:lvar, sym))}
+
+      # Predicate symbols: get closed() { return closed.call(this) }
+      pred_pairs = predicate_symbols.map do |sym|
+        getter = s(:def, nil, s(:args),
+          s(:autoreturn, s(:send, s(:lvar, sym), :call, s(:self))))
+        s(:pair, s(:prop, sym), { get: getter })
+      end
+
       prop_pairs = accessor_list.map do |info|
         pair = {}
         pair[:get] = info[1] if info[1]
@@ -197,7 +228,7 @@ module Ruby2JS
       end
 
       body = body.reject {|node| omit.include? node}.concat([s(:return, s(:hash,
-        *regular_pairs, *prop_pairs))])
+        *regular_pairs, *pred_pairs, *prop_pairs))])
 
       body = s(:send, s(:block, s(:send, nil, :proc), s(:args),
         s(:begin, *body)), :[])
