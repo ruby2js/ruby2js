@@ -128,11 +128,18 @@ module Ruby2JS
             if target&.type == :const && target.children[0].nil?
               const_name = target.children[1].to_s
               model_refs_array = model_refs ? [*model_refs] : []
-              if model_refs_array.include?(const_name) && AR_CLASS_METHODS.include?(method)
-                # Wrap with await, process children first
-                new_args = args.map { |a| self.wrap_ar_operations(a, model_refs) }
-                new_node = node.updated(nil, [target, method, *new_args])
-                return new_node.updated(:await!)
+              if model_refs_array.include?(const_name)
+                if AR_CLASS_METHODS.include?(method)
+                  # Known AR class method: wrap with await!
+                  new_args = args.map { |a| self.wrap_ar_operations(a, model_refs) }
+                  new_node = node.updated(nil, [target, method, *new_args])
+                  return new_node.updated(:await!)
+                elsif args.empty?
+                  # Zero-arg call on model constant (e.g., Card.closed scope getter)
+                  # Scopes return Relations that need await, use await_attr
+                  # to preserve property access (no parens for static getters)
+                  return node.updated(:await_attr)
+                end
               end
             end
 

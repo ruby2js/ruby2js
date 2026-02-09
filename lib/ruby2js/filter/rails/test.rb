@@ -237,7 +237,8 @@ module Ruby2JS
             # are accessible in test functions (not block-scoped to beforeEach).
             ivar_names = extract_ivar_names(body)
 
-            wrapped_body = wrap_ar_operations(body)
+            wrapped_body = wrap_test_ar_operations(body)
+            wrapped_body = ensure_statement_method_calls(wrapped_body)
             processed_body = process(wrapped_body)
 
             async_fn = s(:async, nil, s(:args), processed_body)
@@ -256,7 +257,8 @@ module Ruby2JS
             # teardown do ... end -> afterEach(async () => { ... })
             body = node.children.last
             collect_test_model_references(body)
-            wrapped_body = wrap_ar_operations(body)
+            wrapped_body = wrap_test_ar_operations(body)
+            wrapped_body = ensure_statement_method_calls(wrapped_body)
             processed_body = process(wrapped_body)
 
             async_fn = s(:async, nil, s(:args), processed_body)
@@ -283,7 +285,6 @@ module Ruby2JS
 
           when :assert_difference, :assert_no_difference
             return super unless @rails_test_describe_depth > 0
-            return super unless @rails_test_integration
             transform_assert_difference(call, node.children.last, method == :assert_no_difference)
 
           when :it, :specify, :test
@@ -294,7 +295,8 @@ module Ruby2JS
 
             # Collect models and wrap AR operations
             collect_test_model_references(body)
-            wrapped_body = wrap_ar_operations(body)
+            wrapped_body = wrap_test_ar_operations(body)
+            wrapped_body = ensure_statement_method_calls(wrapped_body)
 
             # Process the wrapped body
             processed_body = process(wrapped_body)
@@ -318,7 +320,8 @@ module Ruby2JS
 
             body = node.children.last
             collect_test_model_references(body)
-            wrapped_body = wrap_ar_operations(body)
+            wrapped_body = wrap_test_ar_operations(body)
+            wrapped_body = ensure_statement_method_calls(wrapped_body)
             processed_body = process(wrapped_body)
 
             async_fn = s(:async, nil, s(:args), processed_body)
@@ -336,7 +339,8 @@ module Ruby2JS
 
             body = node.children.last
             collect_test_model_references(body)
-            wrapped_body = wrap_ar_operations(body)
+            wrapped_body = wrap_test_ar_operations(body)
+            wrapped_body = ensure_statement_method_calls(wrapped_body)
             processed_body = process(wrapped_body)
 
             async_fn = s(:async, nil, s(:args), processed_body)
@@ -403,8 +407,34 @@ module Ruby2JS
         end
 
         # Wrap AR operations with await - delegates to shared helper
-        def wrap_ar_operations(node)
+        def wrap_test_ar_operations(node)
           ActiveRecordHelpers.wrap_ar_operations(node, @rails_test_models)
+        end
+
+        # Convert sends with receivers in statement position to await!
+        # In Ruby, `card.close` or `card.close(user: x)` as standalone statements
+        # are always method calls with side effects. In JS, zero-arg sends would
+        # be property access without this transform. Using await! forces both
+        # parens (method call) and async (await). This catches concern methods
+        # like close, reopen, postpone that wrap_test_ar_operations doesn't
+        # know about. Sends without a receiver (like assert_equal) are not
+        # affected — they're bare function calls handled by the assertion
+        # transform or left as-is.
+        def ensure_statement_method_calls(node)
+          return node unless node.respond_to?(:type) && node.type == :begin
+
+          new_children = node.children.map do |child|
+            if child.respond_to?(:type) && child.type == :send &&
+               child.children[0]  # has a receiver (not bare function call)
+              # Statement-position send with receiver → method call needing await
+              child.updated(:await!)
+            elsif child.respond_to?(:type) && child.type == :begin
+              ensure_statement_method_calls(child)
+            else
+              child
+            end
+          end
+          node.updated(nil, new_children)
         end
 
         # Check if this is a test class (ActiveSupport::TestCase, etc.)
@@ -921,16 +951,27 @@ module Ruby2JS
             end
           end
 
-          # Parse the expression string to build count call
-          # "Article.count" -> await Article.count()
+          # Parse the count expression to build count call
           count_call = nil
           if expr_node.type == :str
+            # String form: "Article.count" -> await Article.count()
             parts = expr_node.children.first.split('.')
             if parts.length == 2
               model_name = parts[0]
               method_name = parts[1]
               count_call = s(:await!,
                 s(:const, nil, model_name.to_sym), method_name.to_sym)
+            end
+          elsif expr_node.type == :block &&
+                (expr_node.children[0]&.type == :lambda ||
+                 (expr_node.children[0]&.type == :send &&
+                  expr_node.children[0].children[1] == :lambda))
+            # Lambda form: -> { cards(:logo).events.count }
+            lambda_body = expr_node.children[2]
+            count_call = wrap_test_ar_operations(lambda_body)
+            # Ensure the count expression is awaited
+            if count_call.respond_to?(:type) && count_call.type == :send
+              count_call = count_call.updated(:await!)
             end
           end
 
@@ -948,8 +989,16 @@ module Ruby2JS
           # expect(countAfter - countBefore).toBe(diff_value);
           before_assign = s(:lvasgn, before_var, count_call)
 
-          # Process the body
-          processed_body = process(body)
+          # Wrap body with AR operations and statement method calls
+          wrapped_body = wrap_test_ar_operations(body)
+          # Single-statement body: force await if has receiver (method call with side effects)
+          if wrapped_body.respond_to?(:type) && wrapped_body.type == :send &&
+             wrapped_body.children[0]
+            wrapped_body = wrapped_body.updated(:await!)
+          end
+          # Multi-statement body: apply ensure_statement_method_calls
+          wrapped_body = ensure_statement_method_calls(wrapped_body)
+          processed_body = process(wrapped_body)
 
           after_assign = s(:lvasgn, after_var, count_call)
 
