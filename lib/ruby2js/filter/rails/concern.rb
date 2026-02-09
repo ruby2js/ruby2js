@@ -82,6 +82,7 @@ module Ruby2JS
         def transform_concern_body(body)
           result = []
           host_names = []  # Names from included do block (associations, scopes)
+          @has_one_names = []  # Track has_one association names for loaded-flag checks
 
           body.each do |node|
             next unless node.respond_to?(:type)
@@ -205,7 +206,9 @@ module Ruby2JS
             when :has_many, :has_one, :belongs_to
               # First arg is association name symbol
               if child.children[2]&.type == :sym
-                names << child.children[2].children[0]
+                assoc_name = child.children[2].children[0]
+                names << assoc_name
+                @has_one_names.push(assoc_name) if method == :has_one
               end
             when :scope
               # First arg is scope name symbol
@@ -298,16 +301,34 @@ module Ruby2JS
           end
 
           # Handle .present? / .blank? / .nil? on bare sends (association checks).
-          # closure.present? → self.closure != null (not ?.length > 0)
+          # closure.present? → check if association is loaded and non-null
           # Must intercept before the functions filter converts .present? to ?.length > 0.
           if node.type == :send && [:present?, :blank?, :nil?].include?(node.children[1])
             receiver = node.children[0]
             if receiver&.respond_to?(:type) && receiver.type == :send && receiver.children[0].nil?
               method = receiver.children[1]
               unless locals.include?(method) || CONCERN_SELF_EXCEPTIONS.include?(method)
-                self_send = receiver.updated(nil, [s(:self), method])
-                op = (node.children[1] == :present?) ? :!= : :==
-                return node.updated(nil, [self_send, op, s(:nil)])
+                # has_one associations use a loaded flag because the getter returns
+                # a HasOneReference proxy (truthy object) when not loaded.
+                # present? → this._X_loaded && this._X != null
+                # blank?/nil? → !this._X_loaded || this._X == null
+                if @has_one_names&.include?(method)
+                  loaded_flag = :"_#{method}_loaded"
+                  cache_name = :"_#{method}"
+                  if node.children[1] == :present?
+                    return s(:and,
+                      s(:attr, s(:self), loaded_flag),
+                      s(:send, s(:attr, s(:self), cache_name), :!=, s(:nil)))
+                  else
+                    return s(:or,
+                      s(:send, s(:attr, s(:self), loaded_flag), :!),
+                      s(:send, s(:attr, s(:self), cache_name), :==, s(:nil)))
+                  end
+                else
+                  self_send = receiver.updated(nil, [s(:self), method])
+                  op = (node.children[1] == :present?) ? :!= : :==
+                  return node.updated(nil, [self_send, op, s(:nil)])
+                end
               end
             end
           end

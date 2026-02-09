@@ -248,12 +248,31 @@ function mergeConcernDeclarations(source, modelsDir) {
   // Track which concern files we've already processed (from explicit includes)
   const processedFiles = new Set();
 
+  // Shared concerns directory: app/models/concerns/
+  const concernsDir = join(modelsDir, '..', 'models', 'concerns');
+
   // Helper: extract declarations from a concern file's included-do block
+  // Also follows include ::ModuleName chains to shared concerns
   function extractDeclarationsFromFile(filePath) {
     const lines = [];
     try {
       const concernSource = readFileSync(filePath, 'utf-8');
       const body = extractIncludedDoBody(concernSource);
+
+      // Follow include chains: look for `include ::ModuleName` in the
+      // entire concern file (both module body and included-do block)
+      const includeChainRegex = /^\s*include\s+::(\w+)/gm;
+      let chainMatch;
+      while ((chainMatch = includeChainRegex.exec(concernSource)) !== null) {
+        const sharedName = chainMatch[1];
+        const snaked = sharedName.replace(/([A-Z])/g, (m, c, i) => (i > 0 ? '_' : '') + c.toLowerCase());
+        const sharedFile = join(concernsDir, snaked + '.rb');
+        if (existsSync(sharedFile) && !processedFiles.has(sharedFile)) {
+          processedFiles.add(sharedFile);
+          lines.push(...extractDeclarationsFromFile(sharedFile));
+        }
+      }
+
       if (body) {
         // Only inject declarations that define model structure:
         // - Associations: has_many, has_one, belongs_to
@@ -496,7 +515,15 @@ function buildAssociationMap(modelsDir) {
         const tableAssocs = {};
         for (const [assocName, meta] of Object.entries(assocObj)) {
           if (meta && meta.model) {
-            tableAssocs[assocName] = underscore(pluralize(meta.model));
+            // Handle namespaced models: "Card::NotNow" → "card_not_nows"
+            const modelParts = meta.model.split('::');
+            const leafName = modelParts.pop();
+            const prefix = modelParts.map(p => underscore(p)).join('_');
+            const tableName2 = prefix ? `${prefix}_${underscore(pluralize(leafName))}` : underscore(pluralize(leafName));
+            tableAssocs[assocName] = {
+              table: tableName2,
+              type: meta.type || 'belongs_to'
+            };
           }
         }
         if (Object.keys(tableAssocs).length > 0) {
@@ -519,8 +546,8 @@ function buildAssociationMap(modelsDir) {
  */
 function inferTargetTable(col, table, associationMap, fixtures) {
   // Check explicit association map first
-  const assocTarget = (associationMap[table] || {})[col];
-  if (assocTarget) return assocTarget;
+  const assocEntry = (associationMap[table] || {})[col];
+  if (assocEntry) return assocEntry.table || assocEntry;
 
   // Convention-based: pluralize the column name and check if that table exists in fixtures
   if (!col.endsWith('_id') && col !== 'id') {
@@ -645,6 +672,67 @@ function inlineFixtures(code, fixtures, associationMap) {
     }
   }
 
+  // Reverse resolution: pull in has_one fixtures that point back to collected fixtures.
+  // E.g., if we have cards_shipping, also pull in closures where card: shipping.
+  // Only do this for has_one associations (not has_many, which would pull too many records).
+  // Also track back-references so we can set parent.association = child after creation.
+  const collectedByTable = new Map(); // table -> Set of fixture names
+  for (const { table, fixture } of allFixtures.values()) {
+    if (!collectedByTable.has(table)) collectedByTable.set(table, new Set());
+    collectedByTable.get(table).add(fixture);
+  }
+
+  const reverseBackRefs = []; // { parentKey, assocName, childKey }
+
+  for (const [modelTable, assocs] of Object.entries(associationMap)) {
+    for (const [assocName, assocEntry] of Object.entries(assocs)) {
+      if (!assocEntry || assocEntry.type !== 'has_one') continue;
+      const reverseTable = assocEntry.table;
+      if (!reverseTable || !fixtures[reverseTable]) continue;
+
+      // Check if any collected fixtures from this model are referenced by reverseTable fixtures
+      const collectedNames = collectedByTable.get(modelTable);
+      if (!collectedNames) continue;
+
+      // The FK column in the reverse table pointing back to modelTable
+      const fkCol = singularize(modelTable);
+
+      for (const [revFixtureName, revFixtureData] of Object.entries(fixtures[reverseTable])) {
+        if (!revFixtureData || typeof revFixtureData !== 'object') continue;
+        const fkValue = revFixtureData[fkCol];
+        if (typeof fkValue !== 'string') continue;
+
+        // Check if this FK points to a collected fixture
+        const ref = resolveFixtureRef(fkValue, modelTable, fixtures);
+        if (ref && collectedNames.has(ref.fixtureName)) {
+          const childKey = `${reverseTable}_${revFixtureName}`;
+          const parentKey = `${modelTable}_${ref.fixtureName}`;
+          if (!allFixtures.has(childKey)) {
+            allFixtures.set(childKey, { table: reverseTable, fixture: revFixtureName });
+            // Also resolve this new fixture's forward dependencies
+            const revData = fixtures[reverseTable]?.[revFixtureName];
+            if (revData && typeof revData === 'object') {
+              for (const [col, val] of Object.entries(revData)) {
+                const target = inferTargetTable(col, reverseTable, associationMap, fixtures);
+                if (target && typeof val === 'string') {
+                  const depRef = resolveFixtureRef(val, target, fixtures);
+                  if (depRef) {
+                    const depKey = `${target}_${depRef.fixtureName}`;
+                    if (!allFixtures.has(depKey)) {
+                      allFixtures.set(depKey, { table: target, fixture: depRef.fixtureName });
+                    }
+                  }
+                }
+              }
+            }
+          }
+          // Track back-reference: parent.assocName = child
+          reverseBackRefs.push({ parentKey, assocName, childKey });
+        }
+      }
+    }
+  }
+
   // Collect all referenced tables and sort by dependency
   const referencedTables = new Set([...allFixtures.values()].map(f => f.table));
   const sortedTables = topologicalSortTables(referencedTables, fixtures, associationMap);
@@ -690,6 +778,15 @@ function inlineFixtures(code, fixtures, associationMap) {
 
       createLines.push(`  _fixtures.${key} = await ${modelName}.create({${attrs.join(', ')}});`);
       sortedFixtures.push({ key, table, fixture, modelName });
+    }
+  }
+
+  // Add back-reference assignments for reverse has_one fixtures.
+  // E.g., after creating closures_shipping with card: cards_shipping,
+  // set cards_shipping.closure = closures_shipping so the loaded flag is populated.
+  for (const { parentKey, assocName, childKey } of reverseBackRefs) {
+    if (allFixtures.has(parentKey) && allFixtures.has(childKey)) {
+      createLines.push(`  _fixtures.${parentKey}.${assocName} = _fixtures.${childKey};`);
     }
   }
 
