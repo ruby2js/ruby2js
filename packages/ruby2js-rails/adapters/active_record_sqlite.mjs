@@ -6,7 +6,7 @@ import { dirname } from 'node:path';
 
 import { SQLiteDialect, SQLITE_TYPE_MAP } from './dialects/sqlite.mjs';
 import { attr_accessor, initTimePolyfill } from 'ruby2js-rails/adapters/active_record_base.mjs';
-import { modelRegistry, CollectionProxy, Reference, HasOneReference } from 'ruby2js-rails/adapters/active_record_sql.mjs';
+import { modelRegistry, _uuidTables, CollectionProxy, Reference, HasOneReference } from 'ruby2js-rails/adapters/active_record_sql.mjs';
 
 // Re-export shared utilities
 export { attr_accessor, modelRegistry, CollectionProxy, Reference, HasOneReference };
@@ -59,6 +59,7 @@ export function execSQL(sql) {
 
 // Abstract DDL interface - creates SQLite tables from abstract schema
 export function createTable(tableName, columns, options = {}) {
+  if (columns.some(c => c.primaryKey && c.type === 'uuid')) _uuidTables.add(tableName);
   const columnDefs = columns.map(col => {
     const sqlType = SQLITE_TYPE_MAP[col.type] || 'TEXT';
     let def = `${col.name} ${sqlType}`;

@@ -22,6 +22,9 @@ import { singularize } from 'ruby2js-rails/adapters/inflector.mjs';
 // Model registry for association resolution (populated by Application.registerModels)
 export const modelRegistry = {};
 
+// Tables with UUID primary keys (populated by createTable in each adapter)
+export const _uuidTables = new Set();
+
 // Re-export CollectionProxy for use by models
 export { CollectionProxy, Reference, HasOneReference };
 
@@ -721,8 +724,9 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     let i = 1;
 
     // Auto-generate UUID if no id set and table uses UUID primary keys
-    // (TEXT PRIMARY KEY columns don't auto-generate in SQLite)
-    if (!this._id && typeof crypto !== 'undefined' && crypto.randomUUID) {
+    // (like Rails' before_create callback for UUID PKs — discovered at migration time)
+    if (!this._id && _uuidTables.has(this.constructor.tableName) &&
+        typeof crypto !== 'undefined' && crypto.randomUUID) {
       this._id = crypto.randomUUID();
       this.attributes.id = this._id;
     }
