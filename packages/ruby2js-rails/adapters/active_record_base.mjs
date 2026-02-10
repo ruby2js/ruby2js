@@ -552,7 +552,10 @@ export function attr_accessor(klass, ...attrs) {
 
 // Time polyfill for Ruby compatibility
 export function initTimePolyfill(globalObj = globalThis) {
+  // Don't overwrite enhanced Time (e.g. from test globals with freeze/travel support)
+  if (globalObj.Time) return;
   globalObj.Time = {
+    get current() { return new Date().toISOString(); },
     now() {
       return { toString() { return new Date().toISOString(); } };
     }

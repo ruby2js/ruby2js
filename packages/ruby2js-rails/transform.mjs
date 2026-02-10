@@ -950,7 +950,9 @@ beforeEach(async () => {
  * Separate from setup.mjs so it can be imported without vitest context.
  */
 export function generateTestGlobalsForEject() {
-  return `// Global stubs for Ruby patterns that don't have direct JS equivalents
+  return `import { beforeEach as _timeBeforeEach } from 'vitest';
+
+// Global stubs for Ruby patterns that don't have direct JS equivalents
 // These are defined here so tests can load without errors
 
 // $private() - Ruby's private method marker, no-op in JS (functions are already scoped)
@@ -1358,10 +1360,104 @@ globalThis.stub_request = function(method, url) {
 };
 globalThis.assert_requested = function(stub) { /* no-op */ };
 
-// freeze_time / travel_to / travel_back - time helpers (no-op stubs)
-globalThis.freeze_time = async function(fn) { if (fn) await fn(); };
-globalThis.travel_to = async function(time, fn) { if (fn) await fn(); };
-globalThis.travel_back = function() {};
+// --- Time helpers (freeze_time, travel_to, travel_back, durations) ---
+
+const _RealDate = globalThis.Date;
+let _frozenTime = null;
+
+function _currentTimeMs() {
+  return _frozenTime !== null ? _frozenTime : _RealDate.now();
+}
+
+// Override Date to respect frozen/traveled time
+const _FakeDate = function(...args) {
+  if (new.target) {
+    if (args.length === 0) return new _RealDate(_currentTimeMs());
+    return new _RealDate(...args);
+  }
+  return new _RealDate(_currentTimeMs()).toString();
+};
+_FakeDate.prototype = _RealDate.prototype;
+_FakeDate.now = function() { return _currentTimeMs(); };
+_FakeDate.parse = _RealDate.parse.bind(_RealDate);
+_FakeDate.UTC = _RealDate.UTC.bind(_RealDate);
+globalThis.Date = _FakeDate;
+
+// Time.current - Ruby's Time.current (returns ISO string)
+globalThis.Time = {
+  get current() { return new _RealDate(_currentTimeMs()).toISOString(); }
+};
+
+// freeze_time - freezes time at current moment
+globalThis.freeze_time = function() {
+  _frozenTime = _RealDate.now();
+};
+
+// travel_to - travel to a specific time, optionally with block
+globalThis.travel_to = function(time, fn) {
+  const target = new _RealDate(time).getTime();
+  const prev = _frozenTime;
+  _frozenTime = target;
+  if (fn) {
+    const result = fn();
+    if (result && typeof result.then === 'function') {
+      return result.then(
+        (v) => { _frozenTime = prev; return v; },
+        (e) => { _frozenTime = prev; throw e; }
+      );
+    }
+    _frozenTime = prev;
+    return result;
+  }
+};
+
+// travel_back - reset time
+globalThis.travel_back = function() {
+  _frozenTime = null;
+};
+
+// Reset time state between tests
+_timeBeforeEach(() => { _frozenTime = null; });
+
+// Duration class for number extensions
+class _Duration {
+  constructor(ms) { this._ms = ms; }
+  get ago() { return new _RealDate(_currentTimeMs() - this._ms).toISOString(); }
+  get from_now() { return new _RealDate(_currentTimeMs() + this._ms).toISOString(); }
+}
+
+// Number extensions: (1).week, (2).days, etc.
+for (const [unit, factor] of Object.entries({
+  second: 1000, seconds: 1000,
+  minute: 60000, minutes: 60000,
+  hour: 3600000, hours: 3600000,
+  day: 86400000, days: 86400000,
+  week: 604800000, weeks: 604800000,
+  month: 2592000000, months: 2592000000,
+  year: 31536000000, years: 31536000000
+})) {
+  Object.defineProperty(Number.prototype, unit, {
+    get() { return new _Duration(this * factor); },
+    configurable: true, enumerable: false
+  });
+}
+
+// .change({usec: 0}) on ISO date strings - truncate milliseconds
+if (!String.prototype.change) {
+  Object.defineProperty(String.prototype, 'change', {
+    value: function(opts) {
+      if (opts && 'usec' in opts && opts.usec === 0) {
+        const d = new _RealDate(this);
+        if (!isNaN(d.getTime())) {
+          d.setMilliseconds(0);
+          return d.toISOString();
+        }
+      }
+      return String(this);
+    },
+    writable: true, configurable: true, enumerable: false
+  });
+}
 
 // perform_enqueued_jobs - ActiveJob test helper (runs block immediately)
 globalThis.perform_enqueued_jobs = async function(fn) { if (fn) await fn(); };
