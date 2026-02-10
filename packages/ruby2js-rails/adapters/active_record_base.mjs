@@ -282,7 +282,31 @@ export class ActiveRecordBase {
     const prefix = this.constructor.name.replace(/([A-Z])/g, (m, c, i) => (i > 0 ? '_' : '') + c.toLowerCase());
     const eventAction = `${prefix}_${action}`;
     if (board?.events) {
-      return await board.events.create({ action: eventAction, creator, board, eventable: this, particulars });
+      const event = await board.events.create({ action: eventAction, creator, board, eventable: this, particulars });
+      // Wrap action as StringInquirer so event.action.card_closed works like Rails
+      if (event && typeof event.action === 'string') {
+        const actionStr = event.action;
+        event.action = new Proxy(new String(actionStr), {
+          get(target, prop) {
+            if (prop === Symbol.toPrimitive || prop === 'valueOf') return () => actionStr;
+            if (prop === 'toString') return () => actionStr;
+            if (typeof prop === 'string' && prop !== 'length' && prop !== 'constructor') {
+              return target.valueOf() === prop ? true : target[prop];
+            }
+            return Reflect.get(target, prop);
+          }
+        });
+      }
+      // Also push into this record's events proxy (card.events cache).
+      // Use the getter (this.events) to ensure the proxy is created.
+      try {
+        const myEvents = this.events;
+        if (myEvents && typeof myEvents === 'object' && '_records' in myEvents) {
+          if (!myEvents._records) myEvents._records = [];
+          myEvents._records.push(event);
+        }
+      } catch(e) { /* no events association on this model */ }
+      return event;
     }
   }
 

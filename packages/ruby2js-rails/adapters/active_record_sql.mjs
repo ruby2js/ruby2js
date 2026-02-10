@@ -560,7 +560,16 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     const vals = [];
 
     for (const cond of conditions) {
-      for (const [key, value] of Object.entries(cond)) {
+      for (let [key, value] of Object.entries(cond)) {
+        // Resolve association names to FK columns (e.g., account -> account_id)
+        const assoc = this.associations?.[key];
+        if (assoc && assoc.type === 'belongs_to') {
+          key = key + '_id';
+          if (value && typeof value === 'object' && value.id) {
+            value = value.id;
+          }
+        }
+
         if (Array.isArray(value)) {
           // IN clause: where({id: [1, 2, 3]})
           const placeholders = value.map(() => this._param(paramIndex.value++)).join(', ');
@@ -571,7 +580,7 @@ export class ActiveRecordSQL extends ActiveRecordBase {
           const { sql, values: rangeVals } = this._buildRangeSQL(key, value, paramIndex);
           parts.push(sql);
           vals.push(...rangeVals);
-        } else if (value === null) {
+        } else if (value === null || value === undefined) {
           // IS NULL
           parts.push(`${key} IS NULL`);
         } else {
@@ -679,6 +688,27 @@ export class ActiveRecordSQL extends ActiveRecordBase {
         this[key] = value;
       }
     }
+    // Reset has_one association caches so they re-load from DB.
+    // has_many proxies are preserved — they may contain in-memory
+    // records (e.g., from track_event push) that tests access
+    // synchronously via .at(-1).
+    const assocs = this.constructor.associations || {};
+    for (const [name, assoc] of Object.entries(assocs)) {
+      if (assoc.type !== 'has_many') {
+        this[`_${name}`] = undefined;
+        this[`_${name}_loaded`] = undefined;
+      }
+    }
+    // Eagerly resolve has_one associations so they're available synchronously
+    for (const [name, assoc] of Object.entries(assocs)) {
+      if (assoc.type === 'has_one') {
+        try {
+          await this[name]; // triggers load + cacheCallback
+        } catch(e) {
+          // Association model may not be registered — skip silently
+        }
+      }
+    }
     return this;
   }
 
@@ -689,6 +719,20 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     const placeholders = [];
     const values = [];
     let i = 1;
+
+    // Auto-generate UUID if no id set and table uses UUID primary keys
+    // (TEXT PRIMARY KEY columns don't auto-generate in SQLite)
+    if (!this._id && typeof crypto !== 'undefined' && crypto.randomUUID) {
+      this._id = crypto.randomUUID();
+      this.attributes.id = this._id;
+    }
+
+    // Include id if present (pre-set UUID or auto-generated)
+    if (this._id) {
+      cols.push('id');
+      placeholders.push(this.constructor._param(i++));
+      values.push(this.constructor._formatValue(this._id));
+    }
 
     for (const [key, value] of Object.entries(this.attributes)) {
       if (key === 'id') continue;
@@ -706,8 +750,11 @@ export class ActiveRecordSQL extends ActiveRecordBase {
 
     const result = await this.constructor._execute(sql, values);
 
-    this.id = this.constructor._getLastInsertId(result);
-    this.attributes.id = this.id;
+    // Only set id from DB if we didn't provide one
+    if (!this._id) {
+      this.id = this.constructor._getLastInsertId(result);
+      this.attributes.id = this.id;
+    }
     this._persisted = true;
     console.log(`  ${this.constructor.name} Create (id: ${this.id})`);
     return true;
@@ -728,7 +775,18 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     const sql = `UPDATE ${this.constructor.tableName} SET ${sets.join(', ')} WHERE id = ${this.constructor._param(i)}`;
     console.debug(`  ${this.constructor.name} Update  ${sql}`, values);
 
-    await this.constructor._execute(sql, values);
+    const result = await this.constructor._execute(sql, values);
+
+    // If UPDATE affected 0 rows, the record doesn't exist yet — INSERT it
+    // This handles fixtures with pre-set UUIDs that set _persisted=true in constructor
+    if (result?.info?.changes === 0) {
+      console.debug(`  ${this.constructor.name} Update affected 0 rows, falling back to INSERT`);
+      // Set created_at since the save() path skipped it (thought this was an update)
+      const now = new Date().toISOString();
+      this.attributes.created_at ??= now;
+      this.created_at ??= now;
+      return await this._insert();
+    }
 
     console.log(`  ${this.constructor.name} Update (id: ${this.id})`);
     return true;
@@ -747,8 +805,23 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     const values = [];
     let i = 1;
     for (const [key, value] of Object.entries(conditions)) {
-      clauses.push(`${key} = ${this._param(i++)}`);
-      values.push(this._formatValue(value));
+      let colName = key;
+      let colValue = value;
+      // If key matches a belongs_to association, resolve to FK column
+      const assoc = this.associations?.[key];
+      if (assoc && assoc.type === 'belongs_to') {
+        colName = key + '_id';
+        // If value is a model instance, use its id
+        if (colValue && typeof colValue === 'object' && colValue.id) {
+          colValue = colValue.id;
+        }
+      }
+      if (colValue === null || colValue === undefined) {
+        clauses.push(`${colName} IS NULL`);
+      } else {
+        clauses.push(`${colName} = ${this._param(i++)}`);
+        values.push(this._formatValue(colValue));
+      }
     }
     return { sql: clauses.join(' AND '), values };
   }

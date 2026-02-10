@@ -174,9 +174,9 @@ export class CollectionProxy {
     return (this._records || []).every(fn);
   }
 
-  // Array indexing
+  // Array indexing (supports negative indices like Ruby)
   at(index) {
-    return (this._records || [])[index];
+    return (this._records || []).at(index);
   }
 
   // --- Thenable (for await support) ---

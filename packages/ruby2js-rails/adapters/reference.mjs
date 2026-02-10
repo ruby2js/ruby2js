@@ -76,4 +76,15 @@ export class HasOneReference {
     }
     return this._loaded;
   }
+
+  // Delegate destroy to the loaded record (for safe-navigation: not_now&.destroy)
+  async destroy() {
+    const record = await this.load();
+    if (record) {
+      await record.destroy();
+      // Clear the parent's cache so has_one getter returns null
+      if (this._cacheCallback) this._cacheCallback(null);
+    }
+    return record;
+  }
 }

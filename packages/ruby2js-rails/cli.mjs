@@ -420,6 +420,40 @@ function resolveFixtureRef(value, targetTable, fixtures) {
 }
 
 /**
+ * Parse a polymorphic fixture reference: "37s_uuid (Account)" -> { fixtureRef: "37s_uuid", typeName: "Account", table: "accounts" }
+ * Returns null if the value doesn't match the polymorphic pattern.
+ */
+function parsePolymorphicRef(value) {
+  const match = value.match(/^(\S+)\s+\((\w+)\)$/);
+  if (!match) return null;
+  const [, fixtureRef, typeName] = match;
+  // Convert TypeName to table_name: Account -> accounts, BoardColumn -> board_columns
+  const underscored = typeName.replace(/([A-Z])/g, (m, c, i) => (i > 0 ? '_' : '') + c.toLowerCase());
+  return { fixtureRef, typeName, table: pluralize(underscored) };
+}
+
+/**
+ * Try to resolve a fixture value, handling both normal and polymorphic references.
+ * For polymorphic values like "37s_uuid (Account)", derives the target table from the type.
+ * Returns { ref, targetTable } or null.
+ */
+function resolveFixtureValue(value, col, table, associationMap, fixtures) {
+  // Try polymorphic first: "37s_uuid (Account)"
+  const poly = parsePolymorphicRef(value);
+  if (poly) {
+    const ref = resolveFixtureRef(poly.fixtureRef, poly.table, fixtures);
+    if (ref) return { ref, targetTable: poly.table };
+  }
+  // Try normal association resolution
+  const targetTable = inferTargetTable(col, table, associationMap, fixtures);
+  if (targetTable) {
+    const ref = resolveFixtureRef(value, targetTable, fixtures);
+    if (ref) return { ref, targetTable };
+  }
+  return null;
+}
+
+/**
  * Parse all fixture YAML files from test/fixtures/.
  * Returns a map: { table_name: { fixture_name: { column: value, ... }, ... }, ... }
  */
@@ -578,10 +612,11 @@ function topologicalSortTables(referencedTables, fixtures, associationMap) {
           // Explicit ID - no dependency
           continue;
         }
-        // Check if column matches an association (explicit or convention-based)
-        const targetTable = inferTargetTable(col, table, associationMap, fixtures);
-        if (targetTable && referencedTables.has(targetTable) && typeof value === 'string') {
-          deps[table].add(targetTable);
+        if (typeof value !== 'string') continue;
+        // Check if column matches an association (explicit, convention, or polymorphic)
+        const resolved = resolveFixtureValue(value, col, table, associationMap, fixtures);
+        if (resolved && referencedTables.has(resolved.targetTable)) {
+          deps[table].add(resolved.targetTable);
         }
       }
     }
@@ -658,15 +693,14 @@ function inlineFixtures(code, fixtures, associationMap) {
     if (!fixtureData || typeof fixtureData !== 'object') continue;
 
     for (const [col, value] of Object.entries(fixtureData)) {
-      const targetTable = inferTargetTable(col, table, associationMap, fixtures);
-      if (targetTable && typeof value === 'string') {
-        const ref = resolveFixtureRef(value, targetTable, fixtures);
-        if (ref) {
-          const key = `${targetTable}_${ref.fixtureName}`;
-          if (!allFixtures.has(key)) {
-            allFixtures.set(key, { table: targetTable, fixture: ref.fixtureName });
-            toResolve.push({ table: targetTable, fixture: ref.fixtureName });
-          }
+      if (typeof value !== 'string') continue;
+      const resolved = resolveFixtureValue(value, col, table, associationMap, fixtures);
+      if (resolved) {
+        const { ref, targetTable } = resolved;
+        const key = `${targetTable}_${ref.fixtureName}`;
+        if (!allFixtures.has(key)) {
+          allFixtures.set(key, { table: targetTable, fixture: ref.fixtureName });
+          toResolve.push({ table: targetTable, fixture: ref.fixtureName });
         }
       }
     }
@@ -713,14 +747,12 @@ function inlineFixtures(code, fixtures, associationMap) {
             const revData = fixtures[reverseTable]?.[revFixtureName];
             if (revData && typeof revData === 'object') {
               for (const [col, val] of Object.entries(revData)) {
-                const target = inferTargetTable(col, reverseTable, associationMap, fixtures);
-                if (target && typeof val === 'string') {
-                  const depRef = resolveFixtureRef(val, target, fixtures);
-                  if (depRef) {
-                    const depKey = `${target}_${depRef.fixtureName}`;
-                    if (!allFixtures.has(depKey)) {
-                      allFixtures.set(depKey, { table: target, fixture: depRef.fixtureName });
-                    }
+                if (typeof val !== 'string') continue;
+                const resolved = resolveFixtureValue(val, col, reverseTable, associationMap, fixtures);
+                if (resolved) {
+                  const depKey = `${resolved.targetTable}_${resolved.ref.fixtureName}`;
+                  if (!allFixtures.has(depKey)) {
+                    allFixtures.set(depKey, { table: resolved.targetTable, fixture: resolved.ref.fixtureName });
                   }
                 }
               }
@@ -753,21 +785,22 @@ function inlineFixtures(code, fixtures, associationMap) {
       // Build create attributes
       const attrs = [];
       for (const [col, value] of Object.entries(fixtureData)) {
-        const targetTable = inferTargetTable(col, table, associationMap, fixtures);
-        if (targetTable && typeof value === 'string') {
-          const ref = resolveFixtureRef(value, targetTable, fixtures);
-          if (ref && allFixtures.has(`${targetTable}_${ref.fixtureName}`)) {
-            // Association reference - pass the object so the setter populates the instance cache
-            // This enables synchronous access via the Reference pattern
-            attrs.push(`${col}: _fixtures.${targetTable}_${ref.fixtureName}`);
-          } else if (ref) {
-            // Known fixture but not in allFixtures - use generated UUID
-            attrs.push(`${col}_id: ${JSON.stringify(fixtureIdentifyUUID(ref.fixtureName))}`);
-          } else {
-            // Association column with unresolvable value - still use _id suffix
-            attrs.push(`${col}_id: ${JSON.stringify(value)}`);
+        if (typeof value === 'string') {
+          const resolved = resolveFixtureValue(value, col, table, associationMap, fixtures);
+          if (resolved) {
+            const { ref, targetTable } = resolved;
+            if (allFixtures.has(`${targetTable}_${ref.fixtureName}`)) {
+              // Association reference - pass the object so the setter populates the instance cache
+              // This enables synchronous access via the Reference pattern
+              attrs.push(`${col}: _fixtures.${targetTable}_${ref.fixtureName}`);
+            } else {
+              // Known fixture but not in allFixtures - use generated UUID
+              attrs.push(`${col}_id: ${JSON.stringify(fixtureIdentifyUUID(ref.fixtureName))}`);
+            }
+            continue;
           }
-        } else if (col.endsWith('_id') || col === 'id') {
+        }
+        if (col.endsWith('_id') || col === 'id') {
           // Explicit ID
           attrs.push(`${col}: ${JSON.stringify(value)}`);
         } else {
@@ -814,6 +847,65 @@ function inlineFixtures(code, fixtures, associationMap) {
   } else {
     // Fallback: prepend before first test/beforeEach
     result = fixtureSetup + '\n\n' + result;
+  }
+
+  return result;
+}
+
+/**
+ * Parse test_helper.rb for global Current.xxx setup and return setup lines.
+ * Also adds `await Current.settle()` after Current setter assignments to
+ * resolve async operations triggered by setter chains (e.g., find_by).
+ */
+function setupCurrentAttributes(code, appRoot) {
+  // Read test_helper.rb and find Current.xxx = fixtures("yyy") patterns
+  const helperPath = join(appRoot, 'test/test_helper.rb');
+  let globalSetups = [];
+  if (existsSync(helperPath)) {
+    const helper = readFileSync(helperPath, 'utf-8');
+    // Match patterns like: Current.account = accounts("37s")
+    const currentSetupRegex = /Current\.(\w+)\s*=\s*(\w+)\(["'](\w+)["']\)/g;
+    let match;
+    while ((match = currentSetupRegex.exec(helper)) !== null) {
+      const [, attr, table, fixture] = match;
+      globalSetups.push(`  Current.${attr} = _fixtures.${table}_${fixture};`);
+    }
+  }
+
+  if (globalSetups.length === 0 && !code.includes('Current.')) return code;
+
+  // Find beforeEach blocks with Current.xxx = ... assignments and add settle()
+  // Pattern: beforeEach(async () => Current.xxx = _fixtures.yyy);
+  let result = code.replace(
+    /beforeEach\(async \(\) => (Current\.\w+ = [^;]+)\);/g,
+    (match, assignment) => {
+      const lines = [...globalSetups, `  ${assignment};`, '  await Current.settle();'];
+      return `beforeEach(async () => {\n${lines.join('\n')}\n});`;
+    }
+  );
+
+  // Also handle beforeEach blocks with { Current.xxx = ... } body
+  result = result.replace(
+    /(beforeEach\(async \(\) => \{[\s\S]*?)(Current\.\w+ = [^;]+;)([\s\S]*?\}\);)/g,
+    (match, before, currentAssign, after) => {
+      if (match.includes('Current.settle()')) return match; // Already processed
+      const settleInsert = globalSetups.length > 0
+        ? '\n' + globalSetups.join('\n') + '\n  ' + currentAssign + '\n  await Current.settle();'
+        : '\n  ' + currentAssign + '\n  await Current.settle();';
+      return before + settleInsert + after;
+    }
+  );
+
+  // If there are global Current setups but no beforeEach with Current, add them
+  // to the fixture beforeEach if it exists
+  if (globalSetups.length > 0 && !result.includes('Current.settle()')) {
+    // Add global setups at the end of the first beforeEach block
+    result = result.replace(
+      /(beforeEach\(async \(\) => \{[\s\S]*?)(\n\}\);)/,
+      (match, body, close) => {
+        return body + '\n' + globalSetups.join('\n') + close;
+      }
+    );
   }
 
   return result;
@@ -1076,6 +1168,16 @@ function addControllerImportsVirtual(code) {
  * To:
  *   let article; beforeEach(async () => { article = expr });
  */
+/**
+ * Fix chained .reload property access to async method call.
+ * Ruby: card.reload.open? (reload is synchronous, returns self)
+ * JS:   (await card.reload()).open (reload is async)
+ */
+function fixReloadChains(code) {
+  // .reload.property (without parens) → (await .reload()).property
+  return code.replace(/(\w[\w.]*?)\.reload\.(\w+)/g, '(await $1.reload()).$2');
+}
+
 function hoistBeforeEachVars(code) {
   // Find all beforeEach blocks using brace matching, then hoist let declarations
   const marker = 'beforeEach(async () => {';
@@ -1182,7 +1284,9 @@ async function transpileTestFiles(appRoot, config) {
           code = inlineFixtures(code, fixtures, associationMap);
         }
 
+        code = setupCurrentAttributes(code, appRoot);
         code = addModelImportsVirtual(code);
+        code = fixReloadChains(code);
         code = hoistBeforeEachVars(code);
         writeFileSync(outPath, code);
         count++;
@@ -1214,7 +1318,9 @@ async function transpileTestFiles(appRoot, config) {
           code = inlineFixtures(code, fixtures, associationMap);
         }
 
+        code = setupCurrentAttributes(code, appRoot);
         code = addControllerImportsVirtual(code);
+        code = fixReloadChains(code);
         code = hoistBeforeEachVars(code);
         code = fixRedirectAssertions(code);
         writeFileSync(outPath, code);
@@ -2462,6 +2568,12 @@ async function runEject(options) {
               code = inlineFixtures(code, fixtures, associationMap);
             }
 
+            // Add Current.account setup from test_helper.rb and settle async setters
+            code = setupCurrentAttributes(code, APP_ROOT);
+
+            // Fix chained .reload property access to async method call
+            code = fixReloadChains(code);
+
             // Hoist let declarations from beforeEach to describe scope
             code = hoistBeforeEachVars(code);
 
@@ -2514,6 +2626,12 @@ async function runEject(options) {
             if (Object.keys(ctrlFixtures).length > 0) {
               code = inlineFixtures(code, ctrlFixtures, ctrlAssociationMap);
             }
+
+            // Add Current.account setup from test_helper.rb and settle async setters
+            code = setupCurrentAttributes(code, APP_ROOT);
+
+            // Fix chained .reload property access to async method call
+            code = fixReloadChains(code);
 
             // Hoist let declarations from beforeEach to describe scope
             code = hoistBeforeEachVars(code);

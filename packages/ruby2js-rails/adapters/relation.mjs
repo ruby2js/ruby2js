@@ -32,6 +32,10 @@ export class Relation {
   // where('status = ? AND role = ?', 'active', 'admin') - multiple placeholders
   where(conditionOrSql, ...values) {
     const rel = this._clone();
+    if (conditionOrSql == null) {
+      // No-op: where() with no args returns a chainable relation (like Rails)
+      return rel;
+    }
     if (typeof conditionOrSql === 'string') {
       // Raw SQL condition
       rel._rawConditions.push({ sql: conditionOrSql, values });

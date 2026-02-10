@@ -15,6 +15,14 @@ module Ruby2JS
           lambda proc
         ].freeze
 
+        # ActiveRecord instance methods that are always method calls, never
+        # property accesses. For csend (safe navigation) nodes with these
+        # methods, we strip source location so the converter emits ().
+        AR_MUTATION_METHODS = %i[
+          destroy destroy! save save! delete reload reload! touch
+          increment! decrement!
+        ].freeze
+
         def initialize(*args)
           super
           @rails_concern = nil
@@ -346,6 +354,37 @@ module Ruby2JS
             end
           end
 
+          # Handle csend (safe navigation) with known AR mutation methods.
+          # Ruby's &. is always a method call, but the converter checks
+          # source location for () to decide parens. Nodes rewritten by
+          # this filter preserve original location (no parens in Ruby source),
+          # so is_method? returns false → property access. Fix: create a
+          # fresh node via s() (no location) for known mutation methods.
+          if node.type == :csend
+            csend_method = node.children[1]
+            new_children = node.children.map { |child|
+              child.respond_to?(:type) ? rewrite_node(child, locals, method_name) : child
+            }
+            if AR_MUTATION_METHODS.include?(csend_method)
+              return s(:csend, *new_children)
+            else
+              return node.updated(nil, new_children)
+            end
+          end
+
+          # Handle transaction blocks: make callback async and await each
+          # statement so that AR operations (destroy, create, etc.) complete
+          # in order. Without this, the callback is sync and async operations
+          # inside are fire-and-forget promises.
+          if node.type == :block
+            send_child = node.children[0]
+            if send_child&.respond_to?(:type) && send_child.type == :send
+              if send_child.children[1] == :transaction
+                return rewrite_transaction_block(node, locals, method_name)
+              end
+            end
+          end
+
           # Recurse into children (but track new locals from block args)
           new_children = node.children.map do |child|
             if child.respond_to?(:type)
@@ -365,6 +404,66 @@ module Ruby2JS
           end
 
           node.updated(nil, new_children)
+        end
+        # Rewrite a transaction do...end block to use async callback with awaits.
+        # Input AST:  s(:block, s(:send, nil, :transaction), s(:args), body)
+        # Output AST: s(:send, nil, :await,
+        #               s(:send, s(:self), :transaction,
+        #                 s(:block, s(:send, nil, :async), s(:args),
+        #                   s(:begin, s(:send, nil, :await, stmt1), ...))))
+        def rewrite_transaction_block(node, locals, method_name)
+          _send_node, args_node, body = node.children
+
+          # Rewrite and await-wrap each statement in the body
+          if body
+            statements = body.type == :begin ? body.children : [body]
+            new_statements = statements.map do |stmt|
+              rewritten = rewrite_node(stmt, locals, method_name)
+              wrap_with_await(rewritten)
+            end
+
+            new_body = if new_statements.length == 1
+              new_statements.first
+            else
+              s(:begin, *new_statements)
+            end
+          end
+
+          # await this.transaction(async () => { ...awaited body... })
+          s(:send, nil, :await,
+            s(:send, s(:self), :transaction,
+              s(:block,
+                s(:send, nil, :async),
+                args_node || s(:args),
+                new_body)))
+        end
+
+        # Wrap a statement with await. For assignments and setters,
+        # put await on the RHS to avoid invalid JS like
+        # await(let x = expr) or (await this.x) = expr.
+        def wrap_with_await(node)
+          return node unless node.respond_to?(:type)
+
+          case node.type
+          when :lvasgn
+            # let x = value → let x = await value
+            name, value = node.children
+            s(:lvasgn, name, s(:send, nil, :await, value))
+          when :ivasgn
+            # @x = value → this._x = await value
+            name, value = node.children
+            s(:ivasgn, name, s(:send, nil, :await, value))
+          when :send
+            target, method, *args = node.children
+            if method && method.to_s.end_with?('=') && target && args.length == 1
+              # this.attr = value → this.attr = await value
+              s(:send, target, method, s(:send, nil, :await, args[0]))
+            else
+              s(:send, nil, :await, node)
+            end
+          else
+            s(:send, nil, :await, node)
+          end
         end
       end
     end

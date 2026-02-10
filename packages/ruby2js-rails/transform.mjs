@@ -972,18 +972,34 @@ globalThis.ActiveSupport = {
   Concern: {},
   CurrentAttributes: class CurrentAttributes {
     static _attributes = {};
+    static _pending = [];
     static attribute(...names) {
       for (const name of names) {
         if (!(name in this)) {
           Object.defineProperty(this, name, {
             get() { return this._attributes[name]; },
-            set(v) { this._attributes[name] = v; },
+            set(v) {
+              // Detect async values (Promises from setter chains like find_by)
+              if (v && typeof v === 'object' && typeof v.then === 'function') {
+                this._pending.push(v.then(resolved => {
+                  this._attributes[name] = resolved;
+                }));
+              }
+              this._attributes[name] = v;
+            },
             configurable: true
           });
         }
       }
     }
-    static reset() { this._attributes = {}; }
+    static reset() { this._attributes = {}; this._pending = []; }
+    // Await all async operations triggered by setter chains
+    static async settle() {
+      if (this._pending.length > 0) {
+        await Promise.all(this._pending);
+        this._pending = [];
+      }
+    }
     static $with(attrs, fn) {
       const prev = { ...this._attributes };
       Object.assign(this._attributes, attrs);
