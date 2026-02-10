@@ -130,6 +130,9 @@ module Ruby2JS
           # First pass: collect DSL declarations
           collect_model_metadata(body)
 
+          # Record metadata for cross-file filter context (test filter reads this)
+          record_model_metadata
+
           # Second pass: transform body
           transformed_body = transform_model_body(body)
 
@@ -806,6 +809,53 @@ module Ruby2JS
               collect_callback(method_name, args)
             end
           end
+        end
+
+        # Record model metadata into shared options hash for cross-file context.
+        # Model metadata is populated during collect_model_metadata and recorded
+        # here so that the test filter can make informed await/sync decisions.
+        def record_model_metadata
+          return unless @options[:metadata] && @rails_model_name
+
+          meta = @options[:metadata]
+          # Use string keys for JS object compatibility
+          meta['models'] = {} unless meta['models']
+
+          model_meta = {}
+
+          # Association names and types (for awaitable getter detection)
+          assocs = []
+          @rails_associations.each do |a|
+            assocs.push({ 'name' => a[:name].to_s, 'type' => a[:type].to_s })
+          end
+          model_meta['associations'] = assocs
+
+          # Scope names (zero-arg scopes become getters)
+          scope_names = []
+          @rails_scopes.each do |s|
+            scope_names.push(s[:name].to_s)
+          end
+          model_meta['scopes'] = scope_names
+
+          # Enum predicate names (synchronous, should NOT be awaited)
+          predicates = []
+          @rails_enums.each do |e|
+            e[:values].each do |v, _val| # Pragma: entries
+              predicates.push(v.to_s + '?')
+            end
+          end
+          model_meta['enum_predicates'] = predicates
+
+          # Enum bang setter names (synchronous state transitions)
+          bangs = []
+          @rails_enums.each do |e|
+            e[:values].each do |v, _val| # Pragma: entries
+              bangs.push(v.to_s + '!')
+            end
+          end
+          model_meta['enum_bangs'] = bangs
+
+          meta['models'][@rails_model_name] = model_meta
         end
 
         # Check if an AST node matches Rails.application.routes.url_helpers

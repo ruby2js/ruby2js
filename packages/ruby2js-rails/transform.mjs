@@ -1948,7 +1948,7 @@ export async function ensureRuby2jsReady() {
  * @param {string} appRoot - Application root directory
  * @returns {Promise<{code: string, map: Object}>}
  */
-export async function transformRuby(source, filePath, section, config, appRoot) {
+export async function transformRuby(source, filePath, section, config, appRoot, metadata = null) {
   const { convert } = await ensureRuby2jsReady();
 
   // Get section-specific config from ruby2js.yml if available
@@ -1959,6 +1959,10 @@ export async function transformRuby(source, filePath, section, config, appRoot) 
     database: config.database,
     target: config.target
   };
+
+  // Thread shared metadata through to filters (populated by model/concern
+  // filters, consumed by test filter for await/sync decisions)
+  if (metadata) options.metadata = metadata;
 
   // Routes need additional options
   if (filePath.endsWith('/routes.rb')) {

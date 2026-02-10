@@ -90,8 +90,9 @@ module Ruby2JS
             @rails_test_describe_depth += 1
             @rails_test_integration = is_integration
 
-            # Collect model references from the body
+            # Collect model references from the body and shared metadata
             collect_test_model_references(body) if body
+            seed_models_from_metadata
 
             # Transform class body
             transformed_body = transform_class_body(body)
@@ -406,6 +407,15 @@ module Ruby2JS
           end
         end
 
+        # Seed @rails_test_models from cross-file metadata (populated by model filter)
+        def seed_models_from_metadata
+          return unless @options[:metadata] && @options[:metadata]['models']
+          models = @options[:metadata]['models']
+          models.each do |name, _meta| # Pragma: entries
+            @rails_test_models << name unless @rails_test_models.include?(name)
+          end
+        end
+
         # Wrap AR operations with await - delegates to shared helper
         def wrap_test_ar_operations(node)
           ActiveRecordHelpers.wrap_ar_operations(node, @rails_test_models)
@@ -420,14 +430,20 @@ module Ruby2JS
         # know about. Sends without a receiver (like assert_equal) are not
         # affected — they're bare function calls handled by the assertion
         # transform or left as-is.
+        #
+        # Uses cross-file metadata (when available) to skip known-sync methods
+        # like enum predicates (card.closed?) which should not be awaited.
         def ensure_statement_method_calls(node)
           return node unless node.respond_to?(:type) && node.type == :begin
 
           new_children = node.children.map do |child|
             if child.respond_to?(:type) && child.type == :send &&
                child.children[0]  # has a receiver (not bare function call)
-              # Statement-position send with receiver → method call needing await
-              child.updated(:await!)
+              if sync_statement_send?(child)
+                child  # known sync — leave as-is, no await
+              else
+                child.updated(:await!)
+              end
             elsif child.respond_to?(:type) && child.type == :begin
               ensure_statement_method_calls(child)
             else
@@ -435,6 +451,28 @@ module Ruby2JS
             end
           end
           node.updated(nil, new_children)
+        end
+
+        # Check if a statement-position send is known to be synchronous.
+        # Uses cross-file metadata populated by the model filter.
+        def sync_statement_send?(node)
+          method = node.children[1]
+          return false unless @options[:metadata] && @options[:metadata]['models']
+
+          method_str = method.to_s
+          is_sync = false
+
+          # Check all models for enum predicates and bangs
+          @options[:metadata]['models'].each do |_name, model_meta| # Pragma: entries
+            if model_meta['enum_predicates'] && model_meta['enum_predicates'].include?(method_str)
+              is_sync = true
+            end
+            if model_meta['enum_bangs'] && model_meta['enum_bangs'].include?(method_str)
+              is_sync = true
+            end
+          end
+
+          is_sync
         end
 
         # Check if this is a test class (ActiveSupport::TestCase, etc.)

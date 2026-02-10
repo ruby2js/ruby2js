@@ -1260,6 +1260,10 @@ async function transpileTestFiles(appRoot, config) {
   // Build association map from Ruby source files (not transpiled .js)
   const associationMap = buildAssociationMapFromRuby(join(appRoot, 'app/models'));
 
+  // Shared metadata (models aren't transpiled in test-only mode, so this
+  // stays empty — but threading it keeps the interface consistent)
+  const metadata = { models: {}, concerns: {} };
+
   let count = 0;
 
   // Transpile model tests
@@ -1277,7 +1281,7 @@ async function transpileTestFiles(appRoot, config) {
 
       try {
         const source = readFileSync(join(modelTestDir, file), 'utf-8');
-        const result = await transformRuby(source, join(modelTestDir, file), 'test', config, appRoot);
+        const result = await transformRuby(source, join(modelTestDir, file), 'test', config, appRoot, metadata);
         let code = result.code;
 
         if (Object.keys(fixtures).length > 0) {
@@ -1311,7 +1315,7 @@ async function transpileTestFiles(appRoot, config) {
 
       try {
         const source = readFileSync(join(controllerTestDir, file), 'utf-8');
-        const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, appRoot);
+        const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, appRoot, metadata);
         let code = result.code;
 
         if (Object.keys(fixtures).length > 0) {
@@ -2119,6 +2123,11 @@ async function runEject(options) {
   let fileCount = 0;
   const errors = [];  // Track errors but continue processing
 
+  // Shared metadata: model/concern filters write here, test filter reads.
+  // Survives across convert() calls because Ruby2JS.convert does options.dup
+  // (shallow copy), so the mutable metadata object reference persists.
+  const metadata = { models: {}, concerns: {} };
+
   // Transform models (including nested subdirectories like account/export.rb)
   const modelsDir = join(APP_ROOT, 'app/models');
   if (existsSync(modelsDir)) {
@@ -2136,7 +2145,7 @@ async function runEject(options) {
           if (!file.includes('/')) {
             source = mergeConcernDeclarations(source, modelsDir);
           }
-          const result = await transformRuby(source, join(modelsDir, file), null, config, APP_ROOT);
+          const result = await transformRuby(source, join(modelsDir, file), null, config, APP_ROOT, metadata);
           // Pass relative output path for correct import resolution
           const relativeOutPath = `app/models/${file.replace('.rb', '.js')}`;
           let code = fixImportsForEject(result.code, relativeOutPath, config);
@@ -2222,7 +2231,7 @@ async function runEject(options) {
         const relativePath = `db/migrate/${m.file}`;
         try {
           const source = readFileSync(join(migrateDir, m.file), 'utf-8');
-          const result = await transformRuby(source, join(migrateDir, m.file), null, config, APP_ROOT);
+          const result = await transformRuby(source, join(migrateDir, m.file), null, config, APP_ROOT, metadata);
           // Pass relative output path for correct import resolution
           const relativeOutPath = `db/migrate/${m.name}.js`;
           let code = fixImportsForEject(result.code, relativeOutPath, config);
@@ -2248,7 +2257,7 @@ async function runEject(options) {
     console.log('  Transforming seeds...');
     try {
       const source = readFileSync(seedsFile, 'utf-8');
-      const result = await transformRuby(source, seedsFile, null, config, APP_ROOT);
+      const result = await transformRuby(source, seedsFile, null, config, APP_ROOT, metadata);
       // Pass relative output path for correct import resolution
       let code = fixImportsForEject(result.code, 'db/seeds.js', config);
       writeFileSync(join(outDir, 'db/seeds.js'), code);
@@ -2425,7 +2434,7 @@ async function runEject(options) {
           if (file.endsWith('.rb')) {
             // Transform Ruby files
             const source = readFileSync(inFile, 'utf-8');
-            const result = await transformRuby(source, inFile, 'stimulus', config, APP_ROOT);
+            const result = await transformRuby(source, inFile, 'stimulus', config, APP_ROOT, metadata);
             // Pass relative output path for correct import resolution
             const relativeOutPath = `app/javascript/controllers/${file.replace('.rb', '.js')}`;
             let code = fixImportsForEject(result.code, relativeOutPath, config);
@@ -2459,7 +2468,7 @@ async function runEject(options) {
         const relativePath = `app/controllers/${file}`;
         try {
           const source = readFileSync(join(appControllersDir, file), 'utf-8');
-          const result = await transformRuby(source, join(appControllersDir, file), 'controllers', config, APP_ROOT);
+          const result = await transformRuby(source, join(appControllersDir, file), 'controllers', config, APP_ROOT, metadata);
           // Pass relative output path for correct import resolution
           const relativeOutPath = `app/controllers/${file.replace('.rb', '.js')}`;
           let code = fixImportsForEject(result.code, relativeOutPath, config);
@@ -2486,7 +2495,7 @@ async function runEject(options) {
           try {
             const source = readFileSync(join(concernsDir, file), 'utf-8');
             // Use 'model' type for concerns (they're module-like)
-            const result = await transformRuby(source, join(concernsDir, file), null, config, APP_ROOT);
+            const result = await transformRuby(source, join(concernsDir, file), null, config, APP_ROOT, metadata);
             const relativeOutPath = `app/controllers/concerns/${file.replace('.rb', '.js')}`;
             let code = fixImportsForEject(result.code, relativeOutPath, config);
             const outFile = join(outDir, 'app/controllers/concerns', file.replace('.rb', '.js'));
@@ -2560,7 +2569,7 @@ async function runEject(options) {
           const outName = file.replace(/_test\.rb$/, '.test.mjs');
           try {
             const source = readFileSync(join(modelTestDir, file), 'utf-8');
-            const result = await transformRuby(source, join(modelTestDir, file), 'test', config, APP_ROOT);
+            const result = await transformRuby(source, join(modelTestDir, file), 'test', config, APP_ROOT, metadata);
             let code = fixTestImportsForEject(result.code);
 
             // Inline fixtures if we have fixture data
@@ -2619,7 +2628,7 @@ async function runEject(options) {
           const outName = file.replace(/_test\.rb$/, '.test.mjs');
           try {
             const source = readFileSync(join(controllerTestDir, file), 'utf-8');
-            const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, APP_ROOT);
+            const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, APP_ROOT, metadata);
             let code = fixTestImportsForEject(result.code);
 
             // Inline fixtures if we have fixture data

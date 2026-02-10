@@ -69,6 +69,23 @@ module Ruby2JS
 
           result = node.updated(nil, [name, new_body_node])
 
+          # Record concern metadata for cross-file filter context
+          if @options[:metadata]
+            concern_name = name.children.last.to_s
+            meta = @options[:metadata]
+            meta['concerns'] = {} unless meta['concerns']
+
+            # Collect method names from transformed body
+            method_names = []
+            new_body.each do |n|
+              if n.respond_to?(:type) && n.type == :def
+                method_names.push(n.children[0].to_s)
+              end
+            end
+
+            meta['concerns'][concern_name] = { 'methods' => method_names }
+          end
+
           @rails_concern = nil
           super(result)
         end
