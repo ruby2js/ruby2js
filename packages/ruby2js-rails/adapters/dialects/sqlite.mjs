@@ -44,10 +44,20 @@ export class SQLiteDialect extends ActiveRecordSQL {
     return val ? 1 : 0;
   }
 
-  // Format value for binding (SQLite needs booleans as 0/1)
+  // Format value for binding (SQLite needs booleans as 0/1, objects as JSON)
   static _formatValue(val) {
     if (typeof val === 'boolean') return val ? 1 : 0;
     if (val instanceof Date) return val.toISOString();
+    // Serialize objects/arrays to JSON (e.g., JSON columns)
+    // Use a replacer to convert model instances to their IDs
+    if (val !== null && typeof val === 'object') {
+      return JSON.stringify(val, (key, v) => {
+        if (v && typeof v === 'object' && v.constructor?.tableName && v.id) {
+          return v.id;
+        }
+        return v;
+      });
+    }
     return val;
   }
 

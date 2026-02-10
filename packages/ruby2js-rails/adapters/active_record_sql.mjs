@@ -757,10 +757,15 @@ export class ActiveRecordSQL extends ActiveRecordBase {
   static _formatValue(val) {
     if (val instanceof Date) return val.toISOString();
     // Serialize plain objects/arrays to JSON for storage (e.g., JSON columns like particulars)
-    if (val !== null && typeof val === 'object' && !Array.isArray(val) && !(val instanceof Buffer)) {
-      return JSON.stringify(val);
+    // Use a replacer to handle model instances (convert to ID) and avoid circular refs
+    if (val !== null && typeof val === 'object') {
+      return JSON.stringify(val, (key, v) => {
+        if (v && typeof v === 'object' && v.constructor?.tableName && v.id) {
+          return v.id;  // Model instance → store as ID
+        }
+        return v;
+      });
     }
-    if (Array.isArray(val)) return JSON.stringify(val);
     return val;
   }
 
