@@ -246,10 +246,14 @@ export class ActiveRecordBase {
   }
 
   async update(attributes) {
-    Object.assign(this.attributes, attributes);
-    // Also update direct properties
     for (const [key, value] of Object.entries(attributes)) {
-      if (key !== 'id') {
+      if (key === 'id') continue;
+      const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(this), key);
+      if (descriptor?.set) {
+        // Association setter — let it handle FK storage, don't copy raw key to attributes
+        this[key] = value;
+      } else {
+        this.attributes[key] = value;
         this[key] = value;
       }
     }

@@ -153,8 +153,13 @@ export class CollectionProxy {
     return (this._records || []).filter(fn);
   }
 
-  find_by(fn) {
-    return (this._records || []).find(fn);
+  find_by(conditions) {
+    // If conditions is a plain object, delegate to scoped query (like Rails find_by)
+    if (conditions && typeof conditions === 'object' && !Array.isArray(conditions) && typeof conditions !== 'function') {
+      return this.toRelation().findBy(conditions);
+    }
+    // If it's a function, use as Array.find callback
+    return (this._records || []).find(conditions);
   }
 
   reduce(fn, initial) {

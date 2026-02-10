@@ -880,7 +880,21 @@ export function generateTestSetupForEject(config = {}) {
   const railsModule = `ruby2js-rails/targets/${target}/rails.js`;
 
   return `// Test setup for Vitest - ejected version
-import { beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, expect } from 'vitest';
+
+// Compare ActiveRecord model instances by class and id (like Rails)
+expect.addEqualityTesters([
+  function modelsEqual(a, b) {
+    const aIsModel = a && typeof a === 'object' && a.constructor?.tableName && 'id' in a;
+    const bIsModel = b && typeof b === 'object' && b.constructor?.tableName && 'id' in b;
+    if (aIsModel && bIsModel) {
+      return a.constructor === b.constructor && a.id === b.id;
+    }
+    // If only one is a model, they're not equal
+    if (aIsModel || bIsModel) return false;
+    return undefined; // fall through to default for non-models
+  }
+]);
 
 beforeAll(async () => {
   // Import models (registers them with Application and modelRegistry)
@@ -975,13 +989,32 @@ globalThis.ActiveSupport = {
       Object.assign(this._attributes, attrs);
       try { return fn?.(); } finally { this._attributes = prev; }
     }
-    // Promote instance methods to static on subclasses
+    // Promote instance methods/setters to static on subclasses
     static _promoteInstanceMethods() {
       const proto = this.prototype;
+      const parentProto = Object.getPrototypeOf(proto);
       for (const name of Object.getOwnPropertyNames(proto)) {
         if (name === 'constructor') continue;
         const desc = Object.getOwnPropertyDescriptor(proto, name);
-        if (desc && typeof desc.value === 'function' && !(name in this)) {
+        if (desc?.set) {
+          // Custom setter (e.g., session=) — integrate with attribute() setter
+          const customSetter = desc.set;
+          const existingDesc = Object.getOwnPropertyDescriptor(this, name);
+          if (existingDesc?.set) {
+            const origGetter = existingDesc.get;
+            const origSetter = existingDesc.set;
+            // Define stub on parent prototype so super.name(v) doesn't crash
+            if (!parentProto[name]) parentProto[name] = function(v) {};
+            Object.defineProperty(this, name, {
+              get: origGetter,
+              set(v) {
+                origSetter.call(this, v);  // Store in _attributes first
+                customSetter.call(this, v); // Then run custom chain
+              },
+              configurable: true
+            });
+          }
+        } else if (desc && typeof desc.value === 'function' && !(name in this)) {
           this[name] = desc.value.bind(this);
         }
       }

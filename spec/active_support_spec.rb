@@ -8,30 +8,29 @@ describe Ruby2JS::Filter::ActiveSupport do
   end
 
   describe 'blank?' do
-    it "should convert blank? using optional chaining" do
-      _(to_js('x.blank?')).must_equal '!x?.length'
+    it "should convert blank? to null/empty/false check" do
+      _(to_js('x.blank?')).must_equal 'x == null || x === "" || x === false'
     end
 
     it "should handle blank? on method calls" do
-      _(to_js('user.name.blank?')).must_equal '!user.name?.length'
+      _(to_js('user.name.blank?')).must_equal 'user.name == null || user.name === "" || user.name === false'
     end
   end
 
   describe 'present?' do
-    it "should convert present? using optional chaining" do
-      _(to_js('x.present?')).must_equal 'x?.length > 0'
+    it "should convert present? to non-null/non-empty check" do
+      _(to_js('x.present?')).must_equal 'x != null && x !== "" && x !== false'
     end
 
     it "should handle present? on method calls" do
-      _(to_js('user.email.present?')).must_equal 'user.email?.length > 0'
+      _(to_js('user.email.present?')).must_equal 'user.email != null && user.email !== "" && user.email !== false'
     end
   end
 
   describe 'presence' do
     it "should convert presence to conditional" do
       result = to_js('x.presence')
-      # May be ternary or if/else depending on context
-      _(result).must_include 'x?.length > 0'
+      _(result).must_include 'x != null'
       _(result).must_include 'null'
     end
   end

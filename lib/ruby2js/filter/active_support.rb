@@ -12,21 +12,42 @@ module Ruby2JS
         target, method, *args = node.children
 
         if method == :blank? && args.empty? && target
-          # obj.blank? => !obj?.length (null/undefined/empty all falsy)
+          # obj.blank? => obj == null || obj === '' || obj === false
+          # Handles nil, undefined, empty strings, and false correctly
+          # (empty arrays return false — use .length === 0 for those)
           target = process(target)
-          return s(:send, s(:cattr, target, :length), :!)
+          return s(:or,
+            s(:or,
+              s(:send, target, :==, s(:nil)),
+              s(:send, target, :"===", s(:str, ""))
+            ),
+            s(:send, target, :"===", s(:false))
+          )
         end
 
         if method == :present? && args.empty? && target
-          # obj.present? => obj?.length > 0
+          # obj.present? => obj != null && obj !== '' && obj !== false
+          # Works for strings, model instances, numbers, etc.
           target = process(target)
-          return s(:send, s(:cattr, target, :length), :>, s(:int, 0))
+          return s(:and,
+            s(:and,
+              s(:send, target, :!=, s(:nil)),
+              s(:send, target, :"!==", s(:str, ""))
+            ),
+            s(:send, target, :"!==", s(:false))
+          )
         end
 
         if method == :presence && args.empty? && target
-          # obj.presence => obj?.length > 0 ? obj : null
+          # obj.presence => (obj != null && obj !== '' && obj !== false) ? obj : null
           target = process(target)
-          present_check = s(:send, s(:cattr, target, :length), :>, s(:int, 0))
+          present_check = s(:and,
+            s(:and,
+              s(:send, target, :!=, s(:nil)),
+              s(:send, target, :"!==", s(:str, ""))
+            ),
+            s(:send, target, :"!==", s(:false))
+          )
           return s(:if, present_check, target, s(:nil))
         end
 

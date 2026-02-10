@@ -96,6 +96,18 @@ module Ruby2JS
 
           # Check if this is an ActiveRecord model
           unless model_class?(class_name, superclass)
+            # Handle CurrentAttributes: prefix bare attribute refs with self.
+            if !@current_attrs_processing && current_attributes_class?(superclass) && body
+              attr_names = collect_current_attribute_names(body)
+              unless attr_names.empty?
+                @current_attrs_processing = true
+                new_body = rewrite_current_attributes_body(body, attr_names)
+                result = process(node.updated(nil, [class_name, superclass, new_body]))
+                @current_attrs_processing = false
+                return result
+              end
+            end
+
             # For non-model classes, still handle include Rails.application.routes.url_helpers
             if body && body_has_url_helpers_include?(body)
               new_body = strip_url_helpers_include(body)
@@ -682,6 +694,63 @@ module Ruby2JS
           end
 
           false
+        end
+
+        # Check if this is a CurrentAttributes subclass
+        def current_attributes_class?(superclass)
+          return false unless superclass&.type == :const
+          name = superclass.children.last.to_s
+          return true if name == 'CurrentAttributes'
+          # Check for ActiveSupport::CurrentAttributes or ApplicationRecord::CurrentAttributes
+          parent = superclass.children.first
+          if parent&.type == :const && name == 'CurrentAttributes'
+            return true
+          end
+          false
+        end
+
+        # Collect attribute names from Current.attribute(:session, :user, ...) calls
+        def collect_current_attribute_names(body)
+          names = []
+          children = body.type == :begin ? body.children : [body]
+          children.each do |child|
+            next unless child&.type == :send
+            # attribute :session, :user, :identity, :account
+            if child.children[0].nil? && child.children[1] == :attribute
+              child.children[2..].each do |arg|
+                names.push(arg.children.first) if arg.type == :sym
+              end
+            end
+          end
+          names
+        end
+
+        # Rewrite bare sends to attribute names as self.name in CurrentAttributes body
+        def rewrite_current_attributes_body(body, attr_names)
+          children = body.type == :begin ? body.children : [body]
+          new_children = children.map do |child|
+            rewrite_current_attributes_node(child, attr_names)
+          end
+          body.type == :begin ? body.updated(nil, new_children) : new_children.first
+        end
+
+        def rewrite_current_attributes_node(node, attr_names)
+          return node unless node.respond_to?(:type)
+
+          # Rewrite bare sends: s(:send, nil, :account) → s(:send, s(:self), :account)
+          if node.type == :send && node.children[0].nil? && attr_names.include?(node.children[1])
+            return node.updated(nil, [s(:self), *node.children[1..]])
+          end
+
+          # Recurse into children
+          new_children = node.children.map do |child|
+            if child.respond_to?(:type)
+              rewrite_current_attributes_node(child, attr_names)
+            else
+              child
+            end
+          end
+          node.updated(nil, new_children)
         end
 
         def collect_model_metadata(body)
