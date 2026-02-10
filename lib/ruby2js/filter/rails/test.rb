@@ -367,14 +367,17 @@ module Ruby2JS
 
         # Extract instance variable names from a setup body.
         # Returns an array of symbols like [:article, :comment].
+        # Recurses into all compound nodes (begin, masgn, mlhs, etc.)
+        # to find ivasgn nodes regardless of nesting depth.
         def extract_ivar_names(node)
           names = []
           return names unless node.respond_to?(:type)
           if node.type == :ivasgn
             names << node.children.first.to_s.sub(/^@/, '').to_sym
-          elsif node.type == :begin
-            node.children.each do |child|
-              names.concat(extract_ivar_names(child))
+          end
+          node.children.each do |child|
+            if child.respond_to?(:type)
+              extract_ivar_names(child).each { |n| names.push(n) }
             end
           end
           names.uniq

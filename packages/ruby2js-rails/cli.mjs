@@ -1161,60 +1161,6 @@ function addControllerImportsVirtual(code) {
 }
 
 /**
- * Hoist `let` variable declarations from beforeEach callbacks to describe scope.
- *
- * Rails setup blocks assign instance variables (@article = ...) that are
- * accessible in all test methods. After transpilation, these become
- * `let article = ...` inside a beforeEach callback, which is block-scoped
- * and not accessible in test functions.
- *
- * This function transforms:
- *   beforeEach(async () => { let article = expr });
- * To:
- *   let article; beforeEach(async () => { article = expr });
- */
-function hoistBeforeEachVars(code) {
-  // Find all beforeEach blocks using brace matching, then hoist let declarations
-  const marker = 'beforeEach(async () => {';
-  let result = code;
-  let searchFrom = 0;
-
-  while (true) {
-    const idx = result.indexOf(marker, searchFrom);
-    if (idx === -1) break;
-
-    const braceStart = idx + marker.length - 1; // position of opening {
-    let depth = 1;
-    let end = -1;
-    for (let i = braceStart + 1; i < result.length; i++) {
-      if (result[i] === '{') depth++;
-      else if (result[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
-    }
-    if (end === -1) break;
-
-    // Extract body between braces
-    const body = result.slice(braceStart + 1, end);
-    const hoisted = [];
-    const newBody = body.replace(/\n(\s*)let (\w+)( = [^;\n]+)/g, (m, indent, name, assignment) => {
-      hoisted.push(`let ${name};`);
-      return `\n${indent}${name}${assignment}`;
-    });
-
-    if (hoisted.length > 0) {
-      const replacement = hoisted.join('\n') + '\n' + marker + newBody + '})';
-      // Find the closing ");" or ")" after the block
-      const afterBlock = result.indexOf(')', end + 1);
-      const replaceEnd = afterBlock !== -1 ? afterBlock + 1 : end + 2;
-      result = result.slice(0, idx) + replacement + result.slice(replaceEnd);
-      searchFrom = idx + replacement.length;
-    } else {
-      searchFrom = end + 1;
-    }
-  }
-  return result;
-}
-
-/**
  * Fix redirect assertions to compare string representations.
  *
  * Path helpers return objects (with toString), not primitive strings.
@@ -1286,7 +1232,7 @@ async function transpileTestFiles(appRoot, config) {
         code = setupCurrentAttributes(code, appRoot);
         code = addModelImportsVirtual(code);
 
-        code = hoistBeforeEachVars(code);
+
         writeFileSync(outPath, code);
         count++;
       } catch (err) {
@@ -1320,7 +1266,7 @@ async function transpileTestFiles(appRoot, config) {
         code = setupCurrentAttributes(code, appRoot);
         code = addControllerImportsVirtual(code);
 
-        code = hoistBeforeEachVars(code);
+
         code = fixRedirectAssertions(code);
         writeFileSync(outPath, code);
         count++;
@@ -2577,8 +2523,7 @@ async function runEject(options) {
 
 
 
-            // Hoist let declarations from beforeEach to describe scope
-            code = hoistBeforeEachVars(code);
+
 
             // Add model imports (pass outName for correct relative path depth)
             code = addModelImportsToTest(code, join(outDir, 'app/models'), outName, 2);
@@ -2635,8 +2580,7 @@ async function runEject(options) {
 
 
 
-            // Hoist let declarations from beforeEach to describe scope
-            code = hoistBeforeEachVars(code);
+
 
             // Add controller, model, and path helper imports (pass outName for correct relative path depth)
             code = addControllerImportsToTest(
