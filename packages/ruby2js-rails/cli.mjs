@@ -849,6 +849,11 @@ function inlineFixtures(code, fixtures, associationMap) {
     result = fixtureSetup + '\n\n' + result;
   }
 
+  // Fix .reload chains in fixture references (e.g., _fixtures.cards_shipping.reload.open)
+  // The AST-level fix in active_record.rb handles lvar/ivar chains, but fixture
+  // references are text-substituted after transpilation so need a text-level fix.
+  result = result.replace(/(_fixtures\.\w+)\.reload\.(\w+)/g, '(await $1.reload()).$2');
+
   return result;
 }
 
@@ -1168,16 +1173,6 @@ function addControllerImportsVirtual(code) {
  * To:
  *   let article; beforeEach(async () => { article = expr });
  */
-/**
- * Fix chained .reload property access to async method call.
- * Ruby: card.reload.open? (reload is synchronous, returns self)
- * JS:   (await card.reload()).open (reload is async)
- */
-function fixReloadChains(code) {
-  // .reload.property (without parens) → (await .reload()).property
-  return code.replace(/(\w[\w.]*?)\.reload\.(\w+)/g, '(await $1.reload()).$2');
-}
-
 function hoistBeforeEachVars(code) {
   // Find all beforeEach blocks using brace matching, then hoist let declarations
   const marker = 'beforeEach(async () => {';
@@ -1290,7 +1285,7 @@ async function transpileTestFiles(appRoot, config) {
 
         code = setupCurrentAttributes(code, appRoot);
         code = addModelImportsVirtual(code);
-        code = fixReloadChains(code);
+
         code = hoistBeforeEachVars(code);
         writeFileSync(outPath, code);
         count++;
@@ -1324,7 +1319,7 @@ async function transpileTestFiles(appRoot, config) {
 
         code = setupCurrentAttributes(code, appRoot);
         code = addControllerImportsVirtual(code);
-        code = fixReloadChains(code);
+
         code = hoistBeforeEachVars(code);
         code = fixRedirectAssertions(code);
         writeFileSync(outPath, code);
@@ -2580,8 +2575,7 @@ async function runEject(options) {
             // Add Current.account setup from test_helper.rb and settle async setters
             code = setupCurrentAttributes(code, APP_ROOT);
 
-            // Fix chained .reload property access to async method call
-            code = fixReloadChains(code);
+
 
             // Hoist let declarations from beforeEach to describe scope
             code = hoistBeforeEachVars(code);
@@ -2639,8 +2633,7 @@ async function runEject(options) {
             // Add Current.account setup from test_helper.rb and settle async setters
             code = setupCurrentAttributes(code, APP_ROOT);
 
-            // Fix chained .reload property access to async method call
-            code = fixReloadChains(code);
+
 
             // Hoist let declarations from beforeEach to describe scope
             code = hoistBeforeEachVars(code);

@@ -150,6 +150,20 @@ module Ruby2JS
               return new_node.updated(:await!)
             end
 
+            # Check for chained AR instance methods (e.g., card.reload.status)
+            # When an AR instance method like .reload appears as the receiver of
+            # another send, wrap it with await: (await card.reload()).status
+            if target&.type == :send
+              chain_receiver = target.children[0]
+              chain_method = target.children[1]
+              if (chain_receiver&.type == :lvar || chain_receiver&.type == :ivar) &&
+                 AR_INSTANCE_METHODS.include?(chain_method)
+                wrapped_target = target.updated(:await!)
+                new_args = args.map { |a| self.wrap_ar_operations(a, model_refs) }
+                return node.updated(nil, [wrapped_target, method, *new_args])
+              end
+            end
+
             # Check for association methods (e.g., article.comments.create!, workflow.nodes.count)
             # Must be a chain: lvar.accessor.method (not just lvar.find which could be Array#find)
             if target&.type == :send && AR_ASSOCIATION_METHODS.include?(method)
