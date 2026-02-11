@@ -144,7 +144,8 @@ module Ruby2JS
             end
 
             # Check for instance method calls (e.g., article.save, @article.update)
-            if (target&.type == :lvar || target&.type == :ivar) && AR_INSTANCE_METHODS.include?(method)
+            # Also handles :attr targets for fixture refs (_fixtures.card)
+            if (target&.type == :lvar || target&.type == :ivar || target&.type == :attr) && AR_INSTANCE_METHODS.include?(method)
               new_args = args.map { |a| self.wrap_ar_operations(a, model_refs) }
               new_node = node.updated(nil, [target, method, *new_args])
               return new_node.updated(:await!)
@@ -156,7 +157,7 @@ module Ruby2JS
             if target&.type == :send
               chain_receiver = target.children[0]
               chain_method = target.children[1]
-              if (chain_receiver&.type == :lvar || chain_receiver&.type == :ivar) &&
+              if (chain_receiver&.type == :lvar || chain_receiver&.type == :ivar || chain_receiver&.type == :attr) &&
                  AR_INSTANCE_METHODS.include?(chain_method)
                 wrapped_target = target.updated(:await!)
                 new_args = args.map { |a| self.wrap_ar_operations(a, model_refs) }
@@ -166,6 +167,9 @@ module Ruby2JS
 
             # Check for association methods (e.g., article.comments.create!, workflow.nodes.count)
             # Must be a chain: lvar.accessor.method (not just lvar.find which could be Array#find)
+            # Note: :attr (fixture refs like _fixtures.card) intentionally excluded here.
+            # Fixture association chains go through the functions filter (.last -> .at(-1))
+            # and assert_difference wraps count calls explicitly.
             if target&.type == :send && AR_ASSOCIATION_METHODS.include?(method)
               assoc_target = target.children[0]
               assoc_method = target.children[1]

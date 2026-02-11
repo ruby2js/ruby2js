@@ -855,6 +855,9 @@ module Ruby2JS
           end
           model_meta['enum_bangs'] = bangs
 
+          # File path for import generation in test filter
+          model_meta['file'] = @options[:file] if @options[:file]
+
           meta['models'][@rails_model_name] = model_meta
         end
 

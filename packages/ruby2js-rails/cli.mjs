@@ -660,31 +660,32 @@ function topologicalSortTables(referencedTables, fixtures, associationMap) {
 }
 
 /**
- * Scan transpiled test code for fixture function calls and inline fixture data.
+ * Build a fixture plan from Ruby source, suitable for passing to the test
+ * filter via metadata. The test filter then generates the fixture setup code
+ * at AST level (correct source maps) instead of text-level post-processing.
  *
- * Fixture calls look like: tableName("fixtureName") e.g., songs("one"), dances("waltz")
- * These are replaced with _fixtures.tableName_fixtureName references,
- * and a beforeEach block is prepended with Model.create() calls.
+ * Returns { setupCode, replacements } or null if no fixtures are referenced.
+ * - setupCode: JavaScript string for the beforeEach block (let _fixtures = {}; beforeEach(...))
+ * - replacements: { "table:fixture": "table_fixture", ... } for AST-level fixture ref replacement
  */
-function inlineFixtures(code, fixtures, associationMap) {
-  // Find all fixture references: word("string")
-  const fixtureCallRegex = /\b([a-z_]+)\("(\w+)"\)/g;
-  const referencedFixtures = new Map();  // "table_fixture" -> { table, fixture }
+function buildFixturePlan(rubySource, fixtures, associationMap) {
+  // Find fixture references in Ruby source: cards(:logo), sessions(:david), accounts(:"37s"), accounts("37s")
+  const fixtureCallRegex = /\b([a-z_]+)\s*(?:[\(:]\s*:["']?(\w+)["']?|\("(\w+)"\))/g;
+  const referencedFixtures = new Map();
   let match;
 
-  while ((match = fixtureCallRegex.exec(code)) !== null) {
+  while ((match = fixtureCallRegex.exec(rubySource)) !== null) {
     const tableName = match[1];
-    const fixtureName = match[2];
-    // Verify this table exists in fixtures
+    const fixtureName = match[2] || match[3];
     if (fixtures[tableName] && fixtures[tableName][fixtureName]) {
       const key = `${tableName}_${fixtureName}`;
       referencedFixtures.set(key, { table: tableName, fixture: fixtureName });
     }
   }
 
-  if (referencedFixtures.size === 0) return code;
+  if (referencedFixtures.size === 0) return null;
 
-  // Resolve transitive dependencies
+  // Resolve transitive dependencies (same logic as inlineFixtures)
   const allFixtures = new Map(referencedFixtures);
   const toResolve = [...referencedFixtures.values()];
   while (toResolve.length > 0) {
@@ -697,26 +698,23 @@ function inlineFixtures(code, fixtures, associationMap) {
       const resolved = resolveFixtureValue(value, col, table, associationMap, fixtures);
       if (resolved) {
         const { ref, targetTable } = resolved;
-        const key = `${targetTable}_${ref.fixtureName}`;
-        if (!allFixtures.has(key)) {
-          allFixtures.set(key, { table: targetTable, fixture: ref.fixtureName });
+        const depKey = `${targetTable}_${ref.fixtureName}`;
+        if (!allFixtures.has(depKey)) {
+          allFixtures.set(depKey, { table: targetTable, fixture: ref.fixtureName });
           toResolve.push({ table: targetTable, fixture: ref.fixtureName });
         }
       }
     }
   }
 
-  // Reverse resolution: pull in has_one fixtures that point back to collected fixtures.
-  // E.g., if we have cards_shipping, also pull in closures where card: shipping.
-  // Only do this for has_one associations (not has_many, which would pull too many records).
-  // Also track back-references so we can set parent.association = child after creation.
-  const collectedByTable = new Map(); // table -> Set of fixture names
+  // Reverse resolution: pull in has_one fixtures that point back to collected fixtures
+  const collectedByTable = new Map();
   for (const { table, fixture } of allFixtures.values()) {
     if (!collectedByTable.has(table)) collectedByTable.set(table, new Set());
     collectedByTable.get(table).add(fixture);
   }
 
-  const reverseBackRefs = []; // { parentKey, assocName, childKey }
+  const reverseBackRefs = [];
 
   for (const [modelTable, assocs] of Object.entries(associationMap)) {
     for (const [assocName, assocEntry] of Object.entries(assocs)) {
@@ -724,11 +722,9 @@ function inlineFixtures(code, fixtures, associationMap) {
       const reverseTable = assocEntry.table;
       if (!reverseTable || !fixtures[reverseTable]) continue;
 
-      // Check if any collected fixtures from this model are referenced by reverseTable fixtures
       const collectedNames = collectedByTable.get(modelTable);
       if (!collectedNames) continue;
 
-      // The FK column in the reverse table pointing back to modelTable
       const fkCol = singularize(modelTable);
 
       for (const [revFixtureName, revFixtureData] of Object.entries(fixtures[reverseTable])) {
@@ -736,14 +732,12 @@ function inlineFixtures(code, fixtures, associationMap) {
         const fkValue = revFixtureData[fkCol];
         if (typeof fkValue !== 'string') continue;
 
-        // Check if this FK points to a collected fixture
         const ref = resolveFixtureRef(fkValue, modelTable, fixtures);
         if (ref && collectedNames.has(ref.fixtureName)) {
           const childKey = `${reverseTable}_${revFixtureName}`;
           const parentKey = `${modelTable}_${ref.fixtureName}`;
           if (!allFixtures.has(childKey)) {
             allFixtures.set(childKey, { table: reverseTable, fixture: revFixtureName });
-            // Also resolve this new fixture's forward dependencies
             const revData = fixtures[reverseTable]?.[revFixtureName];
             if (revData && typeof revData === 'object') {
               for (const [col, val] of Object.entries(revData)) {
@@ -758,20 +752,18 @@ function inlineFixtures(code, fixtures, associationMap) {
               }
             }
           }
-          // Track back-reference: parent.assocName = child
           reverseBackRefs.push({ parentKey, assocName, childKey });
         }
       }
     }
   }
 
-  // Collect all referenced tables and sort by dependency
+  // Sort tables by dependency
   const referencedTables = new Set([...allFixtures.values()].map(f => f.table));
   const sortedTables = topologicalSortTables(referencedTables, fixtures, associationMap);
 
-  // Generate fixture creation code
+  // Generate fixture creation lines (same text as inlineFixtures)
   const createLines = [];
-  const sortedFixtures = [];
 
   for (const table of sortedTables) {
     const tableFixtures = [...allFixtures.values()].filter(f => f.table === table);
@@ -782,7 +774,6 @@ function inlineFixtures(code, fixtures, associationMap) {
       const key = `${table}_${fixture}`;
       const modelName = camelize(singularize(table));
 
-      // Build create attributes
       const attrs = [];
       for (const [col, value] of Object.entries(fixtureData)) {
         if (typeof value === 'string') {
@@ -790,71 +781,38 @@ function inlineFixtures(code, fixtures, associationMap) {
           if (resolved) {
             const { ref, targetTable } = resolved;
             if (allFixtures.has(`${targetTable}_${ref.fixtureName}`)) {
-              // Association reference - pass the object so the setter populates the instance cache
-              // This enables synchronous access via the Reference pattern
               attrs.push(`${col}: _fixtures.${targetTable}_${ref.fixtureName}`);
             } else {
-              // Known fixture but not in allFixtures - use generated UUID
               attrs.push(`${col}_id: ${JSON.stringify(fixtureIdentifyUUID(ref.fixtureName))}`);
             }
             continue;
           }
         }
-        if (col.endsWith('_id') || col === 'id') {
-          // Explicit ID
-          attrs.push(`${col}: ${JSON.stringify(value)}`);
-        } else {
-          // Regular attribute
-          attrs.push(`${col}: ${JSON.stringify(value)}`);
-        }
+        attrs.push(`${col}: ${JSON.stringify(value)}`);
       }
 
       createLines.push(`  _fixtures.${key} = await ${modelName}.create({${attrs.join(', ')}});`);
-      sortedFixtures.push({ key, table, fixture, modelName });
     }
   }
 
-  // Add back-reference assignments for reverse has_one fixtures.
-  // E.g., after creating closures_shipping with card: cards_shipping,
-  // set cards_shipping.closure = closures_shipping so the loaded flag is populated.
+  // Add back-reference assignments
   for (const { parentKey, assocName, childKey } of reverseBackRefs) {
     if (allFixtures.has(parentKey) && allFixtures.has(childKey)) {
       createLines.push(`  _fixtures.${parentKey}.${assocName} = _fixtures.${childKey};`);
     }
   }
 
-  if (createLines.length === 0) return code;
+  if (createLines.length === 0) return null;
 
-  // Build the fixture beforeEach block
-  const fixtureSetup = `let _fixtures = {};\n\nbeforeEach(async () => {\n${createLines.join('\n')}\n});`;
-
-  // Replace fixture calls with _fixtures references
-  let result = code;
+  // Build replacements map: "table:fixture" -> "table_fixture"
+  const replacements = {};
   for (const [key, { table, fixture }] of allFixtures) {
-    // Replace tableName("fixtureName") with _fixtures.tableName_fixtureName
-    const callPattern = new RegExp(`\\b${table}\\("${fixture}"\\)`, 'g');
-    result = result.replace(callPattern, `_fixtures.${key}`);
+    replacements[`${table}:${fixture}`] = key;
   }
 
-  // Insert fixture setup after the opening of describe block
-  // Match various describe formats:
-  //   describe("Name", () => {
-  //   describe(\n  "Name",\n  () => {
-  const describeMatch = result.match(/(describe\([\s\S]*?\(\)\s*=>\s*\{)\s*\n/);
-  if (describeMatch) {
-    const insertPoint = describeMatch.index + describeMatch[0].length;
-    result = result.slice(0, insertPoint) + fixtureSetup + '\n\n' + result.slice(insertPoint);
-  } else {
-    // Fallback: prepend before first test/beforeEach
-    result = fixtureSetup + '\n\n' + result;
-  }
+  const setupCode = `beforeEach(async () => {\n${createLines.join('\n')}\n});`;
 
-  // Fix .reload chains in fixture references (e.g., _fixtures.cards_shipping.reload.open)
-  // The AST-level fix in active_record.rb handles lvar/ivar chains, but fixture
-  // references are text-substituted after transpilation so need a text-level fix.
-  result = result.replace(/(_fixtures\.\w+)\.reload\.(\w+)/g, '(await $1.reload()).$2');
-
-  return result;
+  return { setupCode, replacements };
 }
 
 /**
@@ -924,117 +882,6 @@ function setupCurrentAttributes(code, appRoot) {
  * @param {string} outName - Output filename (may include subdirs like 'account/export.test.mjs')
  * @param {number} baseDepth - Base depth from test subdir to project root (2 for test/models/)
  */
-function addModelImportsToTest(code, modelsDir, outName = '', baseDepth = 2) {
-  if (!existsSync(modelsDir)) return code;
-
-  // Find all model references (PascalCase.method or extends PascalCase)
-  const modelRefRegex = /\b([A-Z][a-z]\w+)\.(create|find|where|all|first|last|count|new|order|destroy_all)\b/g;
-  const referencedModels = new Set();
-  let match;
-
-  while ((match = modelRefRegex.exec(code)) !== null) {
-    referencedModels.add(match[1]);
-  }
-
-  // Also check for models in fixture creation (_fixtures references use model names)
-  const fixtureModelRegex = /await\s+([A-Z][a-z]\w+)\.create\b/g;
-  while ((match = fixtureModelRegex.exec(code)) !== null) {
-    referencedModels.add(match[1]);
-  }
-
-  if (referencedModels.size === 0) return code;
-
-  // Calculate relative path depth based on subdirectories in outName
-  // e.g., 'user.test.mjs' -> 0 extra, 'account/export.test.mjs' -> 1 extra
-  const subdirCount = (outName.match(/\//g) || []).length;
-  const totalDepth = baseDepth + subdirCount;
-  const relativePrefix = '../'.repeat(totalDepth);
-
-  // Build import statements
-  const imports = [];
-  for (const modelName of referencedModels) {
-    const modelFile = underscore(modelName) + '.js';
-    if (existsSync(join(modelsDir, modelFile))) {
-      imports.push(`import { ${modelName} } from '${relativePrefix}app/models/${modelFile}';`);
-    }
-  }
-
-  if (imports.length === 0) return code;
-
-  // Prepend imports to file
-  return imports.join('\n') + '\n\n' + code;
-}
-
-/**
- * Add controller and path helper imports to a controller test file.
- * Scans for XxxController.method patterns and xxx_path( patterns.
- * @param {string} code - The test file code
- * @param {string} controllersDir - Path to controllers directory
- * @param {string} modelsDir - Path to models directory
- * @param {string} outName - Output filename (may include subdirs like 'cards/comments_controller.test.mjs')
- * @param {number} baseDepth - Base depth from test subdir to project root (2 for test/controllers/)
- */
-function addControllerImportsToTest(code, controllersDir, modelsDir, outName = '', baseDepth = 2) {
-  const imports = [];
-
-  // Calculate relative path depth based on subdirectories in outName
-  const subdirCount = (outName.match(/\//g) || []).length;
-  const totalDepth = baseDepth + subdirCount;
-  const relativePrefix = '../'.repeat(totalDepth);
-
-  // Find controller references: XxxController.method
-  const controllerRefRegex = /\b([A-Z][a-z]\w*Controller)\.\w+/g;
-  const referencedControllers = new Set();
-  let match;
-  while ((match = controllerRefRegex.exec(code)) !== null) {
-    referencedControllers.add(match[1]);
-  }
-
-  // Add controller imports
-  for (const controllerName of referencedControllers) {
-    const controllerFile = underscore(controllerName) + '.js';
-    if (existsSync(join(controllersDir, controllerFile))) {
-      imports.push(`import { ${controllerName} } from '${relativePrefix}app/controllers/${controllerFile}';`);
-    }
-  }
-
-  // Find path helper references: xxx_path(
-  const pathRefRegex = /\b([a-z_]+_path)\s*\(/g;
-  const referencedPaths = new Set();
-  while ((match = pathRefRegex.exec(code)) !== null) {
-    referencedPaths.add(match[1]);
-  }
-
-  // Add path helper imports
-  if (referencedPaths.size > 0) {
-    const pathNames = [...referencedPaths].sort().join(', ');
-    imports.push(`import { ${pathNames} } from '${relativePrefix}config/paths.js';`);
-  }
-
-  // Add model imports (reuse existing logic)
-  if (modelsDir && existsSync(modelsDir)) {
-    const modelRefRegex = /\b([A-Z][a-z]\w+)\.(create|find|where|all|first|last|count|new|order|destroy_all)\b/g;
-    const referencedModels = new Set();
-    while ((match = modelRefRegex.exec(code)) !== null) {
-      referencedModels.add(match[1]);
-    }
-    const fixtureModelRegex = /await\s+([A-Z][a-z]\w+)\.create\b/g;
-    while ((match = fixtureModelRegex.exec(code)) !== null) {
-      referencedModels.add(match[1]);
-    }
-    for (const modelName of referencedModels) {
-      const modelFile = underscore(modelName) + '.js';
-      if (existsSync(join(modelsDir, modelFile))) {
-        imports.push(`import { ${modelName} } from '${relativePrefix}app/models/${modelFile}';`);
-      }
-    }
-  }
-
-  if (imports.length === 0) return code;
-
-  return imports.join('\n') + '\n\n' + code;
-}
-
 // ============================================
 // Dev-mode test transpilation (for juntos test)
 // ============================================
@@ -1088,77 +935,10 @@ function buildAssociationMapFromRuby(modelsDir) {
  * Add model imports using virtual modules (for dev-mode tests).
  * Uses 'juntos:models' virtual module instead of concrete file paths.
  */
-function addModelImportsVirtual(code) {
-  const modelRefRegex = /\b([A-Z][a-z]\w+)\.(create|find|where|all|first|last|count|new|order|destroy_all)\b/g;
-  const referencedModels = new Set();
-  let match;
-  while ((match = modelRefRegex.exec(code)) !== null) {
-    referencedModels.add(match[1]);
-  }
-  const fixtureModelRegex = /await\s+([A-Z][a-z]\w+)\.create\b/g;
-  while ((match = fixtureModelRegex.exec(code)) !== null) {
-    referencedModels.add(match[1]);
-  }
-  if (referencedModels.size === 0) return code;
-
-  const modelNames = [...referencedModels].sort().join(', ');
-  return `import { ${modelNames} } from 'juntos:models';\n\n` + code;
-}
-
-/**
- * Add controller, path helper, and model imports using virtual modules.
- * For dev-mode tests, controllers are imported from .rb paths (Vite transforms them),
- * path helpers from 'juntos:paths', and models from 'juntos:models'.
- */
-function addControllerImportsVirtual(code) {
-  const imports = [];
-  let match;
-
-  // Find controller references: XxxController.method
-  const controllerRefRegex = /\b([A-Z][a-z]\w*Controller)\.\w+/g;
-  const referencedControllers = new Set();
-  while ((match = controllerRefRegex.exec(code)) !== null) {
-    referencedControllers.add(match[1]);
-  }
-  for (const controllerName of referencedControllers) {
-    const controllerFile = underscore(controllerName) + '.rb';
-    imports.push(`import { ${controllerName} } from '../../app/controllers/${controllerFile}';`);
-  }
-
-  // Find path helper references: xxx_path(
-  const pathRefRegex = /\b([a-z_]+_path)\s*\(/g;
-  const referencedPaths = new Set();
-  while ((match = pathRefRegex.exec(code)) !== null) {
-    referencedPaths.add(match[1]);
-  }
-  if (referencedPaths.size > 0) {
-    const pathNames = [...referencedPaths].sort().join(', ');
-    imports.push(`import { ${pathNames} } from 'juntos:paths';`);
-  }
-
-  // Find model references
-  const modelRefRegex = /\b([A-Z][a-z]\w+)\.(create|find|where|all|first|last|count|new|order|destroy_all)\b/g;
-  const referencedModels = new Set();
-  while ((match = modelRefRegex.exec(code)) !== null) {
-    referencedModels.add(match[1]);
-  }
-  const fixtureModelRegex = /await\s+([A-Z][a-z]\w+)\.create\b/g;
-  while ((match = fixtureModelRegex.exec(code)) !== null) {
-    referencedModels.add(match[1]);
-  }
-  // Exclude controller names from model imports (e.g., ArticlesController.create
-  // matches the model regex but is a controller action call, not a model operation)
-  for (const controllerName of referencedControllers) {
-    referencedModels.delete(controllerName);
-  }
-  if (referencedModels.size > 0) {
-    const modelNames = [...referencedModels].sort().join(', ');
-    imports.push(`import { ${modelNames} } from 'juntos:models';`);
-  }
-
-  if (imports.length === 0) return code;
-  return imports.join('\n') + '\n\n' + code;
-}
+// Import generation is now handled at the AST level by the test filter
+// (lib/ruby2js/filter/rails/test.rb - build_test_imports method).
+// The filter reads metadata.import_mode and metadata.models to generate
+// s(:import, ...) nodes with correct paths for eject vs. virtual mode.
 
 /**
  * Fix redirect assertions to compare string representations.
@@ -1203,7 +983,7 @@ async function transpileTestFiles(appRoot, config) {
 
   // Shared metadata (models aren't transpiled in test-only mode, so this
   // stays empty — but threading it keeps the interface consistent)
-  const metadata = { models: {}, concerns: {} };
+  const metadata = { models: {}, concerns: {}, import_mode: 'virtual' };
 
   let count = 0;
 
@@ -1222,16 +1002,15 @@ async function transpileTestFiles(appRoot, config) {
 
       try {
         const source = readFileSync(join(modelTestDir, file), 'utf-8');
+        if (Object.keys(fixtures).length > 0) {
+          metadata.fixture_plan = buildFixturePlan(source, fixtures, associationMap);
+        } else {
+          metadata.fixture_plan = null;
+        }
         const result = await transformRuby(source, join(modelTestDir, file), 'test', config, appRoot, metadata);
         let code = result.code;
 
-        if (Object.keys(fixtures).length > 0) {
-          code = inlineFixtures(code, fixtures, associationMap);
-        }
-
         code = setupCurrentAttributes(code, appRoot);
-        code = addModelImportsVirtual(code);
-
 
         writeFileSync(outPath, code);
         count++;
@@ -1256,16 +1035,15 @@ async function transpileTestFiles(appRoot, config) {
 
       try {
         const source = readFileSync(join(controllerTestDir, file), 'utf-8');
+        if (Object.keys(fixtures).length > 0) {
+          metadata.fixture_plan = buildFixturePlan(source, fixtures, associationMap);
+        } else {
+          metadata.fixture_plan = null;
+        }
         const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, appRoot, metadata);
         let code = result.code;
 
-        if (Object.keys(fixtures).length > 0) {
-          code = inlineFixtures(code, fixtures, associationMap);
-        }
-
         code = setupCurrentAttributes(code, appRoot);
-        code = addControllerImportsVirtual(code);
-
 
         code = fixRedirectAssertions(code);
         writeFileSync(outPath, code);
@@ -2067,7 +1845,7 @@ async function runEject(options) {
   // Shared metadata: model/concern filters write here, test filter reads.
   // Survives across convert() calls because Ruby2JS.convert does options.dup
   // (shallow copy), so the mutable metadata object reference persists.
-  const metadata = { models: {}, concerns: {} };
+  const metadata = { models: {}, concerns: {}, import_mode: 'eject' };
 
   // Transform models (including nested subdirectories like account/export.rb)
   const modelsDir = join(APP_ROOT, 'app/models');
@@ -2510,13 +2288,13 @@ async function runEject(options) {
           const outName = file.replace(/_test\.rb$/, '.test.mjs');
           try {
             const source = readFileSync(join(modelTestDir, file), 'utf-8');
+            if (Object.keys(fixtures).length > 0) {
+              metadata.fixture_plan = buildFixturePlan(source, fixtures, associationMap);
+            } else {
+              metadata.fixture_plan = null;
+            }
             const result = await transformRuby(source, join(modelTestDir, file), 'test', config, APP_ROOT, metadata);
             let code = fixTestImportsForEject(result.code);
-
-            // Inline fixtures if we have fixture data
-            if (Object.keys(fixtures).length > 0) {
-              code = inlineFixtures(code, fixtures, associationMap);
-            }
 
             // Add Current.account setup from test_helper.rb and settle async setters
             code = setupCurrentAttributes(code, APP_ROOT);
@@ -2524,9 +2302,6 @@ async function runEject(options) {
 
 
 
-
-            // Add model imports (pass outName for correct relative path depth)
-            code = addModelImportsToTest(code, join(outDir, 'app/models'), outName, 2);
 
             // Ensure parent directory exists for nested test files (e.g., account/cancellable.test.mjs)
             const outPath = join(outModelTestDir, outName);
@@ -2567,13 +2342,13 @@ async function runEject(options) {
           const outName = file.replace(/_test\.rb$/, '.test.mjs');
           try {
             const source = readFileSync(join(controllerTestDir, file), 'utf-8');
+            if (Object.keys(ctrlFixtures).length > 0) {
+              metadata.fixture_plan = buildFixturePlan(source, ctrlFixtures, ctrlAssociationMap);
+            } else {
+              metadata.fixture_plan = null;
+            }
             const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, APP_ROOT, metadata);
             let code = fixTestImportsForEject(result.code);
-
-            // Inline fixtures if we have fixture data
-            if (Object.keys(ctrlFixtures).length > 0) {
-              code = inlineFixtures(code, ctrlFixtures, ctrlAssociationMap);
-            }
 
             // Add Current.account setup from test_helper.rb and settle async setters
             code = setupCurrentAttributes(code, APP_ROOT);
@@ -2581,15 +2356,6 @@ async function runEject(options) {
 
 
 
-
-            // Add controller, model, and path helper imports (pass outName for correct relative path depth)
-            code = addControllerImportsToTest(
-              code,
-              join(outDir, 'app/controllers'),
-              join(outDir, 'app/models'),
-              outName,
-              2
-            );
 
             // Ensure parent directory exists for nested test files (e.g., cards/comments_controller.test.mjs)
             const outPath = join(outControllerTestDir, outName);

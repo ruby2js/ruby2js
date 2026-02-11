@@ -63,6 +63,8 @@ module Ruby2JS
           super
           @rails_test = nil
           @rails_test_models = []
+          @rails_test_controllers = []
+          @rails_test_path_helpers = []
           @rails_test_checked = false
           @rails_test_describe_depth = 0
           @rails_test_integration = false
@@ -107,11 +109,31 @@ module Ruby2JS
               end
             end
 
+            # Prepend fixture setup (let _fixtures = {} + beforeEach) to describe body
+            fixture_nodes = build_fixture_nodes
+            if fixture_nodes.length > 0
+              if transformed_body && transformed_body.type == :begin
+                transformed_body = s(:begin, *fixture_nodes, *transformed_body.children)
+              elsif transformed_body
+                transformed_body = s(:begin, *fixture_nodes, transformed_body)
+              else
+                transformed_body = s(:begin, *fixture_nodes)
+              end
+            end
+
             # Build: describe("Name", () => { ... })
-            result = s(:block,
+            describe_block = s(:block,
               s(:send, nil, :describe, s(:str, describe_name)),
               s(:args),
               transformed_body)
+
+            # Generate imports from metadata (models, controllers, path helpers)
+            import_nodes = build_test_imports
+            if import_nodes.length > 0
+              result = s(:begin, *import_nodes, describe_block)
+            else
+              result = describe_block
+            end
           ensure
             @rails_test_describe_depth -= 1
             @rails_test_integration = false
@@ -392,14 +414,26 @@ module Ruby2JS
 
           case node.type
           when :const
-            # Check for top-level constant (potential model)
+            # Check for top-level constant (potential model or controller)
             if node.children[0].nil?
               name = node.children[1].to_s
-              # Heuristic: capitalized, looks like a model name
+              # Heuristic: capitalized, looks like a model/controller name
               # Exclude common non-model constants
               excluded = %w[Test Minitest Vitest RSpec]
               if name =~ /\A[A-Z][a-z]/ && !excluded.include?(name)
-                @rails_test_models << name unless @rails_test_models.include?(name)
+                if name.end_with?('Controller')
+                  @rails_test_controllers << name unless @rails_test_controllers.include?(name)
+                else
+                  @rails_test_models << name unless @rails_test_models.include?(name)
+                end
+              end
+            end
+          when :send
+            # Track path helper calls: xxx_path(...)
+            if node.children[0].nil?
+              method_name = node.children[1].to_s
+              if method_name.end_with?('_path')
+                @rails_test_path_helpers << method_name unless @rails_test_path_helpers.include?(method_name)
               end
             end
           end
@@ -419,9 +453,139 @@ module Ruby2JS
           end
         end
 
-        # Wrap AR operations with await - delegates to shared helper
+        # Generate import AST nodes for referenced models, controllers, and path helpers.
+        # Uses metadata to determine file paths and import mode (eject vs. virtual).
+        def build_test_imports
+          imports = []
+          meta = @options[:metadata]
+          return imports unless meta
+
+          import_mode = meta['import_mode']
+          file = @options[:file]
+
+          if import_mode == 'eject' && file
+            # Eject mode: relative paths to .js files
+            test_dir = File.dirname(file)
+            depth = test_dir.split('/').length
+            prefix = '../' * depth
+
+            # Model imports: import { Card } from '../../../app/models/card.js'
+            @rails_test_models.each do |name|
+              model_meta = meta['models'] && meta['models'][name]
+              if model_meta && model_meta['file']
+                model_js = model_meta['file'].sub(/\.rb$/, '.js')
+                imports.push(s(:import, [prefix + model_js],
+                  [s(:const, nil, name.to_sym)]))
+              end
+            end
+
+            # Controller imports: import { CardsController } from '../../../app/controllers/cards_controller.js'
+            if meta['controller_files']
+              @rails_test_controllers.each do |name|
+                ctrl_file = nil
+                meta['controller_files'].each do |cname, cfile| # Pragma: entries
+                  ctrl_file = cfile if cname == name
+                end
+                if ctrl_file
+                  imports.push(s(:import, [prefix + 'app/controllers/' + ctrl_file],
+                    [s(:const, nil, name.to_sym)]))
+                end
+              end
+            end
+
+            # Path helper imports: import { cards_path, ... } from '../../../config/paths.js'
+            if @rails_test_path_helpers.length > 0
+              helper_consts = []
+              @rails_test_path_helpers.each do |name|
+                helper_consts.push(s(:const, nil, name.to_sym))
+              end
+              imports.push(s(:import, [prefix + 'config/paths.js'], helper_consts))
+            end
+
+          elsif import_mode == 'virtual'
+            # Virtual mode: import from virtual modules
+            if @rails_test_models.length > 0
+              model_consts = []
+              @rails_test_models.each do |name|
+                model_consts.push(s(:const, nil, name.to_sym))
+              end
+              imports.push(s(:import, ['juntos:models'], model_consts))
+            end
+
+            @rails_test_controllers.each do |name|
+              # Controllers import from .rb paths (Vite transforms them)
+              ctrl_file = name.gsub(/([A-Z])/) { |m| '_' + m.downcase }.sub(/^_/, '') + '.rb'
+              imports.push(s(:import, ['../../app/controllers/' + ctrl_file],
+                [s(:const, nil, name.to_sym)]))
+            end
+
+            if @rails_test_path_helpers.length > 0
+              helper_consts = []
+              @rails_test_path_helpers.each do |name|
+                helper_consts.push(s(:const, nil, name.to_sym))
+              end
+              imports.push(s(:import, ['juntos:paths'], helper_consts))
+            end
+          end
+
+          imports
+        end
+
+        # Build fixture setup nodes (let _fixtures = {} and beforeEach block)
+        # from the pre-computed fixture plan in metadata
+        def build_fixture_nodes
+          plan = @options[:metadata] && @options[:metadata]['fixture_plan']
+          return [] unless plan && plan['setupCode']
+
+          nodes = []
+
+          # let _fixtures = {};
+          nodes.push(s(:lvasgn, :_fixtures, s(:hash)))
+
+          # beforeEach(async () => { ... }) as raw JS
+          nodes.push(s(:jsraw, plan['setupCode']))
+
+          nodes
+        end
+
+        # Pre-resolve fixture references in the AST tree before wrap_ar_operations.
+        # This ensures fixture refs like cards(:logo) become _fixtures.cards_logo
+        # (:attr nodes) so that AR wrapping can detect .reload/.save chains on them.
+        def resolve_fixture_refs_in_tree(node)
+          return node unless node.respond_to?(:type)
+
+          plan = @options[:metadata] && @options[:metadata]['fixture_plan']
+          return node unless plan && plan['replacements']
+
+          # Check if this node is a fixture ref: s(:send, nil, :cards, s(:sym, :logo))
+          # Also handles string args: s(:send, nil, :accounts, s(:str, "37s"))
+          if node.type == :send && node.children[0].nil? &&
+             node.children.length == 3 &&
+             (node.children[2]&.type == :sym || node.children[2]&.type == :str)
+            method_name = node.children[1].to_s
+            if method_name =~ /\A[a-z]/ &&
+               (method_name.end_with?('s') || method_name == 'people')
+              fixture_key = node.children[2].children.first.to_s
+              lookup = method_name + ':' + fixture_key
+              var_name = plan['replacements'][lookup]
+              if var_name
+                return s(:attr, s(:lvar, :_fixtures), var_name.to_sym)
+              end
+            end
+          end
+
+          # Recurse into children
+          new_children = node.children.map do |child|
+            child.respond_to?(:type) ? resolve_fixture_refs_in_tree(child) : child
+          end
+          node.updated(nil, new_children)
+        end
+
+        # Wrap AR operations with await - delegates to shared helper.
+        # Pre-resolves fixture refs so that AR wrapping sees :attr nodes.
         def wrap_test_ar_operations(node)
-          ActiveRecordHelpers.wrap_ar_operations(node, @rails_test_models)
+          resolved = resolve_fixture_refs_in_tree(node)
+          ActiveRecordHelpers.wrap_ar_operations(resolved, @rails_test_models)
         end
 
         # Convert sends with receivers in statement position to await!
@@ -611,18 +775,32 @@ module Ruby2JS
           end
         end
 
-        # Transform fixture references: songs(:one) -> songs("one")
+        # Transform fixture references: songs(:one) -> _fixtures.songs_one or songs("one")
         def transform_fixture_ref(target, method, args)
           return nil unless target.nil?
-          return nil unless args.length == 1 && args.first&.type == :sym
+          return nil unless args.length == 1 &&
+            (args.first&.type == :sym || args.first&.type == :str)
 
           # Check if this looks like a fixture call (plural model name or known table)
           fixture_name = method.to_s
           return nil unless fixture_name =~ /\A[a-z]/ &&
             (fixture_name.end_with?('s') || fixture_name == 'people')
 
-          # Convert symbol arg to string: songs(:one) -> songs("one")
-          s(:send, nil, method, s(:str, args.first.children.first.to_s))
+          fixture_key = args.first.children.first.to_s
+
+          # If a fixture plan exists, produce _fixtures.table_fixture AST node
+          # Use :attr to get property access (no parens) since s() nodes lack loc info
+          plan = @options[:metadata] && @options[:metadata]['fixture_plan']
+          if plan && plan['replacements']
+            lookup = fixture_name + ':' + fixture_key
+            var_name = plan['replacements'][lookup]
+            if var_name
+              return s(:attr, s(:lvar, :_fixtures), var_name.to_sym)
+            end
+          end
+
+          # Fallback: convert symbol arg to string: songs(:one) -> songs("one")
+          s(:send, nil, method, s(:str, fixture_key))
         end
 
         # Check if a node is a primitive literal
@@ -1013,7 +1191,8 @@ module Ruby2JS
                  (expr_node.children[0]&.type == :send &&
                   expr_node.children[0].children[1] == :lambda))
             # Lambda form: -> { cards(:logo).events.count }
-            lambda_body = expr_node.children[2]
+            # Process the lambda body first to transform fixture refs, etc.
+            lambda_body = process(expr_node.children[2])
             count_call = wrap_test_ar_operations(lambda_body)
             # Ensure the count expression is awaited
             if count_call.respond_to?(:type) && count_call.type == :send
