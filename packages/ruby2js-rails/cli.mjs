@@ -812,7 +812,10 @@ function buildFixturePlan(rubySource, fixtures, associationMap) {
 
   const setupCode = `beforeEach(async () => {\n${createLines.join('\n')}\n});`;
 
-  return { setupCode, replacements };
+  // Collect unique model names referenced in fixture creates (for import generation)
+  const fixtureModels = [...new Set([...allFixtures.values()].map(f => camelize(singularize(f.table))))];
+
+  return { setupCode, replacements, fixtureModels };
 }
 
 /**

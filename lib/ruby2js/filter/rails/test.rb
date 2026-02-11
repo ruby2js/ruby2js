@@ -616,6 +616,13 @@ module Ruby2JS
           plan = @options[:metadata] && @options[:metadata]['fixture_plan']
           return [] unless plan && plan['setupCode']
 
+          # Add fixture model names to @rails_test_models for import generation
+          if plan['fixtureModels']
+            plan['fixtureModels'].each do |name|
+              @rails_test_models << name unless @rails_test_models.include?(name)
+            end
+          end
+
           nodes = []
 
           # let _fixtures = {};
@@ -1082,6 +1089,10 @@ module Ruby2JS
           is_nested = resolve_nested(url_info, url_args)
           action = determine_action(http_method, url_info, is_nested)
 
+          # Track controller reference for import generation
+          ctrl_name = url_info[:controller]
+          @rails_test_controllers << ctrl_name unless @rails_test_controllers.include?(ctrl_name)
+
           # Build context arguments from URL hash args and `as:` option
           context_params = []
           if url_hash_node
@@ -1226,6 +1237,10 @@ module Ruby2JS
         # article_url(@article) -> article_path(article)
         def transform_url_to_path(method, args)
           path_method = method.to_s.sub(/_url$/, '_path').to_sym
+
+          # Track path helper for import generation
+          path_str = path_method.to_s
+          @rails_test_path_helpers << path_str unless @rails_test_path_helpers.include?(path_str)
 
           if args.empty?
             s(:send!, nil, path_method)
