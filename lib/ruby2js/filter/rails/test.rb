@@ -692,8 +692,8 @@ module Ruby2JS
           new_children = node.children.map do |child|
             if child.respond_to?(:type) && child.type == :send &&
                child.children[0]  # has a receiver (not bare function call)
-              if sync_statement_send?(child)
-                child  # known sync — leave as-is, no await
+              if sync_statement_send?(child) || child.children[1].to_s.end_with?('=')
+                child  # known sync or setter — leave as-is, no await
               else
                 child.updated(:await!)
               end
@@ -1286,8 +1286,11 @@ module Ruby2JS
             if parts.length == 2
               model_name = parts[0]
               method_name = parts[1]
-              count_call = s(:await!,
-                s(:const, nil, model_name.to_sym), method_name.to_sym)
+              # Build const node, handling :: for nested constants
+              const_node = model_name.split('::').inject(nil) { |parent, name|
+                s(:const, parent, name.to_sym)
+              }
+              count_call = s(:await!, const_node, method_name.to_sym)
             end
           elsif expr_node.type == :block &&
                 (expr_node.children[0]&.type == :lambda ||
