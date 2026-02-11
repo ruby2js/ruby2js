@@ -44,6 +44,7 @@ module Ruby2JS
           return super unless has_concern
 
           @rails_concern = true
+          @concern_enum_bangs = {}
 
           # Transform body
           new_body = transform_concern_body(body)
@@ -241,11 +242,49 @@ module Ruby2JS
                 names << child.children[2].children[0]
               end
             when :enum
-              # enum :status, ... — extract the attribute name
+              # enum :status, ... — extract the attribute name and values
               if child.children[2]&.type == :sym
-                names << child.children[2].children[0]
+                enum_field = child.children[2].children[0]
+                names << enum_field
+                # Extract enum value names for bang method inlining
+                @concern_enum_bangs ||= {}
+                extract_concern_enum_values(child, enum_field)
               end
             end
+          end
+        end
+
+        # Extract enum value names from an enum declaration for bang method inlining.
+        # enum :status, %w[drafted published].index_by(&:itself)
+        # enum :status, { drafted: "drafted", published: "published" }
+        def extract_concern_enum_values(enum_node, field)
+          # Try to find value names from the third arg (after :enum, :field)
+          values_node = enum_node.children[3]
+          return unless values_node
+
+          value_names = []
+          if values_node.type == :hash
+            # { drafted: "drafted", published: "published" }
+            values_node.children.each do |pair|
+              next unless pair.type == :pair
+              key = pair.children[0]
+              val = pair.children[1]
+              name = key.type == :sym ? key.children[0].to_s : key.children[0].to_s
+              value_names.push([name, field, val])
+            end
+          elsif values_node.type == :send && values_node.children[1] == :index_by
+            # %w[drafted published].index_by(&:itself) — extract from array
+            arr = values_node.children[0]
+            if arr.type == :array
+              arr.children.each do |el|
+                name = el.type == :str ? el.children[0] : el.children[0].to_s
+                value_names.push([name, field, s(:str, name)])
+              end
+            end
+          end
+
+          value_names.each do |name, fld, val|
+            @concern_enum_bangs[:"#{name}!"] = { field: fld, value: val }
           end
         end
 
@@ -362,11 +401,28 @@ module Ruby2JS
           if node.type == :send && node.children[0].nil?
             method = node.children[1]
 
+            # Inline enum bang methods: published! → this.update({status: "published"})
+            if @concern_enum_bangs && @concern_enum_bangs[method]
+              info = @concern_enum_bangs[method]
+              return s(:send, s(:self), :update,
+                s(:hash, s(:pair, s(:sym, info[:field]), info[:value])))
+            end
+
             # Skip local variables and known exceptions
             unless locals.include?(method) || CONCERN_SELF_EXCEPTIONS.include?(method)
               new_children = [s(:self), method, *node.children[2..-1].map { |c|
                 rewrite_node(c, locals, method_name)
               }]
+              # For bang methods (!), use s() to create a fresh node
+              # without source location. This forces the converter to emit ()
+              # for method calls. Without this, the preserved location from
+              # Ruby source (which has no parens) causes property access.
+              # Predicate methods (?) are NOT forced — they become getters
+              # (enum predicates, concern predicates) so property access is correct.
+              method_str = method.to_s
+              if method_str.end_with?('!')
+                return s(:send, *new_children)
+              end
               return node.updated(nil, new_children)
             end
           end

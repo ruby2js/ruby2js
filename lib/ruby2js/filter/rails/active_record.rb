@@ -173,8 +173,8 @@ module Ruby2JS
             if target&.type == :send && AR_ASSOCIATION_METHODS.include?(method)
               assoc_target = target.children[0]
               assoc_method = target.children[1]
-              # Only wrap if chain starts from lvar/ivar and accessor isn't [] (hash/array access)
-              if (assoc_target&.type == :lvar || assoc_target&.type == :ivar) && assoc_method != :[]
+              # Only wrap if chain starts from lvar/ivar/attr and accessor isn't [] (hash/array access)
+              if (assoc_target&.type == :lvar || assoc_target&.type == :ivar || assoc_target&.type == :attr) && assoc_method != :[]
                 # Wrap with await, process target and args
                 new_target = self.wrap_ar_operations(target, model_refs)
                 new_args = args.map { |a| self.wrap_ar_operations(a, model_refs) }

@@ -208,8 +208,9 @@ describe Ruby2JS::Filter::Rails::Concern do
       RUBY
       assert_includes result, 'function bar()'
       assert_includes result, 'function check()'
-      # bar should be in return object, check should not
-      assert_match(/return \{get bar\(\)/, result)
+      # both should be in return object (concerns mix all methods),
+      # neither is a getter (only ?-suffix methods become getters)
+      assert_match(/return \{bar, check\}/, result)
     end
   end
 

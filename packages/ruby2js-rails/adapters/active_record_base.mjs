@@ -59,6 +59,16 @@ export class ActiveRecordBase {
         }
       }
     }
+
+    // Apply enum defaults for new records (Rails defaults to first enum value)
+    const enumDefaults = this.constructor._enumDefaults;
+    if (enumDefaults && !this._persisted) {
+      for (const [field, defaultVal] of Object.entries(enumDefaults)) {
+        if (!(field in attributes)) {
+          this.attributes[field] = defaultVal;
+        }
+      }
+    }
   }
 
   // --- Validation ---
@@ -212,11 +222,17 @@ export class ActiveRecordBase {
         await this._runCallbacks('after_save');
         if (typeof this.after_save === 'function') await this.after_save();
         await this._runCallbacks('after_update_commit');
+        this._changes = {};  // Clear dirty tracking after successful save
       }
       return result;
     } else {
       this.attributes.created_at ??= now;
       this.created_at ??= now;
+
+      // Resolve belongs_to defaults (e.g., default: -> { board.account })
+      if (typeof this._resolveDefaults === 'function') {
+        await this._resolveDefaults();
+      }
 
       // Run before_create instance method and registered callbacks
       if (typeof this.before_create === 'function') await this.before_create();
@@ -230,6 +246,7 @@ export class ActiveRecordBase {
         await this._runCallbacks('after_save');
         if (typeof this.after_save === 'function') await this.after_save();
         await this._runCallbacks('after_create_commit');
+        this._changes = {};  // Clear dirty tracking after successful save
       }
       return result;
     }
@@ -277,6 +294,10 @@ export class ActiveRecordBase {
   // Track an event on this record (from Eventable concern).
   // Creates an Event record linked to this eventable and its board.
   async track_event(action, { creator, board, ...particulars } = {}) {
+    // Check should_track_event (concern template method pattern).
+    // This is typically a getter from the mixed-in concern that returns a boolean.
+    // Only skip if the method exists and returns falsy.
+    if ('should_track_event' in this && !this.should_track_event) return;
     if (!creator) creator = globalThis.Current?.user;
     if (!board && this.board) board = this.board;
     const prefix = this.constructor.name.replace(/([A-Z])/g, (m, c, i) => (i > 0 ? '_' : '') + c.toLowerCase());
@@ -545,6 +566,13 @@ export function attr_accessor(klass, ...attrs) {
         this._changes[attr] = value;
       },
       enumerable: true,
+      configurable: true
+    });
+
+    // Rails dirty tracking: <attr>_changed? → <attr>_changed()
+    Object.defineProperty(klass.prototype, `${attr}_changed`, {
+      value() { return attr in this._changes; },
+      writable: true,
       configurable: true
     });
   }

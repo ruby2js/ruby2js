@@ -74,7 +74,11 @@ module Ruby2JS
           end
         end
 
-        next unless visibility == :public
+        # In concerns, include all methods (public and private) in the return
+        # object. Ruby concerns mix all methods into the host class — even
+        # private ones become host class methods. In JS, the IIFE return is
+        # spread onto the prototype via Object.assign.
+        next unless visibility == :public || is_concern
 
         if node.type == :casgn and node.children.first == nil
           symbols << node.children[1]
@@ -83,21 +87,18 @@ module Ruby2JS
           original_name = node.children.first.to_s
           method_name = original_name.sub(/[?!]$/, '').to_sym
           symbols << method_name
-          # In concerns, zero-arg methods become getters (get x() { return x.call(this) })
-          # so property-style access (card.closed, card.color) works after mixing.
-          # ?-suffix methods always become getters regardless of concern status.
-          args = node.children[1]
-          has_no_args = !args || args.children.empty?
-          predicate_symbols << method_name if original_name.end_with?('?') || (is_concern && has_no_args)
+          # ?-suffix methods become getters so property-style access works
+          # (card.closed → get closed() { return closed.call(this) }).
+          # Non-? concern methods stay as regular functions — action methods
+          # like publish, close need to be callable with ().
+          predicate_symbols << method_name if original_name.end_with?('?')
         elsif node.type == :defs and node.children.first.type == :self
           # Convert singleton method (def self.X) to regular function
           # In IIFE context, this.X = ... fails because this is undefined
           original_name = node.children[1].to_s
           method_name = original_name.sub(/[?!]$/, '').to_sym
           symbols << method_name
-          args = node.children[2]
-          has_no_args = !args || args.children.empty?
-          predicate_symbols << method_name if original_name.end_with?('?') || (is_concern && has_no_args)
+          predicate_symbols << method_name if original_name.end_with?('?')
           # Transform defs to def for IIFE-safe output
           new_node = node.updated(:def, [node.children[1], *node.children[2..-1]])
           # Transfer comments from original defs node to new def node

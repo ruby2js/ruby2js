@@ -1198,6 +1198,10 @@ module Ruby2JS
             transformed << generate_association_method(assoc)
           end
 
+          # Generate _resolveDefaults() for belongs_to with default: lambda
+          resolve_defaults = generate_resolve_defaults
+          transformed << resolve_defaults if resolve_defaults
+
           # Generate static associations metadata for eager loading
           if @rails_associations.any?
             assoc_pairs = @rails_associations.map do |assoc|
@@ -1269,6 +1273,19 @@ module Ruby2JS
             generate_enum_methods(enum_data, children).each do |node|
               transformed.push(node)
             end
+          end
+
+          # Generate enum defaults: first value in each enum is the default for new records
+          unless @rails_enums.empty?
+            default_pairs = []
+            @rails_enums.each do |enum_data|
+              field = enum_data[:field]
+              first_key = enum_data[:values].keys.first
+              first_val = enum_data[:values][first_key]
+              default_pairs.push(s(:pair, s(:sym, field), first_val))
+            end
+            transformed << s(:send, s(:self), :_enumDefaults=,
+              s(:hash, *default_pairs))
           end
 
           # Generate callbacks from broadcasts_to declarations
@@ -1566,6 +1583,92 @@ module Ruby2JS
           s(:begin, getter, setter, fk_getter)
         end
 
+        # Generate _resolveDefaults() method for belongs_to associations
+        # with default: -> { ... } lambdas. Called before save to auto-populate
+        # nil FK values from the lambda (Rails behavior).
+        def generate_resolve_defaults
+          # Note: check for AST node using .is_a?(Parser::AST::Node) pattern,
+          # but use duck-typing for JS compatibility
+          defaults = @rails_associations.select { |a|
+            default_val = a[:options][:default]
+            a[:type] == :belongs_to && default_val != nil &&
+              default_val != true && default_val != false &&
+              default_val.respond_to?(:type) && default_val.type == :block
+          }
+          return nil if defaults.empty?
+
+          stmts = []
+          defaults.each do |assoc|
+            name = assoc[:name]
+            foreign_key = assoc[:options][:foreign_key] || "#{name}_id"
+            lambda_node = assoc[:options][:default]
+            lambda_body = lambda_node.children[2]
+
+            # Transform the lambda body: bare sends → self sends
+            # e.g. `board.account` → `this.board.account`
+            # e.g. `Current.user` stays as `Current.user`
+            transformed_body = rewrite_default_lambda_body(lambda_body)
+
+            # Check: if (!this.attributes["account_id"]) { this.account = await ...; }
+            fk_check = s(:send,
+              s(:send, s(:attr, s(:self), :attributes), :[],
+                s(:str, foreign_key)),
+              :!)
+
+            assign = s(:send, s(:self), :"#{name}=",
+              s(:send, nil, :await, transformed_body))
+
+            stmts.push(s(:if, fk_check, assign, nil))
+          end
+
+          s(:async, :_resolveDefaults,
+            s(:args),
+            s(:begin, *stmts))
+        end
+
+        # Transform a belongs_to default lambda body for JS output.
+        # Bare method calls (no receiver) become property access on self.
+        # Association accesses are wrapped with await since getters return
+        # Reference proxies that need resolution.
+        def rewrite_default_lambda_body(node)
+          return node unless node.respond_to?(:type)
+
+          if node.type == :send
+            target, method, *args = node.children
+            if target.nil? && args.empty?
+              # Bare zero-arg call like `board` → `await this.board`
+              # Wrap in await + begin for proper parentheses: (await this.board)
+              assoc = @rails_associations.find { |a| a[:name] == method }
+              base = s(:attr, s(:self), method)
+              if assoc
+                return s(:begin, s(:send, nil, :await, base))
+              end
+              return base
+            elsif target.nil?
+              # Bare call with args → method call `this.method(args)`
+              new_args = args.map { |a| rewrite_default_lambda_body(a) }
+              return s(:send, s(:self), method, *new_args)
+            else
+              new_target = rewrite_default_lambda_body(target)
+              # Zero-arg chained call → property access
+              if args.empty?
+                return s(:attr, new_target, method)
+              end
+              new_args = args.map { |a| rewrite_default_lambda_body(a) }
+              return node.updated(nil, [new_target, method, *new_args])
+            end
+          end
+
+          if node.children.any?
+            new_children = node.children.map { |c|
+              c.respond_to?(:type) ? rewrite_default_lambda_body(c) : c
+            }
+            return node.updated(nil, new_children)
+          end
+
+          node
+        end
+
         def generate_destroy_method
           # Find associations with dependent: :destroy
           dependent_destroy = @rails_associations.select do |assoc|
@@ -1721,10 +1824,9 @@ module Ruby2JS
             method_name = prefix ? "#{prefix}_#{name}" : name
             next if explicit_methods.include?(method_name)
 
-            # Instance predicate method: drafted() { return this.status === "drafted" }
-            result << s(:defm, method_name.to_sym, s(:args),
-              s(:autoreturn,
-                s(:send, s(:attr, s(:self), field), :===, val)))
+            # Instance predicate getter: get drafted() { return this.status === "drafted" }
+            result << s(:defget, method_name.to_sym, s(:args),
+              s(:send, s(:attr, s(:self), field), :===, val))
 
             # Static scope getter: static get drafted() { return this.where({status: "drafted"}) }
             # Use :defp to force getter (synthesized nodes lack location for is_method? check)
@@ -1768,6 +1870,37 @@ module Ruby2JS
           end
         end
 
+        # Collect names of all zero-arg scopes and enum scopes (which become
+        # static getters). Used by transform_scope_body to generate property
+        # access instead of method calls for scope-to-scope chaining.
+        # Note: use Array instead of Set for JS compatibility (Set#include?
+        # transpiles to .includes() which doesn't exist on JS Set)
+        def getter_scope_names
+          names = []
+
+          # Zero-arg scopes
+          @rails_scopes.each do |scope|
+            lambda_node = scope[:body]
+            if lambda_node.type == :block
+              lambda_args = lambda_node.children[1]
+              has_params = lambda_args && lambda_args.children.any?
+              names.push(scope[:name]) unless has_params
+            end
+          end
+
+          # Enum scopes (each enum value generates a static getter scope)
+          @rails_enums.each do |enum_data|
+            next if enum_data[:options][:scopes] == false
+            prefix = enum_data[:options][:prefix]
+            enum_data[:values].keys.each do |name|
+              scope_name = prefix ? "#{prefix}_#{name}" : name
+              names.push(scope_name.to_sym)
+            end
+          end
+
+          names
+        end
+
         def transform_scope_body(node)
           # Note: explicit returns for JS compatibility (case-as-expression doesn't transpile well)
           return node unless node.respond_to?(:type)
@@ -1780,10 +1913,18 @@ module Ruby2JS
             # Note: use == nil for JS compatibility (nil? doesn't exist in JS)
             if target == nil
               new_args = args.map { |a| transform_scope_body(a) }
+              # Zero-arg call to a getter scope: use property access (not method call)
+              if new_args.empty? && getter_scope_names.include?(method)
+                return s(:attr, s(:self), method)
+              end
               return s(:send, s(:self), method, *new_args)
             else
               new_target = transform_scope_body(target)
               new_args = args.map { |a| transform_scope_body(a) }
+              # Zero-arg chained call to a getter scope: use property access
+              if new_args.empty? && getter_scope_names.include?(method)
+                return s(:attr, new_target, method)
+              end
               return s(:send, new_target, method, *new_args)
             end
           else

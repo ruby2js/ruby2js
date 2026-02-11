@@ -274,11 +274,10 @@ function mergeConcernDeclarations(source, modelsDir) {
       }
 
       if (body) {
-        // Only inject declarations that define model structure:
+        // Inject declarations that define model structure and behavior:
         // - Associations: has_many, has_one, belongs_to
         // - Scopes and enums: scope, enum
-        // Skip callbacks — the concern's methods are mixed in at runtime
-        // and callbacks reference methods that may be private in the concern
+        // - Callbacks: before_save :method, after_create -> { ... }, etc.
         for (const line of body.split('\n')) {
           const trimmed = line.trim();
           if (trimmed.length === 0 || trimmed.startsWith('#')) continue;
@@ -286,6 +285,15 @@ function mergeConcernDeclarations(source, modelsDir) {
             // Skip multi-line block openers (incomplete without body + end)
             // e.g., "has_many :accesses do", "scope :foo, -> do"
             if (/\bdo\s*(\|[^|]*\|)?\s*$/.test(trimmed)) continue;
+            lines.push('  ' + trimmed);
+          }
+          // Callbacks: merge symbol-based (before_save :method_name),
+          // lambda-based (after_create -> { ... }), and simple block callbacks.
+          // Skip multi-line blocks (do...end) and callbacks with self.class
+          // which don't transpile well in the model callback context.
+          if (/^(before_|after_)\w+\b/.test(trimmed)) {
+            if (/\bdo\s*(\|[^|]*\|)?\s*$/.test(trimmed)) continue;
+            if (/self\.class\b/.test(trimmed)) continue;
             lines.push('  ' + trimmed);
           }
         }
@@ -1815,6 +1823,58 @@ async function runEject(options) {
         } catch (err) {
           errors.push({ file: relativePath, error: err.message, stack: err.stack });
           console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+        }
+      }
+
+      // Mix concern methods into model prototypes.
+      // After transpilation, model subdirectory files (e.g., card/closeable.js)
+      // export concern objects with methods. We inject imports and Object.assign
+      // calls to apply those methods onto the model class prototype.
+      for (const file of modelFiles) {
+        if (file.includes('/')) continue; // Skip concern files themselves
+        const modelName = file.replace('.rb', '');
+        const modelSubdir = join(modelsDir, modelName);
+        if (!existsSync(modelSubdir)) continue;
+
+        // Find concern JS files in the model's subdirectory
+        const jsFile = join(outDir, 'app/models', modelName + '.js');
+        if (!existsSync(jsFile)) continue;
+
+        const concerns = [];
+        try {
+          for (const entry of readdirSync(join(outDir, 'app/models', modelName), { withFileTypes: true })) {
+            if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+            const concernFile = join(outDir, 'app/models', modelName, entry.name);
+            const concernContent = readFileSync(concernFile, 'utf-8');
+            // Extract concern name from export: `export const Eventable = ...`
+            const exportMatch = concernContent.match(/export\s+(?:const|let|var)\s+(\w+)/);
+            if (exportMatch) {
+              concerns.push({
+                name: exportMatch[1],
+                path: `./${modelName}/${entry.name}`
+              });
+            }
+          }
+        } catch (err) { /* skip */ }
+
+        if (concerns.length > 0) {
+          let content = readFileSync(jsFile, 'utf-8');
+          // Only mix concerns into classes (which have .prototype),
+          // not modules (IIFEs returning plain objects)
+          const className = modelName.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('');
+          if (!content.includes(`class ${className}`)) continue;
+
+          // Add concern imports at the top of the file
+          const importLines = concerns.map(c =>
+            `import { ${c.name} } from '${c.path}';`
+          ).join('\n');
+          // Copy concern property descriptors (including getters) onto prototype
+          // Copy concern property descriptors (including getters) onto prototype
+          const assignLines = concerns.map(c =>
+            `for (const [key, desc] of Object.entries(Object.getOwnPropertyDescriptors(${c.name}))) Object.defineProperty(${className}.prototype, key, desc);`
+          ).join('\n');
+          content = importLines + '\n' + content + '\n' + assignLines + '\n';
+          writeFileSync(jsFile, content);
         }
       }
 
