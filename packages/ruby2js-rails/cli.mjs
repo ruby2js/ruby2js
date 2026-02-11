@@ -816,72 +816,25 @@ function buildFixturePlan(rubySource, fixtures, associationMap) {
 }
 
 /**
- * Parse test_helper.rb for global Current.xxx setup and return setup lines.
- * Also adds `await Current.settle()` after Current setter assignments to
- * resolve async operations triggered by setter chains (e.g., find_by).
+ * Parse test_helper.rb for global Current attribute assignments.
+ *
+ * Looks for patterns like: Current.account = accounts("37s")
+ * Returns an array of { attr, table, fixture } objects stored in metadata
+ * for the test filter to generate Current setup beforeEach blocks at AST level.
  */
-function setupCurrentAttributes(code, appRoot) {
-  // Read test_helper.rb and find Current.xxx = fixtures("yyy") patterns
+function parseCurrentAttributes(appRoot) {
   const helperPath = join(appRoot, 'test/test_helper.rb');
-  let globalSetups = [];
+  const attrs = [];
   if (existsSync(helperPath)) {
     const helper = readFileSync(helperPath, 'utf-8');
-    // Match patterns like: Current.account = accounts("37s")
-    const currentSetupRegex = /Current\.(\w+)\s*=\s*(\w+)\(["'](\w+)["']\)/g;
+    const regex = /Current\.(\w+)\s*=\s*(\w+)\(["'](\w+)["']\)/g;
     let match;
-    while ((match = currentSetupRegex.exec(helper)) !== null) {
-      const [, attr, table, fixture] = match;
-      globalSetups.push(`  Current.${attr} = _fixtures.${table}_${fixture};`);
+    while ((match = regex.exec(helper)) !== null) {
+      attrs.push({ attr: match[1], table: match[2], fixture: match[3] });
     }
   }
-
-  if (globalSetups.length === 0 && !code.includes('Current.')) return code;
-
-  // Find beforeEach blocks with Current.xxx = ... assignments and add settle()
-  // Pattern: beforeEach(async () => Current.xxx = _fixtures.yyy);
-  let result = code.replace(
-    /beforeEach\(async \(\) => (Current\.\w+ = [^;]+)\);/g,
-    (match, assignment) => {
-      const lines = [...globalSetups, `  ${assignment};`, '  await Current.settle();'];
-      return `beforeEach(async () => {\n${lines.join('\n')}\n});`;
-    }
-  );
-
-  // Also handle beforeEach blocks with { Current.xxx = ... } body
-  result = result.replace(
-    /(beforeEach\(async \(\) => \{[\s\S]*?)(Current\.\w+ = [^;]+;)([\s\S]*?\}\);)/g,
-    (match, before, currentAssign, after) => {
-      if (match.includes('Current.settle()')) return match; // Already processed
-      const settleInsert = globalSetups.length > 0
-        ? '\n' + globalSetups.join('\n') + '\n  ' + currentAssign + '\n  await Current.settle();'
-        : '\n  ' + currentAssign + '\n  await Current.settle();';
-      return before + settleInsert + after;
-    }
-  );
-
-  // If there are global Current setups but no beforeEach with Current, add them
-  // to the fixture beforeEach if it exists
-  if (globalSetups.length > 0 && !result.includes('Current.settle()')) {
-    // Add global setups at the end of the first beforeEach block
-    result = result.replace(
-      /(beforeEach\(async \(\) => \{[\s\S]*?)(\n\}\);)/,
-      (match, body, close) => {
-        return body + '\n' + globalSetups.join('\n') + close;
-      }
-    );
-  }
-
-  return result;
+  return attrs;
 }
-
-/**
- * Add model imports to a test file based on model references found in the code.
- * Scans for Model.create, Model.find, etc. and adds import statements.
- * @param {string} code - The test file code
- * @param {string} modelsDir - Path to models directory
- * @param {string} outName - Output filename (may include subdirs like 'account/export.test.mjs')
- * @param {number} baseDepth - Base depth from test subdir to project root (2 for test/models/)
- */
 // ============================================
 // Dev-mode test transpilation (for juntos test)
 // ============================================
@@ -941,23 +894,6 @@ function buildAssociationMapFromRuby(modelsDir) {
 // s(:import, ...) nodes with correct paths for eject vs. virtual mode.
 
 /**
- * Fix redirect assertions to compare string representations.
- *
- * Path helpers return objects (with toString), not primitive strings.
- * toBe uses Object.is (===) which fails on different instances.
- * Converting to String() allows proper comparison.
- *
- * Transform: expect(response.redirect).toBe(article_path(...))
- * To:        expect(String(response.redirect)).toBe(String(article_path(...)))
- */
-function fixRedirectAssertions(code) {
-  return code.replace(
-    /expect\(response\.redirect\)\.toBe\((\w+_path\([^)]*\))\)/g,
-    'expect(String(response.redirect)).toBe(String($1))'
-  );
-}
-
-/**
  * Transpile Ruby test files to .test.mjs for Vitest consumption.
  * Called by `juntos test` before running vitest.
  * Writes .test.mjs files alongside the .rb source files.
@@ -983,7 +919,8 @@ async function transpileTestFiles(appRoot, config) {
 
   // Shared metadata (models aren't transpiled in test-only mode, so this
   // stays empty — but threading it keeps the interface consistent)
-  const metadata = { models: {}, concerns: {}, import_mode: 'virtual' };
+  const metadata = { models: {}, concerns: {}, import_mode: 'virtual',
+    current_attributes: parseCurrentAttributes(appRoot) };
 
   let count = 0;
 
@@ -1009,8 +946,6 @@ async function transpileTestFiles(appRoot, config) {
         }
         const result = await transformRuby(source, join(modelTestDir, file), 'test', config, appRoot, metadata);
         let code = result.code;
-
-        code = setupCurrentAttributes(code, appRoot);
 
         writeFileSync(outPath, code);
         count++;
@@ -1043,9 +978,6 @@ async function transpileTestFiles(appRoot, config) {
         const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, appRoot, metadata);
         let code = result.code;
 
-        code = setupCurrentAttributes(code, appRoot);
-
-        code = fixRedirectAssertions(code);
         writeFileSync(outPath, code);
         count++;
       } catch (err) {
@@ -1845,7 +1777,8 @@ async function runEject(options) {
   // Shared metadata: model/concern filters write here, test filter reads.
   // Survives across convert() calls because Ruby2JS.convert does options.dup
   // (shallow copy), so the mutable metadata object reference persists.
-  const metadata = { models: {}, concerns: {}, import_mode: 'eject' };
+  const metadata = { models: {}, concerns: {}, import_mode: 'eject',
+    current_attributes: parseCurrentAttributes(APP_ROOT) };
 
   // Transform models (including nested subdirectories like account/export.rb)
   const modelsDir = join(APP_ROOT, 'app/models');
@@ -2296,12 +2229,6 @@ async function runEject(options) {
             const result = await transformRuby(source, join(modelTestDir, file), 'test', config, APP_ROOT, metadata);
             let code = fixTestImportsForEject(result.code);
 
-            // Add Current.account setup from test_helper.rb and settle async setters
-            code = setupCurrentAttributes(code, APP_ROOT);
-
-
-
-
 
             // Ensure parent directory exists for nested test files (e.g., account/cancellable.test.mjs)
             const outPath = join(outModelTestDir, outName);
@@ -2349,12 +2276,6 @@ async function runEject(options) {
             }
             const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, APP_ROOT, metadata);
             let code = fixTestImportsForEject(result.code);
-
-            // Add Current.account setup from test_helper.rb and settle async setters
-            code = setupCurrentAttributes(code, APP_ROOT);
-
-
-
 
 
             // Ensure parent directory exists for nested test files (e.g., cards/comments_controller.test.mjs)

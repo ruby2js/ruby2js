@@ -69,6 +69,7 @@ module Ruby2JS
           @rails_test_describe_depth = 0
           @rails_test_integration = false
           @rails_test_response_var = false
+          @rails_test_current_handled = false
         end
 
         # Handle class-based test definitions
@@ -91,6 +92,7 @@ module Ruby2JS
           begin
             @rails_test_describe_depth += 1
             @rails_test_integration = is_integration
+            @rails_test_current_handled = false
 
             # Collect model references from the body and shared metadata
             collect_test_model_references(body) if body
@@ -111,13 +113,23 @@ module Ruby2JS
 
             # Prepend fixture setup (let _fixtures = {} + beforeEach) to describe body
             fixture_nodes = build_fixture_nodes
-            if fixture_nodes.length > 0
+
+            # Add standalone Current attributes beforeEach if no setup block handled it
+            current_standalone = nil
+            if !@rails_test_current_handled
+              current_standalone = build_current_standalone_before_each
+            end
+
+            extra_nodes = fixture_nodes
+            extra_nodes.push(current_standalone) if current_standalone
+
+            if extra_nodes.length > 0
               if transformed_body && transformed_body.type == :begin
-                transformed_body = s(:begin, *fixture_nodes, *transformed_body.children)
+                transformed_body = s(:begin, *extra_nodes, *transformed_body.children)
               elsif transformed_body
-                transformed_body = s(:begin, *fixture_nodes, transformed_body)
+                transformed_body = s(:begin, *extra_nodes, transformed_body)
               else
-                transformed_body = s(:begin, *fixture_nodes)
+                transformed_body = s(:begin, *extra_nodes)
               end
             end
 
@@ -260,9 +272,24 @@ module Ruby2JS
             # are accessible in test functions (not block-scoped to beforeEach).
             ivar_names = extract_ivar_names(body)
 
+            # Check if body has Current.xxx = ... assignments before processing
+            has_current = has_current_assignments(body)
+
             wrapped_body = wrap_test_ar_operations(body)
             wrapped_body = ensure_statement_method_calls(wrapped_body)
             processed_body = process(wrapped_body)
+
+            # Merge global Current attributes and add settle() if needed
+            global_current = build_global_current_nodes
+            if global_current.any? || has_current
+              @rails_test_current_handled = true
+              settle = s(:await!, s(:const, nil, :Current), :settle)
+              if processed_body.respond_to?(:type) && processed_body.type == :begin
+                processed_body = s(:begin, *global_current, *processed_body.children, settle)
+              else
+                processed_body = s(:begin, *global_current, processed_body, settle)
+              end
+            end
 
             async_fn = s(:async, nil, s(:args), processed_body)
             before_each = s(:send, nil, :beforeEach, async_fn)
@@ -529,6 +556,58 @@ module Ruby2JS
           end
 
           imports
+        end
+
+        # Build AST nodes for global Current attribute assignments from metadata.
+        # Returns nodes like: Current.account = _fixtures.accounts_37s
+        def build_global_current_nodes
+          attrs = @options[:metadata] && @options[:metadata]['current_attributes']
+          return [] unless attrs
+
+          nodes = []
+          attrs.each do |attr_entry|
+            attr_name = attr_entry['attr']
+            table = attr_entry['table']
+            fixture = attr_entry['fixture']
+
+            # Build _fixtures.table_fixture reference
+            var_name = "#{table}_#{fixture}"
+            fixture_ref = s(:attr, s(:lvar, :_fixtures), var_name.to_sym)
+
+            # Current.attr = _fixtures.table_fixture
+            nodes.push(s(:send, s(:const, nil, :Current), :"#{attr_name}=", fixture_ref))
+          end
+
+          nodes
+        end
+
+        # Check if an AST node contains Current.xxx = ... assignments
+        def has_current_assignments(node)
+          return false unless node.respond_to?(:type)
+
+          if node.type == :send && node.children[0].respond_to?(:type) &&
+             node.children[0].type == :const &&
+             node.children[0].children[1] == :Current &&
+             node.children[1].to_s.end_with?('=')
+            return true
+          end
+
+          node.children.any? { |c| c.respond_to?(:type) && has_current_assignments(c) }
+        end
+
+        # Build a standalone beforeEach for global Current attributes.
+        # Used when no setup block handles Current assignments.
+        def build_current_standalone_before_each
+          attrs = @options[:metadata] && @options[:metadata]['current_attributes']
+          return nil unless attrs && attrs.length > 0
+
+          nodes = build_global_current_nodes
+          return nil if nodes.empty?
+
+          settle = s(:await!, s(:const, nil, :Current), :settle)
+          body = s(:begin, *nodes, settle)
+          async_fn = s(:async, nil, s(:args), body)
+          s(:send, nil, :beforeEach, async_fn)
         end
 
         # Build fixture setup nodes (let _fixtures = {} and beforeEach block)
@@ -1122,15 +1201,24 @@ module Ruby2JS
         end
 
         # Transform assert_redirected_to url -> expect(response.redirect).toBe(url)
+        # In virtual mode, path helpers return objects with toString(), so wrap
+        # both sides with String() since toBe uses Object.is (===).
         def transform_assert_redirected_to(args)
           return nil if args.empty?
 
           url_node = process(args.first)
 
-          # expect(response.redirect).toBe(url)
-          s(:send,
-            s(:send, nil, :expect, s(:attr, s(:lvar, :response), :redirect)),
-            :toBe, url_node)
+          if @options[:metadata] && @options[:metadata]['import_mode'] == 'virtual'
+            # expect(String(response.redirect)).toBe(String(url))
+            s(:send,
+              s(:send, nil, :expect, s(:send!, nil, :String, s(:attr, s(:lvar, :response), :redirect))),
+              :toBe, s(:send!, nil, :String, url_node))
+          else
+            # expect(response.redirect).toBe(url)
+            s(:send,
+              s(:send, nil, :expect, s(:attr, s(:lvar, :response), :redirect)),
+              :toBe, url_node)
+          end
         end
 
         # Transform URL helper to path helper
