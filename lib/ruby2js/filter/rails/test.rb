@@ -463,6 +463,14 @@ module Ruby2JS
                 @rails_test_path_helpers << method_name unless @rails_test_path_helpers.include?(method_name)
               end
             end
+          when :str
+            # Extract model references from assert_difference string args
+            # e.g., "Comment.count" -> Comment
+            str = node.children[0]
+            if str =~ /\A([A-Z][a-z]\w*)\./
+              name = $1
+              @rails_test_models << name unless @rails_test_models.include?(name)
+            end
           end
 
           # Recurse into children

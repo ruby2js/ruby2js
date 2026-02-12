@@ -577,7 +577,7 @@ module Ruby2JS
         def collect_params_keys_recursive(node, keys)
           return unless node.respond_to?(:type) && node.respond_to?(:children)
 
-          # Match params[:key] pattern
+          # Match params[:key] and params.expect(:key) patterns
           if node.type == :send
             target, method, *args = node.children
             # Note: use args[0] instead of args.first for JS compatibility
@@ -586,7 +586,7 @@ module Ruby2JS
             if target&.type == :send &&
                target.children[0].nil? &&
                target.children[1] == :params &&
-               method == :[] &&
+               (method == :[] || method == :expect) &&
                first_arg&.type == :sym
               keys << first_arg.children[0]
             end
