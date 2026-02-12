@@ -38,6 +38,10 @@ import {
   generateViteConfigForEject,
   generateTestSetupForEject,
   generateTestGlobalsForEject,
+  generateTestRunnerForEject,
+  generateTestLoaderRegistration,
+  generateTestLoaderHooks,
+  generateTestVitestShim,
   generateMainJsForEject,
   generateVitestConfigForEject,
   generateBrowserIndexHtml,
@@ -235,13 +239,14 @@ function mergeConcernDeclarations(source, modelsDir) {
   if (!classMatch) return source;
   const className = classMatch[2];
 
-  // Find include statements: `include Foo, Bar, Baz`
-  const includeRegex = /^\s*include\s+([A-Z][\w:, ]+)/gm;
+  // Find include statements: `include Foo, Bar, Baz` (may span multiple lines)
+  const includeRegex = /^\s*include\s+([\s\S]*?)(?=\n\s*(?:[a-z]|#|$|\n|include\s))/gm;
   let includeMatch;
   const concernNames = [];
   while ((includeMatch = includeRegex.exec(source)) !== null) {
-    // Split comma-separated concern names
-    const names = includeMatch[1].split(',').map(n => n.trim()).filter(n => n.length > 0);
+    // Flatten continuation lines and split comma-separated concern names
+    const flat = includeMatch[1].replace(/\n\s*/g, ' ').replace(/#.*/, '');
+    const names = flat.split(',').map(n => n.trim()).filter(n => /^[A-Z]/.test(n));
     concernNames.push(...names);
   }
 
@@ -345,11 +350,20 @@ function mergeConcernDeclarations(source, modelsDir) {
 
   if (injectedLines.length === 0) return source;
 
-  // Inject after the include statement (or after the class declaration if no include)
-  const insertionPoint = source.match(/^\s*include\s+[^\n]+\n/m);
-  if (insertionPoint) {
-    const pos = insertionPoint.index + insertionPoint[0].length;
-    return source.slice(0, pos) + '\n  # [merged from concerns]\n' + injectedLines.join('\n') + '\n' + source.slice(pos);
+  // Inject after the last include statement (handling multi-line includes with
+  // continuation lines, and multiple separate include statements)
+  const includeLineRegex = /^\s*include\s+[^\n]+(?:\n\s{4,}[^\n]+)*/gm;
+  let lastInclude = null;
+  let m;
+  while ((m = includeLineRegex.exec(source)) !== null) {
+    lastInclude = m;
+  }
+  if (lastInclude) {
+    const pos = lastInclude.index + lastInclude[0].length;
+    // Find the end of the line (in case the regex stopped mid-line)
+    const lineEnd = source.indexOf('\n', pos);
+    const insertPos = lineEnd !== -1 ? lineEnd + 1 : pos;
+    return source.slice(0, insertPos) + '\n  # [merged from concerns]\n' + injectedLines.join('\n') + '\n' + source.slice(insertPos);
   }
 
   // Fallback: insert after class declaration
@@ -1868,12 +1882,15 @@ async function runEject(options) {
           const importLines = concerns.map(c =>
             `import { ${c.name} } from '${c.path}';`
           ).join('\n');
-          // Copy concern property descriptors (including getters) onto prototype
-          // Copy concern property descriptors (including getters) onto prototype
-          const assignLines = concerns.map(c =>
-            `for (const [key, desc] of Object.entries(Object.getOwnPropertyDescriptors(${c.name}))) Object.defineProperty(${className}.prototype, key, desc);`
+          // Defer concern mixing to avoid circular dependency issues with Node ESM.
+          // Concerns import their parent model and vice versa. Running the mixing
+          // at module scope causes TDZ errors. Instead, register a static _mixConcerns
+          // method that setup.mjs calls after all models are loaded.
+          const mixBody = concerns.map(c =>
+            `    for (const [key, desc] of Object.entries(Object.getOwnPropertyDescriptors(${c.name}))) Object.defineProperty(${className}.prototype, key, desc);`
           ).join('\n');
-          content = importLines + '\n' + content + '\n' + assignLines + '\n';
+          const deferredMixin = `${className}._mixConcerns = () => {\n${mixBody}\n};`;
+          content = importLines + '\n' + content + '\n' + deferredMixin + '\n';
           writeFileSync(jsFile, content);
         }
       }
@@ -2385,6 +2402,13 @@ async function runEject(options) {
   fileCount++;
   writeFileSync(join(outTestDir, 'globals.mjs'), generateTestGlobalsForEject());
   fileCount++;
+
+  // Generate lightweight Node-native test runner (bypasses Vite, avoids OOM)
+  writeFileSync(join(outTestDir, 'runner.mjs'), generateTestRunnerForEject());
+  writeFileSync(join(outTestDir, 'register-loader.mjs'), generateTestLoaderRegistration());
+  writeFileSync(join(outTestDir, 'vitest-loader.mjs'), generateTestLoaderHooks());
+  writeFileSync(join(outTestDir, 'vitest-shim.mjs'), generateTestVitestShim());
+  fileCount += 4;
 
   // Generate entry point(s) based on target
   const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];

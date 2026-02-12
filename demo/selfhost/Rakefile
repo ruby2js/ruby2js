@@ -395,8 +395,9 @@ task :local => [:build, :build_lib, :build_transformers, :build_mjs] do
   FileUtils.cp Dir.glob("#{SELFHOST}/dist/*_compiler.mjs"), package_dist
   FileUtils.cp Dir.glob("#{SELFHOST}/dist/*_transformer.mjs"), package_dist
 
-  # Copy ruby2js.js to package root (lib files import ../ruby2js.js)
+  # Copy ruby2js.js to both packages (lib files import ../ruby2js.js)
   FileUtils.cp File.join(SELFHOST, 'ruby2js.js'), PACKAGE
+  FileUtils.cp File.join(SELFHOST, 'ruby2js.js'), File.join(ROOT, 'packages/ruby2js')
 
   puts ""
   puts "Local build complete. Files reference local paths."

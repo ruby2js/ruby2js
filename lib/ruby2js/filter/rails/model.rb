@@ -1306,8 +1306,23 @@ module Ruby2JS
             # Check if used in callbacks
             used_in_callbacks = all_callback_methods.include?(name)
             if used_in_callbacks
+              # Rewrite bare sends to self sends in method body.
+              # Ruby allows bare `title` to call the attribute getter;
+              # JS requires explicit `this.title`.
+              args_node = node.children[1]
+              locals = []
+              if args_node
+                args_node.children.each do |arg|
+                  locals.push(arg.children[0]) if arg.respond_to?(:children) && arg.children[0]
+                end
+              end
+              rewritten = node.updated(nil, [
+                node.children[0],
+                node.children[1],
+                rewrite_bare_sends_to_self(node.children[2], locals)
+              ])
               # Convert to :defm since callback methods are called by framework
-              method_node = node.updated(:defm, node.children)
+              method_node = rewritten.updated(:defm, rewritten.children)
               transformed << process(method_node)
             end
           end
@@ -1624,6 +1639,67 @@ module Ruby2JS
           s(:async, :_resolveDefaults,
             s(:args),
             s(:begin, *stmts))
+        end
+
+        # Rewrite bare sends (no receiver) to self sends in model method bodies.
+        # Ruby `title.blank?` → `self.title.blank?` so JS gets `this.title`.
+        # Skips local variables, known Ruby builtins, and class-level calls.
+        BARE_SEND_EXCEPTIONS = %i[
+          puts print raise fail return break next
+          lambda proc loop
+          Array Hash String Integer Float
+          freeze_time travel_to travel_back
+        ]
+
+        def rewrite_bare_sends_to_self(node, locals)
+          return node unless node.respond_to?(:type)
+
+          case node.type
+          when :send
+            target, method, *args = node.children
+            if target.nil? && !locals.include?(method) &&
+               !BARE_SEND_EXCEPTIONS.include?(method) &&
+               method.to_s =~ /\A[a-z_]/
+              new_args = args.map { |a| rewrite_bare_sends_to_self(a, locals) }
+              return node.updated(nil, [s(:self), method, *new_args])
+            end
+          when :lvasgn
+            # Track local variable assignments
+            locals = locals + [node.children[0]]
+          when :block
+            # Track block args as locals
+            block_locals = locals.dup
+            block_args = node.children[1]
+            if block_args && block_args.type == :args
+              block_args.children.each do |arg|
+                block_locals.push(arg.children[0]) if arg.respond_to?(:children)
+              end
+            end
+            new_children = []
+            idx = 0
+            node.children.each do |c|
+              if idx == 2
+                new_children.push(rewrite_bare_sends_to_self(c, block_locals))
+              elsif c.respond_to?(:type)
+                new_children.push(rewrite_bare_sends_to_self(c, locals))
+              else
+                new_children.push(c)
+              end
+              idx = idx + 1
+            end
+            return node.updated(nil, new_children)
+          end
+
+          # Recurse into children
+          new_children = []
+          node.children.each do |c|
+            if c.respond_to?(:type)
+              new_children.push(rewrite_bare_sends_to_self(c, locals))
+            else
+              new_children.push(c)
+            end
+          end
+          node.updated(nil, new_children)
         end
 
         # Transform a belongs_to default lambda body for JS output.

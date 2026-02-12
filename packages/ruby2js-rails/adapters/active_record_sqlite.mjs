@@ -18,6 +18,12 @@ let db = null;
 
 // Initialize the database
 export async function initDatabase(options = {}) {
+  // Close previous database to prevent native memory accumulation
+  if (db) {
+    try { db.close(); } catch (e) {}
+    db = null;
+  }
+
   const config = { ...DB_CONFIG, ...options };
   const dbPath = config.database || ':memory:';
 
@@ -162,6 +168,15 @@ export async function insert(tableName, data) {
   const sql = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})`;
   const stmt = db.prepare(sql);
   stmt.run(...values);
+}
+
+// Transaction support for test isolation (like Rails transactional tests)
+export function beginTransaction() {
+  if (db) db.exec('BEGIN');
+}
+
+export function rollbackTransaction() {
+  if (db) db.exec('ROLLBACK');
 }
 
 // Close database connection and flush WAL to main database file

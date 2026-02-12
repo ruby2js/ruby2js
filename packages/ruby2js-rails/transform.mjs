@@ -880,7 +880,7 @@ export function generateTestSetupForEject(config = {}) {
   const railsModule = `ruby2js-rails/targets/${target}/rails.js`;
 
   return `// Test setup for Vitest - ejected version
-import { beforeAll, beforeEach, expect } from 'vitest';
+import { beforeAll, beforeEach, afterEach, expect } from 'vitest';
 
 // Compare ActiveRecord model instances by class and id (like Rails)
 expect.addEqualityTesters([
@@ -925,22 +925,35 @@ beforeAll(async () => {
       }
     }
   }
+  // Run deferred concern mixing (avoids circular dependency TDZ issues in Node ESM)
+  for (const value of Object.values(models)) {
+    if (typeof value === 'function' && typeof value._mixConcerns === 'function') {
+      value._mixConcerns();
+    }
+  }
   // Promote CurrentAttributes instance methods to static on Current
   if (globalThis.Current?._promoteInstanceMethods) Current._promoteInstanceMethods();
 
-  // Configure migrations
+  // Configure and initialize database once (like Rails db:test:prepare)
   const { Application } = await import('${railsModule}');
   const { migrations } = await import('../db/migrate/index.js');
   Application.configure({ migrations });
-});
 
-beforeEach(async () => {
-  // Fresh in-memory database for each test
   const activeRecord = await import('ruby2js-rails/adapters/${adapterFile}');
   await activeRecord.initDatabase({ database: ':memory:' });
-
-  const { Application } = await import('${railsModule}');
   await Application.runMigrations(activeRecord);
+});
+
+// Transactional tests: wrap each test in a transaction that rolls back,
+// so fixture data from beforeEach is cleaned up automatically (like Rails)
+beforeEach(async () => {
+  const activeRecord = await import('ruby2js-rails/adapters/${adapterFile}');
+  activeRecord.beginTransaction();
+});
+
+afterEach(async () => {
+  const activeRecord = await import('ruby2js-rails/adapters/${adapterFile}');
+  activeRecord.rollbackTransaction();
 });
 `;
 }
@@ -1624,10 +1637,6 @@ export function generateVitestConfigForEject(config = {}) {
     externals.push('node:sqlite');
   }
 
-  const serverDepsConfig = externals.length > 0
-    ? `\n    server: {\n      deps: {\n        external: ${JSON.stringify(externals)}\n      }\n    },`
-    : '';
-
   return `import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
@@ -1638,7 +1647,18 @@ export default defineConfig({
   test: {
     root: __dirname,
     globals: true,
-    environment: 'node',${serverDepsConfig}
+    environment: 'node',
+    server: {
+      deps: {
+        // Externalize app code and adapters — already valid JS, skip Vite transform.
+        // This dramatically reduces memory usage and startup time.
+        external: [/^\\./, /ruby2js/, ${externals.map(e => JSON.stringify(e)).join(', ')}]
+      }
+    },
+    testTimeout: 5000,
+    hookTimeout: 10000,
+    pool: 'forks',
+    poolOptions: { forks: { maxForks: 4, minForks: 1 } },
     include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
     setupFiles: [resolve(__dirname, 'test/globals.mjs'), resolve(__dirname, 'test/setup.mjs')]
   }
@@ -2053,3 +2073,279 @@ export async function transformJsxRb(source, filePath, config) {
 
 // Re-export ErbCompiler for direct use if needed
 export { ErbCompiler };
+
+// ================================================================
+// Test runner generation (lightweight Node-native, bypasses Vite)
+// ================================================================
+
+export function generateTestLoaderRegistration() {
+  return `// Register custom ESM loader to resolve 'vitest' imports to our shim.
+// Usage: node --import ./test/register-loader.mjs test/runner.mjs [files...]
+import { register } from 'node:module';
+register(new URL('./vitest-loader.mjs', import.meta.url));
+`;
+}
+
+export function generateTestLoaderHooks() {
+  return `// Custom ESM loader that resolves 'vitest' to our lightweight shim
+export function resolve(specifier, context, nextResolve) {
+  if (specifier === 'vitest' || specifier === 'vitest/config') {
+    return { url: new URL('./vitest-shim.mjs', import.meta.url).href, shortCircuit: true };
+  }
+  return nextResolve(specifier, context);
+}
+`;
+}
+
+export function generateTestVitestShim() {
+  return `// Vitest-compatible shim — re-exports test framework globals
+// These are set on globalThis by runner.mjs before this module is imported.
+export const describe = globalThis.describe;
+export const test = globalThis.test;
+export const it = globalThis.it;
+export const expect = globalThis.expect;
+export const beforeAll = globalThis.beforeAll;
+export const beforeEach = globalThis.beforeEach;
+export const afterEach = globalThis.afterEach;
+export const afterAll = globalThis.afterAll;
+export const vi = {};
+export function defineConfig(c) { return c; }
+`;
+}
+
+export function generateTestRunnerForEject() {
+  return `#!/usr/bin/env node
+// Lightweight Node-native test runner for ejected tests.
+// Bypasses Vite entirely — runs plain ESM with vitest-compatible globals.
+//
+// Usage (single file, per-process — recommended for batch runs):
+//   node --import ./test/register-loader.mjs test/runner.mjs [-q] test/models/foo.test.mjs
+//
+// Usage (multiple files in one process — may OOM on large suites):
+//   node --import ./test/register-loader.mjs test/runner.mjs --all
+
+import { resolve, dirname, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { glob } from 'node:fs/promises';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const rootDir = resolve(__dirname, '..');
+
+// ============================================================
+// Test Framework — vitest-compatible describe/test/expect/hooks
+// ============================================================
+
+const _suites = [];
+let _currentSuite = null;
+let _customTesters = [];
+
+class Suite {
+  constructor(name, parent) {
+    this.name = name; this.parent = parent;
+    this.children = []; this.tests = [];
+    this.beforeAlls = []; this.afterAlls = [];
+    this.beforeEachs = []; this.afterEachs = [];
+  }
+}
+
+globalThis.describe = function describe(name, fn) {
+  const suite = new Suite(name, _currentSuite);
+  if (_currentSuite) _currentSuite.children.push(suite);
+  else _suites.push(suite);
+  const prev = _currentSuite;
+  _currentSuite = suite;
+  try { fn(); } catch (e) { /* describe body threw */ } finally { _currentSuite = prev; }
+};
+
+globalThis.test = function test(name, fn) {
+  if (_currentSuite) _currentSuite.tests.push({ name, fn });
+  else { const s = new Suite('(top-level)', null); s.tests.push({ name, fn }); _suites.push(s); }
+};
+globalThis.it = globalThis.test;
+
+const _topLevelBeforeAlls = [];
+const _topLevelAfterAlls = [];
+const _topLevelBeforeEachs = [];
+const _topLevelAfterEachs = [];
+
+globalThis.beforeAll = fn => { if (_currentSuite) _currentSuite.beforeAlls.push(fn); else _topLevelBeforeAlls.push(fn); };
+globalThis.beforeEach = fn => { if (_currentSuite) _currentSuite.beforeEachs.push(fn); else _topLevelBeforeEachs.push(fn); };
+globalThis.afterEach = fn => { if (_currentSuite) _currentSuite.afterEachs.push(fn); else _topLevelAfterEachs.push(fn); };
+globalThis.afterAll = fn => { if (_currentSuite) _currentSuite.afterAlls.push(fn); else _topLevelAfterAlls.push(fn); };
+
+// --- expect ---
+function deepEqual(a, b) {
+  for (const tester of _customTesters) { const r = tester(a, b); if (r === true || r === false) return r; }
+  if (a === b) return true;
+  if (a == null || b == null) return a === b;
+  if (typeof a !== typeof b) return false;
+  if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+  if (a instanceof RegExp && b instanceof RegExp) return a.toString() === b.toString();
+  if (Array.isArray(a)) return Array.isArray(b) && a.length === b.length && a.every((v, i) => deepEqual(v, b[i]));
+  if (typeof a === 'object') {
+    const ka = Object.keys(a), kb = Object.keys(b);
+    return ka.length === kb.length && ka.every(k => deepEqual(a[k], b[k]));
+  }
+  return false;
+}
+
+function fmt(v) {
+  if (v === undefined) return 'undefined'; if (v === null) return 'null';
+  if (typeof v === 'string') return JSON.stringify(v);
+  if (typeof v === 'object') try { return JSON.stringify(v); } catch { return String(v); }
+  return String(v);
+}
+
+function createExpect(actual) {
+  const m = (neg) => ({
+    toBe(exp) { if (neg ? Object.is(actual, exp) : !Object.is(actual, exp)) throw new Error(\`Expected \${fmt(actual)} \${neg?'not ':''}to be \${fmt(exp)}\`); },
+    toEqual(exp) { const p = deepEqual(actual, exp); if (neg ? p : !p) throw new Error(\`Expected \${fmt(actual)} \${neg?'not ':''}to equal \${fmt(exp)}\`); },
+    toStrictEqual(exp) { this.toEqual(exp); },
+    toBeTruthy() { if (neg ? !!actual : !actual) throw new Error(\`Expected \${fmt(actual)} \${neg?'not ':''}to be truthy\`); },
+    toBeFalsy() { if (neg ? !actual : !!actual) throw new Error(\`Expected \${fmt(actual)} \${neg?'not ':''}to be falsy\`); },
+    toBeNull() { if (neg ? actual === null : actual !== null) throw new Error(\`Expected \${fmt(actual)} \${neg?'not ':''}to be null\`); },
+    toBeUndefined() { if (neg ? actual === undefined : actual !== undefined) throw new Error(\`Expected \${fmt(actual)} \${neg?'not ':''}to be undefined\`); },
+    toContain(item) {
+      let p = Array.isArray(actual) ? actual.some(v => deepEqual(v, item))
+            : typeof actual === 'string' ? actual.includes(item) : false;
+      if (neg ? p : !p) throw new Error(\`Expected \${fmt(actual)} \${neg?'not ':''}to contain \${fmt(item)}\`);
+    },
+    toHaveLength(exp) { const l = actual?.length; if (neg ? l === exp : l !== exp) throw new Error(\`Expected length \${l} \${neg?'not ':''}to be \${exp}\`); },
+    toHaveProperty(key) { const p = actual != null && key in actual; if (neg ? p : !p) throw new Error(\`Expected object \${neg?'not ':''}to have property "\${key}"\`); },
+    toMatch(pat) { const p = pat instanceof RegExp ? pat.test(actual) : String(actual).includes(pat); if (neg ? p : !p) throw new Error(\`Expected \${fmt(actual)} \${neg?'not ':''}to match \${pat}\`); },
+    toThrow(exp) {
+      let threw = false, err;
+      try { actual(); } catch (e) { threw = true; err = e; }
+      if (neg) { if (threw) throw new Error('Expected function not to throw'); return; }
+      if (!threw) throw new Error('Expected function to throw');
+      if (exp !== undefined) {
+        if (typeof exp === 'string' && !err.message?.includes(exp)) throw new Error(\`Expected error to include "\${exp}", got "\${err.message}"\`);
+        if (exp instanceof RegExp && !exp.test(err.message)) throw new Error(\`Expected error to match \${exp}, got "\${err.message}"\`);
+        if (typeof exp === 'function' && !(err instanceof exp)) throw new Error(\`Expected \${exp.name}, got \${err.constructor.name}\`);
+      }
+    },
+    toBeGreaterThan(exp) { if (neg ? actual > exp : !(actual > exp)) throw new Error(\`Expected \${actual} \${neg?'not ':''}> \${exp}\`); },
+    toBeGreaterThanOrEqual(exp) { if (neg ? actual >= exp : !(actual >= exp)) throw new Error(\`Expected \${actual} \${neg?'not ':''}>= \${exp}\`); },
+    toBeLessThan(exp) { if (neg ? actual < exp : !(actual < exp)) throw new Error(\`Expected \${actual} \${neg?'not ':''}< \${exp}\`); },
+    toBeInstanceOf(exp) { if (neg ? actual instanceof exp : !(actual instanceof exp)) throw new Error(\`Expected \${neg?'not ':''}instance of \${exp.name}\`); },
+    get rejects() {
+      return { async toThrow(exp) {
+        let threw = false, err;
+        try { await (typeof actual === 'function' ? actual() : actual); } catch (e) { threw = true; err = e; }
+        if (neg) { if (threw) throw new Error('Expected async not to throw'); return; }
+        if (!threw) throw new Error('Expected async to throw');
+        if (exp !== undefined && typeof exp === 'string' && !err.message?.includes(exp))
+          throw new Error(\`Expected error to include "\${exp}", got "\${err.message}"\`);
+      }};
+    }
+  });
+  const obj = m(false); obj.not = m(true); return obj;
+}
+createExpect.addEqualityTesters = (testers) => { _customTesters.push(...testers); };
+globalThis.expect = createExpect;
+
+// ============================================================
+// Test Runner
+// ============================================================
+async function runSuite(suite, ancestors, stats) {
+  const fullName = [...ancestors, suite.name].join(' > ');
+  const allBE = [..._topLevelBeforeEachs], allAE = [..._topLevelAfterEachs];
+  let s = suite; const chain = [];
+  while (s) { chain.unshift(s); s = s.parent; }
+  for (const cs of chain) { allBE.push(...cs.beforeEachs); allAE.push(...cs.afterEachs); }
+
+  for (const fn of suite.beforeAlls) {
+    try { await fn(); } catch (err) { stats.failed += suite.tests.length; return; }
+  }
+  for (const tc of suite.tests) {
+    const testName = fullName + ' > ' + tc.name;
+    try {
+      for (const fn of allBE) await fn();
+      await tc.fn();
+      for (const fn of allAE.slice().reverse()) try { await fn(); } catch {}
+      stats.passed++;
+      if (stats.verbose) console.log('  \\x1b[32m✓\\x1b[0m ' + tc.name);
+    } catch (err) {
+      for (const fn of allAE.slice().reverse()) try { await fn(); } catch {}
+      stats.failed++;
+      stats.failures.push({ test: testName, error: err });
+      if (stats.verbose) console.log('  \\x1b[31m✗\\x1b[0m ' + tc.name);
+      if (stats.verbose) console.log('    ' + (err.message?.split('\\n')[0] || err));
+    }
+  }
+  for (const child of suite.children) await runSuite(child, [...ancestors, suite.name], stats);
+  for (const fn of suite.afterAlls) try { await fn(); } catch {}
+}
+
+// ============================================================
+// Main
+// ============================================================
+const args = process.argv.slice(2);
+const verbose = args.includes('--verbose') || args.includes('-v');
+const quiet = args.includes('--quiet') || args.includes('-q');
+const allMode = args.includes('--all');
+const files = args.filter(a => !a.startsWith('-'));
+
+if (!verbose) {
+  const _origDebug = console.debug;
+  const _origLog = console.log;
+  console.debug = (...a) => { if (typeof a[0] === 'string' && /^\\s+(SELECT|INSERT|UPDATE|DELETE|\\w+ (Create|Update|Destroy|Find))/.test(a[0])) return; _origDebug(...a); };
+  if (quiet) console.log = (...a) => { if (typeof a[0] === 'string' && /^\\s+\\w+ (Create|Update|Destroy|Find|affected)/.test(a[0])) return; _origLog(...a); };
+}
+
+if (files.length === 0 && !allMode) {
+  console.error('Usage: node --import ./test/register-loader.mjs test/runner.mjs [-q] [-v] [--all | test-files...]');
+  process.exit(1);
+}
+
+let testFiles;
+if (allMode) {
+  testFiles = [];
+  for await (const entry of glob('test/**/*.test.{mjs,js}', { cwd: rootDir })) testFiles.push(resolve(rootDir, entry));
+  testFiles.sort();
+} else {
+  testFiles = files.map(f => resolve(process.cwd(), f));
+}
+
+await import(resolve(rootDir, 'test/globals.mjs'));
+await import(resolve(rootDir, 'test/setup.mjs'));
+for (const fn of _topLevelBeforeAlls) await fn();
+
+const _setupBE = [..._topLevelBeforeEachs], _setupAE = [..._topLevelAfterEachs];
+const stats = { passed: 0, failed: 0, filesPassed: 0, filesFailed: 0, filesErrored: 0, failures: [] };
+
+for (const file of testFiles) {
+  const rel = relative(rootDir, file);
+  _suites.length = 0;
+  _topLevelBeforeEachs.length = 0; _topLevelAfterEachs.length = 0;
+  _topLevelBeforeEachs.push(..._setupBE); _topLevelAfterEachs.push(..._setupAE);
+
+  try { await import(file); } catch (err) {
+    console.error('\\x1b[31mERROR\\x1b[0m ' + rel + ': ' + err.message);
+    if (verbose) console.error(err.stack);
+    stats.filesErrored++; continue;
+  }
+
+  const fs = { passed: 0, failed: 0, verbose, failures: [] };
+  if (verbose) console.log('\\n' + rel);
+  for (const suite of _suites) await runSuite(suite, [], fs);
+
+  stats.passed += fs.passed; stats.failed += fs.failed; stats.failures.push(...fs.failures);
+  if (fs.failed > 0) { stats.filesFailed++; if (!verbose) console.log('\\x1b[31m✗\\x1b[0m ' + rel + '  (' + fs.passed + ' passed, ' + fs.failed + ' failed)'); }
+  else { stats.filesPassed++; if (!verbose) console.log('\\x1b[32m✓\\x1b[0m ' + rel + '  (' + fs.passed + ' passed)'); }
+}
+
+console.log('\\n' + '='.repeat(60));
+console.log(' Test Files  ' + stats.filesPassed + ' passed | ' + stats.filesFailed + ' failed | ' + stats.filesErrored + ' errored  (' + testFiles.length + ')');
+console.log('      Tests  ' + stats.passed + ' passed | ' + stats.failed + ' failed  (' + (stats.passed + stats.failed) + ')');
+console.log('='.repeat(60));
+
+if (stats.failures.length > 0 && verbose) {
+  console.log('\\nFailures:');
+  for (const f of stats.failures.slice(0, 50)) { console.log('  ' + f.test); console.log('    ' + (f.error.message?.split('\\n')[0] || f.error)); }
+  if (stats.failures.length > 50) console.log('  ... and ' + (stats.failures.length - 50) + ' more');
+}
+
+process.exit(stats.failed > 0 || stats.filesErrored > 0 ? 1 : 0);
+`;
+}

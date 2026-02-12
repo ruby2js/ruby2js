@@ -72,6 +72,65 @@ module Ruby2JS
         end
 
       elsif \
+        call.children[0] == nil and call.children[1] == :loop and
+        args.children.length == 0
+      then
+        # Ruby's `loop do ... end` → `while (true) { ... }`
+        # Handle `break value` by rewriting to temp var assignment + break
+        has_break_value = false
+        rewrite_break = proc do |node|
+          next node unless ast_node?(node)
+          if node.type == :break && node.children.length > 0 && node.children[0]
+            has_break_value = true
+            s(:begin,
+              s(:lvasgn, :_loop_result, node.children[0]),
+              s(:break))
+          else
+            new_children = node.children.map { |c|
+              ast_node?(c) ? rewrite_break.call(c) : c
+            }
+            node.updated(nil, new_children)
+          end
+        end
+
+        rewritten_block = rewrite_break.call(block || s(:begin))
+
+        if has_break_value && @state != :statement
+          # Used as an expression: wrap in IIFE
+          put '(() => { let _loop_result; '
+          begin
+            vars = @vars.dup # Pragma: hash
+            @vars[:_loop_result] = true
+            next_token, @next_token = @next_token, :continue
+            puts 'while (true) {'
+            scope rewritten_block
+            sput '}'
+          ensure
+            @next_token = next_token
+            @vars = vars
+          end
+          put ' return _loop_result})()'
+        else
+          begin
+            vars = @vars.dup # Pragma: hash
+            if has_break_value
+              put 'let _loop_result; '
+              @vars[:_loop_result] = true
+            end
+            next_token, @next_token = @next_token, :continue
+            puts 'while (true) {'
+            scope rewritten_block
+            sput '}'
+            if has_break_value
+              put '; _loop_result'
+            end
+          ensure
+            @next_token = next_token
+            @vars = vars
+          end
+        end
+
+      elsif \
         call.children[0] == nil and call.children[1] == :function and
         call.children[2..-1].all? do |child|
           # In Ruby, method names are Symbols. In JS (selfhosted), they're strings.

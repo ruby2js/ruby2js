@@ -231,6 +231,151 @@ task :system_stop, [:demo] do |t, args|
 end
 
 # ============================================
+# Fizzy benchmark (production Rails app eject)
+# ============================================
+
+FIZZY_DIR = ENV['FIZZY_DIR'] || File.expand_path('~/git/fizzy')
+RUBY2JS_PKG = File.join(ROOT, 'packages/ruby2js')
+RUBY2JS_RAILS_PKG = File.join(ROOT, 'packages/ruby2js-rails')
+
+desc "Build selfhost, eject Fizzy, and run tests"
+task :fizzy, [:timeout] do |t, args|
+  timeout = (args[:timeout] || 300).to_i
+
+  unless File.directory?(FIZZY_DIR)
+    abort "Fizzy not found at #{FIZZY_DIR}. Set FIZZY_DIR env var."
+  end
+
+  # 1. Build selfhost (copies ruby2js.js to both packages)
+  puts "\n=== Building selfhost ==="
+  Dir.chdir(ROOT) do
+    sh 'bundle exec rake -f demo/selfhost/Rakefile local'
+  end
+
+  # 2. Eject
+  puts "\n=== Ejecting Fizzy ==="
+  cli = File.join(RUBY2JS_RAILS_PKG, 'cli.mjs')
+  Dir.chdir(FIZZY_DIR) do
+    sh "node #{cli} eject -d sqlite"
+  end
+
+  ejected = File.join(FIZZY_DIR, 'ejected')
+
+  # 3. Install npm deps (vitest, etc.) then symlink dev packages
+  puts "\n=== Setting up node_modules ==="
+  Dir.chdir(ejected) do
+    sh 'npm install 2>&1'
+
+    # Replace installed packages with symlinks to dev source
+    FileUtils.rm_rf('node_modules/ruby2js')
+    FileUtils.rm_rf('node_modules/ruby2js-rails')
+    FileUtils.ln_s(RUBY2JS_PKG, 'node_modules/ruby2js')
+    FileUtils.ln_s(RUBY2JS_RAILS_PKG, 'node_modules/ruby2js-rails')
+    puts "  Symlinked ruby2js → #{RUBY2JS_PKG}"
+    puts "  Symlinked ruby2js-rails → #{RUBY2JS_RAILS_PKG}"
+  end
+
+  # 4. Run tests
+  puts "\n=== Running tests ==="
+  Rake::Task[:fizzy_test].invoke(timeout)
+end
+
+desc "Run Fizzy tests only (skip build/eject, reuse existing ejected/)"
+task :fizzy_test, [:timeout] do |t, args|
+  timeout = (args[:timeout] || 60).to_i
+  ejected = File.join(FIZZY_DIR, 'ejected')
+
+  unless File.directory?(ejected)
+    abort "No ejected directory. Run `rake fizzy` first."
+  end
+
+  # Use lightweight Node-native runner (bypasses Vite, avoids OOM).
+  # Each file runs in its own Node process to prevent memory accumulation.
+  runner = File.join(ejected, 'test/runner.mjs')
+  loader = File.join(ejected, 'test/register-loader.mjs')
+
+  unless File.exist?(runner) && File.exist?(loader)
+    abort "Test runner not found. Re-eject to generate test/runner.mjs."
+  end
+
+  test_files = Dir.glob("#{ejected}/test/**/*.test.{mjs,js}").sort
+  passed_files = 0
+  failed_files = 0
+  errored_files = 0
+  passed_tests = 0
+  failed_tests = 0
+  error_details = []
+
+  puts "Running #{test_files.size} test files (#{timeout}s timeout per file)..."
+  puts ""
+
+  test_files.each_with_index do |file, i|
+    rel = file.sub("#{ejected}/", '')
+    cmd = "cd #{ejected} && timeout #{timeout} node --import ./test/register-loader.mjs test/runner.mjs -q #{rel} 2>&1"
+    output = `#{cmd}`
+    status = $?.exitstatus
+
+    # Parse results from runner output:
+    #   ✓ path  (N passed)
+    #   ✗ path  (N passed, M failed)
+    #   ERROR path: message
+    #   Test Files  N passed | M failed | K errored  (total)
+    #        Tests  N passed | M failed  (total)
+    #
+    # Check for errored test FILES first — when describe callbacks throw,
+    # the Tests line still shows "0 passed | 0 failed" which would otherwise
+    # match as "passed".
+    if output =~ /\d+ passed \| \d+ failed \| (\d+) errored/ && $1.to_i > 0
+      errored_files += 1
+      msg = output.lines.find { |l| l.include?('ERROR') }&.strip || 'load error'
+      error_details << [rel, msg, []]
+    elsif output =~ /Tests\s+(\d+)\s+passed\s*\|\s*(\d+)\s+failed/
+      pt, ft = $1.to_i, $2.to_i
+      passed_tests += pt
+      failed_tests += ft
+      if ft > 0
+        failed_files += 1
+        # Extract failure details
+        failures = output.lines.select { |l| l.include?('Expected') || l.include?('Error:') }.first(3).map(&:strip)
+        error_details << [rel, "#{pt} passed, #{ft} failed", failures]
+      elsif pt > 0
+        passed_files += 1
+      else
+        # 0 tests registered, 0 failed — describe body likely threw
+        errored_files += 1
+        msg = output.lines.find { |l| l.include?('ERROR') || l.include?('ReferenceError') || l.include?('TypeError') }&.strip || 'no tests registered'
+        error_details << [rel, msg, []]
+      end
+    elsif status == 124  # timeout
+      errored_files += 1
+      error_details << [rel, 'timeout', []]
+    else
+      errored_files += 1
+      msg = output.lines.last(3).map(&:strip).reject(&:empty?).first || 'unknown error'
+      error_details << [rel, msg, []]
+    end
+
+    print "\r  [#{i+1}/#{test_files.size}] #{passed_files} passed, #{failed_files} failed, #{errored_files} errored"
+    $stdout.flush
+  end
+
+  puts "\n\n"
+  puts "=" * 60
+  puts " Test Files  #{passed_files} passed | #{failed_files} failed | #{errored_files} errored  (#{test_files.size})"
+  puts "      Tests  #{passed_tests} passed | #{failed_tests} failed  (#{passed_tests + failed_tests})"
+  puts "=" * 60
+
+  if error_details.any?
+    puts "\nFailing/errored files (first 40):"
+    error_details.first(40).each do |file, status, details|
+      puts "  #{file}: #{status}"
+      details.each { |d| puts "    #{d}" } if details.any?
+    end
+    puts "  ... and #{error_details.size - 40} more" if error_details.size > 40
+  end
+end
+
+# ============================================
 # Convenience tasks
 # ============================================
 
