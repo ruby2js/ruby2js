@@ -1424,6 +1424,13 @@ globalThis.travel_to = function(time, fn) {
   }
 };
 
+// travel - advance time by a duration (Duration object or milliseconds)
+globalThis.travel = function(duration) {
+  const ms = (duration && typeof duration._ms === 'number') ? duration._ms : Number(duration);
+  const base = _frozenTime !== null ? _frozenTime : _RealDate.now();
+  _frozenTime = base + ms;
+};
+
 // travel_back - reset time
 globalThis.travel_back = function() {
   _frozenTime = null;

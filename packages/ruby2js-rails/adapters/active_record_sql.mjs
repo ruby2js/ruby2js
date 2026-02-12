@@ -140,6 +140,37 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     return new Relation(this).exists();
   }
 
+  // Find a record matching attrs, or create one if not found
+  static async findOrCreateBy(attrs) {
+    const existing = await this.findBy(attrs);
+    if (existing) return existing;
+    return this.create(attrs);
+  }
+
+  // Aggregate: maximum value of a column
+  static async maximum(col) {
+    return new Relation(this).maximum(col);
+  }
+
+  // Aggregate: minimum value of a column
+  static async minimum(col) {
+    return new Relation(this).minimum(col);
+  }
+
+  // Delete all records matching conditions (direct SQL, no callbacks)
+  static async deleteAll(conditions) {
+    if (conditions) {
+      const { sql: whereSql, values } = this._buildWhere(conditions);
+      return this._execute(`DELETE FROM ${this.tableName} WHERE ${whereSql}`, values);
+    }
+    return this._execute(`DELETE FROM ${this.tableName}`, []);
+  }
+
+  // Destroy all records (loads each and calls destroy for callbacks)
+  static async destroyAll() {
+    return new Relation(this).destroyAll();
+  }
+
   // Return values instead of model instances
   static async pluck(...columns) {
     return new Relation(this).pluck(...columns);
@@ -177,6 +208,36 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     const { sql, values } = this._buildRelationSQL(limitedRel);
     const result = await this._execute(sql, values);
     return this._getRows(result).length > 0;
+  }
+
+  // Execute an aggregate query (MAX, MIN, SUM, AVG) for a Relation
+  static async _executeAggregate(rel, func, col) {
+    const aliasName = func.toLowerCase();
+    // Build a modified relation with aggregate select
+    const aggRel = Object.create(rel);
+    aggRel._select = [`${func}(${col}) as ${aliasName}`];
+    const { sql, values } = this._buildRelationSQL(aggRel);
+    const result = await this._execute(sql, values);
+    const rows = this._getRows(result);
+    return rows[0]?.[aliasName] ?? null;
+  }
+
+  // Execute a DELETE query for a Relation
+  static async _executeDelete(rel) {
+    // Build WHERE clause from relation conditions
+    const values = [];
+    const paramIndex = { value: 1 };
+    let sql = `DELETE FROM ${this.tableName}`;
+
+    if (rel._conditions.length > 0) {
+      const { parts, vals } = this._buildConditionsSQL(rel._conditions, paramIndex);
+      if (parts.length > 0) {
+        sql += ` WHERE ${parts.join(' AND ')}`;
+        values.push(...vals);
+      }
+    }
+
+    return this._execute(sql, values);
   }
 
   // Execute a PLUCK query for a Relation (returns values, not models)
@@ -849,4 +910,9 @@ export class ActiveRecordSQL extends ActiveRecordBase {
   static _resultToModels(rows) {
     return rows.map(row => new this(row));
   }
+
+  // Snake case aliases
+  static find_or_create_by(attrs) { return this.findOrCreateBy(attrs); }
+  static delete_all(conditions) { return this.deleteAll(conditions); }
+  static destroy_all() { return this.destroyAll(); }
 }

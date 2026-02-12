@@ -155,6 +155,47 @@ export class Relation {
     return this.model._executeRelation(this);
   }
 
+  // Aggregate: maximum value of a column
+  async maximum(col) {
+    return this.model._executeAggregate(this, 'MAX', col);
+  }
+
+  // Aggregate: minimum value of a column
+  async minimum(col) {
+    return this.model._executeAggregate(this, 'MIN', col);
+  }
+
+  // Destroy all matching records (loads each, calls destroy for callbacks)
+  async destroyAll() {
+    const records = await this.toArray();
+    for (const record of records) {
+      await record.destroy();
+    }
+    return records;
+  }
+
+  // Delete all matching records (direct SQL, no callbacks)
+  async deleteAll() {
+    return this.model._executeDelete(this);
+  }
+
+  // Find or create within this relation's scope
+  async findOrCreateBy(attrs) {
+    const existing = await this.findBy(attrs);
+    if (existing) return existing;
+    // Merge relation conditions into create attrs
+    const createAttrs = { ...attrs };
+    for (const cond of this._conditions) {
+      Object.assign(createAttrs, cond);
+    }
+    return this.model.create(createAttrs);
+  }
+
+  // Snake case aliases
+  destroy_all() { return this.destroyAll(); }
+  delete_all() { return this.deleteAll(); }
+  find_or_create_by(attrs) { return this.findOrCreateBy(attrs); }
+
   // Alias for Rails compatibility: Article.includes(:comments).all
   all() {
     return this;

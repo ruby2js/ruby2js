@@ -285,6 +285,53 @@ export class ActiveRecordBase {
     return this;
   }
 
+  // Increment a counter column via direct SQL (skip callbacks/validations)
+  async increment_bang(field, by = 1) {
+    this.attributes[field] = (this.attributes[field] || 0) + by;
+    this[field] = this.attributes[field];
+    await this.updateColumn(field, this.attributes[field]);
+    return this;
+  }
+
+  // Direct SQL update of a single column, skipping callbacks and validations
+  async updateColumn(col, val) {
+    return this.updateColumns({ [col]: val });
+  }
+
+  // Direct SQL update of multiple columns, skipping callbacks and validations
+  async updateColumns(attrs) {
+    for (const [k, v] of Object.entries(attrs)) {
+      this.attributes[k] = v;
+      if (k !== 'id') this[k] = v;
+    }
+    // Direct SQL update via the class's static _update helper
+    const sets = [];
+    const values = [];
+    let i = 1;
+    for (const [k, v] of Object.entries(attrs)) {
+      sets.push(`${k} = ${this.constructor._param(i++)}`);
+      values.push(this.constructor._formatValue(v));
+    }
+    values.push(this.id);
+    const sql = `UPDATE ${this.constructor.tableName} SET ${sets.join(', ')} WHERE id = ${this.constructor._param(i)}`;
+    await this.constructor._execute(sql, values);
+    return true;
+  }
+
+  // Touch updated_at (and optional extra timestamp columns) via direct SQL
+  async touch(...names) {
+    const now = new Date().toISOString();
+    const attrs = { updated_at: now };
+    for (const name of names) attrs[name] = now;
+    return this.updateColumns(attrs);
+  }
+
+  // Execute block with a pessimistic lock. For SQLite (single-writer), just reload and execute.
+  async withLock(callback) {
+    await this.reload();
+    return callback ? await callback() : undefined;
+  }
+
   // Transaction wrapper — executes callback and returns result.
   // For single-connection in-memory SQLite this is a simple pass-through.
   async transaction(callback) {
@@ -531,6 +578,11 @@ export class ActiveRecordBase {
     const stream = `<turbo-stream action="remove" target="${target}"></turbo-stream>`;
     Broadcaster.broadcast(channel, stream);
   }
+
+  // Snake case aliases
+  update_column(col, val) { return this.updateColumn(col, val); }
+  update_columns(attrs) { return this.updateColumns(attrs); }
+  with_lock(callback) { return this.withLock(callback); }
 
   async belongsTo(modelClass, foreignKey) {
     const fkValue = this.attributes[foreignKey];

@@ -99,6 +99,25 @@ export class CollectionProxy {
     return this.toRelation().last();
   }
 
+  // --- Bulk operations ---
+
+  async destroyAll() {
+    return this.toRelation().destroyAll();
+  }
+
+  async deleteAll() {
+    return this.toRelation().deleteAll();
+  }
+
+  async findOrCreateBy(attrs) {
+    return this.toRelation().findOrCreateBy(attrs);
+  }
+
+  // Snake case aliases
+  destroy_all() { return this.destroyAll(); }
+  delete_all() { return this.deleteAll(); }
+  find_or_create_by(attrs) { return this.findOrCreateBy(attrs); }
+
   // --- Chaining (returns Relation) ---
 
   where(conditions) {

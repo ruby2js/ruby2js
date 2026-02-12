@@ -199,6 +199,33 @@ module Ruby2JS
             end
             return node
 
+          when :block
+            # Block node: s(:block, call, args, body)
+            # Process body recursively, then check if it contains await.
+            # If so, convert the block to pass an async arrow function,
+            # since `await` is only valid inside `async` functions.
+            # Only convert blocks for method calls with receivers (e.g., array.map { })
+            # or lambdas. Don't convert blocks for assertion macros (assert_raises, etc.)
+            # which are handled by the test filter's on_block.
+            call_node, args_node, body_node = node.children
+            new_call = call_node.respond_to?(:type) ? self.wrap_ar_operations(call_node, model_refs) : call_node
+            new_body = body_node.respond_to?(:type) ? self.wrap_ar_operations(body_node, model_refs) : body_node
+
+            # Exclude blocks handled by test filter's on_block (they add async themselves)
+            test_macros = [:describe, :context, :it, :test, :specify, :setup, :teardown,
+                          :before, :after, :assert_raises, :assert_raise,
+                          :assert_difference, :assert_no_difference]
+            call_method = call_node.type == :send ? call_node.children[1] : nil
+            is_test_macro = call_method && test_macros.include?(call_method)
+
+            if !is_test_macro && self.contains_await?(new_body)
+              # Convert: s(:block, call, args, body) → s(call.type, *call.children, s(:async, nil, args, body))
+              async_fn = new_body.updated(:async, [nil, args_node, new_body])
+              return node.updated(new_call.type, [*new_call.children, async_fn])
+            end
+
+            return node.updated(nil, [new_call, args_node, new_body])
+
           else
             if node.children.any?
               # Note: use different variable name to avoid JS TDZ error in switch/case
@@ -211,6 +238,15 @@ module Ruby2JS
               return node
             end
           end
+        end
+
+        # Check if an AST node contains :await, :await!, or :await_attr nodes.
+        # Does not recurse into :async nodes (already handled).
+        def self.contains_await?(node)
+          return false unless node.respond_to?(:type)
+          return true if node.type == :await || node.type == :await! || node.type == :await_attr
+          return false if node.type == :async
+          node.children.any? { |c| c.respond_to?(:type) && self.contains_await?(c) }
         end
       end
     end
