@@ -1772,20 +1772,25 @@ class SelfhostBuilder
   def transpile_unified_views(resource, views_root, views_dist_dir)
     resource_dir = File.join(views_root, resource)
 
-    # Collect all view files with their types
+    # Create resource subdirectory in dist
+    resource_dist_dir = File.join(views_dist_dir, resource)
+
+    # Transpile ERB partials (files starting with _) - they're imported by views but not exported
+    partials = Dir.glob(File.join(resource_dir, '_*.html.erb'))
+    unless partials.empty?
+      FileUtils.mkdir_p(resource_dist_dir)
+      partials.each do |partial_path|
+        partial_name = File.basename(partial_path, '.html.erb')
+        dest_path = File.join(resource_dist_dir, "#{partial_name}.js")
+        self.transpile_erb_file(partial_path, dest_path)
+      end
+    end
+
+    # Collect all view files with their types (non-partials)
     view_files = collect_view_files(resource_dir)
     return if view_files.empty?
 
-    # Create resource subdirectory in dist
-    resource_dist_dir = File.join(views_dist_dir, resource)
     FileUtils.mkdir_p(resource_dist_dir)
-
-    # Transpile ERB partials (files starting with _) - they're imported by views but not exported
-    Dir.glob(File.join(resource_dir, '_*.html.erb')).each do |partial_path|
-      partial_name = File.basename(partial_path, '.html.erb')
-      dest_path = File.join(resource_dist_dir, "#{partial_name}.js")
-      self.transpile_erb_file(partial_path, dest_path)
-    end
 
     # Group files by view name and resolve conflicts
     views_by_name = resolve_view_conflicts(view_files)
