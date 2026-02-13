@@ -78,6 +78,10 @@ server {
     # Upgrade insecure requests - fixes mixed content when behind HTTPS proxy
     add_header Content-Security-Policy "upgrade-insecure-requests" always;
 
+    # Cross-origin isolation - required for SharedArrayBuffer (WebContainers editor)
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Cross-Origin-Embedder-Policy "credentialless" always;
+
     # Always revalidate - with HTTP/2 and 304 responses, overhead is negligible
     add_header Cache-Control "no-cache, must-revalidate" always;
 
