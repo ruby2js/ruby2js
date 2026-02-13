@@ -74,6 +74,15 @@ module Ruby2JS
           # Check if this is a controller (inherits from ApplicationController or *Controller)
           return super unless controller_class?(class_name, superclass)
 
+          # Base ApplicationController (< ActionController::Base) is a Rails concept —
+          # in ejected JS, controllers are standalone modules. Output an empty export module.
+          if superclass.children[1] == :Base &&
+             superclass.children[0]&.type == :const &&
+             superclass.children[0].children[1] == :ActionController
+            return process(s(:send, nil, :export,
+              s(:module, class_name, nil)))
+          end
+
           # Extract controller name (e.g., ArticlesController -> Article, PeopleController -> Person)
           @rails_controller_plural = class_name.children.last.to_s.sub(/Controller$/, '').downcase
           @rails_controller_name = Ruby2JS::Inflector.singularize(@rails_controller_plural).capitalize
@@ -163,8 +172,13 @@ module Ruby2JS
           superclass_str = superclass.children.last.to_s
 
           # Match *Controller < ApplicationController or *Controller < *Controller
+          # Also match ApplicationController < ActionController::Base
           class_name_str.end_with?('Controller') &&
-            (superclass_str == 'ApplicationController' || superclass_str.end_with?('Controller'))
+            (superclass_str == 'ApplicationController' ||
+             superclass_str.end_with?('Controller') ||
+             (superclass_str == 'Base' &&
+              superclass.children[0]&.type == :const &&
+              superclass.children[0].children[1] == :ActionController))
         end
 
         def collect_controller_metadata(body)
@@ -765,6 +779,18 @@ module Ruby2JS
               condition = wrap_with_await_if_needed(condition)
             end
 
+            # Hoist common accept variable if both branches start with the same lvasgn
+            # Note: compare variable names (symbols), not full AST nodes — JS == is
+            # reference comparison so node == node would always be false in selfhost.
+            if then_branch&.type == :begin && else_branch&.type == :begin &&
+               then_branch.children[0]&.type == :lvasgn && else_branch.children[0]&.type == :lvasgn &&
+               then_branch.children[0].children[0] == else_branch.children[0].children[0]
+              hoisted = then_branch.children[0]
+              then_rest = then_branch.children.length > 2 ? s(:begin, *then_branch.children[1..-1]) : then_branch.children[1]
+              else_rest = else_branch.children.length > 2 ? s(:begin, *else_branch.children[1..-1]) : else_branch.children[1]
+              return s(:begin, hoisted, s(:if, condition, then_rest, else_rest))
+            end
+
             return s(:if, condition, then_branch, else_branch)
 
           when :begin
@@ -906,7 +932,14 @@ module Ruby2JS
           end
 
           json_content = transform_ivars_to_locals(json_body)
-          json_return = s(:return, s(:hash, s(:pair, s(:sym, :json), json_content)))
+          # Avoid double-wrapping: if content is already {json: ...}, use it directly
+          if json_content.type == :hash && json_content.children.any? { |p|
+               p.respond_to?(:type) && p.type == :pair &&
+               p.children[0] == s(:sym, :json) }
+            json_return = s(:return, json_content)
+          else
+            json_return = s(:return, s(:hash, s(:pair, s(:sym, :json), json_content)))
+          end
 
           # Build the JSON branch: prefix statements + return
           json_branch = if json_prefix.any?

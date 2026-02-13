@@ -569,11 +569,34 @@ module Ruby2JS
 
           # Build AST for conditional class expression
           # Result: `${static} ${cond1 ? 'class1' : ''} ${cond2 ? 'class2' : ''}`
-          conditional_exprs = result[:conditionals].map do |cond|
-            # (condition ? ' class-name' : '')
-            s(:if, cond[:condition],
-              s(:str, " #{cond[:class]}"),
-              s(:str, ''))
+          # Merge opposite conditionals into a single ternary where possible
+          conditional_exprs = []
+          conditionals = result[:conditionals]
+          skip_next = false
+          conditionals.each_with_index do |cond, i|
+            if skip_next
+              skip_next = false
+              next
+            end
+
+            next_cond = conditionals[i + 1]
+            if next_cond && conditions_are_negated?(cond[:condition], next_cond[:condition])
+              # Merge: (!cond ? "classA" : "") + (cond ? "classB" : "") → (cond ? "classB" : "classA")
+              conditional_exprs << s(:if, next_cond[:condition],
+                s(:str, " #{next_cond[:class]}"),
+                s(:str, " #{cond[:class]}"))
+              skip_next = true
+            elsif next_cond && conditions_are_negated?(next_cond[:condition], cond[:condition])
+              # Same but reversed: (cond ? "classA" : "") + (!cond ? "classB" : "")
+              conditional_exprs << s(:if, cond[:condition],
+                s(:str, " #{cond[:class]}"),
+                s(:str, " #{next_cond[:class]}"))
+              skip_next = true
+            else
+              conditional_exprs << s(:if, cond[:condition],
+                s(:str, " #{cond[:class]}"),
+                s(:str, ''))
+            end
           end
 
           # Combine into a single expression
@@ -595,6 +618,14 @@ module Ruby2JS
 
           # Return template for embedding: class="${...}"
           [nil, full_expr]
+        end
+
+        # Check if two conditions are negations of each other
+        # a is (send b :!) or b is (send a :!)
+        def conditions_are_negated?(a, b)
+          return false unless a.respond_to?(:type) && b.respond_to?(:type)
+          (a.type == :send && a.children[1] == :! && a.children[0] == b) ||
+          (b.type == :send && b.children[1] == :! && b.children[0] == a)
         end
 
         # Build a navigation link
@@ -1396,13 +1427,11 @@ module Ruby2JS
 
           if value
             # Setting content: content_for :title, "Articles"
-            # context.contentFor.title = "Articles"; return ""
-            s(:begin,
-              s(:send,
-                s(:attr, context_ref, :contentFor),
-                "#{key_name}=".to_sym,
-                process(value)),
-              s(:str, ''))
+            # context.contentFor.title = "Articles"
+            s(:send,
+              s(:attr, context_ref, :contentFor),
+              "#{key_name}=".to_sym,
+              process(value))
           else
             # Getting content: content_for(:title)
             # context.contentFor.title || ""
@@ -1668,7 +1697,7 @@ module Ruby2JS
             self.erb_mark_async!()
             map_expr = s(:send, collection_expr, :map,
               s(:block,
-                s(:send, nil, :lambda),
+                s(:send, nil, :proc),
                 s(:args, s(:arg, singular_name)),
                 render_call))
 

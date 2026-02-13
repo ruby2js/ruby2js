@@ -1508,13 +1508,13 @@ module Ruby2JS
 
           # Access foreign key from attributes
           fk_access = s(:send, s(:attr, s(:self), :attributes), :[],
-            s(:send, s(:str, foreign_key), :to_s))
+            s(:str, foreign_key))
 
           if is_polymorphic
             # Polymorphic belongs_to: model type determined by _type column at runtime
             type_column = "#{association_name}_type"
             type_access = s(:send, s(:attr, s(:self), :attributes), :[],
-              s(:send, s(:str, type_column), :to_s))
+              s(:str, type_column))
 
             # Getter: returns cached value or looks up model via _type column
             getter = s(:defget, association_name,
@@ -1533,12 +1533,12 @@ module Ruby2JS
               s(:begin,
                 s(:send, s(:self), "#{cache_name}=".to_sym, s(:lvar, :value)),
                 s(:send, s(:attr, s(:self), :attributes), :[]=,
-                  s(:send, s(:str, foreign_key), :to_s),
+                  s(:str, foreign_key),
                   s(:if, s(:lvar, :value),
                     s(:attr, s(:lvar, :value), :id),
                     s(:nil))),
                 s(:send, s(:attr, s(:self), :attributes), :[]=,
-                  s(:send, s(:str, type_column), :to_s),
+                  s(:str, type_column),
                   s(:if, s(:lvar, :value),
                     s(:attr, s(:attr, s(:lvar, :value), :constructor), :name),
                     s(:nil)))))
@@ -1586,7 +1586,7 @@ module Ruby2JS
               s(:send,
                 s(:attr, s(:self), :attributes),
                 :[]=,
-                s(:send, s(:str, foreign_key), :to_s),
+                s(:str, foreign_key),
                 s(:if, s(:lvar, :value),
                   s(:attr, s(:lvar, :value), :id),
                   s(:nil)))))

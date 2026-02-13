@@ -503,7 +503,7 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it "should handle any? without block" do
-      to_js( 'a.any?' ).must_equal 'a.some(Boolean)'
+      to_js( 'a.any?' ).must_equal 'a.length > 0'
     end
 
     it "should handle all? without block" do
@@ -516,7 +516,7 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it "should handle none? without block" do
-      to_js( 'a.none?' ).must_equal '!a.some(Boolean)'
+      to_js( 'a.none?' ).must_equal 'a.length === 0'
     end
 
     it "should handle map" do

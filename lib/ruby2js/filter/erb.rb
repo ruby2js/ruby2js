@@ -192,8 +192,8 @@ module Ruby2JS
             end
 
             arg = process(inner)
-            # Skip String() wrapper if already a string literal
-            unless arg&.type == :str
+            # Skip String() wrapper if already a string literal or template literal
+            unless arg&.type == :str || arg&.type == :dstr
               arg = s(:send, nil, :String, arg)
             end
           else

@@ -612,16 +612,16 @@ module Ruby2JS
           process S(:send, target, :<, s(:int, 0))
 
         elsif method == :any? and args.length == 0
-          # arr.any? => arr.some(Boolean)
-          process S(:send, target, :some, s(:const, nil, :Boolean))
+          # arr.any? => arr.length > 0
+          process S(:send, s(:attr, target, :length), :>, s(:int, 0))
 
         elsif method == :all? and args.length == 0
           # arr.all? => arr.every(Boolean)
           process S(:send, target, :every, s(:const, nil, :Boolean))
 
         elsif method == :none? and args.length == 0
-          # arr.none? => !arr.some(Boolean)
-          process S(:send, S(:send, target, :some, s(:const, nil, :Boolean)), :!)
+          # arr.none? => arr.length === 0
+          process S(:send, s(:attr, target, :length), :===, s(:int, 0))
 
         elsif [:start_with?, :end_with?].include? method and args.length >= 1
           js_method = method == :start_with? ? :startsWith : :endsWith
