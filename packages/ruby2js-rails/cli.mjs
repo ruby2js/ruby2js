@@ -1836,7 +1836,7 @@ async function runEject(options) {
   // Shared metadata: model/concern filters write here, test filter reads.
   // Survives across convert() calls because Ruby2JS.convert does options.dup
   // (shallow copy), so the mutable metadata object reference persists.
-  const metadata = { models: {}, concerns: {}, import_mode: 'eject',
+  const metadata = { models: {}, concerns: {}, controller_files: {}, import_mode: 'eject',
     current_attributes: parseCurrentAttributes(APP_ROOT) };
 
   // Transform models (including nested subdirectories like account/export.rb)
@@ -2240,6 +2240,9 @@ async function runEject(options) {
           let code = fixImportsForEject(result.code, relativeOutPath, config);
           const outFile = join(outDir, 'app/controllers', file.replace('.rb', '.js'));
           writeFileSync(outFile, code);
+          // Track controller files for test import generation
+          const ctrlName = file.replace('.rb', '').split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('');
+          metadata.controller_files[ctrlName] = file.replace('.rb', '.js');
           fileCount++;
         } catch (err) {
           errors.push({ file: relativePath, error: err.message, stack: err.stack });

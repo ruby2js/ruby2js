@@ -1219,25 +1219,19 @@ module Ruby2JS
           end
         end
 
-        # Transform assert_redirected_to url -> expect(response.redirect).toBe(url)
-        # In virtual mode, path helpers return objects with toString(), so wrap
-        # both sides with String() since toBe uses Object.is (===).
+        # Transform assert_redirected_to url -> expect(String(response.redirect)).toBe(String(url))
+        # Path helpers return objects with toString(), so wrap both sides with
+        # String() since toBe uses Object.is (===). This applies to both virtual
+        # and eject modes since both use createPathHelper.
         def transform_assert_redirected_to(args)
           return nil if args.empty?
 
           url_node = process(args.first)
 
-          if @options[:metadata] && @options[:metadata]['import_mode'] == 'virtual'
-            # expect(String(response.redirect)).toBe(String(url))
-            s(:send,
-              s(:send, nil, :expect, s(:send!, nil, :String, s(:attr, s(:lvar, :response), :redirect))),
-              :toBe, s(:send!, nil, :String, url_node))
-          else
-            # expect(response.redirect).toBe(url)
-            s(:send,
-              s(:send, nil, :expect, s(:attr, s(:lvar, :response), :redirect)),
-              :toBe, url_node)
-          end
+          # expect(String(response.redirect)).toBe(String(url))
+          s(:send,
+            s(:send, nil, :expect, s(:send!, nil, :String, s(:attr, s(:lvar, :response), :redirect))),
+            :toBe, s(:send!, nil, :String, url_node))
         end
 
         # Transform URL helper to path helper

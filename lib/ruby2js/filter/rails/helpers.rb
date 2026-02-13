@@ -2282,9 +2282,12 @@ module Ruby2JS
             plural_path = :"#{plural_name}_path"    # :articles_path
             model_var = s(:lvar, model_name.to_sym)
 
-            # Track path helpers for import
-            @erb_path_helpers << singular_path unless @erb_path_helpers.include?(singular_path)
-            @erb_path_helpers << plural_path unless @erb_path_helpers.include?(plural_path)
+            # Track path helpers for import (skip for nested resources —
+            # they use the parent-prefixed paths like article_comments_path)
+            unless parent_model_name
+              @erb_path_helpers << singular_path unless @erb_path_helpers.include?(singular_path)
+              @erb_path_helpers << plural_path unless @erb_path_helpers.include?(plural_path)
+            end
 
             if model_is_new
               # New model - POST to collection path
