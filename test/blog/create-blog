@@ -313,7 +313,6 @@ class ArticleTest < ActiveSupport::TestCase
 
   test "destroys comments when article is destroyed" do
     article = articles(:one)
-    comment = comments(:one)
     assert_difference("Comment.count", -1) do
       article.destroy
     end

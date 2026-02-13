@@ -729,7 +729,10 @@ function buildFixturePlan(rubySource, fixtures, associationMap) {
     }
   }
 
-  // Reverse resolution: pull in has_one fixtures that point back to collected fixtures
+  // Reverse resolution: pull in fixtures that reference collected fixtures via FK.
+  // Scans all fixture tables for entries whose FK columns point to collected fixtures.
+  // This handles has_many, has_one, and any other reverse FK relationship — matching
+  // Rails behavior where all fixtures are loaded into the DB before each test.
   const collectedByTable = new Map();
   for (const { table, fixture } of allFixtures.values()) {
     if (!collectedByTable.has(table)) collectedByTable.set(table, new Set());
@@ -737,7 +740,52 @@ function buildFixturePlan(rubySource, fixtures, associationMap) {
   }
 
   const reverseBackRefs = [];
+  let foundNew = true;
 
+  while (foundNew) {
+    foundNew = false;
+
+    for (const [childTable, childTableFixtures] of Object.entries(fixtures)) {
+      for (const [childFixtureName, childFixtureData] of Object.entries(childTableFixtures)) {
+        if (!childFixtureData || typeof childFixtureData !== 'object') continue;
+        const childKey = `${childTable}_${childFixtureName}`;
+        if (allFixtures.has(childKey)) continue;
+
+        for (const [col, value] of Object.entries(childFixtureData)) {
+          if (typeof value !== 'string') continue;
+          const targetTable = inferTargetTable(col, childTable, associationMap, fixtures);
+          if (!targetTable) continue;
+          const parentFixtures = collectedByTable.get(targetTable);
+          if (!parentFixtures) continue;
+
+          const ref = resolveFixtureRef(value, targetTable, fixtures);
+          if (ref && parentFixtures.has(ref.fixtureName)) {
+            allFixtures.set(childKey, { table: childTable, fixture: childFixtureName });
+            if (!collectedByTable.has(childTable)) collectedByTable.set(childTable, new Set());
+            collectedByTable.get(childTable).add(childFixtureName);
+            foundNew = true;
+
+            // Resolve forward dependencies of the newly added fixture
+            for (const [fwdCol, fwdVal] of Object.entries(childFixtureData)) {
+              if (typeof fwdVal !== 'string') continue;
+              const resolved = resolveFixtureValue(fwdVal, fwdCol, childTable, associationMap, fixtures);
+              if (resolved) {
+                const depKey = `${resolved.targetTable}_${resolved.ref.fixtureName}`;
+                if (!allFixtures.has(depKey)) {
+                  allFixtures.set(depKey, { table: resolved.targetTable, fixture: resolved.ref.fixtureName });
+                  if (!collectedByTable.has(resolved.targetTable)) collectedByTable.set(resolved.targetTable, new Set());
+                  collectedByTable.get(resolved.targetTable).add(resolved.ref.fixtureName);
+                }
+              }
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Build has_one back-reference assignments from association map
   for (const [modelTable, assocs] of Object.entries(associationMap)) {
     for (const [assocName, assocEntry] of Object.entries(assocs)) {
       if (!assocEntry || assocEntry.type !== 'has_one') continue;
@@ -758,23 +806,9 @@ function buildFixturePlan(rubySource, fixtures, associationMap) {
         if (ref && collectedNames.has(ref.fixtureName)) {
           const childKey = `${reverseTable}_${revFixtureName}`;
           const parentKey = `${modelTable}_${ref.fixtureName}`;
-          if (!allFixtures.has(childKey)) {
-            allFixtures.set(childKey, { table: reverseTable, fixture: revFixtureName });
-            const revData = fixtures[reverseTable]?.[revFixtureName];
-            if (revData && typeof revData === 'object') {
-              for (const [col, val] of Object.entries(revData)) {
-                if (typeof val !== 'string') continue;
-                const resolved = resolveFixtureValue(val, col, reverseTable, associationMap, fixtures);
-                if (resolved) {
-                  const depKey = `${resolved.targetTable}_${resolved.ref.fixtureName}`;
-                  if (!allFixtures.has(depKey)) {
-                    allFixtures.set(depKey, { table: resolved.targetTable, fixture: resolved.ref.fixtureName });
-                  }
-                }
-              }
-            }
+          if (allFixtures.has(parentKey) && allFixtures.has(childKey)) {
+            reverseBackRefs.push({ parentKey, assocName, childKey });
           }
-          reverseBackRefs.push({ parentKey, assocName, childKey });
         }
       }
     }
