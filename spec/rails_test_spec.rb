@@ -713,7 +713,7 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(response.redirect).toBe(article_path(article))'
+      assert_includes result, 'expect(String(response.redirect)).toBe(String(article_path(article)))'
     end
 
     it "converts assert_redirected_to with plural path" do
@@ -725,7 +725,7 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(response.redirect).toBe(articles_path())'
+      assert_includes result, 'expect(String(response.redirect)).toBe(String(articles_path()))'
     end
   end
 

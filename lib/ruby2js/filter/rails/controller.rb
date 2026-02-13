@@ -83,6 +83,7 @@ module Ruby2JS
           # First pass: collect before_actions, private methods, and model references
           collect_controller_metadata(body)
           collect_model_references(body)
+          record_controller_metadata
 
           # Second pass: transform methods
           transformed_body = transform_controller_body(body)
@@ -137,6 +138,22 @@ module Ruby2JS
         end
 
         private
+
+        # Record controller file path in shared metadata so the test filter
+        # can generate correct imports. Follows the same pattern as
+        # model.rb's record_model_metadata.
+        def record_controller_metadata
+          return unless @options[:metadata] && @rails_controller_const
+
+          meta = @options[:metadata]
+          meta['controller_files'] = {} unless meta['controller_files']
+
+          ctrl_name = @rails_controller_const.to_s
+          if @options[:file]
+            basename = File.basename(@options[:file]).sub(/\.rb$/, '.js')
+            meta['controller_files'][ctrl_name] = basename
+          end
+        end
 
         def controller_class?(class_name, superclass)
           return false unless class_name&.type == :const

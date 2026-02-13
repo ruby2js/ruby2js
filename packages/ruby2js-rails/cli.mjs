@@ -894,6 +894,23 @@ function parseCurrentAttributes(appRoot) {
   }
   return attrs;
 }
+
+/**
+ * Create a shared metadata object for threading through Ruby2JS filters.
+ * Both eject and virtual test modes use this to ensure the same fields exist.
+ * Model, concern, and controller filters write to this during transformation;
+ * the test filter reads it to generate correct imports.
+ */
+function createMetadata(mode, appRoot) {
+  return {
+    models: {},
+    concerns: {},
+    controller_files: {},
+    import_mode: mode,
+    current_attributes: parseCurrentAttributes(appRoot)
+  };
+}
+
 // ============================================
 // Dev-mode test transpilation (for juntos test)
 // ============================================
@@ -978,8 +995,7 @@ async function transpileTestFiles(appRoot, config) {
 
   // Shared metadata (models aren't transpiled in test-only mode, so this
   // stays empty — but threading it keeps the interface consistent)
-  const metadata = { models: {}, concerns: {}, import_mode: 'virtual',
-    current_attributes: parseCurrentAttributes(appRoot) };
+  const metadata = createMetadata('virtual', appRoot);
 
   let count = 0;
 
@@ -1833,11 +1849,10 @@ async function runEject(options) {
   let fileCount = 0;
   const errors = [];  // Track errors but continue processing
 
-  // Shared metadata: model/concern filters write here, test filter reads.
+  // Shared metadata: model/concern/controller filters write here, test filter reads.
   // Survives across convert() calls because Ruby2JS.convert does options.dup
   // (shallow copy), so the mutable metadata object reference persists.
-  const metadata = { models: {}, concerns: {}, controller_files: {}, import_mode: 'eject',
-    current_attributes: parseCurrentAttributes(APP_ROOT) };
+  const metadata = createMetadata('eject', APP_ROOT);
 
   // Transform models (including nested subdirectories like account/export.rb)
   const modelsDir = join(APP_ROOT, 'app/models');
@@ -2240,9 +2255,6 @@ async function runEject(options) {
           let code = fixImportsForEject(result.code, relativeOutPath, config);
           const outFile = join(outDir, 'app/controllers', file.replace('.rb', '.js'));
           writeFileSync(outFile, code);
-          // Track controller files for test import generation
-          const ctrlName = file.replace('.rb', '').split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('');
-          metadata.controller_files[ctrlName] = file.replace('.rb', '.js');
           fileCount++;
         } catch (err) {
           errors.push({ file: relativePath, error: err.message, stack: err.stack });

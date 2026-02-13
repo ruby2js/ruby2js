@@ -548,9 +548,20 @@ module Ruby2JS
             end
 
             @rails_test_controllers.each do |name|
-              # Controllers import from .rb paths (Vite transforms them)
-              ctrl_file = name.gsub(/([A-Z])/) { |m| '_' + m.downcase }.sub(/^_/, '') + '.rb'
-              imports.push(s(:import, ['../../app/controllers/' + ctrl_file],
+              # Controllers import from .rb paths (Vite transforms them).
+              # Prefer metadata when available; fall back to regex derivation.
+              ctrl_file = nil
+              if meta['controller_files']
+                meta['controller_files'].each do |cname, cfile| # Pragma: entries
+                  ctrl_file = cfile if cname == name
+                end
+              end
+              if ctrl_file
+                ctrl_rb = ctrl_file.sub(/\.js$/, '.rb')
+              else
+                ctrl_rb = name.gsub(/([A-Z])/) { |m| '_' + m.downcase }.sub(/^_/, '') + '.rb'
+              end
+              imports.push(s(:import, ['../../app/controllers/' + ctrl_rb],
                 [s(:const, nil, name.to_sym)]))
             end
 
