@@ -57,6 +57,7 @@ import {
   generateBrowserIndexHtml,
   generateBrowserMainJs,
   ensureRuby2jsReady,
+  buildAppManifest,
   ErbCompiler
 } from './transform.mjs';
 
@@ -652,8 +653,39 @@ function createRubyTransformPlugin(config, appRoot) {
   // Cache for transformed files
   const transformCache = new Map();
 
+  // Pre-analysis state: metadata from model transforms
+  let metadata = null;
+  let manifestPromise = null;
+
+  async function ensureManifest() {
+    if (!metadata) {
+      if (!manifestPromise) {
+        manifestPromise = buildAppManifest(appRoot, config, { mode: 'vite' });
+      }
+      const manifest = await manifestPromise;
+      metadata = manifest.metadata;
+      // Seed transform cache from pre-analyzed models
+      for (const [filePath, result] of manifest.modelCache) {
+        try {
+          const stat = fs.statSync(filePath);
+          const js = fixImports(result.code, filePath);
+          const map = result.map;
+          if (map) {
+            map.file = path.basename(filePath).replace('.rb', '.js');
+            map.sources = [filePath];
+            map.sourceRoot = '';
+            map.sourcesContent = [fs.readFileSync(filePath, 'utf-8')];
+          }
+          transformCache.set(filePath, { result: { code: js, map }, mtime: stat.mtimeMs });
+        } catch {}
+      }
+    }
+    return metadata;
+  }
+
   // Local wrapper for transformRuby that uses closure's config/appRoot
   async function transformRubyLocal(source, filePath, section = null) {
+    const meta = await ensureManifest();
     const { convert } = await ensureRuby2jsReady();
     // Get section-specific config from ruby2js.yml if available
     const sectionConfig = config.sections?.[section] || null;
@@ -661,7 +693,8 @@ function createRubyTransformPlugin(config, appRoot) {
       ...getBuildOptions(section, config.target, sectionConfig),
       file: path.relative(appRoot, filePath),
       database: config.database,
-      target: config.target
+      target: config.target,
+      metadata: meta
     };
     return convert(source, options);
   }
@@ -669,6 +702,35 @@ function createRubyTransformPlugin(config, appRoot) {
   return {
     name: 'juntos-ruby',
     enforce: 'pre',
+
+    async buildStart() {
+      await ensureManifest();
+      const modelCount = metadata.models ? Object.keys(metadata.models).length : 0;
+      console.log(`[juntos] Pre-analyzed ${modelCount} models`);
+    },
+
+    handleHotUpdate({ file, server }) {
+      const normalizedFile = file.replace(/\\/g, '/');
+
+      if (normalizedFile.includes('/app/models/') && file.endsWith('.rb')) {
+        // Invalidate metadata — model change may affect associations
+        metadata = null;
+        manifestPromise = null;
+        transformCache.delete(file);
+
+        // Rebuild asynchronously
+        ensureManifest().then(() => {
+          console.log('[juntos] Model metadata rebuilt after change');
+        });
+
+        server.ws.send({
+          type: 'custom',
+          event: 'ruby2js:turbo-reload',
+          data: { file }
+        });
+        return [];
+      }
+    },
 
     // Resolve virtual modules and source file imports
     resolveId(source, importer) {
@@ -2029,16 +2091,7 @@ function createHmrPlugin() {
       // Normalize path for matching
       const normalizedFile = file.replace(/\\/g, '/');
 
-      // Models: Turbo reload (associations, dependencies unknown)
-      if (normalizedFile.includes('/app/models/') && file.endsWith('.rb')) {
-        console.log('[juntos] Model changed, triggering Turbo reload:', file);
-        server.ws.send({
-          type: 'custom',
-          event: 'ruby2js:turbo-reload',
-          data: { file }
-        });
-        return [];
-      }
+      // Models: handled by juntos-ruby plugin (metadata rebuild + Turbo reload)
 
       // Routes: Turbo reload (need full regeneration)
       if (normalizedFile.includes('/config/routes')) {

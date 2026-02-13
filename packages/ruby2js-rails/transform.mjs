@@ -11,8 +11,8 @@ import fs from 'node:fs';
 // Import ERB compiler for .erb files
 import { ErbCompiler } from './lib/erb_compiler.js';
 
-// Import inflector for singularization
-import { singularize } from 'ruby2js-rails/adapters/inflector.mjs';
+// Import inflector for singularization/pluralization
+import { singularize, pluralize, underscore } from 'ruby2js-rails/adapters/inflector.mjs';
 
 // ============================================================
 // Constants
@@ -74,8 +74,8 @@ export function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-// Re-export singularize for convenience
-export { singularize };
+// Re-export inflector functions for convenience
+export { singularize, pluralize, underscore };
 
 // ============================================================
 // Build options
@@ -300,6 +300,286 @@ export function findControllers(appRoot) {
       file: f,
       name: f.replace(/_controller\.(rb|js)$/, '').replace(/_/g, '-')
     }));
+}
+
+// ============================================================
+// Concern merging and metadata
+// ============================================================
+
+/**
+ * Extract the body of `included do ... end` from a concern file.
+ * Returns the lines inside the block, or empty string if not found.
+ */
+function extractIncludedDoBody(concernSource) {
+  // Match `included do\n ... \n  end` — the `end` that closes `included do`
+  // is at the same indentation level as `included`
+  const match = concernSource.match(/^(\s*)included\s+do\s*\n([\s\S]*?)\n\1end/m);
+  if (!match) return '';
+  return match[2];
+}
+
+/**
+ * Pre-process a model's Ruby source to merge in declarations from its
+ * included concerns' `included do` blocks.
+ *
+ * This ensures that `has_many`, `belongs_to`, `has_one`, `scope`, `enum`,
+ * and callback declarations that live in concerns are visible to the
+ * Rails model filter during transpilation.
+ *
+ * @param {string} source - The model's Ruby source code
+ * @param {string} modelsDir - Path to app/models directory
+ * @returns {string} Modified source with concern declarations injected
+ */
+export function mergeConcernDeclarations(source, modelsDir) {
+  // Find the class declaration and its include statement
+  const classMatch = source.match(/^(class\s+(\w+)\s*<[^\n]*\n)/m);
+  if (!classMatch) return source;
+  const className = classMatch[2];
+
+  // Find include statements: `include Foo, Bar, Baz` (may span multiple lines)
+  const includeRegex = /^\s*include\s+([\s\S]*?)(?=\n\s*(?:[a-z]|#|$|\n|include\s))/gm;
+  let includeMatch;
+  const concernNames = [];
+  while ((includeMatch = includeRegex.exec(source)) !== null) {
+    // Flatten continuation lines and split comma-separated concern names
+    const flat = includeMatch[1].replace(/\n\s*/g, ' ').replace(/#.*/, '');
+    const names = flat.split(',').map(n => n.trim()).filter(n => /^[A-Z]/.test(n));
+    concernNames.push(...names);
+  }
+
+  // Track which concern files we've already processed (from explicit includes)
+  const processedFiles = new Set();
+
+  // Shared concerns directory: app/models/concerns/
+  const concernsDir = path.join(modelsDir, '..', 'models', 'concerns');
+
+  // Helper: extract declarations from a concern file's included-do block
+  // Also follows include ::ModuleName chains to shared concerns
+  function extractDeclarationsFromFile(filePath) {
+    const lines = [];
+    try {
+      const concernSource = fs.readFileSync(filePath, 'utf-8');
+      const body = extractIncludedDoBody(concernSource);
+
+      // Follow include chains: look for `include ::ModuleName` in the
+      // entire concern file (both module body and included-do block)
+      const includeChainRegex = /^\s*include\s+::(\w+)/gm;
+      let chainMatch;
+      while ((chainMatch = includeChainRegex.exec(concernSource)) !== null) {
+        const sharedName = chainMatch[1];
+        const snaked = sharedName.replace(/([A-Z])/g, (m, c, i) => (i > 0 ? '_' : '') + c.toLowerCase());
+        const sharedFile = path.join(concernsDir, snaked + '.rb');
+        if (fs.existsSync(sharedFile) && !processedFiles.has(sharedFile)) {
+          processedFiles.add(sharedFile);
+          lines.push(...extractDeclarationsFromFile(sharedFile));
+        }
+      }
+
+      if (body) {
+        // Inject declarations that define model structure and behavior:
+        // - Associations: has_many, has_one, belongs_to
+        // - Scopes and enums: scope, enum
+        // - Callbacks: before_save :method, after_create -> { ... }, etc.
+        for (const line of body.split('\n')) {
+          const trimmed = line.trim();
+          if (trimmed.length === 0 || trimmed.startsWith('#')) continue;
+          if (/^(has_many|has_one|belongs_to|scope|enum)\b/.test(trimmed)) {
+            // Skip multi-line block openers (incomplete without body + end)
+            // e.g., "has_many :accesses do", "scope :foo, -> do"
+            if (/\bdo\s*(\|[^|]*\|)?\s*$/.test(trimmed)) continue;
+            lines.push('  ' + trimmed);
+          }
+          // Callbacks: merge symbol-based (before_save :method_name),
+          // lambda-based (after_create -> { ... }), and simple block callbacks.
+          // Skip multi-line blocks (do...end) and callbacks with self.class
+          // which don't transpile well in the model callback context.
+          if (/^(before_|after_)\w+\b/.test(trimmed)) {
+            if (/\bdo\s*(\|[^|]*\|)?\s*$/.test(trimmed)) continue;
+            if (/self\.class\b/.test(trimmed)) continue;
+            lines.push('  ' + trimmed);
+          }
+        }
+      }
+    } catch (err) {
+      // Skip concerns that can't be read
+    }
+    return lines;
+  }
+
+  // Phase 1: Process explicitly included concerns
+  const injectedLines = [];
+  for (const name of concernNames) {
+    // Concern file path: Card includes Closeable => card/closeable.rb
+    // Board includes Cards => board/cards.rb
+    const snakeName = name.replace(/([A-Z])/g, (m, c, i) => (i > 0 ? '_' : '') + c.toLowerCase());
+    const concernFile = path.join(modelsDir, className.toLowerCase(), snakeName + '.rb');
+
+    if (!fs.existsSync(concernFile)) continue;
+    processedFiles.add(concernFile);
+    injectedLines.push(...extractDeclarationsFromFile(concernFile));
+  }
+
+  // Phase 2: Auto-discover concerns from the model's subdirectory
+  // Rails convention: files in app/models/card/ are Card:: concerns
+  // Some may not be explicitly included (e.g., stripped benchmark repos)
+  const modelSubdir = path.join(modelsDir, className.toLowerCase());
+  if (fs.existsSync(modelSubdir)) {
+    try {
+      for (const entry of fs.readdirSync(modelSubdir, { withFileTypes: true })) {
+        if (!entry.isFile() || !entry.name.endsWith('.rb')) continue;
+        const filePath = path.join(modelSubdir, entry.name);
+        if (processedFiles.has(filePath)) continue;
+
+        // Only process ActiveSupport::Concern modules (skip sub-models and plain classes)
+        try {
+          const content = fs.readFileSync(filePath, 'utf-8');
+          if (!/extend\s+ActiveSupport::Concern/.test(content)) continue;
+          processedFiles.add(filePath);
+          injectedLines.push(...extractDeclarationsFromFile(filePath));
+        } catch (err) {
+          // Skip unreadable files
+        }
+      }
+    } catch (err) {
+      // Skip if directory can't be read
+    }
+  }
+
+  if (injectedLines.length === 0) return source;
+
+  // Inject after the last include statement (handling multi-line includes with
+  // continuation lines, and multiple separate include statements)
+  const includeLineRegex = /^\s*include\s+[^\n]+(?:\n\s{4,}[^\n]+)*/gm;
+  let lastInclude = null;
+  let m;
+  while ((m = includeLineRegex.exec(source)) !== null) {
+    lastInclude = m;
+  }
+  if (lastInclude) {
+    const pos = lastInclude.index + lastInclude[0].length;
+    // Find the end of the line (in case the regex stopped mid-line)
+    const lineEnd = source.indexOf('\n', pos);
+    const insertPos = lineEnd !== -1 ? lineEnd + 1 : pos;
+    return source.slice(0, insertPos) + '\n  # [merged from concerns]\n' + injectedLines.join('\n') + '\n' + source.slice(insertPos);
+  }
+
+  // Fallback: insert after class declaration
+  const classEnd = classMatch.index + classMatch[0].length;
+  return source.slice(0, classEnd) + '\n  # [merged from concerns]\n' + injectedLines.join('\n') + '\n' + source.slice(classEnd);
+}
+
+/**
+ * Parse test_helper.rb for global Current attribute assignments.
+ *
+ * Looks for patterns like: Current.account = accounts("37s")
+ * Returns an array of { attr, table, fixture } objects stored in metadata
+ * for the test filter to generate Current setup beforeEach blocks at AST level.
+ */
+export function parseCurrentAttributes(appRoot) {
+  const helperPath = path.join(appRoot, 'test/test_helper.rb');
+  const attrs = [];
+  if (fs.existsSync(helperPath)) {
+    const helper = fs.readFileSync(helperPath, 'utf-8');
+    const regex = /Current\.(\w+)\s*=\s*(\w+)\(["'](\w+)["']\)/g;
+    let match;
+    while ((match = regex.exec(helper)) !== null) {
+      attrs.push({ attr: match[1], table: match[2], fixture: match[3] });
+    }
+  }
+  return attrs;
+}
+
+/**
+ * Create a shared metadata object for threading through Ruby2JS filters.
+ * Both eject and virtual test modes use this to ensure the same fields exist.
+ * Model, concern, and controller filters write to this during transformation;
+ * the test filter reads it to generate correct imports.
+ */
+export function createMetadata(mode, appRoot) {
+  return {
+    models: {},
+    concerns: {},
+    controller_files: {},
+    import_mode: mode,
+    current_attributes: parseCurrentAttributes(appRoot)
+  };
+}
+
+/**
+ * Pre-analyze the application by transforming all model files.
+ * Populates metadata.models as a side effect of the Rails model filter.
+ * Returns both the metadata object and a cache of transform results.
+ *
+ * @param {string} appRoot - Application root directory
+ * @param {Object} config - Configuration (database, target, sections, etc.)
+ * @param {Object} [options]
+ * @param {string} [options.mode='vite'] - 'vite' | 'eject' | 'virtual'
+ * @returns {Promise<{metadata: Object, modelCache: Map<string, {code: string, map: Object}>}>}
+ */
+export async function buildAppManifest(appRoot, config, { mode = 'vite' } = {}) {
+  await ensureRuby2jsReady();
+
+  const metadata = createMetadata(mode, appRoot);
+  const modelCache = new Map(); // filePath → { code, map }
+
+  const modelsDir = path.join(appRoot, 'app/models');
+  const models = findModels(appRoot);
+
+  for (const modelPath of models) {
+    const file = modelPath + '.rb';
+    const filePath = path.join(modelsDir, file);
+    if (!fs.existsSync(filePath)) continue;
+
+    try {
+      let source = fs.readFileSync(filePath, 'utf-8');
+      // Merge concern declarations for top-level models
+      if (!file.includes('/')) {
+        source = mergeConcernDeclarations(source, modelsDir);
+      }
+
+      const result = await transformRuby(source, filePath, null, config, appRoot, metadata);
+      modelCache.set(filePath, { code: result.code, map: result.map });
+    } catch (err) {
+      console.warn(`[juntos] buildAppManifest: skipped ${file}: ${err.message}`);
+    }
+  }
+
+  return { metadata, modelCache };
+}
+
+/**
+ * Derive an association map from pre-populated metadata.models.
+ * Converts the metadata format ({ ModelName: { associations: [{name, type}, ...] } })
+ * to the { tableName: { assocName: targetTable } } format that
+ * buildFixturePlan expects.
+ *
+ * @param {Object} metadata - Metadata with populated models field
+ * @returns {Object} Association map
+ */
+export function deriveAssociationMap(metadata) {
+  const assocMap = {};
+
+  for (const [className, modelMeta] of Object.entries(metadata.models || {})) {
+    if (!modelMeta.associations || !Array.isArray(modelMeta.associations)) continue;
+    const tableName = underscore(pluralize(className));
+    const tableAssocs = {};
+
+    for (const assoc of modelMeta.associations) {
+      if (!assoc.name) continue;
+      // Derive target table from association name using Rails conventions
+      const targetTable = pluralize(assoc.name);
+      tableAssocs[assoc.name] = {
+        table: targetTable,
+        type: assoc.type || 'belongs_to'
+      };
+    }
+
+    if (Object.keys(tableAssocs).length > 0) {
+      assocMap[tableName] = tableAssocs;
+    }
+  }
+
+  return assocMap;
 }
 
 // ============================================================
