@@ -292,4 +292,158 @@ describe Ruby2JS::Filter::Rails::Routes do
       refute_includes result, 'export []'
     end
   end
+
+  describe "namespace" do
+    it "generates path helpers with namespace prefix" do
+      result = to_js(<<~RUBY, paths_only: true)
+        Rails.application.routes.draw do
+          namespace :account do
+            resource :settings
+            resources :exports, only: [:create, :show]
+          end
+        end
+      RUBY
+      assert_includes result, 'function account_settings_path()'
+      assert_includes result, '"/account/settings"'
+      assert_includes result, 'function account_exports_path()'
+      assert_includes result, '"/account/exports"'
+      assert_includes result, 'function account_export_path('
+      assert_includes result, '/account/exports/'
+    end
+
+    it "generates path helpers with nested namespaces" do
+      result = to_js(<<~RUBY, paths_only: true)
+        Rails.application.routes.draw do
+          namespace :events do
+            namespace :day_timeline do
+              resources :columns, only: :show
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'function events_day_timeline_column_path('
+      assert_includes result, '/events/day_timeline/columns/'
+    end
+  end
+
+  describe "scope" do
+    it "scope module: is transparent for paths" do
+      result = to_js(<<~RUBY, paths_only: true)
+        Rails.application.routes.draw do
+          resources :users do
+            scope module: :users do
+              resource :avatar
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'function user_avatar_path(user)'
+      assert_includes result, '/users/'
+      assert_includes result, '/avatar'
+      # No extra "users" segment from the scope
+      refute_includes result, '/users/users/'
+    end
+
+    it "scope as: adds naming prefix without URL change" do
+      result = to_js(<<~RUBY, paths_only: true)
+        Rails.application.routes.draw do
+          resource :signup, only: %i[ new create ] do
+            collection do
+              scope module: :signups, as: :signup do
+                resource :completion, only: %i[ new create ]
+              end
+            end
+          end
+        end
+      RUBY
+      # collection clears parent prefix; scope as: :signup adds it back
+      assert_includes result, 'function new_signup_completion_path()'
+      assert_includes result, '"/signup/completion/new"'
+    end
+  end
+
+  describe "collection" do
+    it "removes parent :id from path for collection-level resources" do
+      result = to_js(<<~RUBY, paths_only: true)
+        Rails.application.routes.draw do
+          resources :notifications do
+            scope module: :notifications do
+              collection do
+                resource :bulk_reading, only: :create
+              end
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'function bulk_reading_path()'
+      assert_includes result, '"/notifications/bulk_reading"'
+      # Should NOT have :id in path
+      refute_includes result, 'notification_id'
+    end
+
+    it "generates path helpers for on: :collection custom routes" do
+      result = to_js(<<~RUBY, paths_only: true)
+        Rails.application.routes.draw do
+          resources :notifications do
+            get "tray", to: "trays#show", on: :collection, as: :notification_tray
+          end
+        end
+      RUBY
+      assert_includes result, 'function notification_tray_path()'
+      assert_includes result, '"/notifications/tray"'
+    end
+  end
+
+  describe "custom routes with as:" do
+    it "generates path helper for get with as:" do
+      result = to_js(<<~RUBY, paths_only: true)
+        Rails.application.routes.draw do
+          get "join/:code", to: "join_codes#new", as: :join
+        end
+      RUBY
+      assert_includes result, 'function join_path(code)'
+      assert_includes result, '/join/'
+    end
+
+    it "generates path helper for hashrocket syntax" do
+      result = to_js(<<~RUBY, paths_only: true)
+        Rails.application.routes.draw do
+          get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
+        end
+      RUBY
+      assert_includes result, 'function pwa_manifest_path()'
+      assert_includes result, '"/manifest"'
+    end
+  end
+
+  describe "singular resource with only: :create" do
+    it "generates path helper for create-only singular resources" do
+      result = to_js(<<~RUBY, paths_only: true)
+        Rails.application.routes.draw do
+          resources :cards do
+            scope module: :cards do
+              resource :self_assignment, only: :create
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'function card_self_assignment_path(card)'
+    end
+  end
+
+  describe "param: option" do
+    it "uses custom param in paths" do
+      result = to_js(<<~RUBY, paths_only: true)
+        Rails.application.routes.draw do
+          resources :email_addresses, param: :token do
+            resource :confirmation
+          end
+        end
+      RUBY
+      assert_includes result, 'function email_address_path('
+      # Custom param :token is used in nesting (nested resources reference parent by token)
+      assert_includes result, 'function email_address_confirmation_path(token)'
+      assert_includes result, '/email_addresses/'
+    end
+  end
 end

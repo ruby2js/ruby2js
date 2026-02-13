@@ -135,6 +135,12 @@ module Ruby2JS
             process_resources(args, body)
           when :resource
             process_resource_singular(args, body)
+          when :namespace
+            process_namespace(args, body)
+          when :scope
+            process_scope(args, body)
+          when :collection
+            process_collection(body)
           end
         end
 
@@ -175,40 +181,101 @@ module Ruby2JS
         def process_custom_route(http_method, args)
           return if args.empty?
 
-          path = nil
+          raw_path = nil
           controller = nil
           action = nil
+          as_name = nil
+          on_collection = false
 
           args.each do |arg|
             case arg.type
             when :str, :sym
-              path ||= "#{base_path}/#{arg.children[0]}"
+              raw_path ||= arg.children[0].to_s
             when :hash
               arg.children.each do |pair|
                 key = pair.children[0]
                 value = pair.children[1]
+
+                # Handle hashrocket syntax: "path" => "controller#action"
+                if key.type == :str && value.type == :str
+                  raw_path ||= key.children[0].to_s
+                  ctrl, act = value.children[0].split('#')
+                  if ctrl && act
+                    controller = "#{ctrl.split('/').map { |p| p.split('_').map(&:capitalize).join }.join('::')}Controller"
+                    action = act
+                  end
+                  next
+                end
+
                 next unless key.type == :sym
 
                 case key.children[0]
                 when :to
                   if value.type == :str
                     ctrl, act = value.children[0].split('#')
-                    controller = "#{ctrl.split('_').map(&:capitalize).join}Controller"
+                    controller = "#{ctrl.split('/').map { |p| p.split('_').map(&:capitalize).join }.join('::')}Controller"
                     action = act
                   end
+                when :as
+                  as_name = value.children[0].to_s if value.type == :sym || value.type == :str
+                when :on
+                  on_collection = true if value.type == :sym && value.children[0] == :collection
                 end
               end
             end
           end
 
-          return unless path && controller && action
+          # For on: :collection, temporarily remove parent's param
+          saved_parent = nil
+          if on_collection && @rails_route_nesting.any?
+            parent = @rails_route_nesting.last
+            saved_parent = { param: parent[:param], type: parent[:type] }
+            parent[:param] = nil
+            parent[:type] = :namespace
+          end
 
-          @rails_routes_list << {
-            path: path,  # base_path already included above
-            controller: controller,
-            action: transform_action_name(action.to_sym).to_s,
-            method: http_method.to_s.upcase
-          }
+          # Build full path with nesting prefix
+          path_prefix = @rails_route_nesting.map { |n|
+            next '' unless n[:path]
+            n[:param] ? "/#{n[:path]}/:#{n[:param]}" : "/#{n[:path]}"
+          }.join
+          full_path = "#{base_path}#{path_prefix}/#{raw_path}" if raw_path
+
+          if full_path && controller && action
+            @rails_routes_list << {
+              path: full_path,
+              controller: controller,
+              action: transform_action_name(action.to_sym).to_s,
+              method: http_method.to_s.upcase
+            }
+          end
+
+          # Generate path helper if as: is specified
+          if as_name
+            helper_path = full_path || "#{base_path}#{path_prefix}"
+            # Extract dynamic segments as params
+            params = nesting_params
+            # Add any :param segments from the path itself (except nesting ones)
+            if raw_path
+              raw_path.scan(/:(\w+)/).each do |match|
+                param_name = match[0].to_sym
+                params << param_name unless params.include?(param_name)
+              end
+            end
+
+            @rails_path_helpers << {
+              name: "#{as_name}_path".to_sym,
+              path: helper_path,
+              params: params
+            }
+          end
+
+          # Restore parent's param if we saved it
+          if saved_parent
+            parent = @rails_route_nesting.last
+            parent[:param] = saved_parent[:param]
+            parent[:type] = saved_parent[:type]
+          end
         end
 
         def process_resources(args, body)
@@ -231,11 +298,20 @@ module Ruby2JS
           end
 
           # Build path prefix from nesting (base_path always prepended)
-          path_prefix = @rails_route_nesting.map { |n| "/#{n[:path]}/:#{n[:param]}" }.join
-          resource_path = "#{base_path}#{path_prefix}/#{resource_name}"
+          path_prefix = @rails_route_nesting.map { |n|
+            next '' unless n[:path]
+            n[:param] ? "/#{n[:path]}/:#{n[:param]}" : "/#{n[:path]}"
+          }.join
+
+          # Use custom path option if specified, otherwise use resource_name
+          url_segment = options[:path] || resource_name
+          resource_path = "#{base_path}#{path_prefix}/#{url_segment}"
 
           controller_name = "#{resource_name.to_s.split('_').map(&:capitalize).join}Controller"
           singular_name = Ruby2JS::Inflector.singularize(resource_name.to_s)
+
+          # Use custom param if specified
+          param_name = options[:param] ? "#{options[:param]}" : "#{singular_name}_id"
 
           # Track resource for Router.resources() generation
           resource_info = {
@@ -256,10 +332,13 @@ module Ruby2JS
           end
 
           # Generate routes for each action
+          # Use custom param in route paths if specified
+          id_segment = options[:param] ? ":#{options[:param]}" : ":id"
           RESTFUL_ROUTES.each do |route|
             next unless actions.include?(route[:action])
 
-            full_path = "#{resource_path}#{route[:path]}"
+            route_path = route[:path].sub(':id', id_segment)
+            full_path = "#{resource_path}#{route_path}"
             action_name = transform_action_name(route[:action])
 
             @rails_routes_list << {
@@ -271,13 +350,14 @@ module Ruby2JS
           end
 
           # Generate path helpers
-          generate_path_helpers(resource_name, singular_name, resource_path, actions)
+          generate_path_helpers(resource_name, singular_name, resource_path, actions, options)
 
           # Process nested resources
           if body
             @rails_route_nesting.push({
-              path: resource_name,
-              param: "#{singular_name}_id"
+              path: url_segment,
+              param: param_name,
+              type: :resource
             })
             process_routes_body(body)
             @rails_route_nesting.pop
@@ -305,7 +385,10 @@ module Ruby2JS
           end
 
           # Build path prefix from nesting (base_path always prepended)
-          path_prefix = @rails_route_nesting.map { |n| "/#{n[:path]}/:#{n[:param]}" }.join
+          path_prefix = @rails_route_nesting.map { |n|
+            next '' unless n[:path]
+            n[:param] ? "/#{n[:path]}/:#{n[:param]}" : "/#{n[:path]}"
+          }.join
           resource_path = "#{base_path}#{path_prefix}/#{resource_name}"
 
           controller_name = "#{resource_name.to_s.split('_').map(&:capitalize).join}Controller"
@@ -337,14 +420,82 @@ module Ruby2JS
           # Generate path helpers for singular resource (no :id)
           generate_singular_path_helpers(resource_name, resource_path, actions)
 
-          # Process nested resources
+          # Process nested resources — singular resource uses resource_name as param
           if body
             @rails_route_nesting.push({
               path: resource_name,
-              param: "#{resource_name}_id"
+              param: "#{resource_name}_id",
+              type: :resource
             })
             process_routes_body(body)
             @rails_route_nesting.pop
+          end
+        end
+
+        def process_namespace(args, body)
+          return if args.empty?
+          name = args[0].children[0] if args[0].type == :sym
+          return unless name
+
+          @rails_route_nesting.push({
+            path: name,
+            param: nil,
+            type: :namespace
+          })
+          process_routes_body(body) if body
+          @rails_route_nesting.pop
+        end
+
+        def process_scope(args, body)
+          # Extract options from scope args
+          as_name = nil
+          module_only = false
+
+          args.each do |arg|
+            next unless arg.type == :hash
+            arg.children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              next unless key.type == :sym
+              case key.children[0]
+              when :as
+                as_name = value.children[0] if value.type == :sym || value.type == :str
+              when :module
+                module_only = true
+              end
+            end
+          end
+
+          if as_name
+            # scope as: :name → name prefix only, no URL path change
+            @rails_route_nesting.push({ path: nil, name: as_name, param: nil, type: :namespace })
+            process_routes_body(body) if body
+            @rails_route_nesting.pop
+          elsif module_only
+            # scope module: :name → transparent for paths, just recurse
+            process_routes_body(body) if body
+          else
+            process_routes_body(body) if body
+          end
+        end
+
+        def process_collection(body)
+          return unless body
+          if @rails_route_nesting.any?
+            # Save and modify parent: no :id param, no naming prefix
+            parent = @rails_route_nesting.last
+            saved_param = parent[:param]
+            saved_type = parent[:type]
+            saved_name = parent[:name]
+            parent[:param] = nil
+            parent[:type] = :namespace
+            parent[:name] = ''  # Clear naming prefix for collection-level resources
+            process_routes_body(body)
+            parent[:param] = saved_param
+            parent[:type] = saved_type
+            parent[:name] = saved_name
+          else
+            process_routes_body(body)
           end
         end
 
@@ -364,6 +515,10 @@ module Ruby2JS
                 options[:only] = extract_action_list(value)
               when :except
                 options[:except] = extract_action_list(value)
+              when :param
+                options[:param] = value.children[0].to_s if value.type == :sym || value.type == :str
+              when :path
+                options[:path] = value.children[0].to_s if value.type == :sym || value.type == :str
               end
             end
           end
@@ -408,8 +563,11 @@ module Ruby2JS
           end
         end
 
-        def generate_path_helpers(resource_name, singular_name, resource_path, actions)
+        def generate_path_helpers(resource_name, singular_name, resource_path, actions, options = {})
           prefix = nesting_prefix
+
+          # Use custom param in path templates if specified
+          id_segment = options[:param] ? ":#{options[:param]}" : ":id"
 
           # Collection path: articles_path or board_articles_path (nested)
           if actions.include?(:index) || actions.include?(:create)
@@ -433,7 +591,7 @@ module Ruby2JS
           if actions.include?(:show) || actions.include?(:update) || actions.include?(:destroy)
             @rails_path_helpers << {
               name: "#{prefix}#{singular_name}_path".to_sym,
-              path: "#{resource_path}/:id",
+              path: "#{resource_path}/#{id_segment}",
               params: nesting_params + [singular_name.to_sym]
             }
           end
@@ -442,7 +600,7 @@ module Ruby2JS
           if actions.include?(:edit)
             @rails_path_helpers << {
               name: "edit_#{prefix}#{singular_name}_path".to_sym,
-              path: "#{resource_path}/:id/edit",
+              path: "#{resource_path}/#{id_segment}/edit",
               params: nesting_params + [singular_name.to_sym]
             }
           end
@@ -454,8 +612,8 @@ module Ruby2JS
           # Nested: column_left_position_path (singular under columns)
           prefix = nesting_prefix
 
-          # Main path: profile_path (for show/update/destroy)
-          if actions.include?(:show) || actions.include?(:update) || actions.include?(:destroy)
+          # Main path: profile_path (for show/update/destroy/create)
+          if actions.include?(:show) || actions.include?(:update) || actions.include?(:destroy) || actions.include?(:create)
             @rails_path_helpers << {
               name: "#{prefix}#{resource_name}_path".to_sym,
               path: resource_path,
@@ -483,15 +641,20 @@ module Ruby2JS
         end
 
         def nesting_params
-          @rails_route_nesting.map { |n| n[:param].sub(/_id$/, '').to_sym }
+          @rails_route_nesting.select { |n| n[:param] }.map { |n| n[:param].sub(/_id$/, '').to_sym }
         end
 
         # Build prefix for nested resource path helper names
         # e.g., for cards nested under boards, returns "board_"
+        # Namespace entries use name/path as-is (already singular), resource entries singularize
         def nesting_prefix
-          prefix = @rails_route_nesting.map { |n|
-            Ruby2JS::Inflector.singularize(n[:path].to_s)
-          }.join('_')
+          parts = @rails_route_nesting.map { |n|
+            label = (n[:name] || n[:path]).to_s
+            n[:type] == :namespace ? label : Ruby2JS::Inflector.singularize(label)
+          }
+          # Filter out empty labels (from entries with nil path and nil name)
+          parts = parts.reject { |p| p.empty? }
+          prefix = parts.join('_')
           prefix.empty? ? '' : "#{prefix}_"
         end
 
@@ -851,29 +1014,28 @@ module Ruby2JS
             # Simple static path
             path_expr = s(:str, path)
           else
-            # Path with interpolations
+            # Path with interpolations — replace each :placeholder with extract_id(param)
             parts = []
             remaining = path
+            param_index = 0
 
-            # Handle nesting params
-            params.each do |param|
-              param_pattern = ":#{param}_id"
-              if remaining.include?(param_pattern)
-                before, remaining = remaining.split(param_pattern, 2)
-                parts << s(:str, before) unless before.empty?
-                parts << s(:begin, s(:send, nil, :extract_id, s(:lvar, param)))
-              end
-            end
+            # Find all :placeholder segments and replace them with corresponding params
+            while remaining.include?(':') && param_index < params.length
+              # Find the next :placeholder
+              # Use match then indexOf(string) for JS compatibility
+              # (pre_match/post_match don't exist in JS)
+              match = remaining.match(/:(\w+)/)
+              break unless match
 
-            # Handle :id at the end (member routes)
-            if remaining.include?(':id')
-              before, after = remaining.split(':id', 2)
+              placeholder = match[0]  # e.g., ":user_id", ":id", ":token", ":code"
+              idx = remaining.index(placeholder)
+              before = remaining[0, idx]
+              after = remaining[(idx + placeholder.length)..]
+
               parts << s(:str, before) unless before.empty?
-              # Last param is the resource
-              last_param = params.last
-              parts << s(:begin, s(:send, nil, :extract_id, s(:lvar, last_param)))
-              parts << s(:str, after) unless after.empty?
-              remaining = ''
+              parts << s(:begin, s(:send, nil, :extract_id, s(:lvar, params[param_index])))
+              param_index += 1
+              remaining = after
             end
 
             parts << s(:str, remaining) unless remaining.empty?
@@ -929,15 +1091,26 @@ module Ruby2JS
             statements << build_extract_id_helper
           end
 
+          # Deduplicate path helpers by name (skip duplicates)
+          seen_names = {}
+          unique_helpers = []
+          @rails_path_helpers.each do |h|
+            name = h[:name].to_s
+            unless seen_names[name]
+              seen_names[name] = true
+              unique_helpers.push(h)
+            end
+          end
+
           # Generate path helper functions
-          @rails_path_helpers.each do |helper|
+          unique_helpers.each do |helper|
             statements << build_path_helper(helper)
           end
 
           # Export all helpers
           exports = []
-          exports << s(:const, nil, :extract_id) if @rails_path_helpers.any? { |h| h[:params].any? }
-          @rails_path_helpers.each do |helper|
+          exports << s(:const, nil, :extract_id) if unique_helpers.any? { |h| h[:params].any? }
+          unique_helpers.each do |helper|
             exports << s(:const, nil, helper[:name])
           end
           statements << s(:export, s(:array, *exports))

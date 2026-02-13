@@ -178,24 +178,23 @@ Dozens of earlier transpilation bugs were also fixed (ERB comments, nested param
 
 The initial approach scoped Fizzy to a cards-in-columns core (~34 tests). That core is now substantially working (50 tests passing including non-core tests). The strategy has shifted to **full application testing** — all 829 tests run, prioritized by root cause impact.
 
-The three highest-impact root causes account for the majority of failures:
-1. Missing route path exports in `config/paths.js` — 70+ controller test files can't even load (96 errored files total)
-2. Missing adapter methods — `update_column`, `valid?`, `delete_all`, `find_or_create_by`, etc. (~54 tests)
-3. Test helper functions — `sign_in_as`, `untenanted`, fixture shorthands (~43 tests)
-
-Fixing route path exports alone would unblock ~70 controller test files and expose the actual test-level failures in those files.
+The highest-impact root causes:
+1. ~~Missing route path exports in `config/paths.js`~~ — **DONE** (errored files dropped 96→37, 66 controller test files unblocked)
+2. `sign_in_as` + controller test infrastructure — most unblocked controller tests fail here
+3. Missing adapter methods — `update_column`, `valid?`, `delete_all`, `find_or_create_by`, etc.
+4. Test helper functions — `untenanted`, fixture shorthands, `assert_emails`
 
 ---
 
-## Current Status (Updated 2026-02-11)
+## Current Status (Updated 2026-02-13)
 
-### Overall: 47/511 tests passing, 5/188 test files fully passing
+### Overall: 51/714 tests passing, 5/188 test files fully passing
 
 | Category | Files | Tests | Notes |
 |----------|-------|-------|-------|
-| **Fully passing** | 5 | 47 | All tests in file pass |
-| **Partially failing** | 87 | 464 fail | At least one test registered; some fail |
-| **Errored** | 96 | — | File can't load (describe body throws, missing exports) |
+| **Fully passing** | 5 | 51 | All tests in file pass |
+| **Partially failing** | 146 | 663 fail | At least one test registered; some fail |
+| **Errored** | 37 | — | File can't load (missing view partials, ActiveStorage engine routes) |
 
 ### Passing Files
 
@@ -207,26 +206,26 @@ Fixing route path exports alone would unblock ~70 controller test files and expo
 | **card/messages** | 1/1 |
 | **user/configurable** | 1/1 |
 
-Plus 38 additional passing tests spread across 87 partially-failing files.
+Plus 42 additional passing tests spread across 146 partially-failing files.
 
 ### Root Causes by Impact
 
 | # | Root Cause | Failures | % | Fix Complexity |
 |---|-----------|----------|---|----------------|
-| 1 | **Missing route path exports** | ~70 files errored | 37% of files | Medium — `config/paths.js` needs route helper generation |
-| 2 | **`sign_in_as` not defined** | ~22 tests (in files that load) | ~5% | Medium — test helper + HTTP dispatch layer |
-| 3 | **Missing adapter methods** | ~54 | 11% | Medium — `update_column`, `valid?`, `delete_all`, `destroy_all`, `find_or_create_by`, `with_lock`, `maximum`, `left_outer_joins`, `exists?` |
-| 4 | **Test helper variables/functions** | ~43 | 8% | Low-Medium — `untenanted`, fixture table shorthands, `assert_emails`, `SecureRandom` |
-| 5 | **Schema/migration gaps** | ~34 | 7% | Low — missing columns (`body`, `signing_secret`, `description`, `blob_id`), NOT NULL constraints |
-| 6 | **Undefined property access** | ~30 | 6% | Varies — null associations, async/await gaps |
-| 7 | **ActiveStorage not implemented** | 24 | 5% | High — `has_one_attached`/`has_many_attached` + `.attach` |
-| 8 | **Getter-vs-method gap** | ~29 | 6% | Medium — Ruby `obj.method` → JS `obj.method` (property) instead of `obj.method()` |
-| 9 | **Null query results** | ~13 | 3% | Varies — queries returning null unexpectedly |
+| 1 | ~~**Missing route path exports**~~ | ~~~70 files errored~~ | ~~37%~~ | **DONE** — routes filter handles namespace/scope/collection/custom routes |
+| 2 | **`sign_in_as` not defined** | most controller tests | high | Medium — test helper + HTTP dispatch layer |
+| 3 | **Missing adapter methods** | ~54 | 8% | Medium — `update_column`, `valid?`, `delete_all`, `destroy_all`, `find_or_create_by`, `with_lock`, `maximum`, `left_outer_joins`, `exists?` |
+| 4 | **Test helper variables/functions** | ~43 | 6% | Low-Medium — `untenanted`, fixture table shorthands, `assert_emails`, `SecureRandom` |
+| 5 | **Schema/migration gaps** | ~34 | 5% | Low — missing columns (`body`, `signing_secret`, `description`, `blob_id`), NOT NULL constraints |
+| 6 | **Undefined property access** | ~30 | 4% | Varies — null associations, async/await gaps |
+| 7 | **ActiveStorage not implemented** | 24 | 3% | High — `has_one_attached`/`has_many_attached` + `.attach` |
+| 8 | **Getter-vs-method gap** | ~29 | 4% | Medium — Ruby `obj.method` → JS `obj.method` (property) instead of `obj.method()` |
+| 9 | **Null query results** | ~13 | 2% | Varies — queries returning null unexpectedly |
 | 10 | **Settings accessors** | 12 | 2% | Low — `store_accessor`/`settings` concern methods |
-| 11 | **`validates_uniqueness_of`** | 9 | 2% | Medium — needs DB-backed uniqueness check |
-| 12 | **`attribute_present?`** | 9 | 2% | Low — simple method on ActiveRecord |
-| 13 | **Expected errors not thrown** | 8 | 2% | Medium — validation implementations |
-| 14 | **Other** (assertion mismatches, transpilation bugs) | ~40 | 8% | Varies |
+| 11 | **`validates_uniqueness_of`** | 9 | 1% | Medium — needs DB-backed uniqueness check |
+| 12 | **`attribute_present?`** | 9 | 1% | Low — simple method on ActiveRecord |
+| 13 | **Expected errors not thrown** | 8 | 1% | Medium — validation implementations |
+| 14 | **Other** (assertion mismatches, transpilation bugs) | ~40 | 6% | Varies |
 
 ### What's Been Done (completed priorities from previous plan)
 
@@ -242,6 +241,7 @@ Plus 38 additional passing tests spread across 87 partially-failing files.
 - [x] **Lightweight test runner** — Node-native vitest-compatible runner (bypasses Vite OOM)
 - [x] **Deferred concern mixing** — `_mixConcerns()` pattern avoids circular dependency TDZ errors
 - [x] **Accurate test counting** — errored files no longer inflate pass count
+- [x] **Route path exports** — routes filter handles namespace/scope/collection/custom routes; 276 path helpers generated (errored files 96→37)
 
 ---
 
@@ -408,13 +408,13 @@ bundle exec rake -f test/Rakefile fizzy_test
 
 The `fizzy` task handles the entire pipeline reliably:
 
-1. **Builds selfhost** — transpiles ruby2js to JS, copies `ruby2js.js` to both packages
-2. **Ejects Fizzy** — runs `cli.mjs eject -d sqlite` in the Fizzy directory
-3. **Installs npm deps** — `npm install` in ejected/
-4. **Symlinks dev packages** — replaces installed `ruby2js` and `ruby2js-rails` in `node_modules/` with symlinks to the local package directories
+1. **Builds selfhost** — transpiles ruby2js to JS, copies `ruby2js.js` to packages
+2. **Symlinks dev packages for eject** — replaces `ruby2js` and `ruby2js-rails` in `fizzy/node_modules/` with symlinks to dev source (`demo/selfhost/` and `packages/ruby2js-rails/`), so the eject command uses current filters
+3. **Ejects Fizzy** — runs `cli.mjs eject -d sqlite` in the Fizzy directory
+4. **Installs npm deps + symlinks** — `npm install` in ejected/, then replaces installed packages with symlinks to dev source
 5. **Runs tests** — lightweight Node-native runner, each file in its own process (per-file timeout)
 
-The symlink step is critical: it ensures the ejected app always uses the current dev source for adapters, runtime, and the transpiler bundle. Without it, `npm install` fetches published (stale) versions from tarballs.
+The pre-eject symlink (step 2) is critical: `cli.mjs` loads filters via `import 'ruby2js/filters/rails/routes.js'` from `fizzy/node_modules/ruby2js`. Without the symlink, eject uses the published (stale) filter, not the dev version. The post-eject symlink (step 4) ensures tests resolve runtime adapters from dev source.
 
 Set `FIZZY_DIR` if Fizzy is not at `~/git/fizzy`:
 ```bash
@@ -429,21 +429,26 @@ If you need to run individual steps:
 # 1. Build selfhost (after changing filters/converters/model.rb)
 bundle exec rake -f demo/selfhost/Rakefile local
 
-# 2. Eject
+# 2. Symlink dev packages in fizzy/ (so eject uses current filters)
 cd /path/to/fizzy
+rm -rf node_modules/ruby2js node_modules/ruby2js-rails
+ln -s /path/to/ruby2js/demo/selfhost node_modules/ruby2js
+ln -s /path/to/ruby2js/packages/ruby2js-rails node_modules/ruby2js-rails
+
+# 3. Eject
 node /path/to/ruby2js/packages/ruby2js-rails/cli.mjs eject -d sqlite
 
-# 3. Install deps + symlink (in ejected/)
+# 4. Install deps + symlink (in ejected/)
 cd ejected
 npm install
 rm -rf node_modules/ruby2js node_modules/ruby2js-rails
-ln -s /path/to/ruby2js/packages/ruby2js node_modules/ruby2js
+ln -s /path/to/ruby2js/demo/selfhost node_modules/ruby2js
 ln -s /path/to/ruby2js/packages/ruby2js-rails node_modules/ruby2js-rails
 
-# 4. Run a single test file
+# 5. Run a single test file
 node --import ./test/register-loader.mjs test/runner.mjs test/models/card/pinnable.test.mjs
 
-# 4b. Run all tests via Rakefile (from ruby2js root)
+# 5b. Run all tests via Rakefile (from ruby2js root)
 bundle exec rake -f test/Rakefile fizzy_test
 ```
 
@@ -562,16 +567,11 @@ Key insights from the transpilation effort:
 
 ## Next Steps: Prioritized by Impact
 
-### Priority 1: Route Path Exports (~70 errored controller test files)
+### ~~Priority 1: Route Path Exports~~ — DONE
 
-The single highest-impact fix. Nearly all controller tests error at import time because `config/paths.js` doesn't export the needed route helper functions (e.g., `board_column_path`, `card_comments_path`).
+Routes filter now handles `namespace`, `scope` (with `as:` and `module:` options), `collection`, custom routes with `as:`, and `param:` option on resources. Generates 276 deduplicated path helpers from Fizzy's routes (up from 48). Errored test files dropped from 96 to 37; 66 controller test files unblocked.
 
-**Approach:**
-- Generate route path functions from `config/routes.rb` during eject
-- Each function takes an object/ID and returns a URL path string
-- Populate `config/paths.js` with all named route helpers
-
-**Complexity:** Medium — route DSL parsing exists in the routes filter; need to generate JS path helper functions from it.
+Key fixes: `pre_match`/`post_match` → `indexOf`+`slice` (Ruby MatchData methods don't exist in JS), `hash.values` → explicit iteration (doesn't transpile to JS), duplicate path deduplication.
 
 ### Priority 2: `sign_in_as` + Controller Test Infrastructure
 
@@ -640,14 +640,14 @@ Multiple smaller issues:
 
 ## Milestones
 
-### Milestone 1: 100 tests (~53 more)
+### ~~Milestone 2: Controller tests load~~ — DONE
+Route path exports fixed. Errored files dropped from 96→37. 714 tests now discoverable (up from 511).
+
+### Milestone 1: 100 tests (~49 more)
 Focus on Priorities 3-5 (adapter methods, schema gaps, getter-vs-method). These are model-test focused and don't require controller infrastructure.
 
-### Milestone 2: Controller tests load (~70 errored files unblocked)
-Requires Priority 1 (route path exports). Currently 96 files error at import time; fixing route paths unblocks ~70 of them and reveals the real test-level failures.
-
 ### Milestone 3: 200+ tests
-Requires Priority 2 (`sign_in_as` + controller test dispatch). Once controller tests can load, `sign_in_as` and HTTP dispatch are needed to actually run them.
+Requires Priority 2 (`sign_in_as` + controller test dispatch). Controller tests now load but fail on missing `sign_in_as` and HTTP dispatch.
 
 ### Milestone 4: Infrastructure Adapters
 ActionText, ActiveStorage, ActionMailer — feature-specific, not blocking core tests.

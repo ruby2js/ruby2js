@@ -235,7 +235,7 @@ end
 # ============================================
 
 FIZZY_DIR = ENV['FIZZY_DIR'] || File.expand_path('~/git/fizzy')
-RUBY2JS_PKG = File.join(ROOT, 'packages/ruby2js')
+RUBY2JS_PKG = File.join(ROOT, 'demo/selfhost')
 RUBY2JS_RAILS_PKG = File.join(ROOT, 'packages/ruby2js-rails')
 
 desc "Build selfhost, eject Fizzy, and run tests"
@@ -252,7 +252,19 @@ task :fizzy, [:timeout] do |t, args|
     sh 'bundle exec rake -f demo/selfhost/Rakefile local'
   end
 
-  # 2. Eject
+  # 2. Symlink dev packages in fizzy/node_modules/ so eject uses current source
+  puts "\n=== Symlinking dev packages for eject ==="
+  fizzy_nm = File.join(FIZZY_DIR, 'node_modules')
+  if File.directory?(fizzy_nm)
+    FileUtils.rm_rf(File.join(fizzy_nm, 'ruby2js'))
+    FileUtils.rm_rf(File.join(fizzy_nm, 'ruby2js-rails'))
+    FileUtils.ln_s(RUBY2JS_PKG, File.join(fizzy_nm, 'ruby2js'))
+    FileUtils.ln_s(RUBY2JS_RAILS_PKG, File.join(fizzy_nm, 'ruby2js-rails'))
+    puts "  Symlinked ruby2js → #{RUBY2JS_PKG}"
+    puts "  Symlinked ruby2js-rails → #{RUBY2JS_RAILS_PKG}"
+  end
+
+  # 3. Eject
   puts "\n=== Ejecting Fizzy ==="
   cli = File.join(RUBY2JS_RAILS_PKG, 'cli.mjs')
   Dir.chdir(FIZZY_DIR) do
@@ -261,7 +273,7 @@ task :fizzy, [:timeout] do |t, args|
 
   ejected = File.join(FIZZY_DIR, 'ejected')
 
-  # 3. Install npm deps (vitest, etc.) then symlink dev packages
+  # 4. Install npm deps (vitest, etc.) then symlink dev packages in ejected/
   puts "\n=== Setting up node_modules ==="
   Dir.chdir(ejected) do
     sh 'npm install 2>&1'
@@ -275,7 +287,7 @@ task :fizzy, [:timeout] do |t, args|
     puts "  Symlinked ruby2js-rails → #{RUBY2JS_RAILS_PKG}"
   end
 
-  # 4. Run tests
+  # 5. Run tests
   puts "\n=== Running tests ==="
   Rake::Task[:fizzy_test].invoke(timeout)
 end
