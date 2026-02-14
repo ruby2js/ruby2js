@@ -2223,56 +2223,62 @@ async function runEject(options) {
     console.log('  Transforming views...');
     const resources = findViewResources(APP_ROOT);
 
-    for (const resource of resources) {
-      const resourceDir = join(viewsDir, resource);
-      const outResourceDir = join(outDir, 'app/views', resource);
-      if (!existsSync(outResourceDir)) {
-        mkdirSync(outResourceDir, { recursive: true });
-      }
-
-      const files = readdirSync(resourceDir);
-
-      // Transform ERB files
-      const erbFiles = files
-        .filter(f => f.endsWith('.html.erb') && !f.startsWith('._'))
-        .filter(f => shouldInclude(`app/views/${resource}/${f}`));
-
-      for (const file of erbFiles) {
-        const relativePath = `app/views/${resource}/${file}`;
-        try {
-          const source = readFileSync(join(resourceDir, file), 'utf-8');
-          const result = await transformErb(source, join(resourceDir, file), false, config);
-          // Pass relative output path for correct import resolution
-          const relativeOutPath = `app/views/${resource}/${file.replace('.html.erb', '.js')}`;
-          let code = fixImportsForEject(result.code, relativeOutPath, config);
-          const outFile = join(outResourceDir, file.replace('.html.erb', '.js'));
-          writeFileSync(outFile, code);
-          fileCount++;
-        } catch (err) {
-          errors.push({ file: relativePath, error: err.message, stack: err.stack });
-          console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+    // Recursively collect view files from a resource directory
+    function collectViewFiles(dir, base) {
+      const entries = readdirSync(dir, { withFileTypes: true });
+      let result = [];
+      for (const entry of entries) {
+        if (entry.name.startsWith('.') || entry.name.startsWith('._')) continue;
+        const relPath = base ? `${base}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+          result = result.concat(collectViewFiles(join(dir, entry.name), relPath));
+        } else if (entry.name.endsWith('.html.erb') || entry.name.endsWith('.jsx.rb')) {
+          result.push(relPath);
         }
       }
+      return result;
+    }
 
-      // Transform JSX.rb files
-      const jsxFiles = files
-        .filter(f => f.endsWith('.jsx.rb') && !f.startsWith('._'))
-        .filter(f => shouldInclude(`app/views/${resource}/${f}`));
+    for (const resource of resources) {
+      const resourceDir = join(viewsDir, resource);
+      const viewFiles = collectViewFiles(resourceDir, '');
 
-      for (const file of jsxFiles) {
-        const relativePath = `app/views/${resource}/${file}`;
-        try {
-          const source = readFileSync(join(resourceDir, file), 'utf-8');
-          const result = await transformJsxRb(source, join(resourceDir, file), config);
-          // Pass relative output path for correct import resolution
-          const relativeOutPath = `app/views/${resource}/${file.replace('.jsx.rb', '.js')}`;
-          let code = fixImportsForEject(result.code, relativeOutPath, config);
-          const outFile = join(outResourceDir, file.replace('.jsx.rb', '.js'));
-          writeFileSync(outFile, code);
-          fileCount++;
-        } catch (err) {
-          errors.push({ file: relativePath, error: err.message, stack: err.stack });
-          console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+      for (const relFile of viewFiles) {
+        const fullPath = join(resourceDir, relFile);
+        const relativePath = `app/views/${resource}/${relFile}`;
+        if (!shouldInclude(relativePath)) continue;
+
+        const outFileDir = join(outDir, 'app/views', resource, relFile, '..');
+        if (!existsSync(outFileDir)) {
+          mkdirSync(outFileDir, { recursive: true });
+        }
+
+        if (relFile.endsWith('.html.erb')) {
+          try {
+            const source = readFileSync(fullPath, 'utf-8');
+            const result = await transformErb(source, fullPath, false, config);
+            const relativeOutPath = `app/views/${resource}/${relFile.replace('.html.erb', '.js')}`;
+            let code = fixImportsForEject(result.code, relativeOutPath, config);
+            const outFile = join(outDir, 'app/views', resource, relFile.replace('.html.erb', '.js'));
+            writeFileSync(outFile, code);
+            fileCount++;
+          } catch (err) {
+            errors.push({ file: relativePath, error: err.message, stack: err.stack });
+            console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+          }
+        } else if (relFile.endsWith('.jsx.rb')) {
+          try {
+            const source = readFileSync(fullPath, 'utf-8');
+            const result = await transformJsxRb(source, fullPath, config);
+            const relativeOutPath = `app/views/${resource}/${relFile.replace('.jsx.rb', '.js')}`;
+            let code = fixImportsForEject(result.code, relativeOutPath, config);
+            const outFile = join(outDir, 'app/views', resource, relFile.replace('.jsx.rb', '.js'));
+            writeFileSync(outFile, code);
+            fileCount++;
+          } catch (err) {
+            errors.push({ file: relativePath, error: err.message, stack: err.stack });
+            console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+          }
         }
       }
     }
