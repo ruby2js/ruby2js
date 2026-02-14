@@ -713,6 +713,145 @@ function buildFixturePlan(rubySource, fixtures, associationMap) {
 }
 
 /**
+ * Post-process a transpiled Ruby module into individual named exports.
+ * The Ruby module converter produces `const ModuleName = { method1(...) {...}, ... }`.
+ * This extracts each method as `export async function methodName(...) { ... }`.
+ * Also adds `import { fixtures }` when the code references `fixtures`.
+ *
+ * @param {string} code - Transpiled JavaScript from a Ruby module
+ * @param {string[]} modelNames - Known AR model class names (for async detection)
+ * @returns {{ code: string, exports: string[] }} - Processed code and list of exported names
+ */
+function postProcessTestHelper(code, modelNames = []) {
+  const exportedNames = [];
+
+  // Match: [export] const ModuleName = { ... }  (the entire object literal)
+  const moduleMatch = code.match(/^(?:export\s+)?const \w+ = \{([\s\S]*)\}\s*$/);
+  if (!moduleMatch) {
+    // Not a module object literal — return as-is
+    return { code, exports: exportedNames };
+  }
+
+  const body = moduleMatch[1];
+
+  // Build regex for AR model calls that need await
+  const arMethods = ['findBy', 'find', 'create', 'update', 'destroy', 'where',
+    'all', 'first', 'last', 'count', 'deleteAll', 'destroyAll', 'findOrCreateBy',
+    'save', 'reload', 'order', 'limit', 'pluck', 'exists'];
+  const modelPattern = modelNames.length > 0
+    ? new RegExp(`(?:(?:${modelNames.join('|')})\\.(?:${arMethods.join('|')})\\b|(?:await\\s))`)
+    : /await\s/;
+
+  // Parse methods from the object literal body.
+  // Methods appear as: methodName(...) { ... },  or  get methodName(...) { ... },
+  // We use a brace-balanced parser to extract each method.
+  const functions = [];
+  let i = 0;
+  while (i < body.length) {
+    // Skip whitespace and commas
+    while (i < body.length && /[\s,]/.test(body[i])) i++;
+    if (i >= body.length) break;
+
+    // Match method signature: optional "get " prefix, name, params
+    const sigMatch = body.slice(i).match(/^(?:get\s+)?(\w+)\(([^)]*)\)\s*\{/);
+    if (!sigMatch) {
+      // Skip unrecognized content
+      i++;
+      continue;
+    }
+
+    const methodName = sigMatch[1];
+    let params = sigMatch[2];
+    const braceStart = i + sigMatch[0].length - 1;
+
+    // Find matching close brace
+    let depth = 0;
+    let end = -1;
+    for (let j = braceStart; j < body.length; j++) {
+      if (body[j] === '{') depth++;
+      else if (body[j] === '}') {
+        depth--;
+        if (depth === 0) { end = j; break; }
+      }
+    }
+    if (end === -1) break;
+
+    let methodBody = body.slice(braceStart + 1, end);
+
+    // Remove _implicitBlockYield from params — convert to fn callback param
+    const hasYield = params.includes('_implicitBlockYield');
+    if (hasYield) {
+      params = params.replace(/,?\s*_implicitBlockYield\s*=\s*null/, '').trim();
+      if (params.length > 0 && !params.endsWith(',')) {
+        params += ', fn';
+      } else {
+        params += params.length > 0 ? ' fn' : 'fn';
+      }
+      // Replace _implicitBlockYield() calls with fn()
+      methodBody = methodBody.replace(/_implicitBlockYield\(\)/g, 'fn()');
+    }
+
+    // Clean up: remove leading `return` on last statement if it's an assignment
+    methodBody = methodBody.replace(/\n(\s*)return (Current\.\w+ = )/, '\n$1$2');
+
+    functions.push({ name: methodName, params, body: methodBody });
+    exportedNames.push(methodName);
+
+    i = end + 1;
+  }
+
+  if (functions.length === 0) {
+    return { code, exports: exportedNames };
+  }
+
+  // Build set of method names for this.X() → X() rewriting
+  const methodNames = new Set(functions.map(f => f.name));
+
+  // First pass: determine which methods need async (AR calls or await)
+  const asyncMethods = new Set();
+  for (const fn of functions) {
+    if (modelPattern.test(fn.body)) asyncMethods.add(fn.name);
+  }
+
+  // Rewrite this.X(...) → X(...) or await X(...), and propagate async
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const fn of functions) {
+      const rewritten = fn.body.replace(
+        /\bthis\.(\w+)\(/g,
+        (match, name) => {
+          if (!methodNames.has(name)) return match;
+          return asyncMethods.has(name) ? `await ${name}(` : `${name}(`;
+        }
+      );
+      if (rewritten !== fn.body) {
+        fn.body = rewritten;
+        // If we added an await, this method needs to be async too
+        if (/\bawait\s/.test(fn.body) && !asyncMethods.has(fn.name)) {
+          asyncMethods.add(fn.name);
+          changed = true; // propagate: another method calling this one may need async
+        }
+      }
+    }
+  }
+
+  // Build output: fixtures import (if referenced) + functions
+  const lines = [];
+  if (code.includes('fixtures[') || code.includes('fixtures.')) {
+    lines.push("import { fixtures } from '../fixtures.mjs';");
+    lines.push('');
+  }
+  lines.push(functions.map(fn => {
+    const asyncPrefix = asyncMethods.has(fn.name) ? 'async ' : '';
+    return `export ${asyncPrefix}function ${fn.name}(${fn.params}) {${fn.body}}`;
+  }).join('\n\n'));
+  lines.push('');
+
+  return { code: lines.join('\n'), exports: exportedNames };
+}
+
+/**
  * Build a universal replacements map from ALL fixtures (not per-file).
  * Returns { "accounts:37s": "accounts_37s", "cards:logo": "cards_logo", ... }
  */
@@ -2274,6 +2413,7 @@ async function runEject(options) {
   // Copy and transform test files
   const testDir = join(APP_ROOT, 'test');
   let hasFixtures = false;
+  let helperExports = []; // [{ file: 'session_test_helper.mjs', exports: ['signInAs', ...] }]
   if (existsSync(testDir)) {
     // Copy .mjs and .js test files with import fixes
     const testFiles = readdirSync(testDir)
@@ -2321,6 +2461,43 @@ async function runEject(options) {
       metadata.fixture_plan = { replacements: buildUniversalReplacementsMap(fixtures) };
     } else {
       metadata.fixture_plan = null;
+    }
+
+    // Transpile Ruby test helper files (test/test_helpers/*.rb → .mjs)
+    const testHelpersDir = join(testDir, 'test_helpers');
+    if (existsSync(testHelpersDir)) {
+      const helperFiles = readdirSync(testHelpersDir)
+        .filter(f => f.endsWith('.rb') && !f.startsWith('._'));
+
+      if (helperFiles.length > 0) {
+        console.log('  Transpiling test helpers...');
+        const outHelpersDir = join(outDir, 'test/test_helpers');
+        if (!existsSync(outHelpersDir)) {
+          mkdirSync(outHelpersDir, { recursive: true });
+        }
+
+        // Collect known model names for async detection
+        const modelNames = Object.keys(metadata.models || {});
+
+        for (const file of helperFiles) {
+          const relativePath = `test/test_helpers/${file}`;
+          const outName = file.replace(/\.rb$/, '.mjs');
+          try {
+            const source = readFileSync(join(testHelpersDir, file), 'utf-8');
+            const result = await transformRuby(source, join(testHelpersDir, file), null, config, APP_ROOT, metadata);
+            const { code, exports: exportNames } = postProcessTestHelper(result.code, modelNames);
+
+            if (exportNames.length > 0) {
+              writeFileSync(join(outHelpersDir, outName), code);
+              helperExports.push({ file: outName, exports: exportNames });
+              fileCount++;
+            }
+          } catch (err) {
+            errors.push({ file: relativePath, error: err.message, stack: err.stack });
+            console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+          }
+        }
+      }
     }
 
     // Transpile Ruby model test files
@@ -2423,7 +2600,7 @@ async function runEject(options) {
   if (!existsSync(outTestDir)) {
     mkdirSync(outTestDir, { recursive: true });
   }
-  writeFileSync(join(outTestDir, 'setup.mjs'), generateTestSetupForEject({ ...config, hasFixtures }));
+  writeFileSync(join(outTestDir, 'setup.mjs'), generateTestSetupForEject({ ...config, hasFixtures, helpers: helperExports }));
   fileCount++;
   writeFileSync(join(outTestDir, 'globals.mjs'), generateTestGlobalsForEject());
   fileCount++;

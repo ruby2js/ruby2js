@@ -1162,8 +1162,20 @@ export function generateTestSetupForEject(config = {}) {
   const fixtureImport = config.hasFixtures ? `\nimport { loadFixtures } from './fixtures.mjs';` : '';
   const fixtureLoad = config.hasFixtures ? `\n  await loadFixtures();` : '';
 
+  // Generate imports and globalThis assignments for test helpers
+  const helpers = config.helpers || [];
+  const helperImports = helpers.map(h =>
+    `import { ${h.exports.join(', ')} } from './test_helpers/${h.file}';`
+  ).join('\n');
+  const helperGlobals = helpers.flatMap(h =>
+    h.exports.map(name => `globalThis.${name} = ${name};`)
+  ).join('\n');
+  const helperSection = helpers.length > 0
+    ? `\n${helperImports}\n\n// Make test helpers globally available (like Rails includes)\n${helperGlobals}\n`
+    : '';
+
   return `// Test setup for Vitest - ejected version
-import { beforeAll, beforeEach, afterEach, expect } from 'vitest';${fixtureImport}
+import { beforeAll, beforeEach, afterEach, expect } from 'vitest';${fixtureImport}${helperSection}
 
 // Compare ActiveRecord model instances by class and id (like Rails)
 expect.addEqualityTesters([
