@@ -165,6 +165,15 @@ module Ruby2JS
             return s(:hide)
           end
 
+          # Strip include SomeHelper (meaningless in ejected JS tests)
+          if target.nil? && method == :include && args.length == 1 &&
+             args.first.type == :const
+            import_mode = @options[:metadata] && @options[:metadata]['import_mode']
+            if import_mode == 'eject'
+              return s(:hide)
+            end
+          end
+
           # Only transform assertions inside test describe blocks
           if @rails_test_describe_depth > 0
             # Integration test specific transforms
@@ -537,6 +546,13 @@ module Ruby2JS
               imports.push(s(:import, [prefix + 'config/paths.js'], helper_consts))
             end
 
+            # Fixture import: import { fixtures } from '../../../test/fixtures.mjs'
+            plan = meta['fixture_plan']
+            if plan && plan['replacements']
+              imports.push(s(:import, [prefix + 'test/fixtures.mjs'],
+                [s(:const, nil, :fixtures)]))
+            end
+
           elsif import_mode == 'virtual'
             # Virtual mode: import from virtual modules
             if @rails_test_models.length > 0
@@ -578,10 +594,14 @@ module Ruby2JS
         end
 
         # Build AST nodes for global Current attribute assignments from metadata.
-        # Returns nodes like: Current.account = _fixtures.accounts_37s
+        # Returns nodes like: Current.account = fixtures.accounts_37s (eject)
+        # or Current.account = _fixtures.accounts_37s (virtual)
         def build_global_current_nodes
           attrs = @options[:metadata] && @options[:metadata]['current_attributes']
           return [] unless attrs
+
+          import_mode = @options[:metadata] && @options[:metadata]['import_mode']
+          fixture_var = (import_mode == 'eject') ? :fixtures : :_fixtures
 
           nodes = []
           attrs.each do |attr_entry|
@@ -589,11 +609,11 @@ module Ruby2JS
             table = attr_entry['table']
             fixture = attr_entry['fixture']
 
-            # Build _fixtures.table_fixture reference
+            # Build fixtures.table_fixture reference
             var_name = "#{table}_#{fixture}"
-            fixture_ref = s(:attr, s(:lvar, :_fixtures), var_name.to_sym)
+            fixture_ref = s(:attr, s(:lvar, fixture_var), var_name.to_sym)
 
-            # Current.attr = _fixtures.table_fixture
+            # Current.attr = fixtures.table_fixture
             nodes.push(s(:send, s(:const, nil, :Current), :"#{attr_name}=", fixture_ref))
           end
 
@@ -616,7 +636,11 @@ module Ruby2JS
 
         # Build a standalone beforeEach for global Current attributes.
         # Used when no setup block handles Current assignments.
+        # Returns nil in eject mode (Current setup is in shared fixtures module).
         def build_current_standalone_before_each
+          import_mode = @options[:metadata] && @options[:metadata]['import_mode']
+          return nil if import_mode == 'eject'
+
           attrs = @options[:metadata] && @options[:metadata]['current_attributes']
           return nil unless attrs && attrs.length > 0
 
@@ -630,9 +654,17 @@ module Ruby2JS
         end
 
         # Build fixture setup nodes (let _fixtures = {} and beforeEach block)
-        # from the pre-computed fixture plan in metadata
+        # from the pre-computed fixture plan in metadata.
+        # In eject mode: returns empty (import is added at top level via build_test_imports).
+        # In virtual mode: generates let _fixtures = {} + beforeEach setupCode.
         def build_fixture_nodes
           plan = @options[:metadata] && @options[:metadata]['fixture_plan']
+          import_mode = @options[:metadata] && @options[:metadata]['import_mode']
+
+          # Eject mode: fixture import goes at top level (build_test_imports), not inside describe
+          return [] if import_mode == 'eject'
+
+          # Virtual/dev mode: existing per-file fixture setup
           return [] unless plan && plan['setupCode']
 
           # Add fixture model names to @rails_test_models for import generation
@@ -654,13 +686,16 @@ module Ruby2JS
         end
 
         # Pre-resolve fixture references in the AST tree before wrap_ar_operations.
-        # This ensures fixture refs like cards(:logo) become _fixtures.cards_logo
-        # (:attr nodes) so that AR wrapping can detect .reload/.save chains on them.
+        # This ensures fixture refs like cards(:logo) become fixtures.cards_logo (eject)
+        # or _fixtures.cards_logo (virtual) so AR wrapping can detect .reload/.save chains.
         def resolve_fixture_refs_in_tree(node)
           return node unless node.respond_to?(:type)
 
           plan = @options[:metadata] && @options[:metadata]['fixture_plan']
           return node unless plan && plan['replacements']
+
+          import_mode = @options[:metadata] && @options[:metadata]['import_mode']
+          fixture_var = (import_mode == 'eject') ? :fixtures : :_fixtures
 
           # Check if this node is a fixture ref: s(:send, nil, :cards, s(:sym, :logo))
           # Also handles string args: s(:send, nil, :accounts, s(:str, "37s"))
@@ -674,7 +709,7 @@ module Ruby2JS
               lookup = method_name + ':' + fixture_key
               var_name = plan['replacements'][lookup]
               if var_name
-                return s(:attr, s(:lvar, :_fixtures), var_name.to_sym)
+                return s(:attr, s(:lvar, fixture_var), var_name.to_sym)
               end
             end
           end

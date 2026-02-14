@@ -1159,8 +1159,11 @@ export function generateTestSetupForEject(config = {}) {
   }
   const railsModule = `ruby2js-rails/targets/${target}/rails.js`;
 
+  const fixtureImport = config.hasFixtures ? `\nimport { loadFixtures } from './fixtures.mjs';` : '';
+  const fixtureLoad = config.hasFixtures ? `\n  await loadFixtures();` : '';
+
   return `// Test setup for Vitest - ejected version
-import { beforeAll, beforeEach, afterEach, expect } from 'vitest';
+import { beforeAll, beforeEach, afterEach, expect } from 'vitest';${fixtureImport}
 
 // Compare ActiveRecord model instances by class and id (like Rails)
 expect.addEqualityTesters([
@@ -1228,7 +1231,7 @@ beforeAll(async () => {
 // so fixture data from beforeEach is cleaned up automatically (like Rails)
 beforeEach(async () => {
   const activeRecord = await import('ruby2js-rails/adapters/${adapterFile}');
-  activeRecord.beginTransaction();
+  activeRecord.beginTransaction();${fixtureLoad}
 });
 
 afterEach(async () => {
