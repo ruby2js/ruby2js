@@ -159,8 +159,14 @@ module Ruby2JS
 
           ctrl_name = @rails_controller_const.to_s
           if @options[:file]
-            basename = File.basename(@options[:file]).sub(/\.rb$/, '.js')
-            meta['controller_files'][ctrl_name] = basename
+            file_path = @options[:file].to_s
+            # Extract path relative to app/controllers/ for nested controllers
+            if file_path.include?('app/controllers/')
+              relative = file_path.split('app/controllers/').last
+            else
+              relative = File.basename(file_path)
+            end
+            meta['controller_files'][ctrl_name] = relative.sub(/\.rb$/, '.js')
           end
         end
 

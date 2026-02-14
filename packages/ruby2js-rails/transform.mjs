@@ -745,6 +745,47 @@ export function fixImportsForEject(js, fromFile, config = {}) {
     }
   }
 
+  // For controller files, fix concern imports BEFORE depth adjustment.
+  // The controller filter generates ALL includes as ../models/xxx.js, but controller concerns
+  // live in ./concerns/xxx.js. Fix this first so depth adjustment applies correctly.
+  if (fromFile && fromFile.startsWith('app/controllers/')) {
+    const controllerConcerns = config.controllerConcerns;
+    const concernFallbackPatterns = ['scoped', 'authentication', 'authorization'];
+    js = js.replace(/from ['"]\.\.\/models\/([\w]+)\.js['"]/g, (match, name) => {
+      if (controllerConcerns) {
+        // Exact match against known controller concern files
+        if (controllerConcerns.has(name)) {
+          return `from './concerns/${name}.js'`;
+        }
+      } else {
+        // Fallback to pattern matching when concern list unavailable (e.g., dev mode)
+        const isLikelyConcern = concernFallbackPatterns.some(p => name.toLowerCase().includes(p));
+        if (isLikelyConcern) {
+          return `from './concerns/${name}.js'`;
+        }
+      }
+      return match;
+    });
+
+    // For nested controller files (in subdirectories), adjust relative imports.
+    // The controller filter generates paths relative to app/controllers/, but nested files
+    // (e.g., cards/closures_controller.js) are in subdirs.
+    // ./concerns/card_scoped.js → ../concerns/card_scoped.js (one level)
+    // ../models/current.js → ../../models/current.js (one level)
+    // ../views/foo.js → ../../views/foo.js (one level)
+    const ctrlRelPath = fromFile.replace('app/controllers/', '');
+    const depth = ctrlRelPath.split('/').length - 1; // 0 for top-level, 1 for cards/x.js, etc.
+    if (depth > 0) {
+      const prefix = '../'.repeat(depth);
+      // Adjust any ../ relative imports by prepending depth prefix.
+      // Handles ../models/*, ../../config/*, etc. — any number of ../ levels.
+      js = js.replace(/from ['"]((?:\.\.\/)+)([\w/]+\.(?:js|mjs))['"]/g,
+        (match, dots, path) => `from '${prefix}${dots}${path}'`);
+      // Adjust ./ relative imports (e.g., ./concerns/*)
+      js = js.replace(/from ['"]\.\/([\w/]+\.(?:js|mjs))['"]/g, `from '${prefix}$1'`);
+    }
+  }
+
   // Add missing superclass imports for nested model files.
   // When ESM autoexport unnests a namespaced class (e.g., Account::Export < Export),
   // the model filter may not generate an import for the superclass if it doesn't recognize
@@ -934,18 +975,7 @@ export function fixImportsForEject(js, fromFile, config = {}) {
       });
     }
   }
-  // Controller concerns: redirect from ../models/board_scoped.js to ./concerns/board_scoped.js
-  // The controller filter generates proper snake_case names (BoardScoped -> board_scoped)
-  const concernPatterns = ['scoped', 'authentication', 'authorization'];
-  js = js.replace(/from ['"]\.\.\/models\/([\w/]+)\.js['"]/g, (match, name) => {
-    // Nested paths (containing /) are real model imports, not concerns
-    if (name.includes('/')) return match;
-    const isLikelyConcern = concernPatterns.some(pattern => name.toLowerCase().includes(pattern));
-    if (isLikelyConcern) {
-      return `from './concerns/${name}.js'`;
-    }
-    return match;
-  });
+  // Controller concern fix is now handled inside the controller block above (before depth adjustment)
 
   // Path helper → ruby2js-rails package
   js = js.replace(/from ['"]ruby2js-rails\/path_helper\.mjs['"]/g, "from 'ruby2js-rails/path_helper.mjs'");

@@ -2182,7 +2182,8 @@ async function runEject(options) {
         database: config.database,
         target: config.target,
         paths_only: true,  // Generate only path helpers
-        base: config.base || '/'
+        base: config.base || '/',
+        metadata
       };
       const pathsResult = convert(source, pathsOptions);
       let pathsCode = pathsResult.toString();
@@ -2203,7 +2204,8 @@ async function runEject(options) {
         database: config.database,
         target: config.target,
         paths_file: './paths.js',  // Import path helpers from paths.js
-        base: config.base || '/'
+        base: config.base || '/',
+        metadata
       };
       const routesResult = convert(source, routesOptions);
       let routesCode = fixImportsForEject(routesResult.toString(), 'config/routes.js', config);
@@ -2353,8 +2355,15 @@ async function runEject(options) {
   // Transform Rails controllers
   const appControllersDir = join(APP_ROOT, 'app/controllers');
   if (existsSync(appControllersDir)) {
-    const controllerFiles = readdirSync(appControllersDir)
-      .filter(f => f.endsWith('.rb') && !f.startsWith('._'))
+    // Collect controller concern names for import resolution
+    const ctrlConcernsDir = join(appControllersDir, 'concerns');
+    if (existsSync(ctrlConcernsDir)) {
+      config.controllerConcerns = new Set(
+        findRubyModelFiles(ctrlConcernsDir).map(f => f.replace(/\.rb$/, ''))
+      );
+    }
+
+    const controllerFiles = findRubyModelFiles(appControllersDir)
       .filter(f => shouldInclude(`app/controllers/${f}`));
 
     if (controllerFiles.length > 0) {
@@ -2368,6 +2377,10 @@ async function runEject(options) {
           const relativeOutPath = `app/controllers/${file.replace('.rb', '.js')}`;
           let code = fixImportsForEject(result.code, relativeOutPath, config);
           const outFile = join(outDir, 'app/controllers', file.replace('.rb', '.js'));
+          const outParentDir = dirname(outFile);
+          if (!existsSync(outParentDir)) {
+            mkdirSync(outParentDir, { recursive: true });
+          }
           writeFileSync(outFile, code);
           fileCount++;
         } catch (err) {

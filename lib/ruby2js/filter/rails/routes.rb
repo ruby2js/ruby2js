@@ -268,6 +268,10 @@ module Ruby2JS
               path: helper_path,
               params: params
             }
+
+            if controller
+              store_route_mapping("#{as_name}_path", controller, false, nesting_prefix)
+            end
           end
 
           # Restore parent's param if we saved it
@@ -565,6 +569,7 @@ module Ruby2JS
 
         def generate_path_helpers(resource_name, singular_name, resource_path, actions, options = {})
           prefix = nesting_prefix
+          ctrl_resource = resource_name.to_s
 
           # Use custom param in path templates if specified
           id_segment = options[:param] ? ":#{options[:param]}" : ":id"
@@ -576,6 +581,7 @@ module Ruby2JS
               path: resource_path,
               params: nesting_params
             }
+            store_route_mapping("#{prefix}#{resource_name}_path", ctrl_resource, false, prefix)
           end
 
           # New path: new_article_path or new_board_article_path (nested)
@@ -585,6 +591,7 @@ module Ruby2JS
               path: "#{resource_path}/new",
               params: nesting_params
             }
+            store_route_mapping("new_#{prefix}#{singular_name}_path", ctrl_resource, true, prefix)
           end
 
           # Member path: article_path(article) or board_article_path(board, article)
@@ -594,6 +601,7 @@ module Ruby2JS
               path: "#{resource_path}/#{id_segment}",
               params: nesting_params + [singular_name.to_sym]
             }
+            store_route_mapping("#{prefix}#{singular_name}_path", ctrl_resource, true, prefix)
           end
 
           # Edit path: edit_article_path(article) or edit_board_article_path(board, article)
@@ -603,6 +611,7 @@ module Ruby2JS
               path: "#{resource_path}/#{id_segment}/edit",
               params: nesting_params + [singular_name.to_sym]
             }
+            store_route_mapping("edit_#{prefix}#{singular_name}_path", ctrl_resource, true, prefix)
           end
         end
 
@@ -611,6 +620,7 @@ module Ruby2JS
           # resource :profile generates profile_path, new_profile_path, edit_profile_path
           # Nested: column_left_position_path (singular under columns)
           prefix = nesting_prefix
+          ctrl_resource = resource_name.to_s + 's'  # singular resource -> pluralize for controller name
 
           # Main path: profile_path (for show/update/destroy/create)
           if actions.include?(:show) || actions.include?(:update) || actions.include?(:destroy) || actions.include?(:create)
@@ -619,6 +629,7 @@ module Ruby2JS
               path: resource_path,
               params: nesting_params
             }
+            store_route_mapping("#{prefix}#{resource_name}_path", ctrl_resource, true, prefix)
           end
 
           # New path: new_profile_path
@@ -628,6 +639,7 @@ module Ruby2JS
               path: "#{resource_path}/new",
               params: nesting_params
             }
+            store_route_mapping("new_#{prefix}#{resource_name}_path", ctrl_resource, true, prefix)
           end
 
           # Edit path: edit_profile_path
@@ -637,6 +649,7 @@ module Ruby2JS
               path: "#{resource_path}/edit",
               params: nesting_params
             }
+            store_route_mapping("edit_#{prefix}#{resource_name}_path", ctrl_resource, true, prefix)
           end
         end
 
@@ -656,6 +669,19 @@ module Ruby2JS
           parts = parts.reject { |p| p.empty? }
           prefix = parts.join('_')
           prefix.empty? ? '' : "#{prefix}_"
+        end
+
+        def store_route_mapping(helper_name, resource_name, is_singular, prefix_str)
+          return unless @options[:metadata]
+          mapping = (@options[:metadata][:routes_mapping] ||= {})
+          ctrl = "#{resource_name.to_s.split('_').map(&:capitalize).join}Controller"
+          parent = prefix_str.chomp('_')
+          mapping[helper_name.to_s] = {
+            controller: ctrl,
+            base: resource_name.to_s,
+            singular: is_singular,
+            action_or_parent: parent.empty? ? nil : parent
+          }
         end
 
         def build_routes_module

@@ -992,6 +992,22 @@ module Ruby2JS
             name = name.sub(/^edit_/, '')
           end
 
+          # Check routes metadata for exact mapping
+          metadata = @options[:metadata]
+          routes_mapping = (metadata ? metadata[:routes_mapping] : nil) || {}
+          lookup_key = prefix ? "#{prefix}_#{name}_path" : "#{name}_path"
+          if routes_mapping[lookup_key]
+            info = routes_mapping[lookup_key]
+            return {
+              controller: info[:controller],
+              base: info[:base],
+              singular: info[:singular],
+              prefix: prefix,
+              action_or_parent: info[:action_or_parent]
+            }
+          end
+
+          # Fall back to heuristic parsing when no metadata available
           # Determine if the resource name is plural or singular
           if name.end_with?('s') && name.length > 1
             is_plural = true

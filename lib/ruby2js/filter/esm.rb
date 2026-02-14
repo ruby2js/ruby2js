@@ -166,6 +166,13 @@ module Ruby2JS
             end
           elsif child.type == :casgn and child.children.first == nil
             replacement = s(:export, child)
+          elsif child.type == :casgn and child.children.first != nil
+            # Namespaced constant (e.g., Cards.ClosuresController = ...)
+            # Unwrap namespace for export: export const ClosuresController = ...
+            leaf_name = child.children[1]
+            value = child.children[2]
+            unnested = s(:casgn, nil, leaf_name, value)
+            replacement = s(:export, unnested)
           elsif child.type == :def
             replacement = s(:export, child)
           end
@@ -374,8 +381,24 @@ module Ruby2JS
               end
             end
           end
+          # Unwrap namespace for namespaced module/class exports
+          # e.g., export Cards::ClosuresController → export const ClosuresController
+          processed_args = process_all(args)
+          if processed_args.length == 1 &&
+            processed_args[0].respond_to?(:type) &&
+            [:module, :class].include?(processed_args[0].type) &&
+            processed_args[0].children.first.respond_to?(:type) &&
+            processed_args[0].children.first.type == :const &&
+            processed_args[0].children.first.children.first != nil
+            child_node = processed_args[0]
+            leaf_name = child_node.children.first.children.last
+            leaf_const = s(:const, nil, leaf_name)
+            unnested = child_node.updated(child_node.type,
+              [leaf_const, *child_node.children[1..-1]])
+            processed_args = [unnested]
+          end
           # Use node.updated to preserve location for comment re-association
-          result = node.updated(:export, process_all(args))
+          result = node.updated(:export, processed_args)
           # Combine comments from send node and child node
           node_comments = @comments.get(node)
           all_comments = []
