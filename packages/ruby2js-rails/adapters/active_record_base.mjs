@@ -110,6 +110,10 @@ export class ActiveRecordBase {
     return this._errors._all.length === 0;
   }
 
+  valid() {
+    return this.isValid;
+  }
+
   // Override in subclass to add validations
   validate() {}
 
@@ -577,6 +581,11 @@ export class ActiveRecordBase {
     const target = options.target || this.domId();
     const stream = `<turbo-stream action="remove" target="${target}"></turbo-stream>`;
     Broadcaster.broadcast(channel, stream);
+  }
+
+  attribute_present(name) {
+    const value = this.attributes[name];
+    return value != null && value !== '' && value !== false;
   }
 
   // Snake case aliases

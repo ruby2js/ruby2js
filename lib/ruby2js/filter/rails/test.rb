@@ -1003,7 +1003,8 @@ module Ruby2JS
               base: info[:base],
               singular: info[:singular],
               prefix: prefix,
-              action_or_parent: info[:action_or_parent]
+              action_or_parent: info[:action_or_parent],
+              from_metadata: true
             }
           end
 
@@ -1095,6 +1096,9 @@ module Ruby2JS
         #
         def resolve_nested(url_info, url_args)
           return false unless url_info[:action_or_parent]
+
+          # Metadata-based routes always have correct nesting info
+          return true if url_info[:from_metadata]
 
           # new_ and edit_ prefixed URLs with action_or_parent are always nested
           # e.g., new_person_payment_url(@person) -> nested new on payments
