@@ -93,8 +93,37 @@ module Ruby2JS
 
               # Generate import path based on whether partial is in a different directory
               import_path = if partial_directory
-                # Cross-directory partial: ../comments/_comment.js
-                "../#{partial_directory}/_#{partial_name}.js"
+                # Cross-directory partial: compute relative path from current file
+                # to the target partial (partial_directory is relative to app/views/)
+                target = "#{partial_directory}/_#{partial_name}.js"
+                file = @options[:file].to_s
+                views_match = file.match(%r{app/views/(.*)})
+                if views_match
+                  current_dir = File.dirname(views_match[1])
+                  target_dir = File.dirname(target)
+                  target_file = File.basename(target)
+
+                  from_parts = current_dir.split('/')
+                  to_parts = target_dir.split('/')
+
+                  # Find common prefix
+                  common = 0
+                  common += 1 while common < from_parts.length &&
+                    common < to_parts.length &&
+                    from_parts[common] == to_parts[common]
+
+                  ups = from_parts.length - common
+                  downs = to_parts[common..]
+
+                  if ups == 0 && downs.empty?
+                    "./#{target_file}"
+                  else
+                    "#{'../' * ups}#{(downs + [target_file]).join('/')}"
+                  end
+                else
+                  # Fallback when file path not available
+                  "../#{partial_directory}/_#{partial_name}.js"
+                end
               else
                 # Same directory partial: ./_form.js
                 "./_#{partial_name}.js"
