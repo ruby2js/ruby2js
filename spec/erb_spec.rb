@@ -14,9 +14,8 @@ describe Ruby2JS::Filter::Erb do
       # ERB output format: _erbout = +''; _erbout.<< "str".freeze; _erbout
       erb_src = '_erbout = +\'\'; _erbout.<< "<h1>".freeze; _erbout.<<(( @title ).to_s); _erbout.<< "</h1>".freeze; _erbout'
       to_js(erb_src).must_include 'function render({ title })'
-      to_js(erb_src).must_include 'let _erbout = ""'
-      to_js(erb_src).must_include '_erbout += `<h1>${title}</h1>`'
-      to_js(erb_src).must_include 'return _erbout'
+      to_js(erb_src).must_include 'return `<h1>${title}</h1>`'
+      to_js(erb_src).wont_include 'let _erbout'
     end
 
     it "should handle multiple instance variables" do
@@ -49,8 +48,8 @@ describe Ruby2JS::Filter::Erb do
       # HERB output format: _buf = ::String.new; _buf << 'str'.freeze; _buf.to_s
       herb_src = "_buf = ::String.new; _buf << '<h1>'.freeze; _buf << (@title).to_s; _buf << '</h1>'.freeze; _buf.to_s"
       to_js(herb_src).must_include 'function render({ title })'
-      to_js(herb_src).must_include 'let _buf = ""'
-      to_js(herb_src).must_include '_buf += `<h1>${title}</h1>`'
+      to_js(herb_src).must_include 'return `<h1>${title}</h1>`'
+      to_js(herb_src).wont_include 'let _buf'
     end
 
     it "should handle multiple instance variables in HERB" do
@@ -131,6 +130,31 @@ describe Ruby2JS::Filter::Erb do
     end
   end
 
+  describe 'buffer variable optimization' do
+    it "should eliminate buffer for single append with no side effects" do
+      erb_src = '_erbout = +\'\'; _erbout.<< "<h1>Hello</h1>".freeze; _erbout'
+      result = to_js(erb_src)
+      result.must_include 'return "<h1>Hello</h1>"'
+      result.wont_include 'let _erbout'
+      result.wont_include '_erbout +='
+    end
+
+    it "should eliminate buffer for single append with side effect" do
+      erb_src = '_erbout = +\'\'; @scores = [1, 2, 3]; _erbout.<< "<div>".freeze; _erbout.<<(( @scores ).to_s); _erbout.<< "</div>".freeze; _erbout'
+      result = to_js(erb_src)
+      result.must_include 'scores = [1, 2, 3]'
+      result.must_include 'return `<div>${scores}</div>`'
+      result.wont_include 'let _erbout'
+    end
+
+    it "should absorb first append for multiple appends" do
+      erb_src = '_erbout = +\'\'; _erbout.<< "<h1>".freeze; _erbout.<<(( @title ).to_s); _erbout.<< "</h1>".freeze; @scores = [1]; _erbout.<< "<p>".freeze; _erbout.<<(( @scores ).to_s); _erbout.<< "</p>".freeze; _erbout'
+      result = to_js(erb_src)
+      result.must_include 'let _erbout = `<h1>${title}</h1>`'
+      result.must_include 'return _erbout + `<p>${scores}</p>`'
+    end
+  end
+
   describe 'html_safe and raw' do
     it "should strip html_safe calls" do
       erb_src = '_erbout = +\'\'; _erbout.<<(( @content.html_safe ).to_s); _erbout'
@@ -195,7 +219,8 @@ describe Ruby2JS::Filter::Erb do
       erb_src = "def render\n_buf = ::String.new; _buf << \"<h1>\".freeze; _buf << (@title).to_s; _buf << \"</h1>\".freeze; _buf.to_s\nend"
       result = to_js(erb_src)
       result.must_include 'function render({ title })'
-      result.must_include '_buf += `<h1>${title}</h1>`'
+      result.must_include 'return `<h1>${title}</h1>`'
+      result.wont_include 'let _buf'
     end
 
     it "should handle def render with multiple ivars" do

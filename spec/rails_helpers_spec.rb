@@ -23,7 +23,7 @@ describe Ruby2JS::Filter::Rails::Helpers do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<h1><%= @title %></h1>')
       result.must_include 'function render({ $context, title })'
-      result.must_include '_buf += `<h1>${title}</h1>`'
+      result.must_include 'return `<h1>${title}</h1>`'
     end
 
     it "should handle block expressions like form_for" do

@@ -315,6 +315,9 @@ module Ruby2JS
         # Step 2.5: Collapse consecutive buffer appends into single dstr
         transformed_children = collapse_buf_appends(transformed_children, bufvar)
 
+        # Step 2.6: Eliminate redundant buffer variable when possible
+        transformed_children = optimize_buf_variable(transformed_children, bufvar)
+
         # Step 3: Let subclasses add imports via erb_prepend_imports hook
         # (must happen before we check imported names)
         erb_prepend_imports
@@ -765,6 +768,121 @@ module Ruby2JS
           end
         end
         result
+      end
+
+      # Optimize away redundant buffer variable when possible.
+      # Absorbs first append into init, and for single-append case,
+      # eliminates the buffer variable entirely.
+      def optimize_buf_variable(children, bufvar)
+        return children if children.length < 2
+
+        # Precondition: first child is buffer init
+        first = children[0]
+        return children unless ast_node?(first) &&
+          first.type == :lvasgn &&
+          first.children[0] == bufvar &&
+          ast_node?(first.children[1]) &&
+          first.children[1].type == :str &&
+          first.children[1].children[0] == ""
+
+        # Precondition: last child is buffer reference
+        last = children[children.length - 1]
+        return children unless ast_node?(last) &&
+          last.type == :lvar &&
+          last.children[0] == bufvar
+
+        # Flatten begin nodes that contain only buf appends (e.g., form helpers
+        # wrap multiple _buf += statements in a begin node)
+        flat = []
+        children.each do |child|
+          if ast_node?(child) && child.type == :begin && buf_only?(child, bufvar)
+            child.children.each { |c| flat << c }
+          else
+            flat << child
+          end
+        end
+        children = flat
+
+        # Find all buf append indices and check for stray bufvar references
+        append_indices = []
+        i = 0
+        while i < children.length
+          child = children[i]
+          if ast_node?(child) &&
+             child.type == :op_asgn &&
+             ast_node?(child.children[0]) &&
+             child.children[0].type == :lvasgn &&
+             child.children[0].children[0] == bufvar &&
+             child.children[1] == :+
+            append_indices << i
+          elsif i > 0 && i < children.length - 1
+            # Bail out if bufvar is referenced in a non-append child
+            return children if references_var?(child, bufvar)
+          end
+          i += 1
+        end
+
+        return children if append_indices.empty?
+
+        first_append_idx = append_indices[0]
+        first_append = children[first_append_idx]
+        first_value = first_append.children[2]
+
+        if append_indices.length == 1
+          # Single append case: eliminate buffer entirely
+          result = []
+          i = 1
+          while i < children.length - 1
+            result << children[i] unless i == first_append_idx
+            i += 1
+          end
+          result << first_value
+          result
+        else
+          # Multi-append case: absorb first append into init, remove final lvar,
+          # and convert last append from _buf += X to _buf + X (no needless mutation)
+          last_append_idx = append_indices[append_indices.length - 1]
+          result = []
+          result << s(:lvasgn, bufvar, first_value)
+          i = 1
+          while i < children.length - 1
+            if i == first_append_idx
+              # skip — absorbed into init
+            elsif i == last_append_idx
+              last_val = children[i].children[2]
+              result << s(:send, s(:lvar, bufvar), :+, last_val)
+            else
+              result << children[i]
+            end
+            i += 1
+          end
+          result
+        end
+      end
+
+      # Check if an AST node references a given variable anywhere
+      def references_var?(node, varname)
+        return false unless ast_node?(node)
+
+        if node.type == :lvar && node.children[0] == varname
+          return true
+        end
+
+        if node.type == :lvasgn && node.children[0] == varname
+          return true
+        end
+
+        if node.type == :op_asgn && ast_node?(node.children[0]) &&
+           node.children[0].type == :lvasgn &&
+           node.children[0].children[0] == varname
+          return true
+        end
+
+        node.children.each do |child|
+          return true if references_var?(child, varname)
+        end
+
+        false
       end
 
       # Helper to get only undefined locals (used but not assigned)
