@@ -1,6 +1,7 @@
 require 'minitest/autorun'
 require 'ruby2js/filter/erb'
 require 'ruby2js/filter/functions'
+require 'ruby2js/erubi'
 
 describe Ruby2JS::Filter::Erb do
 
@@ -14,7 +15,7 @@ describe Ruby2JS::Filter::Erb do
       erb_src = '_erbout = +\'\'; _erbout.<< "<h1>".freeze; _erbout.<<(( @title ).to_s); _erbout.<< "</h1>".freeze; _erbout'
       to_js(erb_src).must_include 'function render({ title })'
       to_js(erb_src).must_include 'let _erbout = ""'
-      to_js(erb_src).must_include '_erbout += `<h1>${String(title)}</h1>`'
+      to_js(erb_src).must_include '_erbout += `<h1>${title}</h1>`'
       to_js(erb_src).must_include 'return _erbout'
     end
 
@@ -49,7 +50,7 @@ describe Ruby2JS::Filter::Erb do
       herb_src = "_buf = ::String.new; _buf << '<h1>'.freeze; _buf << (@title).to_s; _buf << '</h1>'.freeze; _buf.to_s"
       to_js(herb_src).must_include 'function render({ title })'
       to_js(herb_src).must_include 'let _buf = ""'
-      to_js(herb_src).must_include '_buf += `<h1>${String(title)}</h1>`'
+      to_js(herb_src).must_include '_buf += `<h1>${title}</h1>`'
     end
 
     it "should handle multiple instance variables in HERB" do
@@ -66,6 +67,51 @@ describe Ruby2JS::Filter::Erb do
       result.must_include 'function render({ items })'
       result.must_include 'for (let item of items)'
       result.must_include 'String(item.name)'
+    end
+  end
+
+  describe 'inline control flow' do
+    it "should inline if/else as ternary in template literal" do
+      erb_src = '_erbout = +\'\'; _erbout.<< "<div>".freeze; if show; _erbout.<< "<p>visible</p>".freeze; else; _erbout.<< "<p>hidden</p>".freeze; end; _erbout.<< "</div>".freeze; _erbout'
+      result = to_js(erb_src)
+      result.must_include '`<div>${show ? "<p>visible</p>" : "<p>hidden</p>"}</div>`'
+    end
+
+    it "should inline if-without-else with empty string fallback" do
+      erb_src = '_erbout = +\'\'; _erbout.<< "<div>".freeze; if show; _erbout.<< "<p>visible</p>".freeze; end; _erbout.<< "</div>".freeze; _erbout'
+      result = to_js(erb_src)
+      result.must_include '`<div>${show ? "<p>visible</p>" : ""}</div>`'
+    end
+
+    it "should inline .each as .map().join in template literal" do
+      erb_src = '_erbout = +\'\'; _erbout.<< "<ul>".freeze; for item in items; _erbout.<< "<li>".freeze; _erbout.<<(( item.name ).to_s); _erbout.<< "</li>".freeze; end; _erbout.<< "</ul>".freeze; _erbout'
+      result = to_js(erb_src)
+      result.must_include '`<ul>${items.map(item => (`<li>${item.name}</li>`)).join("")}</ul>`'
+    end
+
+    it "should not inline if with non-buf-only branches" do
+      # Skip in selfhost — complex if with assignment doesn't parse
+      return skip() unless defined?(Ruby2JS::Erubi)
+      # if branch has an assignment — not buf_only
+      erb_src = '_erbout = +\'\'; _erbout.<< "<div>".freeze; if show; x = 1; _erbout.<<(( x ).to_s); end; _erbout.<< "</div>".freeze; _erbout'
+      result = to_js(erb_src)
+      result.wont_include '? '
+      result.must_include 'if (show)'
+    end
+
+    it "should recursively collapse buf appends within non-inlineable if" do
+      # Skip in selfhost — standalone if block doesn't parse correctly
+      return skip() unless defined?(Ruby2JS::Erubi)
+      erb_src = '_erbout = +\'\'; if show; _erbout.<< "<p>".freeze; _erbout.<<(( @name ).to_s); _erbout.<< "</p>".freeze; end; _erbout'
+      result = to_js(erb_src)
+      result.must_include '`<p>${name}</p>`'
+      result.must_include 'if (show)'
+    end
+
+    it "should inline if with expression values" do
+      erb_src = '_erbout = +\'\'; _erbout.<< "<span>".freeze; if active; _erbout.<<(( @name ).to_s); else; _erbout.<< "anonymous".freeze; end; _erbout.<< "</span>".freeze; _erbout'
+      result = to_js(erb_src)
+      result.must_include '`<span>${active ? name : "anonymous"}</span>`'
     end
   end
 
@@ -149,7 +195,7 @@ describe Ruby2JS::Filter::Erb do
       erb_src = "def render\n_buf = ::String.new; _buf << \"<h1>\".freeze; _buf << (@title).to_s; _buf << \"</h1>\".freeze; _buf.to_s\nend"
       result = to_js(erb_src)
       result.must_include 'function render({ title })'
-      result.must_include '_buf += `<h1>${String(title)}</h1>`'
+      result.must_include '_buf += `<h1>${title}</h1>`'
     end
 
     it "should handle def render with multiple ivars" do

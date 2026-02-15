@@ -499,32 +499,229 @@ module Ruby2JS
         names
       end
 
+      # Check if a node contains only buffer appends (safe to inline)
+      # Returns true for op_asgn on bufvar, or begin blocks where all children are buf_only?
+      def buf_only?(node, bufvar)
+        return false unless ast_node?(node)
+
+        if node.type == :op_asgn &&
+           ast_node?(node.children[0]) &&
+           node.children[0].type == :lvasgn &&
+           node.children[0].children[0] == bufvar &&
+           node.children[1] == :+
+          return true
+        end
+
+        if node.type == :begin
+          result = true
+          node.children.each do |child|
+            result = false unless buf_only?(child, bufvar)
+          end
+          return result
+        end
+
+        false
+      end
+
+      # Extract dstr parts from a buf-only node
+      # Returns an array of :str and :begin nodes suitable for embedding in a :dstr
+      def buf_to_dstr_parts(node, bufvar)
+        parts = []
+
+        if node.type == :op_asgn
+          value = node.children[2]
+          if value.type == :str
+            parts << value
+          elsif value.type == :dstr
+            value.children.each { |c| parts.push(c) }
+          else
+            # Strip String() wrapper — template literal interpolation coerces
+            if value.type == :send && value.children[0].nil? &&
+               value.children[1] == :String && value.children.length == 3
+              parts << s(:begin, value.children[2])
+            else
+              parts << s(:begin, value)
+            end
+          end
+        elsif node.type == :begin
+          node.children.each do |child|
+            buf_to_dstr_parts(child, bufvar).each { |p| parts.push(p) }
+          end
+        end
+
+        parts
+      end
+
+      # Check if a node is an inlineable :if (both branches are buf_only?)
+      def inlineable_if?(node, bufvar)
+        return false unless ast_node?(node) && node.type == :if
+        cond = node.children[0]
+        then_branch = node.children[1]
+        else_branch = node.children[2]
+
+        # Then branch must exist and be buf_only
+        return false unless then_branch && buf_only?(then_branch, bufvar)
+
+        # Else branch: either nil (if-without-else) or buf_only
+        if else_branch
+          buf_only?(else_branch, bufvar)
+        else
+          true
+        end
+      end
+
+      # Check if a node is an inlineable .each block (body is buf_only?)
+      def inlineable_each?(node, bufvar)
+        return false unless ast_node?(node) && node.type == :for
+        # :for nodes are [var, collection, body]
+        body = node.children[2]
+        body && buf_only?(body, bufvar)
+      end
+
+      # Check if a node can participate in a buf-append run
+      def buf_append?(node, bufvar)
+        return false unless ast_node?(node)
+
+        # Direct buffer append
+        if node.type == :op_asgn &&
+           ast_node?(node.children[0]) &&
+           node.children[0].type == :lvasgn &&
+           node.children[0].children[0] == bufvar &&
+           node.children[1] == :+
+          return true
+        end
+
+        # Inlineable if/else or .each
+        return true if inlineable_if?(node, bufvar)
+        return true if inlineable_each?(node, bufvar)
+
+        false
+      end
+
+      # Build dstr parts from a run element (op_asgn, inlineable if, or inlineable for)
+      def run_to_dstr_parts(node, bufvar)
+        if node.type == :op_asgn
+          buf_to_dstr_parts(node, bufvar)
+        elsif node.type == :if
+          inline_if_to_dstr_part(node, bufvar)
+        elsif node.type == :for
+          inline_each_to_dstr_part(node, bufvar)
+        else
+          []
+        end
+      end
+
+      # Convert an inlineable :if to a dstr part (ternary expression)
+      def inline_if_to_dstr_part(node, bufvar)
+        cond = node.children[0]
+        then_branch = node.children[1]
+        else_branch = node.children[2]
+
+        then_parts = buf_to_dstr_parts(then_branch, bufvar)
+        then_value = parts_to_value(then_parts)
+
+        if else_branch
+          else_parts = buf_to_dstr_parts(else_branch, bufvar)
+          else_value = parts_to_value(else_parts)
+        else
+          else_value = s(:str, "")
+        end
+
+        [s(:begin, s(:if, cond, then_value, else_value))]
+      end
+
+      # Convert an inlineable :for to a dstr part (.map().join(""))
+      def inline_each_to_dstr_part(node, bufvar)
+        lvar = node.children[0]   # loop variable
+        collection = node.children[1]  # collection
+        body = node.children[2]   # loop body
+
+        body_parts = buf_to_dstr_parts(body, bufvar)
+        body_value = parts_to_value(body_parts)
+
+        # Build: collection.map(lvar => body_value).join("")
+        map_block = s(:block,
+          s(:send, collection, :map),
+          s(:args, s(:arg, lvar.children[0])),
+          body_value)
+        join_call = s(:send, map_block, :join, s(:str, ""))
+
+        [s(:begin, join_call)]
+      end
+
+      # Convert dstr parts array to a single value (:str, :dstr, or unwrapped expression)
+      def parts_to_value(parts)
+        if parts.length == 1 && parts[0].type == :str
+          parts[0]
+        elsif parts.length == 1 && parts[0].type == :begin
+          # Single expression — unwrap the :begin to avoid IIFE generation
+          parts[0].children[0]
+        else
+          s(:dstr, *parts)
+        end
+      end
+
+      # Recursively apply collapse_buf_appends to children of non-inlineable control flow
+      def recursive_collapse(node, bufvar)
+        return node unless ast_node?(node)
+
+        if node.type == :if
+          cond = node.children[0]
+          then_branch = node.children[1]
+          else_branch = node.children[2]
+
+          then_branch = recursive_collapse_body(then_branch, bufvar) if then_branch
+          else_branch = recursive_collapse_body(else_branch, bufvar) if else_branch
+
+          s(:if, cond, then_branch, else_branch)
+        elsif node.type == :for
+          lvar = node.children[0]
+          collection = node.children[1]
+          body = node.children[2]
+
+          body = recursive_collapse_body(body, bufvar) if body
+
+          s(:for, lvar, collection, body)
+        elsif node.type == :begin
+          new_children = collapse_buf_appends([*node.children], bufvar)
+          s(:begin, *new_children)
+        else
+          node
+        end
+      end
+
+      # Collapse buf appends within a branch body (begin or single node)
+      def recursive_collapse_body(node, bufvar)
+        return node unless ast_node?(node)
+
+        if node.type == :begin
+          new_children = collapse_buf_appends([*node.children], bufvar)
+          s(:begin, *new_children)
+        else
+          # Single statement — wrap in array, collapse, unwrap
+          collapsed = collapse_buf_appends([node], bufvar)
+          if collapsed.length == 1
+            collapsed[0]
+          else
+            s(:begin, *collapsed)
+          end
+        end
+      end
+
       # Collapse consecutive _buf += statements into a single dstr
-      # e.g., _buf += "a"; _buf += String(x); _buf += "b"
-      # becomes: _buf += `a${String(x)}b`
+      # Also inlines simple if/else as ternary and .each as .map().join("")
       def collapse_buf_appends(children, bufvar)
         result = []
         i = 0
         while i < children.length
           child = children[i]
 
-          # Check if this is a buffer append: s(:op_asgn, s(:lvasgn, bufvar), :+, value)
-          if ast_node?(child) && child.type == :op_asgn &&
-             ast_node?(child.children[0]) &&
-             child.children[0].type == :lvasgn &&
-             child.children[0].children[0] == bufvar &&
-             child.children[1] == :+
-
-            # Collect consecutive buffer appends
+          if buf_append?(child, bufvar)
+            # Collect consecutive buffer appends (including inlineable control flow)
             run_start = i
             i += 1
             while i < children.length
-              next_child = children[i]
-              if ast_node?(next_child) && next_child.type == :op_asgn &&
-                 ast_node?(next_child.children[0]) &&
-                 next_child.children[0].type == :lvasgn &&
-                 next_child.children[0].children[0] == bufvar &&
-                 next_child.children[1] == :+
+              if buf_append?(children[i], bufvar)
                 i += 1
               else
                 break
@@ -536,14 +733,7 @@ module Ruby2JS
               # Build dstr parts from the run
               dstr_parts = []
               run.each do |node|
-                value = node.children[2]
-                if value.type == :str
-                  dstr_parts << value
-                elsif value.type == :dstr
-                  value.children.each { |c| dstr_parts.push(c) }
-                else
-                  dstr_parts << s(:begin, value)
-                end
+                run_to_dstr_parts(node, bufvar).each { |p| dstr_parts.push(p) }
               end
 
               # If all parts are :str, merge into a single :str
@@ -557,8 +747,18 @@ module Ruby2JS
                 result << s(:op_asgn, s(:lvasgn, bufvar), :+, s(:dstr, *dstr_parts))
               end
             else
-              result << child
+              # Single element — if it's inlineable control flow that's alone,
+              # don't inline it (no benefit), but do recursively collapse its body
+              if child.type == :if || child.type == :for
+                result << recursive_collapse(child, bufvar)
+              else
+                result << child
+              end
             end
+          elsif child.type == :if || child.type == :for || child.type == :begin
+            # Non-inlineable control flow — recursively collapse within
+            result << recursive_collapse(child, bufvar)
+            i += 1
           else
             result << child
             i += 1

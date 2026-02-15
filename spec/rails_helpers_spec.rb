@@ -23,7 +23,7 @@ describe Ruby2JS::Filter::Rails::Helpers do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<h1><%= @title %></h1>')
       result.must_include 'function render({ $context, title })'
-      result.must_include '_buf += `<h1>${String(title)}</h1>`'
+      result.must_include '_buf += `<h1>${title}</h1>`'
     end
 
     it "should handle block expressions like form_for" do
@@ -42,7 +42,7 @@ describe Ruby2JS::Filter::Rails::Helpers do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<div class="container"><%= @content %></div>')
       result.must_include 'container'
-      result.must_include 'String(content)'
+      result.must_include '${content}'
     end
 
     it "should handle form builder label method" do
@@ -70,9 +70,9 @@ describe Ruby2JS::Filter::Rails::Helpers do
     it "should handle check_box with symbol field name" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_for @user do |f| %><%= f.check_box :admin, class: "toggle" %><% end %>')
-      result.must_include 'type=\\"checkbox\\"'
+      result.must_include 'type="checkbox"'
       result.must_include 'user[admin]'
-      result.must_include 'class=\\"toggle\\"'
+      result.must_include 'class="toggle"'
     end
 
     it "should handle check_box with dynamic string field name" do
@@ -88,12 +88,12 @@ describe Ruby2JS::Filter::Rails::Helpers do
     it "should handle file_field" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_with(model: @recording) do |form| %><%= form.file_field :song_file, class: "hidden" %><% end %>')
-      result.must_include 'type=\\"file\\"'
+      result.must_include 'type="file"'
       result.must_include 'recording[song_file]'
-      result.must_include 'class=\\"hidden\\"'
+      result.must_include 'class="hidden"'
       # File inputs should NOT have value attribute (check the specific input line)
-      result.must_include '<input type=\\"file\\"'
-      result.wont_include 'type=\\"file\\"" value='
+      result.must_include '<input type="file"'
+      result.wont_include 'type="file"" value='
     end
 
     it "should handle fields_for without crashing" do
@@ -111,7 +111,7 @@ describe Ruby2JS::Filter::Rails::Helpers do
     it "should handle submit with custom label" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_for @user do |f| %><%= f.submit "Create Account" %><% end %>')
-      result.must_include 'type=\\"submit\\"'
+      result.must_include 'type="submit"'
       result.must_include 'Create Account'
     end
 
@@ -125,9 +125,9 @@ describe Ruby2JS::Filter::Rails::Helpers do
     it "should handle form_with url: with static string" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_with(url: "/photos", method: :post, class: "my-form") do |f| %><%= f.text_field :caption %><% end %>')
-      result.must_include 'action=\\"/photos\\"'
-      result.must_include 'method=\\"post\\"'
-      result.must_include 'class=\\"my-form\\"'
+      result.must_include 'action="/photos"'
+      result.must_include 'method="post"'
+      result.must_include 'class="my-form"'
       result.must_include '<form'
     end
 
@@ -144,15 +144,15 @@ describe Ruby2JS::Filter::Rails::Helpers do
     it "should handle form_with url: with data attributes" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_with(url: "/photos", method: :post, data: { turbo_frame: "modal" }) do |f| %><% end %>')
-      result.must_include 'action=\\"/photos\\"'
-      result.must_include 'data-turbo-frame=\\"modal\\"'
+      result.must_include 'action="/photos"'
+      result.must_include 'data-turbo-frame="modal"'
     end
 
     it "should handle form_with url: with method override (patch)" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_with(url: "/photos/1", method: :patch) do |f| %><% end %>')
-      result.must_include 'action=\\"/photos/1\\"'
-      result.must_include 'method=\\"post\\"'
+      result.must_include 'action="/photos/1"'
+      result.must_include 'method="post"'
       result.must_include '_method'
       result.must_include 'patch'
     end
@@ -160,8 +160,8 @@ describe Ruby2JS::Filter::Rails::Helpers do
     it "should handle form_with url: with method override (delete)" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_with(url: "/photos/1", method: :delete) do |f| %><% end %>')
-      result.must_include 'action=\\"/photos/1\\"'
-      result.must_include 'method=\\"post\\"'
+      result.must_include 'action="/photos/1"'
+      result.must_include 'method="post"'
       result.must_include '_method'
       result.must_include 'delete'
     end
@@ -184,16 +184,14 @@ describe Ruby2JS::Filter::Rails::Helpers do
     it "should include class on submit button" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_with(model: @article) do |form| %><%= form.submit class: "btn btn-primary" %><% end %>')
-      # Static string output - quotes are escaped
-      result.must_include 'class=\\"btn btn-primary\\"'
-      result.must_include 'type=\\"submit\\"'
+      result.must_include 'class="btn btn-primary"'
+      result.must_include 'type="submit"'
     end
 
     it "should include class on label" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_with(model: @article) do |form| %><%= form.label :title, class: "font-bold" %><% end %>')
-      # Static string output - quotes are escaped
-      result.must_include 'class=\\"font-bold\\"'
+      result.must_include 'class="font-bold"'
       result.must_include '<label'
     end
 
