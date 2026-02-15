@@ -14,8 +14,7 @@ describe Ruby2JS::Filter::Erb do
       erb_src = '_erbout = +\'\'; _erbout.<< "<h1>".freeze; _erbout.<<(( @title ).to_s); _erbout.<< "</h1>".freeze; _erbout'
       to_js(erb_src).must_include 'function render({ title })'
       to_js(erb_src).must_include 'let _erbout = ""'
-      to_js(erb_src).must_include '_erbout += "<h1>"'
-      to_js(erb_src).must_include 'String(title)'
+      to_js(erb_src).must_include '_erbout += `<h1>${String(title)}</h1>`'
       to_js(erb_src).must_include 'return _erbout'
     end
 
@@ -50,8 +49,7 @@ describe Ruby2JS::Filter::Erb do
       herb_src = "_buf = ::String.new; _buf << '<h1>'.freeze; _buf << (@title).to_s; _buf << '</h1>'.freeze; _buf.to_s"
       to_js(herb_src).must_include 'function render({ title })'
       to_js(herb_src).must_include 'let _buf = ""'
-      to_js(herb_src).must_include '_buf += "<h1>"'
-      to_js(herb_src).must_include 'String(title)'
+      to_js(herb_src).must_include '_buf += `<h1>${String(title)}</h1>`'
     end
 
     it "should handle multiple instance variables in HERB" do
@@ -151,8 +149,7 @@ describe Ruby2JS::Filter::Erb do
       erb_src = "def render\n_buf = ::String.new; _buf << \"<h1>\".freeze; _buf << (@title).to_s; _buf << \"</h1>\".freeze; _buf.to_s\nend"
       result = to_js(erb_src)
       result.must_include 'function render({ title })'
-      result.must_include '_buf += "<h1>"'
-      result.must_include 'String(title)'
+      result.must_include '_buf += `<h1>${String(title)}</h1>`'
     end
 
     it "should handle def render with multiple ivars" do

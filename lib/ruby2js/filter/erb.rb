@@ -312,6 +312,9 @@ module Ruby2JS
         # Step 2: Transform the body (this triggers all filters including helpers)
         transformed_children = children.map { |child| process(child) }
 
+        # Step 2.5: Collapse consecutive buffer appends into single dstr
+        transformed_children = collapse_buf_appends(transformed_children, bufvar)
+
         # Step 3: Let subclasses add imports via erb_prepend_imports hook
         # (must happen before we check imported names)
         erb_prepend_imports
@@ -494,6 +497,74 @@ module Ruby2JS
         end
 
         names
+      end
+
+      # Collapse consecutive _buf += statements into a single dstr
+      # e.g., _buf += "a"; _buf += String(x); _buf += "b"
+      # becomes: _buf += `a${String(x)}b`
+      def collapse_buf_appends(children, bufvar)
+        result = []
+        i = 0
+        while i < children.length
+          child = children[i]
+
+          # Check if this is a buffer append: s(:op_asgn, s(:lvasgn, bufvar), :+, value)
+          if ast_node?(child) && child.type == :op_asgn &&
+             ast_node?(child.children[0]) &&
+             child.children[0].type == :lvasgn &&
+             child.children[0].children[0] == bufvar &&
+             child.children[1] == :+
+
+            # Collect consecutive buffer appends
+            run_start = i
+            i += 1
+            while i < children.length
+              next_child = children[i]
+              if ast_node?(next_child) && next_child.type == :op_asgn &&
+                 ast_node?(next_child.children[0]) &&
+                 next_child.children[0].type == :lvasgn &&
+                 next_child.children[0].children[0] == bufvar &&
+                 next_child.children[1] == :+
+                i += 1
+              else
+                break
+              end
+            end
+
+            run = children[run_start...i]
+            if run.length > 1
+              # Build dstr parts from the run
+              dstr_parts = []
+              run.each do |node|
+                value = node.children[2]
+                if value.type == :str
+                  dstr_parts << value
+                elsif value.type == :dstr
+                  value.children.each { |c| dstr_parts.push(c) }
+                else
+                  dstr_parts << s(:begin, value)
+                end
+              end
+
+              # If all parts are :str, merge into a single :str
+              all_str = true
+              dstr_parts.each { |p| all_str = false unless ast_node?(p) && p.type == :str }
+              if all_str
+                merged = ""
+                dstr_parts.each { |p| merged = merged + p.children[0] }
+                result << s(:op_asgn, s(:lvasgn, bufvar), :+, s(:str, merged))
+              else
+                result << s(:op_asgn, s(:lvasgn, bufvar), :+, s(:dstr, *dstr_parts))
+              end
+            else
+              result << child
+            end
+          else
+            result << child
+            i += 1
+          end
+        end
+        result
       end
 
       # Helper to get only undefined locals (used but not assigned)
