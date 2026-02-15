@@ -387,6 +387,203 @@ task :fizzy_test, [:timeout] do |t, args|
   end
 end
 
+desc "Summarize Fizzy test failure patterns (reuses existing ejected/)"
+task :fizzy_summary, [:timeout] do |t, args|
+  timeout = (args[:timeout] || 60).to_i
+  ejected = File.join(FIZZY_DIR, 'ejected')
+
+  unless File.directory?(ejected)
+    abort "No ejected directory. Run `rake fizzy` first."
+  end
+
+  runner = File.join(ejected, 'test/runner.mjs')
+  loader = File.join(ejected, 'test/register-loader.mjs')
+
+  unless File.exist?(runner) && File.exist?(loader)
+    abort "Test runner not found. Re-eject to generate test/runner.mjs."
+  end
+
+  test_files = Dir.glob("#{ejected}/test/**/*.test.{mjs,js}").sort
+  passed = []
+  failed = []
+  errored = []
+  total_passed_tests = 0
+  total_failed_tests = 0
+
+  puts "Running #{test_files.size} test files (#{timeout}s timeout per file)..."
+  puts ""
+
+  test_files.each_with_index do |file, i|
+    rel = file.sub("#{ejected}/", '')
+    # Use -v for failure details, pipe through tail to avoid capturing
+    # 100K+ lines of SQL/migration noise per file
+    cmd = "cd #{ejected} && timeout #{timeout} node --import ./test/register-loader.mjs test/runner.mjs -v #{rel} 2>&1 | tail -500"
+    output = `#{cmd}`
+    status = $?.exitstatus
+
+    if output =~ /\d+ passed \| \d+ failed \| (\d+) errored/ && $1.to_i > 0
+      # Error during load
+      msg = output.lines.find { |l| l.include?('ERROR') }&.strip || ''
+      errored << { file: rel, error: msg }
+    elsif output =~ /Tests\s+(\d+)\s+passed\s*\|\s*(\d+)\s+failed/
+      pt, ft = $1.to_i, $2.to_i
+      total_passed_tests += pt
+      total_failed_tests += ft
+      if ft > 0
+        # Extract failure messages from verbose output (last section: "Failures:")
+        failure_msgs = []
+        in_failures = false
+        output.lines.each do |line|
+          in_failures = true if line.strip == 'Failures:'
+          next unless in_failures
+          # Lines starting with 4 spaces under each test name are error messages
+          if line =~ /^\s{4}(\S.*)/ && !line.include?('> ')
+            failure_msgs << $1.strip
+          end
+        end
+        failed << { file: rel, passed: pt, failed: ft, messages: failure_msgs }
+      elsif pt > 0
+        passed << { file: rel, passed: pt }
+      else
+        msg = output.lines.find { |l| l.include?('ERROR') || l.include?('ReferenceError') || l.include?('TypeError') }&.strip || 'no tests registered'
+        errored << { file: rel, error: msg }
+      end
+    elsif status == 124
+      errored << { file: rel, error: 'timeout (process killed)' }
+    else
+      msg = output.lines.last(3).map(&:strip).reject(&:empty?).first || 'unknown error'
+      errored << { file: rel, error: msg }
+    end
+
+    print "\r  [#{i+1}/#{test_files.size}] #{passed.size} passed, #{failed.size} failed, #{errored.size} errored"
+    $stdout.flush
+  end
+
+  puts "\n\n"
+
+  # ---- Categorize errors ----
+  error_categories = Hash.new { |h, k| h[k] = [] }
+
+  errored.each do |info|
+    msg = info[:error]
+    case msg
+    when /Cannot find module '([^']+)'/
+      missing = $1.sub("#{ejected}/", '')
+      if missing =~ /\.(svg|png|jpg|gif|webp|ico)$/
+        error_categories["Missing asset import (#{File.basename(missing)})"] << info[:file]
+      elsif missing.include?('active_support') || missing.include?('time.js')
+        error_categories["Missing framework module (#{File.basename(missing, '.js')})"] << info[:file]
+      elsif missing =~ /app\/models\/(.*)/
+        model = $1.sub(/\.js$/, '')
+        error_categories["Missing/mangled model import (#{model})"] << info[:file]
+      elsif missing =~ /app\/views\/layouts\/(.*)/
+        error_categories["Missing layout partial (#{$1})"] << info[:file]
+      elsif missing =~ /app\/views\/(.*)/
+        error_categories["Missing view module (#{$1})"] << info[:file]
+      else
+        error_categories["Cannot find module (#{File.basename(missing)})"] << info[:file]
+      end
+    when /does not provide an export named '([^']+)'/
+      error_categories["Missing route export (#{$1})"] << info[:file]
+    when /Invalid left-hand side/
+      error_categories["Syntax error: invalid assignment"] << info[:file]
+    when /timeout/
+      error_categories["Timeout (infinite loop)"] << info[:file]
+    when /no tests registered/
+      error_categories["Empty test file (0 tests)"] << info[:file]
+    else
+      error_categories["Other load error"] << info[:file]
+    end
+  end
+
+  # ---- Categorize failures ----
+  failure_categories = Hash.new { |h, k| h[k] = [] }
+
+  failed.each do |info|
+    messages = info[:messages] || []
+    patterns_seen = Set.new
+
+    messages.each do |msg|
+      pattern = case msg
+      when /(\w+Controller\w*) is not defined/
+        "Controller not defined (#{$1})"
+      when /(\w+) is not defined/
+        "Variable not defined"
+      when /(\S+) is not a function/
+        "Not a function"
+      when /is not a constructor/
+        "Not a constructor"
+      when /Cannot read properties of (undefined|null) \(reading '([^']+)'\)/
+        "Cannot read property of #{$1}"
+      when /Cannot set property/
+        "Cannot set property (getter-only)"
+      when /NOT NULL constraint failed: (\w+\.\w+)/
+        "Schema: NOT NULL (#{$1})"
+      when /no column named (\w+)/
+        "Schema: missing column (#{$1})"
+      when /Maximum call stack/
+        "Stack overflow"
+      when /Expected (async )?function \w+|Expected \w+\(\) \{/
+        "Predicate returns function not value"
+      when /Expected/
+        "Assertion mismatch"
+      when /Active Storage service not initialized/
+        "Active Storage not initialized"
+      else
+        nil
+      end
+      patterns_seen << pattern if pattern
+    end
+
+    patterns_seen << "Other test failure" if patterns_seen.empty?
+
+    patterns_seen.each do |pattern|
+      failure_categories[pattern] << info[:file]
+    end
+  end
+
+  # ---- Print report ----
+  puts "=" * 70
+  puts " FIZZY EJECT TEST SUMMARY"
+  puts "=" * 70
+  puts ""
+  puts " Test Files: #{passed.size} passed | #{failed.size} failed | #{errored.size} errored  (#{test_files.size})"
+  puts "     Tests:  #{total_passed_tests} passed | #{total_failed_tests} failed  (#{total_passed_tests + total_failed_tests})"
+  puts ""
+
+  if passed.any?
+    puts "-" * 70
+    puts " PASSING FILES (#{passed.size})"
+    puts "-" * 70
+    passed.each { |info| puts "  ✓ #{info[:file]} (#{info[:passed]} tests)" }
+    puts ""
+  end
+
+  if error_categories.any?
+    puts "-" * 70
+    puts " LOAD ERRORS by category (#{errored.size} files)"
+    puts "-" * 70
+    error_categories.sort_by { |_, files| -files.size }.each do |category, files|
+      puts "  #{category} (#{files.size} files)"
+      files.sort.each { |f| puts "    #{f}" }
+    end
+    puts ""
+  end
+
+  if failure_categories.any?
+    puts "-" * 70
+    puts " TEST FAILURES by pattern (#{failed.size} files)"
+    puts "-" * 70
+    failure_categories.sort_by { |_, files| -files.size }.each do |pattern, files|
+      puts "  #{pattern} (#{files.size} files)"
+      files.sort.each { |f| puts "    #{f}" }
+    end
+    puts ""
+  end
+
+  puts "=" * 70
+end
+
 # ============================================
 # Convenience tasks
 # ============================================
