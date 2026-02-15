@@ -115,8 +115,8 @@ module Ruby2JS
                   ups = from_parts.length - common
                   downs = to_parts[common..]
 
-                  if ups == 0 && downs.empty?
-                    "./#{target_file}"
+                  if ups == 0
+                    "./#{(downs + [target_file]).join('/')}"
                   else
                     "#{'../' * ups}#{(downs + [target_file]).join('/')}"
                   end
