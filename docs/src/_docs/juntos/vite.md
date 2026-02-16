@@ -198,14 +198,18 @@ external:
   - "@hotwired/turbo"
   - "@hotwired/stimulus"
 
+# Include/exclude filtering (applies to both Vite and eject)
+# When include is set, only matching files are processed
+include:
+  - app/models/heat.rb
+  - app/models/score.rb
+  - app/views/scores/**
+exclude:
+  - app/models/concerns/**
+
 # Eject command configuration (see "juntos eject --help")
 eject:
   output: ejected
-  include:
-    - app/models/*.rb
-    - app/views/articles/**/*
-  exclude:
-    - "**/*_test.rb"
 ```
 
 ### dependencies vs external

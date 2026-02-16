@@ -195,19 +195,25 @@ Patterns support glob syntax:
 
 **Filtering in ruby2js.yml:**
 
-Instead of command-line flags, you can configure filtering in `config/ruby2js.yml`:
+Instead of command-line flags, you can configure filtering in `config/ruby2js.yml`.
+Top-level `include`/`exclude` patterns apply to both the Vite plugin and eject:
 
 ```yaml
+# Top-level: applies to Vite dev server AND eject
+include:
+  - app/models/*.rb
+  - app/views/articles/**/*
+  - config/routes.rb
+exclude:
+  - "**/*_test.rb"
+  - app/models/concerns/*
+
 eject:
   output: ejected
-  include:
-    - app/models/*.rb
-    - app/views/articles/**/*
-    - config/routes.rb
-  exclude:
-    - "**/*_test.rb"
-    - app/models/concerns/*
 ```
+
+Note: Migrations are never filtered — all migrations run regardless of include/exclude
+patterns, since excluded models may still depend on the schema they define.
 
 CLI flags take precedence over the config file. This is useful for:
 - **Converting piece by piece:** Start with a few models, verify they work, add more

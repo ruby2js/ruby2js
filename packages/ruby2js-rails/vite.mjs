@@ -58,6 +58,7 @@ import {
   generateBrowserMainJs,
   ensureRuby2jsReady,
   buildAppManifest,
+  shouldIncludeFile,
   ErbCompiler
 } from './transform.mjs';
 
@@ -303,7 +304,10 @@ export function loadConfig(appRoot, overrides = {}) {
     external,
     base,
     // Section-specific configs from ruby2js.yml (controllers, stimulus, etc.)
-    sections: sectionConfigs
+    sections: sectionConfigs,
+    // Include/exclude patterns for filtering models and views
+    include: topLevelConfig.include || [],
+    exclude: topLevelConfig.exclude || []
   };
 }
 
@@ -776,7 +780,10 @@ export class ApplicationRecord extends ActiveRecord {}
       // Registers models with both Application and the adapter's modelRegistry
       // Also registers for RPC when dual bundle mode is enabled (hydration needs RPC)
       if (id === '\0juntos:models') {
-        const models = findModels(appRoot);
+        const allModels = findModels(appRoot);
+        const models = (config.include?.length || config.exclude?.length)
+          ? allModels.filter(m => shouldIncludeFile(`app/models/${m}.rb`, config.include, config.exclude))
+          : allModels;
         const collisions = findLeafCollisions(models);
         const imports = models.map(m => {
           const leafClass = m.split('/').pop().split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
@@ -872,6 +879,15 @@ export const migrations = [${exports.join(', ')}];
 ${imports.join('\n')}
 export const ${className} = { ${members.join(', ')} };
 `;
+        }
+
+        // Filter view resources by include/exclude patterns
+        // Use a synthetic path to check if any file in this resource dir would be included
+        if (config.include?.length || config.exclude?.length) {
+          if (!shouldIncludeFile(`app/views/${resource}/index.html.erb`, config.include, config.exclude)) {
+            const className = capitalize(singularize(resource)) + 'Views';
+            return `export const ${className} = {};`;
+          }
         }
 
         // Regular views: use shared generateViewsModule

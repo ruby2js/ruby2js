@@ -55,7 +55,10 @@ import {
   transformErb,
   transformJsxRb,
   fixImportsForEject,
-  fixTestImportsForEject
+  fixTestImportsForEject,
+  globToRegex,
+  matchesAny,
+  shouldIncludeFile
 } from './transform.mjs';
 
 import { singularize, camelize, pluralize, underscore } from './adapters/inflector.mjs';
@@ -89,72 +92,6 @@ function formatError(err) {
     return err.stack;
   }
   return err.message;
-}
-
-// ============================================
-// Glob matching helpers (for eject filtering)
-// ============================================
-
-/**
- * Convert a glob pattern to a regex.
- * Supports: * (any non-slash), ** (any including slash), ? (single char)
- */
-function globToRegex(pattern) {
-  let regex = pattern
-    // Escape special regex chars (except * and ?)
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    // ** matches anything including /
-    .replace(/\*\*/g, '<<<GLOBSTAR>>>')
-    // * matches anything except /
-    .replace(/\*/g, '[^/]*')
-    // ? matches single char except /
-    .replace(/\?/g, '[^/]')
-    // Restore globstar
-    .replace(/<<<GLOBSTAR>>>/g, '.*');
-
-  return new RegExp(`^${regex}$`);
-}
-
-/**
- * Check if a path matches any of the given glob patterns.
- */
-function matchesAny(filePath, patterns) {
-  if (!patterns || patterns.length === 0) return false;
-  return patterns.some(pattern => {
-    // Normalize path separators
-    const normalizedPath = filePath.replace(/\\/g, '/');
-    const normalizedPattern = pattern.replace(/\\/g, '/');
-    return globToRegex(normalizedPattern).test(normalizedPath);
-  });
-}
-
-/**
- * Determine if a file should be included in eject based on include/exclude patterns.
- *
- * @param {string} relativePath - Path relative to app root (e.g., 'app/models/article.rb')
- * @param {string[]} includePatterns - Patterns to include (if empty, include all)
- * @param {string[]} excludePatterns - Patterns to exclude
- * @returns {boolean} True if file should be included
- */
-function shouldIncludeFile(relativePath, includePatterns, excludePatterns) {
-  // Normalize path
-  const normalizedPath = relativePath.replace(/\\/g, '/');
-
-  // If include patterns specified, file must match at least one
-  if (includePatterns && includePatterns.length > 0) {
-    if (!matchesAny(normalizedPath, includePatterns)) {
-      return false;
-    }
-  }
-
-  // If exclude patterns specified, file must not match any
-  if (excludePatterns && excludePatterns.length > 0) {
-    if (matchesAny(normalizedPath, excludePatterns)) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 /**
