@@ -568,6 +568,11 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'a.indexOf("abc")'
     end
 
+    it "should handle index with regex" do
+      to_js( 'str.index(/pattern/)' ).
+        must_equal 'str.search(/pattern/)'
+    end
+
     it "should NOT handle index as a property" do
       to_js( 'a.index' ).
         must_equal 'a.index'

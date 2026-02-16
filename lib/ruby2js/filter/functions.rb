@@ -1064,7 +1064,11 @@ module Ruby2JS
           process s(:send!, target, :trimStart)
 
         elsif method == :index and parens_or_included?(node, method)
-          process node.updated(nil, [target, :indexOf, *args])
+          if args.length == 1 && args.first.type == :regexp
+            process node.updated(nil, [target, :search, *args])
+          else
+            process node.updated(nil, [target, :indexOf, *args])
+          end
 
         elsif method == :rindex and parens_or_included?(node, method) and
             args.none? { |arg| arg.type == :block_pass }

@@ -49,7 +49,7 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `.gsub` {{ caret }} `replace(//g)`
 * `.has_key?` {{ caret }} `key in hash`
 * `.include?` {{ caret }} `.indexOf() != -1`
-* `.index` {{ caret }} `indexOf` (when using arg) or `findIndex` (when using block)
+* `.index` {{ caret }} `indexOf` (with string arg), `search` (with regex arg), or `findIndex` (with block)
 * `.inspect` {{ caret }} `JSON.stringify()`
 * `.join` {{ caret }} `.join('')` (Ruby defaults to `""`, JS to `","`)
 * `.key?` {{ caret }} `key in hash`
