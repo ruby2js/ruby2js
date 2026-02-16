@@ -27,6 +27,8 @@ Browser deployment creates a static site that runs your entire application clien
 |---------|---------|----------|
 | `dexie` | IndexedDB | Most apps, best performance |
 | `sqljs` | SQLite/WASM | SQL compatibility, smaller datasets |
+| `sqlite-wasm` | SQLite/WASM + OPFS | SQL compatibility, persistent storage |
+| `wa-sqlite` | SQLite/WASM + OPFS | SQL compatibility, flexible VFS |
 | `pglite` | PostgreSQL/WASM | PostgreSQL features, larger apps |
 
 ## Development

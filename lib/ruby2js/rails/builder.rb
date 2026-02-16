@@ -141,6 +141,10 @@ class SelfhostBuilder
     'dexie' => 'active_record_dexie.mjs',
     'indexeddb' => 'active_record_dexie.mjs',
     'pglite' => 'active_record_pglite.mjs',
+    'sqlite_wasm' => 'active_record_sqlite_wasm.mjs',
+    'sqlite-wasm' => 'active_record_sqlite_wasm.mjs',
+    'wa_sqlite' => 'active_record_wa_sqlite.mjs',
+    'wa-sqlite' => 'active_record_wa_sqlite.mjs',
     # Node.js adapters
     'better_sqlite3' => 'active_record_better_sqlite3.mjs',
     'sqlite3' => 'active_record_better_sqlite3.mjs',  # Alias

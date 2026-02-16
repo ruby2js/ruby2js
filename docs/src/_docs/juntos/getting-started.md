@@ -88,6 +88,8 @@ Builds and deploys to serverless platforms.
 |---------|---------|---------|------------------|
 | `dexie` | Browser | IndexedDB | Direct (local) |
 | `sqljs` | Browser | SQLite/WASM | Direct (local) |
+| `sqlite-wasm` | Browser | SQLite/WASM + OPFS | Direct (local) |
+| `wa-sqlite` | Browser | SQLite/WASM + OPFS | Direct (local) |
 | `pglite` | Browser, Node | PostgreSQL/WASM | Direct (local) |
 | `sqlite` | Node, Bun | SQLite file | Direct (server) |
 | `pg` | Node, Bun, Deno | PostgreSQL | Direct (server) |

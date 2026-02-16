@@ -490,6 +490,8 @@ The CLI auto-installs the required npm package for each adapter:
 | `dexie` | dexie | browser |
 | `sqlite` | better-sqlite3 | node, bun |
 | `sqljs` | sql.js | browser |
+| `sqlite-wasm` | @sqlite.org/sqlite-wasm | browser |
+| `wa-sqlite` | wa-sqlite | browser |
 | `pglite` | @electric-sql/pglite | browser, node |
 | `pg` | pg | node, bun, deno |
 | `neon` | @neondatabase/serverless | vercel, node |
@@ -501,6 +503,8 @@ The CLI auto-installs the required npm package for each adapter:
 - `indexeddb` → dexie
 - `sqlite3`, `better_sqlite3` → sqlite
 - `sql.js` → sqljs
+- `sqlite_wasm` → sqlite-wasm
+- `wa_sqlite` → wa-sqlite
 - `postgres`, `postgresql` → pg
 - `mysql2` → mysql
 
@@ -512,7 +516,7 @@ When target is not specified, it's inferred from the database:
 
 | Database | Default Target |
 |----------|---------------|
-| dexie, sqljs, pglite | browser |
+| dexie, sqljs, sqlite-wasm, wa-sqlite, pglite | browser |
 | sqlite, pg, mysql | node |
 | neon, turso | vercel |
 | d1 | cloudflare |

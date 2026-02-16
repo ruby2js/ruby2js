@@ -62,6 +62,8 @@ juntos({
 |----------|--------------|
 | `dexie` | browser, capacitor |
 | `sqljs` | browser, capacitor |
+| `sqlite-wasm` | browser, capacitor |
+| `wa-sqlite` | browser, capacitor |
 | `sqlite` / `better_sqlite3` | node, bun, electron |
 | `pg` | node, bun, deno, electron |
 | `neon` | vercel, vercel-edge |
