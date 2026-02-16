@@ -160,6 +160,15 @@ Create a Juntos project within showcase (or as a sibling) with:
 - `config/ruby2js.yml` with include patterns for scoring models/views
 - `config/database.yml` with `adapter: sqlite-wasm`
 
+**Validation — Models transpile without errors:**
+
+1. All 12 models transpile — no parse errors, no unsupported syntax. Showcase models likely use patterns the demos don't (STI, complex scopes, `Event.current` singleton, custom methods with SQL-heavy logic like `Heat#rank_placement`).
+2. Generated `app/models/index.js` lists all 12 models with correct imports — the include filter didn't accidentally exclude dependencies.
+3. Association graph is complete — no dangling `belongs_to` pointing to excluded models. Every referenced model class is in the bundle.
+4. Syntax check the output — `node -c` on each generated `.js` file catches transpilation bugs before anything runs.
+
+*Likely issues*: Unsupported Ruby patterns (STI `type` column handling, class methods with complex default arguments, `scope` lambdas with SQL fragments).
+
 #### 2b. Database bootstrap
 
 A Stimulus controller or standalone module that:
@@ -171,6 +180,16 @@ A Stimulus controller or standalone module that:
 
 This is browser-only code — it doesn't exist in Rails, so no conditional branching needed.
 
+**Validation — Models can query imported data:**
+
+1. Import succeeds — `importDump()` handles the full dump without errors. Real dumps may have SQLite-specific syntax (`INSERT OR REPLACE`, `PRAGMA` statements, triggers) that the statement splitter doesn't handle.
+2. Table verification — `SELECT name FROM sqlite_master WHERE type='table'` returns the expected tables (heats, scores, entries, people, dances, categories, judges, solos, events, ages, levels, studios).
+3. Basic queries work — `Heat.all()`, `Score.where({heat_id: 1})`, `Entry.find(1)` return rows with correct types (integers are integers, not strings).
+4. Associations resolve — `heat.scores`, `heat.dance`, `entry.lead` return the right related records. This tests that foreign keys in the imported data match what the transpiled models expect.
+5. Row counts match — Compare `Heat.count()` in the browser against `Heat.count` from Rails console for the same event database.
+
+*Likely issues*: Column type mismatches (SQLite's loose typing vs what the adapter expects), association naming mismatches between the dump schema and transpiled model declarations, `importDump()` choking on triggers or views in the dump.
+
 #### 2c. Score write-back
 
 When a judge submits a score:
@@ -179,11 +198,29 @@ When a judge submits a score:
 3. Process queue when online, retry on failure
 4. The existing `batch_scores` endpoint accepts bulk uploads — reuse it
 
+**Validation — Round-trip data integrity:**
+
+1. Local write persists — Create a score via `Score.create(...)`, verify `Score.find(id)` returns it, close and reopen the OPFS database, verify it's still there.
+2. POST payload matches Rails format — Capture the HTTP POST body and verify it matches what the existing `/batch_scores` endpoint expects. Compare against a real request from the current Rails scoring UI.
+3. Rails accepts the POST — Actually POST to a test instance and verify the score appears in the Rails database.
+4. Conflict-free — Two scores from different judges for the same heat don't collide (each judge has an independent score row).
+
+*Likely issues*: CSRF token handling, authentication (judges access via link with judge ID — how does the SPA authenticate POSTs?), field naming mismatches between transpiled model attributes and Rails strong params.
+
 #### 2d. Mount point
 
 Either:
 - A new route in Rails that serves the Juntos SPA's `index.html` (simplest)
 - Modify the existing `/scores/:judge/heats` route to serve the SPA when a query param or cookie is set (allows A/B testing)
+
+**Validation — End-to-end rendering parity:**
+
+1. SPA loads and renders — Navigate to the mount point, see the heat list for a specific judge.
+2. Visual diff against Rails — For 3-5 heats, screenshot the Rails-rendered page and the SPA-rendered page side by side. This is manual initially but feeds into Phase 3's automated HTML diff.
+3. Navigation works — Click through heat list → heat detail → back, verify no broken routes or missing views.
+4. Data matches — Spot-check that names, scores, and dance labels shown in the SPA match exactly what Rails shows.
+
+*Likely issues*: Missing view helpers (the scoring views likely use helpers not yet transpiled), ERB partials that reference excluded models or controller methods, route generation differences.
 
 ### Phase 3: Validation
 
