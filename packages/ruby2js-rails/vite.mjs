@@ -2287,6 +2287,10 @@ function createVirtualPlugin(config, appRoot) {
     'planetscale': 'active_record_planetscale.mjs',
     'd1': 'active_record_d1.mjs',
     'sqljs': 'active_record_sqljs.mjs',
+    'sqlite_wasm': 'active_record_sqlite_wasm.mjs',
+    'sqlite-wasm': 'active_record_sqlite_wasm.mjs',
+    'wa_sqlite': 'active_record_wa_sqlite.mjs',
+    'wa-sqlite': 'active_record_wa_sqlite.mjs',
     'pglite': 'active_record_pglite.mjs',
     'supabase': 'active_record_supabase.mjs',
     'rpc': 'active_record_rpc.mjs'  // RPC adapter for client-side model access

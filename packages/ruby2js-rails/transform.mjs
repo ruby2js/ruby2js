@@ -28,6 +28,10 @@ export const DEFAULT_TARGETS = Object.freeze({
   sqljs: 'browser',
   'sql.js': 'browser',
   pglite: 'browser',
+  sqlite_wasm: 'browser',
+  'sqlite-wasm': 'browser',
+  wa_sqlite: 'browser',
+  'wa-sqlite': 'browser',
 
   // TCP-based server databases
   better_sqlite3: 'node',
@@ -1954,6 +1958,10 @@ function getActiveRecordAdapterFile(database) {
     'turso': 'active_record_turso.mjs',
     'pglite': 'active_record_pglite.mjs',
     'sqljs': 'active_record_sqljs.mjs',
+    'sqlite_wasm': 'active_record_sqlite_wasm.mjs',
+    'sqlite-wasm': 'active_record_sqlite_wasm.mjs',
+    'wa_sqlite': 'active_record_wa_sqlite.mjs',
+    'wa-sqlite': 'active_record_wa_sqlite.mjs',
     'mysql': 'active_record_mysql2.mjs',
     'mysql2': 'active_record_mysql2.mjs'
   };
