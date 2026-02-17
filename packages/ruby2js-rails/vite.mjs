@@ -722,15 +722,14 @@ function createRubyTransformPlugin(config, appRoot) {
         manifestPromise = null;
         transformCache.delete(file);
 
-        // Rebuild asynchronously
+        // Rebuild metadata, then trigger Turbo-aware reload
         ensureManifest().then(() => {
           console.log('[juntos] Model metadata rebuilt after change');
-        });
-
-        server.ws.send({
-          type: 'custom',
-          event: 'ruby2js:turbo-reload',
-          data: { file }
+          server.ws.send({
+            type: 'custom',
+            event: 'ruby2js:turbo-reload',
+            data: { file }
+          });
         });
         return [];
       }
@@ -2097,10 +2096,49 @@ function createHmrPlugin() {
   return {
     name: 'juntos-hmr',
 
-    // Watch ERB files even though they're not in the module graph
+    // Watch ERB files and inject HMR runtime into HTML responses
     configureServer(server) {
       // Add app/views/**/*.erb to Vite's watcher
       server.watcher.add('**/app/views/**/*.erb');
+
+      // Inject HMR runtime into HTML responses from the app server.
+      // transformIndexHtml only works for Vite-served HTML (browser targets).
+      // This middleware handles server-rendered HTML (node/SSR targets) too.
+      const hmrScript = `<script type="module">${STIMULUS_HMR_RUNTIME}</script>`;
+      server.middlewares.use((req, res, next) => {
+        const originalEnd = res.end;
+        const originalWrite = res.write;
+        let body = '';
+        let isHtml = false;
+
+        res.write = function(chunk, ...args) {
+          if (!isHtml) {
+            const contentType = res.getHeader('content-type');
+            isHtml = typeof contentType === 'string' && contentType.includes('text/html');
+          }
+          if (isHtml && chunk) {
+            body += typeof chunk === 'string' ? chunk : chunk.toString();
+            return true;
+          }
+          return originalWrite.call(this, chunk, ...args);
+        };
+
+        res.end = function(chunk, ...args) {
+          if (isHtml) {
+            if (chunk) body += typeof chunk === 'string' ? chunk : chunk.toString();
+            if (body.includes('</head>')) {
+              body = body.replace('</head>', hmrScript + '</head>');
+            } else if (body.includes('</body>')) {
+              body = body.replace('</body>', hmrScript + '</body>');
+            }
+            res.removeHeader('content-length');
+            return originalEnd.call(this, body, ...args);
+          }
+          return originalEnd.call(this, chunk, ...args);
+        };
+
+        next();
+      });
     },
 
     handleHotUpdate({ file, server, modules }) {
