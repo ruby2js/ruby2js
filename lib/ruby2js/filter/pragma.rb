@@ -482,13 +482,17 @@ module Ruby2JS
           end
         end
 
+        # Use options[:file] as fallback when AST source buffer name is nil
+        # (common with selfhost converter where source buffer names aren't set)
+        file = source_name || @options[:file]
+
         diagnostics.push({
           severity: :warning,
           rule: :ambiguous_method,
           method: method.to_s,
           line: line,
           column: column,
-          file: source_name,
+          file: file,
           valid_types: valid_types,
           message: "ambiguous method '#{method}' - receiver type unknown"
         })
