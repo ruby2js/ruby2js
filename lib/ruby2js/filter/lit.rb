@@ -275,15 +275,15 @@ module Ruby2JS
       public
 
       def on_ivar(node)
-        return super unless @le_props&.include?(node.children.first) # Pragma: hash
-        process s(:attr, s(:self), node.children.first.to_s[1..-1])
+        return super unless @le_props&.include?(node.children[0]) # Pragma: hash
+        process s(:attr, s(:self), node.children[0].to_s[1..-1])
       end
 
       def on_ivasgn(node)
-        return super unless @le_props&.include?(node.children.first) # Pragma: hash
+        return super unless @le_props&.include?(node.children[0]) # Pragma: hash
         return super unless node.children.length > 1
 
-        process s(:send, s(:self), node.children.first.to_s[1..-1]+'=',
+        process s(:send, s(:self), node.children[0].to_s[1..-1]+'=',
           process(node.children[1]))
       end
 
