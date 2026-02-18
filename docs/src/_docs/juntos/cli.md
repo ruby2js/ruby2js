@@ -493,6 +493,7 @@ npx juntos lint [options] [files...]
 
 | Option | Description |
 |--------|-------------|
+| `--strict` | Enable strict warnings for rare but possible issues |
 | `--disable RULE` | Disable a rule (can be repeated) |
 | `--include PATTERN` | Include only matching files (glob, can be repeated) |
 | `--exclude PATTERN` | Exclude matching files (glob, can be repeated) |
@@ -503,6 +504,7 @@ npx juntos lint [options] [files...]
 ```bash
 npx juntos lint                              # Lint all Ruby source files
 npx juntos lint app/models/article.rb        # Lint a specific file
+npx juntos lint --strict                     # Include strict warnings
 npx juntos lint --disable ambiguous_method   # Skip type-ambiguity warnings
 npx juntos lint --include "app/models/**"    # Only lint models
 ```
@@ -529,7 +531,7 @@ Linted 12 files: 0 errors, 2 warnings
 
 | Rule | Severity | Description |
 |------|----------|-------------|
-| `ambiguous_method` | warning | Method has different JavaScript behavior depending on receiver type. Fix by adding a `# Pragma:` comment or initializing the variable so the type can be inferred. |
+| `ambiguous_method` | warning | Method has different JavaScript behavior depending on receiver type (see below). |
 | `method_missing` | error | `method_missing` has no JavaScript equivalent |
 | `eval_call` | error | `eval()` cannot be safely transpiled |
 | `instance_eval` | error | `instance_eval` cannot be transpiled |
@@ -541,6 +543,12 @@ Linted 12 files: 0 errors, 2 warnings
 | `force_encoding` | warning | `force_encoding` has no JavaScript equivalent (JS strings are always UTF-16) |
 | `parse_error` | error | File could not be parsed |
 | `conversion_error` | error | File could not be converted |
+
+**Default vs strict ambiguous method warnings:**
+
+By default, the linter only warns about methods where the JavaScript fallthrough is **silently wrong** — operators like `<<` (bitwise shift instead of append), `+`/`-`/`&`/`|` on arrays (arithmetic instead of set operations), `dup` (no JS equivalent), `delete`/`clear`/`empty?` (wrong for certain types), and `include?` (wrong for Hash/Set).
+
+With `--strict`, additional warnings appear for methods where the default JavaScript is **usually correct** but could be wrong for less common types like `Map`, `Set`, or `Proc`: `[]`, `[]=`, `key?`, `merge`, `any?`, `replace`, `first`, `to_h`, `compact`, and `flatten`.
 
 ### Fixing ambiguous method warnings
 

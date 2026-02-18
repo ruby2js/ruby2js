@@ -1550,6 +1550,33 @@ describe Ruby2JS::Filter::Pragma do
       ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == 'each' }
       _(ambiguous).must_be_empty
     end
+
+    it "should not report strict-only warnings by default" do
+      diags = lint('obj[key]')
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == '[]' }
+      _(ambiguous).must_be_empty
+    end
+
+    it "should report strict-only warnings when strict is set" do
+      diags = lint('obj[key]', strict: true)
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == '[]' }
+      _(d).wont_be_nil
+      _(d[:valid_types]).must_include :map
+      _(d[:valid_types]).must_include :proc
+    end
+
+    it "should not report strict merge warning by default" do
+      diags = lint('obj.merge(other)')
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == 'merge' }
+      _(ambiguous).must_be_empty
+    end
+
+    it "should report strict merge warning when strict is set" do
+      diags = lint('obj.merge(other)', strict: true)
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'merge' }
+      _(d).wont_be_nil
+      _(d[:valid_types]).must_include :set
+    end
   end
 
   describe "automatic class reopening detection" do

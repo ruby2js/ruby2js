@@ -2466,7 +2466,7 @@ export async function transformRuby(source, filePath, section, config, appRoot, 
  * @param {string} appRoot - Application root directory
  * @returns {Promise<Array>} Array of diagnostic objects
  */
-export async function lintRuby(source, filePath, section, config, appRoot) {
+export async function lintRuby(source, filePath, section, config, appRoot, lintOptions = {}) {
   const { convert, parse } = await ensureRuby2jsReady();
   const diagnostics = [];
   const relPath = path.relative(appRoot, filePath);
@@ -2502,6 +2502,7 @@ export async function lintRuby(source, filePath, section, config, appRoot) {
       database: config.database,
       target: config.target,
       lint: true,
+      strict: !!lintOptions.strict,
       diagnostics: diagnostics  // shared mutable array - pragma filter pushes to it
     };
 

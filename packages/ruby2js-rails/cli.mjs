@@ -1136,7 +1136,8 @@ function parseCommonArgs(args) {
     exclude: [],      // --exclude patterns (can be repeated)
     only: null,       // --only comma-separated list (shorthand for include-only)
     // Lint options
-    disable: []       // --disable rules (can be repeated)
+    disable: [],      // --disable rules (can be repeated)
+    strict: false     // --strict: enable strict lint warnings
   };
 
   const remaining = [];
@@ -1229,6 +1230,8 @@ function parseCommonArgs(args) {
       options.disable.push(args[++i]);
     } else if (arg.startsWith('--disable=')) {
       options.disable.push(arg.slice(10));
+    } else if (arg === '--strict') {
+      options.strict = true;
     } else {
       remaining.push(arg);
     }
@@ -3332,7 +3335,7 @@ async function runLint(files, options) {
 
     let diagnostics;
     try {
-      diagnostics = await lintRuby(source, filePath, section, config, APP_ROOT);
+      diagnostics = await lintRuby(source, filePath, section, config, APP_ROOT, { strict: options.strict });
     } catch (err) {
       diagnostics = [{
         severity: 'error', rule: 'lint_error',
@@ -4075,6 +4078,7 @@ switch (command) {
     if (options.help) {
       console.log('Usage: juntos lint [options] [files...]\n\nScan Ruby files for transpilation issues.\n');
       console.log('Options:');
+      console.log('  --strict                 Enable strict warnings (rare but possible issues)');
       console.log('  --disable RULE           Disable a lint rule (can be repeated)');
       console.log('  --include PATTERN        Include only matching files (glob)');
       console.log('  --exclude PATTERN        Exclude matching files (glob)');
@@ -4094,6 +4098,7 @@ switch (command) {
       console.log('\nExamples:');
       console.log('  juntos lint                              # Lint all Ruby source files');
       console.log('  juntos lint app/models/article.rb        # Lint specific file');
+      console.log('  juntos lint --strict                     # Include strict warnings');
       console.log('  juntos lint --disable ambiguous_method   # Skip ambiguity warnings');
       process.exit(0);
     }
