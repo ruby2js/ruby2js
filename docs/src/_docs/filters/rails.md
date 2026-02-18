@@ -243,6 +243,22 @@ export class Article extends ApplicationRecord {
 }
 ```
 
+Rails `arel_table[:column]` references in scopes are simplified to column name strings, which is useful when a column name conflicts with a SQL keyword:
+
+```ruby
+class Category < ApplicationRecord
+  scope :ordered, -> { order(arel_table[:order]) }
+end
+```
+
+```javascript
+export class Category extends ApplicationRecord {
+  static ordered() {
+    return this.order("order")
+  }
+}
+```
+
 ### Enums
 
 Rails `enum` declarations are transpiled to instance predicate methods, static scope methods, and a frozen values constant.

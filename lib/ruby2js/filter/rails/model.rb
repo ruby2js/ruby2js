@@ -1985,6 +1985,13 @@ module Ruby2JS
           when :send
             target, method, *args = node.children
 
+            # Simplify arel_table[:column] to just the column name string
+            if target.respond_to?(:type) && target.type == :send &&
+               target.children[0] == nil && target.children[1] == :arel_table &&
+               method == :[] && args.length == 1 && args[0].type == :sym
+              return s(:str, args[0].children[0].to_s)
+            end
+
             # Transform implicit self calls (where, order, limit, etc.)
             # Note: use == nil for JS compatibility (nil? doesn't exist in JS)
             if target == nil

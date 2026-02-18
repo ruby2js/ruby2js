@@ -86,59 +86,30 @@ of `group_by`.
 
 ## 4. Adapter Gaps
 
-### 4a. `arel_table` in scopes
+### 4a. `arel_table` in scopes ✅
 
-Four models use `arel_table` for ordering:
-```ruby
-scope :ordered, -> { order(arel_table[:order]) }
-scope :by_name, -> { order(arel_table[:name]) }
-```
+Fixed. Added `arel_table[:column]` detection in `transform_scope_body` in
+`lib/ruby2js/filter/rails/model.rb`. The pattern `arel_table[:col]` is simplified
+to the column name string `"col"`. E.g., `order(arel_table[:order])` → `this.order("order")`.
 
-The adapters don't support Arel. Options:
-- **Rewrite in showcase** to `order(:order)` / `order(:name)` — simplest
-- **Transpiler fix**: detect `arel_table[:col]` pattern and simplify to column name
-- **Adapter support**: teach the SQL adapter to handle `{column: 'asc'}` objects
+### 4b. Nested `includes` ✅
 
-**Recommendation:** Transpiler fix — `arel_table[:col]` is a common Rails idiom
-for avoiding SQL keyword conflicts (e.g., `order` is both a column and SQL keyword).
-Detect in the model filter and emit the column name as a string.
+Already works. The adapter's `_loadAssociations` in `active_record_sql.mjs` handles
+both flat strings and nested hash objects (`{ posts: ['comments', 'tags'] }`).
+The transpiler correctly converts `includes(entry: [:lead, :follow])` to
+`includes({entry: ["lead", "follow"]})`. **No fix needed.**
 
-### 4b. Nested `includes`
+### 4c. Raw SQL in `where` / scopes ✅
 
-```ruby
-heats.includes(entry: [:lead, :follow])
-```
+Already works. The adapter's `where()` accepts raw SQL strings, and the SQL adapter
+inserts them directly into the WHERE clause. `where('heat_id < 0')` works as-is.
+**No fix needed.**
 
-The adapter currently supports flat `includes(:scores, :entry)` but not nested
-hash syntax for eager-loading through associations.
+### 4d. `where.not` with ranges ✅
 
-**Used in:** Dance (`scrutineering`), various query chains
-
-**Fix in:** `packages/ruby2js-rails/adapters/relation.mjs` — extend `includes()`
-to accept hash arguments and resolve nested associations.
-
-### 4c. Raw SQL in `where` / scopes
-
-```ruby
-scope :category_scores, -> { where('heat_id < 0') }
-Score.where(heat: heats)  # association-based where
-```
-
-String-based `where` conditions need the SQL adapter to parse simple expressions.
-Association-based `where` (passing an ActiveRecord relation or collection) needs
-adapter support for `IN` clause generation.
-
-**Used in:** Score (scopes), Dance (`scrutineering`), Category (`is_spacer?`)
-
-### 4d. `where.not` with ranges
-
-```ruby
-.where.not(number: ..0)
-```
-
-The `where.not` chain transpiles correctly. The adapter's `not()` method exists.
-But beginless ranges as condition values need adapter-level handling to generate
-`number > 0` SQL.
+Already works. The adapter's `_buildRangeSQL` handles all range types including
+beginless ranges. `where.not(number: ..0)` correctly generates `number > 0`.
+**No fix needed.**
 
 ---
 
@@ -214,28 +185,28 @@ the query execute.
 
 ## Suggested Order of Work
 
-**Phase A — Fix bugs (blocks correctness):**
-1. `to_h` with block (1a)
-2. `group_by` + chained enumerable (1b)
+**Phase A — Fix bugs (blocks correctness): ✅ COMPLETE**
+1. `to_h` with block (1a) ✅
+2. `group_by` + chained enumerable (1b) ✅
 
-**Phase B — Add missing methods (blocks compilation):**
-3. `uniq` mapping (2a)
-4. `rotate` mapping (2c)
+**Phase B — Add missing methods (blocks compilation): ✅ COMPLETE**
+3. `uniq` mapping (2a) ✅
+4. `rotate` mapping (2c) ✅
 
-**Phase C — Adapter gaps (blocks queries):**
-5. `arel_table` simplification (4a)
-6. Nested `includes` (4b)
-7. Raw SQL in `where` (4c)
+**Phase C — Adapter gaps (blocks queries): ✅ COMPLETE**
+5. `arel_table` simplification (4a) ✅ — transpiler fix in model filter
+6. Nested `includes` (4b) ✅ — already supported
+7. Raw SQL in `where` (4c) ✅ — already supported
+8. `where.not` with ranges (4d) ✅ — already supported
 
 **Phase D — Lint improvements (prevents regressions):**
-8. Missing-method detection (3a)
-9. Incorrect `to_h` detection (3b)
+9. Missing-method detection (3a)
+10. Incorrect `to_h` detection (3b)
 
 **Phase E — Integration testing:**
-10. Transpile all 12 models, syntax-check output
-11. Test recursive lambda scoring algorithms with real event data
-12. Test `super` in column accessors against adapter
+11. Transpile all 12 models, syntax-check output
+12. Test recursive lambda scoring algorithms with real event data
+13. Test `super` in column accessors against adapter
 
-Phase A and B are prerequisites. Phase C may be partially worked around by
-rewriting a few scopes in the showcase app. Phase D improves the developer
-experience for all future Juntos users, not just this pilot.
+Phases A–C are complete. Phase D improves the developer experience for all
+future Juntos users, not just this pilot.

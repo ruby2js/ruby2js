@@ -216,6 +216,18 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'static get recent()'
       assert_includes result, 'this.order({created_at: "desc"}).limit(10)'
     end
+
+    it "simplifies arel_table[:column] to column name string" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          scope :ordered, -> { order(arel_table[:order]) }
+          scope :by_name, -> { order(arel_table[:name]) }
+        end
+      RUBY
+      assert_includes result, 'this.order("order")'
+      assert_includes result, 'this.order("name")'
+      refute_includes result, 'arel_table'
+    end
   end
 
   describe "callbacks" do
