@@ -76,13 +76,23 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'modelRegistry.Export'
     end
 
-    it "supports foreign_key option" do
+    it "supports foreign_key option with string" do
       result = to_js(<<~RUBY)
         class Article < ApplicationRecord
           has_many :comments, foreign_key: 'post_id'
         end
       RUBY
       assert_includes result, 'foreignKey: "post_id"'
+    end
+
+    it "supports foreign_key option with symbol" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          has_many :comments, foreign_key: :post_id
+        end
+      RUBY
+      assert_includes result, 'foreignKey: "post_id"'
+      refute_includes result, ':post_id'
     end
 
     it "handles dependent destroy" do

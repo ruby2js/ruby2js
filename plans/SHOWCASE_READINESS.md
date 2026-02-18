@@ -59,28 +59,25 @@ Fixed. `rotate` → `[...a.slice(1), a[0]]`, `rotate(n)` → `[...a.slice(n), ..
 
 ---
 
-## 3. Lint Enhancements
+## 3. Lint Enhancements ✅
 
-### 3a. Detect methods with no JS equivalent
+### 3a. Detect methods with no JS equivalent ✅
 
-Add structural lint rules for Ruby methods that pass through silently but will
-fail at runtime:
+No longer needed — `uniq` (2a) and `rotate` (2c) are now mapped. `sort_by`
+without a block is already handled by the functions filter (uses `slice().sort()`
+or `toSorted()` depending on ES level).
 
-- `uniq` (until 2a is fixed)
-- `rotate` (until 2c is fixed)
-- `sort_by` without a block (Ruby sorts ascending by default; JS `.sort()` is lexicographic)
+The `juntos lint` command already provides structural anti-pattern detection
+(lint.mjs) and ambiguous-method warnings (pragma.rb).
 
-These are more valuable than the ambiguous-method warnings because the failure
-is guaranteed, not type-dependent.
+### 3b. Detect incorrect `to_h` with block ✅
 
-### 3b. Detect incorrect `to_h` with block
+No longer needed — `to_h` with block is now correctly transpiled (1a).
 
-Until bug 1a is fixed, lint should flag `to_h` calls that have a block argument.
+### 3c. Detect `.map`/`.select`/`.each` chained after `group_by` ✅
 
-### 3c. Detect `.map`/`.select`/`.each` chained after `group_by`
-
-Until bug 1b is fixed, lint should flag enumerable methods called on the result
-of `group_by`.
+No longer needed — `group_by` result is now type-inferred as `:hash`, which
+triggers automatic `Object.entries()` wrapping (1b).
 
 ---
 
@@ -199,9 +196,9 @@ the query execute.
 7. Raw SQL in `where` (4c) ✅ — already supported
 8. `where.not` with ranges (4d) ✅ — already supported
 
-**Phase D — Lint improvements (prevents regressions):**
-9. Missing-method detection (3a)
-10. Incorrect `to_h` detection (3b)
+**Phase D — Lint improvements (prevents regressions): ✅ COMPLETE**
+9. Missing-method detection (3a) ✅ — resolved by Phase B fixes
+10. Incorrect `to_h` / `group_by` detection (3b, 3c) ✅ — resolved by Phase A fixes
 
 **Phase E — Integration testing:**
 11. Transpile all 12 models, syntax-check output

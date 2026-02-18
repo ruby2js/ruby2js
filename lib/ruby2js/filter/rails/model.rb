@@ -1226,7 +1226,7 @@ module Ruby2JS
                 s(:pair, s(:sym, :model), s(:str, class_name))
               ]
               if assoc[:options][:foreign_key]
-                props << s(:pair, s(:sym, :foreignKey), s(:str, assoc[:options][:foreign_key]))
+                props << s(:pair, s(:sym, :foreignKey), s(:str, assoc[:options][:foreign_key].to_s))
               end
               # Polymorphic associations: include foreignType and ownerType
               if assoc[:options][:as]
@@ -1380,7 +1380,7 @@ module Ruby2JS
           class_name = Ruby2JS::Inflector.classify(Ruby2JS::Inflector.singularize(association_name.to_s)) if class_name.empty?
           # Polymorphic: has_many :events, as: :eventable → foreignKey: "eventable_id"
           polymorphic_name = assoc[:options][:as]
-          foreign_key = assoc[:options][:foreign_key] ||
+          foreign_key = assoc[:options][:foreign_key]&.to_s ||
             (polymorphic_name ? "#{polymorphic_name}_id" : "#{@rails_model_name.downcase}_id")
 
           # Build association metadata object: { name: 'comments', type: 'has_many', foreignKey: 'article_id' }
@@ -1440,7 +1440,7 @@ module Ruby2JS
           loaded_flag = "_#{association_name}_loaded".to_sym
           class_name = (assoc[:options][:class_name] || '').split('::').last || ''
           class_name = Ruby2JS::Inflector.classify(association_name.to_s) if class_name.empty?
-          foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
+          foreign_key = assoc[:options][:foreign_key]&.to_s || "#{@rails_model_name.downcase}_id"
 
           model_ref = s(:send, s(:lvar, :modelRegistry), :[], s(:str, class_name))
 
@@ -1503,7 +1503,7 @@ module Ruby2JS
           cache_name = "_#{association_name}".to_sym
           class_name = (assoc[:options][:class_name] || '').split('::').last || ''
           class_name = Ruby2JS::Inflector.classify(association_name.to_s) if class_name.empty?
-          foreign_key = assoc[:options][:foreign_key] || "#{association_name}_id"
+          foreign_key = assoc[:options][:foreign_key]&.to_s || "#{association_name}_id"
           is_polymorphic = assoc[:options][:polymorphic] == true
 
           # Access foreign key from attributes
@@ -1615,7 +1615,7 @@ module Ruby2JS
           stmts = []
           defaults.each do |assoc|
             name = assoc[:name]
-            foreign_key = assoc[:options][:foreign_key] || "#{name}_id"
+            foreign_key = assoc[:options][:foreign_key]&.to_s || "#{name}_id"
             lambda_node = assoc[:options][:default]
             lambda_body = lambda_node.children[2]
 
