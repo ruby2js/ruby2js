@@ -199,6 +199,9 @@ x = a & b # Pragma: array
 
 x = a | b # Pragma: array
 # => let x = [...new Set([...a, ...b])]  (union)
+
+arr.delete(val) # Pragma: array
+# => arr.splice(arr.indexOf(val), 1)
 ```
 
 **Note:** All array operators work with type inference:
@@ -226,10 +229,36 @@ obj.dup # Pragma: hash
 
 obj.include?(key) # Pragma: hash
 # => key in obj
+
+obj.clear # Pragma: hash
+# => for (let _key of Object.keys(obj)) delete obj[_key]
+
+obj.first # Pragma: hash
+# => Object.entries(obj)[0]
+
+obj.to_h # Pragma: hash
+# => obj  (no-op identity)
+
+obj.compact # Pragma: hash
+# => Object.fromEntries(Object.entries(obj).filter(([_k, _v]) => _v != null))
+
+obj.flatten # Pragma: hash
+# => Object.entries(obj).flat(Infinity)
+
+# Block methods with entries wrapping:
+obj.reduce(init) { |acc, (k, v)| ... } # Pragma: hash
+# => Object.entries(obj).reduce((acc, [k, v]) => ..., init)
+
+obj.flat_map { |k, v| ... } # Pragma: hash
+# => Object.entries(obj).flatMap(([k, v]) => ...)
+
+obj.each_with_index { |(k, v), i| ... } # Pragma: hash
+# => Object.entries(obj).forEach(([k, v], i) => ...)
 ```
 
 **When to use:** When you need hash-specific operations like the `in` operator
-for key checking.
+for key checking, or when iterating over hashes with methods that the functions
+filter normally maps to array operations.
 
 ### `set`
 
@@ -300,9 +329,13 @@ Specifies that the receiver is a String.
 ```ruby
 str.dup # Pragma: string
 # => str
+
+s.replace("other") # Pragma: string
+# => s = "other"
 ```
 
-**Note:** Strings in JavaScript are immutable, so `.dup` is a no-op.
+**Note:** Strings in JavaScript are immutable, so `.dup` is a no-op and
+`.replace` becomes a reassignment.
 
 ## Type Inference
 

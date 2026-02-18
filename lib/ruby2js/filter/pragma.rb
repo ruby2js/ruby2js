@@ -757,13 +757,14 @@ module Ruby2JS
           end
           # Note: array and string both use .includes() which functions filter handles
 
-        # .delete - Set/Map: delete (keep as method), Hash: delete keyword
+        # .delete - Set/Map: delete (keep as method), Hash: delete keyword, Array: splice
         when :delete
           # Only apply if this is a real :send node, not from :attr or :call processing
           if node.type == :send
             # Check pragma first, then fall back to inferred type
             type = if pragma?(node, :set) then :set
                    elsif pragma?(node, :map) then :map
+                   elsif pragma?(node, :array) then :array
                    else var_type(target)
                    end
 
@@ -772,16 +773,21 @@ module Ruby2JS
               # This structure isn't recognized by functions filter, so it won't be converted to delete keyword
               # Don't re-process to avoid infinite loop - just return the transformed node
               return s(:call, s(:attr, process(target), :delete), nil, *args.map { |a| process(a) })
+            elsif type == :array && args.length == 1
+              # arr.delete(val) → arr.splice(arr.indexOf(val), 1)
+              return process s(:send, target, :splice,
+                s(:send, target, :indexOf, args.first), s(:int, 1))
             end
           end
 
-        # .clear - Set/Map: clear (keep as method), Array: length = 0
+        # .clear - Set/Map: clear (keep as method), Array: length = 0, Hash: delete keys
         when :clear
           # Only apply if this is a real :send node, not from :attr or :call processing
           if node.type == :send
             # Check pragma first, then fall back to inferred type
             type = if pragma?(node, :set) then :set
                    elsif pragma?(node, :map) then :map
+                   elsif pragma?(node, :hash) then :hash
                    else var_type(target)
                    end
 
@@ -790,6 +796,11 @@ module Ruby2JS
               # This structure isn't recognized by functions filter, so it won't be converted to length = 0
               # Don't re-process to avoid infinite loop - just return the transformed node
               return s(:call, s(:attr, process(target), :clear), nil)
+            elsif type == :hash && args.length == 0
+              # hash.clear → for (let _key of Object.keys(hash)) delete hash[_key]
+              return process s(:for_of, s(:lvasgn, :_key),
+                s(:send, s(:const, nil, :Object), :keys, target),
+                s(:undef, s(:send, target, :[], s(:lvar, :_key))))
             end
           end
 
@@ -942,6 +953,74 @@ module Ruby2JS
             return process s(:array, s(:splat, set_new))
           end
 
+        # .replace - String: reassignment (JS strings are immutable)
+        when :replace
+          type = if pragma?(node, :string) then :string
+                 else var_type(target)
+                 end
+
+          if type == :string && args.length == 1
+            # str.replace(other) → str = other (reassignment)
+            if target&.type == :lvar
+              return process s(:lvasgn, target.children.first, args.first)
+            elsif target&.type == :ivar
+              return process s(:ivasgn, target.children.first, args.first)
+            end
+          end
+
+        # .first - Hash: Object.entries(hash)[0]
+        when :first
+          type = if pragma?(node, :hash) then :hash
+                 else var_type(target)
+                 end
+
+          if type == :hash && args.empty?
+            # hash.first → Object.entries(hash)[0]
+            return process s(:send,
+              s(:send, s(:const, nil, :Object), :entries, target),
+              :[], s(:int, 0))
+          end
+
+        # .to_h - Hash: no-op identity
+        when :to_h
+          type = if pragma?(node, :hash) then :hash
+                 else var_type(target)
+                 end
+
+          if type == :hash && args.empty?
+            return process target
+          end
+
+        # .compact - Hash: Object.fromEntries(Object.entries(hash).filter(([k,v]) => v != null))
+        when :compact
+          type = if pragma?(node, :hash) then :hash
+                 else var_type(target)
+                 end
+
+          if type == :hash && args.empty?
+            entries_call = s(:send, s(:const, nil, :Object), :entries, target)
+            # Build: .filter(([k,v]) => v != null)
+            filter_block = s(:block,
+              s(:send, entries_call, :filter),
+              s(:args, s(:mlhs, s(:arg, :_k), s(:arg, :_v))),
+              s(:send, s(:lvar, :_v), :!=, s(:nil)))
+            return process s(:send,
+              s(:const, nil, :Object), :fromEntries, filter_block)
+          end
+
+        # .flatten - Hash: no-op (not meaningful for hashes, return entries)
+        when :flatten
+          type = if pragma?(node, :hash) then :hash
+                 else var_type(target)
+                 end
+
+          if type == :hash && args.empty?
+            # hash.flatten → Object.entries(hash).flat(Infinity)
+            return process s(:send,
+              s(:send, s(:const, nil, :Object), :entries, target),
+              :flat, s(:lvar, :Infinity))
+          end
+
         # .call - with method pragma, convert proc.call(args) to proc(args)
         when :call
           if pragma?(node, :method) && target
@@ -1068,6 +1147,52 @@ module Ruby2JS
 
             return s(:send,
               s(:const, nil, :Object), :fromEntries, processed_filter)
+          end
+        end
+
+        # Handle hash reduce/inject, flat_map, each_with_index
+        # Wrap receiver in Object.entries() and destructure block args
+        if call.type == :send
+          target, method = call.children[0], call.children[1]
+          if target && [:reduce, :inject, :flat_map, :each_with_index].include?(method)
+            type = if pragma?(node, :entries) || pragma?(node, :hash) then :hash
+                   else var_type(target) || infer_type(target)
+                   end
+
+            if type == :hash
+              entries_call = s(:send, s(:const, nil, :Object), :entries, target)
+
+              if [:reduce, :inject].include?(method)
+                # hash.reduce(init) { |acc, (k,v)| ... } → Object.entries(hash).reduce(...)
+                # Use s() to create new node without location to avoid re-triggering pragma
+                return process s(:block,
+                  s(:send, entries_call, :reduce, *call.children[2..]),
+                  args,
+                  body
+                )
+
+              elsif method == :flat_map
+                # hash.flat_map { |k,v| ... } → Object.entries(hash).flatMap(([k,v]) => ...)
+                new_args = if args&.children&.length.to_i > 1
+                  s(:args, s(:mlhs, *args.children))
+                else
+                  args
+                end
+                return process s(:block,
+                  s(:send, entries_call, :flat_map),
+                  new_args,
+                  body
+                )
+
+              elsif method == :each_with_index
+                # hash.each_with_index { |(k,v), i| ... } → Object.entries(hash).forEach(([k,v], i) => ...)
+                return process s(:block,
+                  s(:send, entries_call, :each_with_index),
+                  args,
+                  body
+                )
+              end
+            end
           end
         end
 

@@ -321,6 +321,16 @@ describe Ruby2JS::Filter::Pragma do
       to_js('x = arr.dup').
         must_equal 'let x = arr.dup'
     end
+
+    it "should convert delete to splice with pragma" do
+      to_js('arr.delete(val) # Pragma: array').
+        must_equal 'arr.splice(arr.indexOf(val), 1)'
+    end
+
+    it "should convert delete to splice with inferred type" do
+      to_js('arr = [1, 2, 3]; arr.delete(2)').
+        must_equal 'let arr = [1, 2, 3]; arr.splice(arr.indexOf(2), 1)'
+    end
   end
 
   describe "hash pragma" do
@@ -348,6 +358,31 @@ describe Ruby2JS::Filter::Pragma do
     it "should convert empty? to Object.keys check" do
       to_js('obj.empty? # Pragma: hash').
         must_equal 'Object.keys(obj).length === 0'
+    end
+
+    it "should convert clear to delete loop" do
+      to_js('obj.clear # Pragma: hash').
+        must_include 'Object.keys(obj)'
+    end
+
+    it "should convert first to Object.entries[0]" do
+      to_js('obj.first # Pragma: hash').
+        must_equal 'Object.entries(obj)[0]'
+    end
+
+    it "should convert to_h to no-op" do
+      to_js('h = {}; h.to_h # Pragma: hash').
+        must_equal 'let h = {}; h'
+    end
+
+    it "should convert compact to fromEntries/filter" do
+      to_js('obj.compact # Pragma: hash').
+        must_include 'Object.fromEntries'
+    end
+
+    it "should convert flatten to entries.flat" do
+      to_js('obj.flatten # Pragma: hash').
+        must_include 'Object.entries(obj).flat(Infinity)'
     end
   end
 
@@ -400,6 +435,21 @@ describe Ruby2JS::Filter::Pragma do
     it "should convert dup to no-op" do
       to_js('x = str.dup # Pragma: string').
         must_equal 'let x = str'
+    end
+
+    it "should convert replace to reassignment for lvar" do
+      to_js('s = "hello"; s.replace("world") # Pragma: string').
+        must_equal 'let s = "hello"; s = "world"'
+    end
+
+    it "should convert replace to reassignment with inferred type" do
+      to_js('s = "hello"; s.replace("world")').
+        must_equal 'let s = "hello"; s = "world"'
+    end
+
+    it "should convert replace for ivar" do
+      to_js('@s = "hello"; @s.replace("world") # Pragma: string').
+        must_equal 'this._s = "hello"; this._s = "world"'
     end
   end
 
@@ -648,6 +698,21 @@ describe Ruby2JS::Filter::Pragma do
         must_equal 'x ||= fn(y)'
     end
 
+    it "should apply entries pragma to reduce on hash" do
+      to_js('hash.reduce(0) { |acc, (k, v)| acc + v } # Pragma: entries').
+        must_include 'Object.entries(hash).reduce'
+    end
+
+    it "should apply entries pragma to flat_map on hash" do
+      to_js('hash.flat_map { |k, v| [k, v] } # Pragma: entries').
+        must_include 'Object.entries(hash)'
+    end
+
+    it "should apply entries pragma to each_with_index on hash" do
+      to_js('hash.each_with_index { |(k, v), i| puts i } # Pragma: entries').
+        must_include 'Object.entries(hash)'
+    end
+
     it "should apply entries and hash pragmas together" do
       code = 'result = options.select { |k, v| v > 0 }.keys() # Pragma: entries # Pragma: hash'
       js = to_js(code)
@@ -825,6 +890,56 @@ describe Ruby2JS::Filter::Pragma do
       it "should disambiguate .key? for map" do
         to_js('m = Map.new; m.key?(:k)').
           must_equal 'let m = new Map; m.has("k")'
+      end
+
+      it "should disambiguate .delete for array" do
+        to_js_with_functions('a = [1, 2, 3]; a.delete(2)').
+          must_equal 'let a = [1, 2, 3]; a.splice(a.indexOf(2), 1)'
+      end
+
+      it "should disambiguate .clear for hash" do
+        to_js_with_functions('h = {}; h.clear').
+          must_include 'Object.keys(h)'
+      end
+
+      it "should disambiguate .first for hash" do
+        to_js('h = {}; h.first').
+          must_equal 'let h = {}; Object.entries(h)[0]'
+      end
+
+      it "should disambiguate .to_h for hash" do
+        to_js('h = {}; h.to_h').
+          must_equal 'let h = {}; h'
+      end
+
+      it "should disambiguate .compact for hash" do
+        to_js('h = {}; h.compact').
+          must_include 'Object.fromEntries'
+      end
+
+      it "should disambiguate .flatten for hash" do
+        to_js('h = {}; h.flatten').
+          must_include 'Object.entries(h).flat(Infinity)'
+      end
+
+      it "should disambiguate .replace for string" do
+        to_js('s = "hello"; s.replace("world")').
+          must_equal 'let s = "hello"; s = "world"'
+      end
+
+      it "should disambiguate reduce for hash" do
+        to_js_with_functions('h = {}; h.reduce(0) { |acc, (k, v)| acc + v }').
+          must_include 'Object.entries(h).reduce'
+      end
+
+      it "should disambiguate flat_map for hash" do
+        to_js_with_functions('h = {}; h.flat_map { |k, v| [k, v] }').
+          must_include 'Object.entries(h).flatMap'
+      end
+
+      it "should disambiguate each_with_index for hash" do
+        to_js_with_functions('h = {}; h.each_with_index { |(k, v), i| puts i }').
+          must_include 'Object.entries(h).forEach'
       end
 
       it "should disambiguate .any? and .empty? for hash" do
