@@ -375,6 +375,22 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.compact!' ).must_equal 'a.splice(0, a.length, ...a.filter(x => x != null))'
     end
 
+    it "should handle uniq" do
+      to_js( 'a.uniq' ).must_equal '[...new Set(a)]'
+    end
+
+    it "should handle uniq!" do
+      to_js( 'a.uniq!' ).must_equal 'a.splice(0, a.length, ...new Set(a))'
+    end
+
+    it "should handle rotate" do
+      to_js( 'a.rotate' ).must_equal '[...a.slice(1), a[0]]'
+    end
+
+    it "should handle rotate with argument" do
+      to_js( 'a.rotate(2)' ).must_equal '[...a.slice(2), ...a.slice(0, 2)]'
+    end
+
     it "should not convert compact with block to filter" do
       # compact with a block is NOT the array compact method
       # e.g., serializer.compact { } should remain as compact, not become filter

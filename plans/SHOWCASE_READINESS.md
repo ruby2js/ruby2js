@@ -38,16 +38,9 @@ make `group_by` return `Object.entries` format when it detects a chained enumera
 
 ## 2. Missing Method Mappings (easy)
 
-### 2a. `uniq` — no mapping, passes through silently
+### 2a. `uniq` — no mapping, passes through silently ✅
 
-```ruby
-items.uniq        # → [...new Set(items)]
-items.uniq!       # → items = [...new Set(items)]  (or splice-based)
-```
-
-**Used in:** Heat (`partners`), Person (`active`), Dance (`scrutineering`)
-
-**Fix in:** `lib/ruby2js/filter/functions.rb`
+Fixed. `uniq` → `[...new Set(a)]`, `uniq!` → `a.splice(0, a.length, ...new Set(a))`.
 
 ### 2b. `unshift` — already exists in JS with the same name
 
@@ -60,16 +53,9 @@ but confirm it works when chained.
 
 **Used in:** Solo (`instructors`)
 
-### 2c. `rotate` — no mapping
+### 2c. `rotate` — no mapping ✅
 
-```ruby
-arr.rotate         # → [...arr.slice(1), arr[0]]
-arr.rotate(n)      # → [...arr.slice(n), ...arr.slice(0, n)]
-```
-
-**Used in:** Person (`display_name`) — `name.split(/,\s*/).rotate.join(' ')`
-
-**Fix in:** `lib/ruby2js/filter/functions.rb`
+Fixed. `rotate` → `[...a.slice(1), a[0]]`, `rotate(n)` → `[...a.slice(n), ...a.slice(0, n)]`.
 
 ---
 

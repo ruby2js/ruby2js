@@ -1053,6 +1053,31 @@ module Ruby2JS
               s(:block, s(:send, nil, :proc), s(:args, s(:arg, :x)),
                 s(:send, s(:lvar, :x), :'!=', s(:nil))))))
 
+        elsif method==:uniq and args.length == 0
+          # array.uniq -> [...new Set(array)]
+          process s(:array, s(:splat,
+            s(:send, s(:const, nil, :Set), :new, target)))
+
+        elsif method==:uniq! and args.length == 0
+          # array.uniq! -> array.splice(0, array.length, ...new Set(array))
+          process s(:send, target, :splice,
+            s(:int, 0),
+            s(:attr, target, :length),
+            s(:splat, s(:send, s(:const, nil, :Set), :new, target)))
+
+        elsif method==:rotate
+          if args.length == 0
+            # array.rotate -> [...array.slice(1), array[0]]
+            process s(:array,
+              s(:splat, s(:send, target, :slice, s(:int, 1))),
+              s(:send, target, :[], s(:int, 0)))
+          elsif args.length == 1
+            # array.rotate(n) -> [...array.slice(n), ...array.slice(0, n)]
+            process s(:array,
+              s(:splat, s(:send, target, :slice, args.first)),
+              s(:splat, s(:send, target, :slice, s(:int, 0), args.first)))
+          end
+
         elsif method==:to_h and args.length==0
           process node.updated(nil, [s(:const, nil, :Object), :fromEntries,
             target])

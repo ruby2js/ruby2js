@@ -55,6 +55,8 @@ Additionally, the `functions` filter provides the following conversions:
 * `include M` {{ caret }} `Object.defineProperties(..., Object.getOwnPropertyDescriptors(M))`
 * `.merge` {{ caret }} `{...a, ...b}`
 * `.flatten` {{ caret }} `.flat(Infinity)`
+* `.uniq` {{ caret }} `[...new Set(a)]`
+* `.rotate` {{ caret }} `[...a.slice(1), a[0]]`
 * `.lstrip` {{ caret }} `.trimEnd`
 * `.rstrip` {{ caret }} `.trimStart`
 * `a.to_h` {{ caret }} `Object.fromEntries(a)`
