@@ -466,6 +466,34 @@ module Ruby2JS
         [source_name, line]
       end
 
+      # Record a diagnostic for an ambiguous method when lint mode is enabled.
+      # Only called when type resolution falls through (no pragma, no inferred type).
+      def record_ambiguous_diagnostic(node, method, valid_types)
+        return unless @options[:lint]
+        diagnostics = @options[:diagnostics]
+        return unless diagnostics
+
+        source_name, line = node_source_and_line(node)
+        column = nil
+        if node.respond_to?(:loc) && node.loc
+          loc = node.loc
+          if loc.respond_to?(:expression) && loc.expression
+            column = loc.expression.column
+          end
+        end
+
+        diagnostics.push({
+          severity: :warning,
+          rule: :ambiguous_method,
+          method: method.to_s,
+          line: line,
+          column: column,
+          file: source_name,
+          valid_types: valid_types,
+          message: "ambiguous method '#{method}' - receiver type unknown"
+        })
+      end
+
       # Handle || with nullish pragma -> ?? or with logical pragma -> || (forces logical)
       def on_or(node)
         if pragma?(node, :nullish) && es2020
@@ -718,6 +746,8 @@ module Ruby2JS
           elsif type == :string
             # No-op for strings in JS (they're immutable)
             return process target
+          else
+            record_ambiguous_diagnostic(node, method, [:array, :hash, :string]) if target
           end
 
         # << - Array: push, Set: add, String: +=
@@ -738,6 +768,8 @@ module Ruby2JS
           elsif type == :string && args.length == 1
             # target += arg (returns new string)
             return process s(:op_asgn, target, :+, args.first)
+          else
+            record_ambiguous_diagnostic(node, method, [:array, :set, :string]) if target
           end
 
         # .include? - Array: includes(), String: includes(), Set: has(), Hash: 'key' in obj
@@ -754,6 +786,8 @@ module Ruby2JS
           elsif type == :set && args.length == 1
             # target.has(arg) - Set membership check
             return process s(:send, target, :has, args.first)
+          else
+            record_ambiguous_diagnostic(node, method, [:hash, :set]) if target
           end
           # Note: array and string both use .includes() which functions filter handles
 
@@ -777,6 +811,8 @@ module Ruby2JS
               # arr.delete(val) → arr.splice(arr.indexOf(val), 1)
               return process s(:send, target, :splice,
                 s(:send, target, :indexOf, args.first), s(:int, 1))
+            else
+              record_ambiguous_diagnostic(node, method, [:set, :map, :array]) if target
             end
           end
 
@@ -801,6 +837,8 @@ module Ruby2JS
               return process s(:for_of, s(:lvasgn, :_key),
                 s(:send, s(:const, nil, :Object), :keys, target),
                 s(:undef, s(:send, target, :[], s(:lvar, :_key))))
+            else
+              record_ambiguous_diagnostic(node, method, [:set, :map, :hash]) if target
             end
           end
 
@@ -816,6 +854,8 @@ module Ruby2JS
             return process s(:for_of, s(:lvasgn, item_var),
               args.first,
               s(:send, target, :add, s(:lvar, item_var)))
+          else
+            record_ambiguous_diagnostic(node, method, [:set]) if target
           end
 
         # [] - Map: get, Proc: call, Hash/Array: bracket access
@@ -831,6 +871,8 @@ module Ruby2JS
           elsif type == :proc
             # proc[args] -> proc(args) - direct function call
             return process node.updated(:call, [target, nil, *args])
+          else
+            record_ambiguous_diagnostic(node, method, [:map, :proc]) if target
           end
 
         # []= - Map: set (keep as method call), Hash/Array: bracket assignment
@@ -843,6 +885,8 @@ module Ruby2JS
           if type == :map && args.length == 2
             # target.set(key, value)
             return process s(:send, target, :set, *args)
+          else
+            record_ambiguous_diagnostic(node, method, [:map]) if target
           end
 
         # .key? - Map: has, Hash: 'key' in obj
@@ -855,6 +899,8 @@ module Ruby2JS
           if type == :map && args.length == 1
             # target.has(key)
             return process s(:send, target, :has, args.first)
+          else
+            record_ambiguous_diagnostic(node, method, [:map]) if target
           end
 
         # .any? - Hash: Object.keys(hash).length > 0 (without block)
@@ -869,6 +915,8 @@ module Ruby2JS
             return process s(:send,
               s(:attr, s(:send, s(:const, nil, :Object), :keys, target), :length),
               :>, s(:int, 0))
+          else
+            record_ambiguous_diagnostic(node, method, [:hash]) if target
           end
 
         # .empty? - Hash: Object.keys(hash).length === 0, Set/Map: size === 0
@@ -888,6 +936,8 @@ module Ruby2JS
           elsif (type == :set || type == :map) && args.empty?
             # target.size === 0 (JS Sets/Maps use .size not .length)
             return process s(:send, s(:attr, target, :size), :==, s(:int, 0))
+          else
+            record_ambiguous_diagnostic(node, method, [:hash, :set, :map]) if target
           end
           # Note: array and string use .length which functions filter handles
 
@@ -901,6 +951,8 @@ module Ruby2JS
           if type == :array && target && args.length == 1
             # [...a, ...b]
             return process s(:array, s(:splat, target), s(:splat, args.first))
+          else
+            record_ambiguous_diagnostic(node, method, [:array]) if target
           end
 
         # a - b → a.filter(x => !b.includes(x))  (difference - JS - gives NaN)
@@ -920,6 +972,8 @@ module Ruby2JS
               s(:args, x_arg),
               negated
             )
+          else
+            record_ambiguous_diagnostic(node, method, [:array]) if target
           end
 
         # a & b → a.filter(x => b.includes(x))  (intersection - JS & is bitwise)
@@ -938,6 +992,8 @@ module Ruby2JS
               s(:args, x_arg),
               includes_call
             )
+          else
+            record_ambiguous_diagnostic(node, method, [:array]) if target
           end
 
         # a | b → [...new Set([...a, ...b])]  (union - JS | is bitwise)
@@ -951,6 +1007,8 @@ module Ruby2JS
             spread_both = s(:array, s(:splat, target), s(:splat, args.first))
             set_new = s(:send, s(:const, nil, :Set), :new, spread_both)
             return process s(:array, s(:splat, set_new))
+          else
+            record_ambiguous_diagnostic(node, method, [:array]) if target
           end
 
         # .replace - String: reassignment (JS strings are immutable)
@@ -966,6 +1024,8 @@ module Ruby2JS
             elsif target&.type == :ivar
               return process s(:ivasgn, target.children.first, args.first)
             end
+          else
+            record_ambiguous_diagnostic(node, method, [:string]) if target
           end
 
         # .first - Hash: Object.entries(hash)[0]
@@ -979,6 +1039,8 @@ module Ruby2JS
             return process s(:send,
               s(:send, s(:const, nil, :Object), :entries, target),
               :[], s(:int, 0))
+          else
+            record_ambiguous_diagnostic(node, method, [:hash]) if target
           end
 
         # .to_h - Hash: no-op identity
@@ -989,6 +1051,8 @@ module Ruby2JS
 
           if type == :hash && args.empty?
             return process target
+          else
+            record_ambiguous_diagnostic(node, method, [:hash]) if target
           end
 
         # .compact - Hash: Object.fromEntries(Object.entries(hash).filter(([k,v]) => v != null))
@@ -1006,6 +1070,8 @@ module Ruby2JS
               s(:send, s(:lvar, :_v), :!=, s(:nil)))
             return process s(:send,
               s(:const, nil, :Object), :fromEntries, filter_block)
+          else
+            record_ambiguous_diagnostic(node, method, [:hash]) if target
           end
 
         # .flatten - Hash: no-op (not meaningful for hashes, return entries)
@@ -1019,6 +1085,8 @@ module Ruby2JS
             return process s(:send,
               s(:send, s(:const, nil, :Object), :entries, target),
               :flat, s(:lvar, :Infinity))
+          else
+            record_ambiguous_diagnostic(node, method, [:hash]) if target
           end
 
         # .call - with method pragma, convert proc.call(args) to proc(args)
@@ -1211,6 +1279,20 @@ module Ruby2JS
                 args,
                 body
               ])
+            end
+          end
+        end
+
+        # Lint: warn about potential hash iteration when block has 2+ args
+        # and receiver type is unknown (suggesting user may intend hash iteration)
+        if @options[:lint] && call.type == :send
+          lint_target = call.children[0]
+          lint_method = call.children[1]
+          if lint_target && args&.children&.length.to_i > 1 &&
+             [:each, :each_pair, :map, :collect, :select, :flat_map, :each_with_index].include?(lint_method)
+            lint_type = var_type(lint_target) || infer_type(lint_target)
+            unless lint_type
+              record_ambiguous_diagnostic(node, lint_method, [:hash])
             end
           end
         end

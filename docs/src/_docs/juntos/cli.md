@@ -481,6 +481,107 @@ npx juntos doctor
 | node_modules | Dependencies installed |
 | dist/ | Build status |
 
+## juntos lint
+
+Scan Ruby files for transpilation issues before they surface at runtime.
+
+```bash
+npx juntos lint [options] [files...]
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--disable RULE` | Disable a rule (can be repeated) |
+| `--include PATTERN` | Include only matching files (glob, can be repeated) |
+| `--exclude PATTERN` | Exclude matching files (glob, can be repeated) |
+| `-h, --help` | Show help |
+
+**Examples:**
+
+```bash
+npx juntos lint                              # Lint all Ruby source files
+npx juntos lint app/models/article.rb        # Lint a specific file
+npx juntos lint --disable ambiguous_method   # Skip type-ambiguity warnings
+npx juntos lint --include "app/models/**"    # Only lint models
+```
+
+**What it does:**
+
+1. Discovers Ruby files in `app/models/`, `app/controllers/`, `app/javascript/controllers/`, `app/views/`, `config/routes.rb`, and `db/seeds.rb`
+2. **Phase 1 — Structural checks:** Walks the raw AST to detect patterns that cannot be transpiled to JavaScript (e.g., `method_missing`, `eval`, `retry`)
+3. **Phase 2 — Type-ambiguity checks:** Runs the full transpilation with lint mode enabled. The pragma filter reports methods whose JavaScript output depends on the receiver type (Array, Hash, Set, etc.) when neither a `# Pragma:` annotation nor type inference can determine the type
+4. Prints diagnostics with file, line, and column, then exits with code 1 if any errors are found
+
+**Output example:**
+
+```
+  app/models/article.rb:15:3 warning: ambiguous method 'delete' - receiver type unknown [ambiguous_method]
+    Consider: # Pragma: set or # Pragma: map or # Pragma: array
+  app/models/article.rb:42:5 warning: ambiguous method '<<' - receiver type unknown [ambiguous_method]
+    Consider: # Pragma: array or # Pragma: set or # Pragma: string
+
+Linted 12 files: 0 errors, 2 warnings
+```
+
+### Rules
+
+| Rule | Severity | Description |
+|------|----------|-------------|
+| `ambiguous_method` | warning | Method has different JavaScript behavior depending on receiver type. Fix by adding a `# Pragma:` comment or initializing the variable so the type can be inferred. |
+| `method_missing` | error | `method_missing` has no JavaScript equivalent |
+| `eval_call` | error | `eval()` cannot be safely transpiled |
+| `instance_eval` | error | `instance_eval` cannot be transpiled |
+| `singleton_method` | warning | `def obj.method` has limited JavaScript support |
+| `retry_statement` | warning | `retry` has no direct JavaScript equivalent |
+| `redo_statement` | warning | `redo` has no direct JavaScript equivalent |
+| `ruby_catch_throw` | warning | Ruby `catch`/`throw` differs from JavaScript `try`/`catch` |
+| `prepend_call` | warning | `prepend` has no JavaScript equivalent |
+| `force_encoding` | warning | `force_encoding` has no JavaScript equivalent (JS strings are always UTF-16) |
+| `parse_error` | error | File could not be parsed |
+| `conversion_error` | error | File could not be converted |
+
+### Fixing ambiguous method warnings
+
+When the lint reports an ambiguous method, it means the transpiler doesn't know the receiver's type and may produce incorrect JavaScript. There are three ways to fix this:
+
+**1. Add a pragma comment** on the same line:
+
+```ruby
+items.delete(x)        # Pragma: array    → items.splice(items.indexOf(x), 1)
+items.delete(x)        # Pragma: set      → items.delete(x)  (kept as-is for Set)
+```
+
+**2. Initialize the variable** so the type can be inferred:
+
+```ruby
+items = []             # Pragma filter now knows items is an Array
+items.delete(x)        # → items.splice(items.indexOf(x), 1)
+```
+
+**3. Use Sorbet-style annotations:**
+
+```ruby
+items = T.let([], Array)
+items.delete(x)        # → items.splice(items.indexOf(x), 1)
+```
+
+See the [Pragmas documentation](/docs/users-guide/pragmas) for the full list of type disambiguation pragmas.
+
+### Configuration in ruby2js.yml
+
+```yaml
+lint:
+  disable:
+    - ambiguous_method
+    - singleton_method
+  include:
+    - "app/models/**"
+  exclude:
+    - "app/models/concerns/**"
+```
+
 ## Database Adapters
 
 The CLI auto-installs the required npm package for each adapter:

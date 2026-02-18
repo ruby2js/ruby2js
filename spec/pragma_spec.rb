@@ -1432,6 +1432,126 @@ describe Ruby2JS::Filter::Pragma do
     end
   end
 
+  describe "lint mode diagnostics" do
+    def lint(string, options={})
+      diagnostics = []
+      Ruby2JS.convert(string, options.merge(
+        eslevel: options[:eslevel] || 2021,
+        filters: [Ruby2JS::Filter::Pragma],
+        lint: true,
+        diagnostics: diagnostics
+      ))
+      diagnostics
+    end
+
+    it "should report ambiguous delete without type info" do
+      diags = lint('obj.delete(key)')
+      _(diags.length).must_be :>=, 1
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'delete' }
+      _(d).wont_be_nil
+      _(d[:severity]).must_equal :warning
+      _(d[:valid_types]).must_include :set
+      _(d[:valid_types]).must_include :array
+    end
+
+    it "should be silent when pragma is present" do
+      diags = lint('obj.delete(key) # Pragma: set')
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method }
+      _(ambiguous).must_be_empty
+    end
+
+    it "should be silent when type is inferred" do
+      diags = lint('x = []; x.delete(1)')
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == 'delete' }
+      _(ambiguous).must_be_empty
+    end
+
+    it "should report ambiguous <<" do
+      diags = lint('obj << item')
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == '<<' }
+      _(d).wont_be_nil
+      _(d[:valid_types]).must_include :array
+      _(d[:valid_types]).must_include :set
+      _(d[:valid_types]).must_include :string
+    end
+
+    it "should report ambiguous include?" do
+      diags = lint('obj.include?(key)')
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'include?' }
+      _(d).wont_be_nil
+      _(d[:valid_types]).must_include :hash
+      _(d[:valid_types]).must_include :set
+    end
+
+    it "should report ambiguous dup" do
+      diags = lint('obj.dup')
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'dup' }
+      _(d).wont_be_nil
+      _(d[:valid_types]).must_include :array
+      _(d[:valid_types]).must_include :hash
+      _(d[:valid_types]).must_include :string
+    end
+
+    it "should report ambiguous empty?" do
+      diags = lint('obj.empty?')
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'empty?' }
+      _(d).wont_be_nil
+      _(d[:valid_types]).must_include :hash
+      _(d[:valid_types]).must_include :set
+      _(d[:valid_types]).must_include :map
+    end
+
+    it "should include valid_types in diagnostic" do
+      diags = lint('obj.clear')
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'clear' }
+      _(d).wont_be_nil
+      _(d[:valid_types].length).must_be :>=, 2
+    end
+
+    it "should not produce diagnostics when lint is not set" do
+      diagnostics = []
+      Ruby2JS.convert('obj.delete(key)',
+        eslevel: 2021,
+        filters: [Ruby2JS::Filter::Pragma],
+        diagnostics: diagnostics
+        # lint: true is NOT set
+      )
+      _(diagnostics).must_be_empty
+    end
+
+    it "should not produce diagnostics for non-ambiguous methods" do
+      diags = lint('obj.to_s')
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method }
+      _(ambiguous).must_be_empty
+    end
+
+    it "should not produce diagnostics for bare method calls" do
+      diags = lint('delete "foo"')
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == 'delete' }
+      _(ambiguous).must_be_empty
+    end
+
+    it "should include line number in diagnostic" do
+      diags = lint("x = 1\nobj.dup")
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'dup' }
+      _(d).wont_be_nil
+      _(d[:line]).must_equal 2
+    end
+
+    it "should report ambiguous hash iteration with 2+ block args" do
+      diags = lint('obj.each { |k, v| puts k }')
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'each' }
+      _(d).wont_be_nil
+      _(d[:valid_types]).must_include :hash
+    end
+
+    it "should not report hash iteration when type is known" do
+      diags = lint('h = {}; h.each { |k, v| puts k }')
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == 'each' }
+      _(ambiguous).must_be_empty
+    end
+  end
+
   describe "automatic class reopening detection" do
     it "should treat class as extension when preceded by Struct.new" do
       js = to_js('Color = Struct.new(:name, :value); class Color; def to_s; value; end; end')

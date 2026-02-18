@@ -10,6 +10,7 @@
  *   up        Build and run locally
  *   test      Run tests with Vitest
  *   db        Database commands (migrate, seed, prepare, reset, create, drop)
+ *   lint      Scan Ruby files for transpilation issues
  *   info      Show current configuration
  *   doctor    Check environment and prerequisites
  */
@@ -58,7 +59,8 @@ import {
   fixTestImportsForEject,
   globToRegex,
   matchesAny,
-  shouldIncludeFile
+  shouldIncludeFile,
+  lintRuby
 } from './transform.mjs';
 
 import { singularize, camelize, pluralize, underscore } from './adapters/inflector.mjs';
@@ -1132,7 +1134,9 @@ function parseCommonArgs(args) {
     // Eject filtering options
     include: [],      // --include patterns (can be repeated)
     exclude: [],      // --exclude patterns (can be repeated)
-    only: null        // --only comma-separated list (shorthand for include-only)
+    only: null,       // --only comma-separated list (shorthand for include-only)
+    // Lint options
+    disable: []       // --disable rules (can be repeated)
   };
 
   const remaining = [];
@@ -1221,6 +1225,10 @@ function parseCommonArgs(args) {
       options.only = args[++i];
     } else if (arg.startsWith('--only=')) {
       options.only = arg.slice(7);
+    } else if (arg === '--disable') {
+      options.disable.push(args[++i]);
+    } else if (arg.startsWith('--disable=')) {
+      options.disable.push(arg.slice(10));
     } else {
       remaining.push(arg);
     }
@@ -3207,6 +3215,162 @@ Note: Browser databases (dexie) auto-migrate at runtime.
 }
 
 // ============================================
+// Command: lint
+// ============================================
+
+/**
+ * Recursively find all Ruby files (*.rb) in a directory.
+ */
+function findAllRubyFiles(dir) {
+  const files = [];
+  if (!existsSync(dir)) return files;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith('.') || entry.name.startsWith('._')) continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...findAllRubyFiles(full));
+    } else if (entry.name.endsWith('.rb')) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
+/**
+ * Determine the transform section for a file based on its path.
+ */
+function inferSection(filePath, appRoot) {
+  const rel = relative(appRoot, filePath);
+  if (rel.startsWith('app/models/')) return 'models';
+  if (rel.startsWith('app/controllers/') || rel.startsWith('app/javascript/controllers/')) return 'controllers';
+  if (rel.startsWith('app/views/')) return null; // views use ERB transform
+  if (rel.startsWith('config/routes')) return 'routes';
+  if (rel.startsWith('test/') || rel.startsWith('spec/')) return 'models'; // test files use model section defaults
+  return null;
+}
+
+async function runLint(files, options) {
+  // Load config
+  const { loadConfig } = await import('./vite.mjs');
+  const config = loadConfig(APP_ROOT, {
+    database: options.database,
+    target: options.target
+  });
+
+  // Load lint config from ruby2js.yml
+  let lintConfig = {};
+  const ruby2jsPath = join(APP_ROOT, 'config/ruby2js.yml');
+  if (existsSync(ruby2jsPath) && yaml) {
+    try {
+      const parsed = yaml.load(readFileSync(ruby2jsPath, 'utf8'));
+      lintConfig = parsed?.lint || {};
+    } catch { /* ignore parse errors */ }
+  }
+
+  // Merge disabled rules: CLI flags + config file
+  const disabledRules = new Set([
+    ...options.disable,
+    ...(lintConfig.disable || [])
+  ]);
+
+  // Include/exclude patterns: CLI flags + config file
+  const includePatterns = [
+    ...options.include,
+    ...(lintConfig.include || [])
+  ];
+  const excludePatterns = [
+    ...options.exclude,
+    ...(lintConfig.exclude || [])
+  ];
+
+  // Discover files
+  let filePaths;
+  if (files.length > 0) {
+    // Explicit files from command args
+    filePaths = files.map(f => {
+      const full = f.startsWith('/') ? f : join(APP_ROOT, f);
+      return full;
+    }).filter(f => existsSync(f));
+  } else {
+    // Scan default directories
+    filePaths = [
+      ...findAllRubyFiles(join(APP_ROOT, 'app/models')),
+      ...findAllRubyFiles(join(APP_ROOT, 'app/controllers')),
+      ...findAllRubyFiles(join(APP_ROOT, 'app/javascript/controllers')),
+      ...findAllRubyFiles(join(APP_ROOT, 'app/views'))
+    ];
+
+    // Add individual files if they exist
+    for (const f of ['config/routes.rb', 'db/seeds.rb']) {
+      const full = join(APP_ROOT, f);
+      if (existsSync(full)) filePaths.push(full);
+    }
+  }
+
+  // Apply include/exclude filtering
+  if (includePatterns.length > 0 || excludePatterns.length > 0) {
+    filePaths = filePaths.filter(f => {
+      const rel = relative(APP_ROOT, f);
+      return shouldIncludeFile(rel, includePatterns, excludePatterns);
+    });
+  }
+
+  if (filePaths.length === 0) {
+    console.log('No Ruby files found to lint.');
+    return;
+  }
+
+  // Lint each file
+  let totalErrors = 0;
+  let totalWarnings = 0;
+  let filesWithIssues = 0;
+
+  for (const filePath of filePaths) {
+    const source = readFileSync(filePath, 'utf8');
+    const section = inferSection(filePath, APP_ROOT);
+    const relPath = relative(APP_ROOT, filePath);
+
+    let diagnostics;
+    try {
+      diagnostics = await lintRuby(source, filePath, section, config, APP_ROOT);
+    } catch (err) {
+      diagnostics = [{
+        severity: 'error', rule: 'lint_error',
+        message: err.message, file: relPath, line: null, column: null
+      }];
+    }
+
+    // Filter out disabled rules
+    diagnostics = diagnostics.filter(d => !disabledRules.has(d.rule));
+
+    if (diagnostics.length === 0) continue;
+    filesWithIssues++;
+
+    for (const d of diagnostics) {
+      const sev = d.severity === 'error' ? '\x1b[31merror\x1b[0m' : '\x1b[33mwarning\x1b[0m';
+      const loc = d.line ? `${d.file}:${d.line}${d.column != null ? ':' + d.column : ''}` : d.file;
+      console.log(`  ${loc} ${sev}: ${d.message} [${d.rule}]`);
+
+      // Show pragma hint for ambiguous methods
+      if (d.rule === 'ambiguous_method' && d.valid_types?.length > 0) {
+        const hints = d.valid_types.map(t => `# Pragma: ${t}`).join(' or ');
+        console.log(`    Consider: ${hints}`);
+      }
+
+      if (d.severity === 'error') totalErrors++;
+      else totalWarnings++;
+    }
+  }
+
+  console.log('');
+  console.log(`Linted ${filePaths.length} files: ${totalErrors} errors, ${totalWarnings} warnings`);
+
+  if (totalErrors > 0) {
+    process.exit(1);
+  }
+}
+
+// ============================================
 // Command: info
 // ============================================
 
@@ -3753,6 +3917,7 @@ Commands:
   deploy    Build and deploy to serverless platform
   up        Build and run locally (node, bun, browser)
   db        Database commands (create, migrate, seed, prepare, drop, reset)
+  lint      Scan Ruby files for transpilation issues
   info      Show current configuration
   doctor    Check environment and prerequisites
 
@@ -3904,6 +4069,38 @@ switch (command) {
 
   case 'db':
     runDb(commandArgs, options);
+    break;
+
+  case 'lint':
+    if (options.help) {
+      console.log('Usage: juntos lint [options] [files...]\n\nScan Ruby files for transpilation issues.\n');
+      console.log('Options:');
+      console.log('  --disable RULE           Disable a lint rule (can be repeated)');
+      console.log('  --include PATTERN        Include only matching files (glob)');
+      console.log('  --exclude PATTERN        Exclude matching files (glob)');
+      console.log('\nRules:');
+      console.log('  ambiguous_method   Method with different JS behavior depending on type');
+      console.log('  method_missing     method_missing cannot be transpiled');
+      console.log('  eval_call          eval() is not safely transpilable');
+      console.log('  instance_eval      instance_eval is not transpilable');
+      console.log('  singleton_method   def obj.method has limited support');
+      console.log('  retry_statement    retry has no JS equivalent');
+      console.log('  redo_statement     redo has no JS equivalent');
+      console.log('  ruby_catch_throw   Ruby catch/throw differs from JS');
+      console.log('  prepend_call       prepend has no JS equivalent');
+      console.log('  force_encoding     force_encoding has no JS equivalent');
+      console.log('  parse_error        File could not be parsed');
+      console.log('  conversion_error   File could not be converted');
+      console.log('\nExamples:');
+      console.log('  juntos lint                              # Lint all Ruby source files');
+      console.log('  juntos lint app/models/article.rb        # Lint specific file');
+      console.log('  juntos lint --disable ambiguous_method   # Skip ambiguity warnings');
+      process.exit(0);
+    }
+    runLint(commandArgs, options).catch(err => {
+      console.error('Lint failed:', formatError(err));
+      process.exit(1);
+    });
     break;
 
   case 'info':

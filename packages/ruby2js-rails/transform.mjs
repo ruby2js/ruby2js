@@ -2453,6 +2453,72 @@ export async function transformRuby(source, filePath, section, config, appRoot, 
 }
 
 /**
+ * Lint Ruby source for transpilation issues.
+ *
+ * Combines two phases:
+ * 1. Structural checks on raw AST (anti-patterns that can't transpile)
+ * 2. Type-ambiguity checks via pragma filter (runs full convert with lint: true)
+ *
+ * @param {string} source - Ruby source code
+ * @param {string} filePath - Path to source file
+ * @param {string} section - Transformation section (models, controllers, etc.)
+ * @param {Object} config - Configuration object with target, database, etc.
+ * @param {string} appRoot - Application root directory
+ * @returns {Promise<Array>} Array of diagnostic objects
+ */
+export async function lintRuby(source, filePath, section, config, appRoot) {
+  const { convert, parse } = await ensureRuby2jsReady();
+  const diagnostics = [];
+  const relPath = path.relative(appRoot, filePath);
+
+  // Phase 1: Structural checks on raw AST
+  try {
+    const { checkStructural } = await import('./lint.mjs');
+    const [ast] = parse(source, relPath);
+    const structural = checkStructural(ast, relPath);
+    diagnostics.push(...structural);
+  } catch (e) {
+    diagnostics.push({
+      severity: 'error', rule: 'parse_error',
+      message: e.message, file: relPath, line: null, column: null
+    });
+    return diagnostics;
+  }
+
+  // Phase 2: Type-ambiguity checks via pragma filter (runs full convert)
+  try {
+    const sectionConfig = config.sections?.[section] || null;
+    const options = {
+      ...getBuildOptions(section, config.target, sectionConfig),
+      file: relPath,
+      database: config.database,
+      target: config.target,
+      lint: true,
+      diagnostics: diagnostics  // shared mutable array - pragma filter pushes to it
+    };
+
+    convert(source, options);
+  } catch (e) {
+    diagnostics.push({
+      severity: 'error', rule: 'conversion_error',
+      message: e.message, file: relPath, line: null, column: null
+    });
+  }
+
+  // Normalize severity to strings (Ruby symbols come back as strings from selfhost)
+  for (const d of diagnostics) {
+    if (typeof d.severity === 'symbol' || typeof d.severity !== 'string') {
+      d.severity = String(d.severity);
+    }
+    if (d.valid_types && !Array.isArray(d.valid_types)) {
+      d.valid_types = Array.from(d.valid_types);
+    }
+  }
+
+  return diagnostics;
+}
+
+/**
  * Transform ERB template to JavaScript.
  *
  * @param {string} code - ERB source code

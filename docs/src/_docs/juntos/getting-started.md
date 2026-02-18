@@ -158,9 +158,10 @@ bin/juntos dev -d dexie
 ```
 
 If transpilation fails, check:
-1. Unsupported Ruby features (see [What Works](#what-works) below)
-2. Gems that require native extensions
-3. Complex metaprogramming
+1. Run `bin/juntos lint` to catch common issues (ambiguous methods, unsupported patterns)
+2. Unsupported Ruby features (see [What Works](#what-works) below)
+3. Gems that require native extensions
+4. Complex metaprogramming
 
 ## What Works
 
