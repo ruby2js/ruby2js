@@ -148,6 +148,10 @@ module Ruby2JS
             if receiver.nil? && [:proc, :lambda].include?(method)
               return :proc
             end
+            # group_by { } returns a hash (Object in JS)
+            if method == :group_by
+              return :hash
+            end
           end
         end
 

@@ -58,6 +58,7 @@ Additionally, the `functions` filter provides the following conversions:
 * `.lstrip` {{ caret }} `.trimEnd`
 * `.rstrip` {{ caret }} `.trimStart`
 * `a.to_h` {{ caret }} `Object.fromEntries(a)`
+* `a.to_h { |x| [k, v] }` {{ caret }} `Object.fromEntries(a.map(x => [k, v]))`
 * `Hash[a]` {{ caret }} `Object.fromEntries(a)`
 * `a&.b` {{ caret }} `a?.b`
 * `.scan` {{ caret }} `Array.from(str.matchAll(/.../g), s => s.slice(1))`

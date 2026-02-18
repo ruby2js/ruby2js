@@ -807,6 +807,26 @@ describe Ruby2JS::Filter::Pragma do
       end
     end
 
+    describe "from group_by" do
+      it "should infer hash type from group_by result" do
+        to_js_with_functions(
+          'scores.group_by { |s| s.heat_id }.map { |k, v| [k, v.length] }'
+        ).must_include 'Object.entries('
+      end
+
+      it "should wrap group_by + select in Object.entries and fromEntries" do
+        to_js_with_functions(
+          'scores.group_by { |s| s.heat_id }.select { |k, v| v.length > 1 }'
+        ).must_include 'Object.fromEntries(Object.entries('
+      end
+
+      it "should wrap group_by + each in Object.entries" do
+        to_js_with_functions(
+          'scores.group_by { |s| s.id }.each { |k, v| puts k }'
+        ).must_include 'Object.entries('
+      end
+    end
+
     describe "instance variables" do
       it "should track types for instance variables" do
         to_js('@items = []; @items << "x"').

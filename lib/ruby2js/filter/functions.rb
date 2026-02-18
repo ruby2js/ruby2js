@@ -1257,6 +1257,15 @@ module Ruby2JS
             s(:autoreturn, *node.children[2..-1]))
           process call.updated(nil, [*call.children, block])
 
+        elsif method == :to_h and call.children.length == 2
+          # arr.to_h { |x| [k, v] } => Object.fromEntries(arr.map(x => [k, v]))
+          target = call.children.first
+          map_block = s(:block,
+            s(:send, target, :map),
+            node.children[1],
+            s(:autoreturn, *node.children[2..-1]))
+          process s(:send, s(:const, nil, :Object), :fromEntries, map_block)
+
         elsif method == :compact and call.children.length == 2
           # compact with a block is NOT the array compact method
           # (e.g., serializer.compact { ... } should not become filter)

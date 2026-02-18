@@ -690,6 +690,11 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.to_h' ).must_equal 'Object.fromEntries(a)'
     end
 
+    it "should handle to_h with block" do
+      to_js( 'a.to_h { |x| [x, x.length] }' ).
+        must_equal 'Object.fromEntries(a.map(x => ([x, x.length])))'
+    end
+
     it "should handle Hash[]" do
       to_js( 'Hash[a]' ).must_equal 'Object.fromEntries(a)'
     end
