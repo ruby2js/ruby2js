@@ -2122,6 +2122,7 @@ export function generateBrowserIndexHtml(appName, mainJsPath = './main.js') {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="turbo-refresh-method" content="morph">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${appName}</title>
   <link rel="icon" href="data:,">
@@ -2151,6 +2152,52 @@ import { Application } from '${routesPath}';
 import '${controllersPath}';
 window.Turbo = Turbo;
 Application.start();
+
+// Dev-mode HMR handlers
+if (import.meta.hot) {
+  // Model hot-swap: re-import model, patch old class, Turbo morph
+  import.meta.hot.on('juntos:model-update', async (data) => {
+    try {
+      const mod = await import(/* @vite-ignore */ data.file + '?t=' + Date.now());
+      // Patch the OLD class with methods/properties from the NEW class.
+      // This updates existing references (controllers still hold the old class).
+      for (const [key, NewClass] of Object.entries(mod)) {
+        const OldClass = Application.models[key];
+        if (typeof NewClass !== 'function' || !OldClass) continue;
+        // Copy prototype methods (validate, custom methods, getters/setters)
+        for (const name of Object.getOwnPropertyNames(NewClass.prototype)) {
+          if (name === 'constructor') continue;
+          Object.defineProperty(OldClass.prototype, name,
+            Object.getOwnPropertyDescriptor(NewClass.prototype, name));
+        }
+        // Copy static properties (associations, callbacks, etc.)
+        for (const name of Object.getOwnPropertyNames(NewClass)) {
+          if (['prototype', 'length', 'name'].includes(name)) continue;
+          try {
+            Object.defineProperty(OldClass, name,
+              Object.getOwnPropertyDescriptor(NewClass, name));
+          } catch {}
+        }
+        console.log('[juntos] Hot-patched model:', key);
+      }
+    } catch (e) {
+      console.warn('[juntos] Model hot-swap failed, doing full reload:', e);
+      location.reload();
+      return;
+    }
+    // No page refresh needed — the patched model is immediately active.
+    // Next form submission will use the new validation rules.
+  });
+
+  // Route/controller reload (smooth Turbo navigation)
+  import.meta.hot.on('juntos:reload', () => {
+    if (window.Turbo) {
+      window.Turbo.visit(location.href, { action: 'replace' });
+    } else {
+      location.reload();
+    }
+  });
+}
 `;
 }
 

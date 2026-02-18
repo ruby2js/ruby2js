@@ -722,12 +722,12 @@ function createRubyTransformPlugin(config, appRoot) {
         manifestPromise = null;
         transformCache.delete(file);
 
-        // Rebuild metadata, then trigger Turbo-aware reload
+        // Rebuild metadata, then hot-swap model and Turbo morph
         ensureManifest().then(() => {
           console.log('[juntos] Model metadata rebuilt after change');
-          server.ws.send({
+          hmrSend(server, {
             type: 'custom',
-            event: 'ruby2js:turbo-reload',
+            event: 'juntos:model-update',
             data: { file }
           });
         });
@@ -1309,6 +1309,15 @@ const SERVER_RUNTIMES = ['node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 've
  */
 function isServerTarget(target) {
   return SERVER_RUNTIMES.includes(target);
+}
+
+/**
+ * Send an HMR message to the client.
+ * Supports both Vite 6 (server.ws) and Vite 7+ (server.hot).
+ */
+function hmrSend(server, message) {
+  const hot = server.hot || server.ws;
+  if (hot) hot.send(message);
 }
 
 /**
@@ -2096,49 +2105,10 @@ function createHmrPlugin() {
   return {
     name: 'juntos-hmr',
 
-    // Watch ERB files and inject HMR runtime into HTML responses
+    // Watch ERB files even though they're not in the module graph
     configureServer(server) {
       // Add app/views/**/*.erb to Vite's watcher
       server.watcher.add('**/app/views/**/*.erb');
-
-      // Inject HMR runtime into HTML responses from the app server.
-      // transformIndexHtml only works for Vite-served HTML (browser targets).
-      // This middleware handles server-rendered HTML (node/SSR targets) too.
-      const hmrScript = `<script type="module">${STIMULUS_HMR_RUNTIME}</script>`;
-      server.middlewares.use((req, res, next) => {
-        const originalEnd = res.end;
-        const originalWrite = res.write;
-        let body = '';
-        let isHtml = false;
-
-        res.write = function(chunk, ...args) {
-          if (!isHtml) {
-            const contentType = res.getHeader('content-type');
-            isHtml = typeof contentType === 'string' && contentType.includes('text/html');
-          }
-          if (isHtml && chunk) {
-            body += typeof chunk === 'string' ? chunk : chunk.toString();
-            return true;
-          }
-          return originalWrite.call(this, chunk, ...args);
-        };
-
-        res.end = function(chunk, ...args) {
-          if (isHtml) {
-            if (chunk) body += typeof chunk === 'string' ? chunk : chunk.toString();
-            if (body.includes('</head>')) {
-              body = body.replace('</head>', hmrScript + '</head>');
-            } else if (body.includes('</body>')) {
-              body = body.replace('</body>', hmrScript + '</body>');
-            }
-            res.removeHeader('content-length');
-            return originalEnd.call(this, body, ...args);
-          }
-          return originalEnd.call(this, chunk, ...args);
-        };
-
-        next();
-      });
     },
 
     handleHotUpdate({ file, server, modules }) {
@@ -2147,25 +2117,17 @@ function createHmrPlugin() {
 
       // Models: handled by juntos-ruby plugin (metadata rebuild + Turbo reload)
 
-      // Routes: Turbo reload (need full regeneration)
+      // Routes: full reload (need full regeneration)
       if (normalizedFile.includes('/config/routes')) {
-        console.log('[juntos] Routes changed, triggering Turbo reload:', file);
-        server.ws.send({
-          type: 'custom',
-          event: 'ruby2js:turbo-reload',
-          data: { file }
-        });
+        console.log('[juntos] Routes changed, triggering reload:', file);
+        hmrSend(server, { type: 'custom', event: 'juntos:reload' });
         return [];
       }
 
-      // Rails controllers (app/controllers/): Turbo reload (route handlers)
+      // Rails controllers (app/controllers/): full reload
       if (normalizedFile.includes('/app/controllers/') && file.endsWith('.rb')) {
-        console.log('[juntos] Rails controller changed, triggering Turbo reload:', file);
-        server.ws.send({
-          type: 'custom',
-          event: 'ruby2js:turbo-reload',
-          data: { file }
-        });
+        console.log('[juntos] Rails controller changed, triggering reload:', file);
+        hmrSend(server, { type: 'custom', event: 'juntos:reload' });
         return [];
       }
 
@@ -2174,7 +2136,7 @@ function createHmrPlugin() {
           file.match(/_controller(\.jsx)?\.rb$/)) {
         const controllerName = extractControllerName(file);
 
-        server.ws.send({
+        hmrSend(server, {
           type: 'custom',
           event: 'ruby2js:stimulus-update',
           data: {
@@ -2267,18 +2229,6 @@ if (import.meta.hot) {
     }
   });
 
-  // Turbo-aware page reload (smooth navigation instead of hard refresh)
-  import.meta.hot.on('ruby2js:turbo-reload', (data) => {
-    console.log('[juntos] Reloading via Turbo:', data?.file || 'unknown');
-
-    // Use Turbo.visit for smooth page transition if available
-    if (window.Turbo) {
-      window.Turbo.visit(location.href, { action: 'replace' });
-    } else {
-      // Fall back to hard reload if Turbo isn't available
-      location.reload();
-    }
-  });
 }
 `;
 
