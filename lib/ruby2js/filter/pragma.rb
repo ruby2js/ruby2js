@@ -474,6 +474,11 @@ module Ruby2JS
         return unless diagnostics
 
         source_name, line = node_source_and_line(node)
+
+        # Skip diagnostics for synthetic nodes (created by filters, not from user source).
+        # These have no location info and would produce confusing output.
+        return unless line
+
         column = nil
         if node.respond_to?(:loc) && node.loc
           loc = node.loc
