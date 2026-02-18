@@ -2473,10 +2473,18 @@ export async function lintRuby(source, filePath, section, config, appRoot) {
 
   // Phase 1: Structural checks on raw AST
   try {
-    const { checkStructural } = await import('./lint.mjs');
-    const [ast] = parse(source, relPath);
-    const structural = checkStructural(ast, relPath);
-    diagnostics.push(...structural);
+    let checkStructural;
+    try {
+      ({ checkStructural } = await import('./lint.mjs'));
+    } catch {
+      // lint.mjs not available (e.g., older tarball) — skip structural checks
+    }
+
+    if (checkStructural) {
+      const [ast] = parse(source, relPath);
+      const structural = checkStructural(ast, relPath);
+      diagnostics.push(...structural);
+    }
   } catch (e) {
     diagnostics.push({
       severity: 'error', rule: 'parse_error',

@@ -71,6 +71,7 @@
     "vite-ssr-dev.mjs",
     "testing.mjs",
     "transform.mjs",
+    "lint.mjs",
     "url_helpers.mjs"
   ],
   "keywords": [
