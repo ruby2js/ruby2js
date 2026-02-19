@@ -97,7 +97,8 @@ async function setup() {
     // Download everything from releases
     console.log('1. Downloading tarballs from releases...');
     await downloadFile(`${RELEASES_URL}/ruby2js-beta.tgz`, join(tarballs, 'ruby2js-beta.tgz'));
-    await downloadFile(`${RELEASES_URL}/ruby2js-rails-beta.tgz`, join(tarballs, 'ruby2js-rails-beta.tgz'));
+    await downloadFile(`${RELEASES_URL}/juntos-beta.tgz`, join(tarballs, 'juntos-beta.tgz'));
+    await downloadFile(`${RELEASES_URL}/juntos-dev-beta.tgz`, join(tarballs, 'juntos-dev-beta.tgz'));
     await downloadFile(`${RELEASES_URL}/vite-plugin-ruby2js-beta.tgz`, join(tarballs, 'vite-plugin-ruby2js-beta.tgz'));
     await downloadFile(`${RELEASES_URL}/demo-${demoHyphen}.tar.gz`, join(tarballs, `demo-${demoHyphen}.tar.gz`));
   }
@@ -108,11 +109,11 @@ async function setup() {
 
   const demoDir = join(WORK_DIR, demo);
 
-  // Extract ruby2js-rails to get the CLI for init
-  console.log('\n3. Extracting ruby2js-rails CLI...');
-  const cliDir = join(tarballs, 'ruby2js-rails');
+  // Extract juntos-dev to get the CLI for init
+  console.log('\n3. Extracting juntos-dev CLI...');
+  const cliDir = join(tarballs, 'juntos-dev');
   mkdirSync(cliDir, { recursive: true });
-  execSync(`tar -xzf ${tarballs}/ruby2js-rails-beta.tgz -C ${cliDir}`);
+  execSync(`tar -xzf ${tarballs}/juntos-dev-beta.tgz -C ${cliDir}`);
 
   // Run init from local CLI to add Juntos config (package.json, vite.config.js, etc.)
   console.log('\n4. Initializing Juntos config...');
@@ -131,7 +132,7 @@ async function setup() {
   // Install local tarballs + better-sqlite3 in one command.
   // This uses local tarballs instead of fetching from GitHub Pages URLs in package.json.
   console.log('\n5. Installing dependencies from local tarballs...');
-  execSync(`npm install ${tarballs}/ruby2js-beta.tgz ${tarballs}/ruby2js-rails-beta.tgz ${tarballs}/vite-plugin-ruby2js-beta.tgz better-sqlite3`, {
+  execSync(`npm install ${tarballs}/ruby2js-beta.tgz ${tarballs}/juntos-beta.tgz ${tarballs}/juntos-dev-beta.tgz ${tarballs}/vite-plugin-ruby2js-beta.tgz better-sqlite3`, {
     cwd: demoDir,
     stdio: 'inherit'
   });

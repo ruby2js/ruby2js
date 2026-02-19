@@ -298,9 +298,9 @@ Ruby syntax in your frontmatter:
 
 Ruby2JS supports the same deployment targets:
 
-- **Vercel Edge** - `packages/ruby2js-rails/targets/vercel-edge/`
-- **Cloudflare Workers** - `packages/ruby2js-rails/targets/cloudflare/`
-- **Node.js** - `packages/ruby2js-rails/targets/node/`
+- **Vercel Edge** - `packages/juntos/targets/vercel-edge/`
+- **Cloudflare Workers** - `packages/juntos/targets/cloudflare/`
+- **Node.js** - `packages/juntos/targets/node/`
 
 ### Caching (ISR)
 

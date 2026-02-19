@@ -16,7 +16,7 @@ Juntos uses Vite as its build tool. When you run `juntos install`, a `vite.confi
 After running `juntos install`, your `dist/vite.config.js` looks like:
 
 ```javascript
-import { juntos } from 'ruby2js-rails/vite';
+import { juntos } from 'juntos-dev/vite';
 
 export default juntos({
   database: 'dexie',
@@ -230,7 +230,7 @@ eject:
 Since `juntos()` returns a plugin array, combine with other Vite plugins:
 
 ```javascript
-import { juntos } from 'ruby2js-rails/vite';
+import { juntos } from 'juntos-dev/vite';
 import react from '@vitejs/plugin-react';
 
 export default {

@@ -27,7 +27,7 @@ This demo shows how to integrate third-party React libraries (React Flow) with J
 
 - **React Flow** — Node-based visual editor for workflows
 - **JSON broadcasting** — `broadcast_json_to` for React state updates
-- **React Context** — `JsonStreamProvider` (from ruby2js-rails) for subscription management
+- **React Context** — `JsonStreamProvider` (from juntos) for subscription management
 - **Real-time sync** — Multiple users see changes instantly
 - **Multi-target** — Works on both browser (BroadcastChannel) and node (WebSocket) targets
 
@@ -110,7 +110,7 @@ end
 
 ### JsonStreamProvider Component
 
-The `JsonStreamProvider` is included in the ruby2js-rails package. It handles WebSocket (node target) or BroadcastChannel (browser target) automatically:
+The `JsonStreamProvider` is included in the juntos package. It handles WebSocket (node target) or BroadcastChannel (browser target) automatically:
 
 ```ruby
 # Import from lib/ (copied during build) - use relative path from your file

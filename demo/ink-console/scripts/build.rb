@@ -151,7 +151,7 @@ class InkConsoleBuilder
       adapter_file = ADAPTER_FILES[adapter]
     end
 
-    package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
+    package_dir = File.join(DEMO_ROOT, '../../packages/juntos')
     adapter_src = File.join(package_dir, 'adapters', adapter_file)
 
     unless File.exist?(adapter_src)

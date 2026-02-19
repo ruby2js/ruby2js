@@ -65,7 +65,7 @@ export function rails(options = {}) {
 
     // Path aliases for Rails conventions
     {
-      name: 'ruby2js-rails-config',
+      name: 'juntos-config',
       config() {
         return {
           resolve: {
@@ -79,7 +79,7 @@ export function rails(options = {}) {
   // Add HMR support if enabled
   if (hmr) {
     plugins.push({
-      name: 'ruby2js-rails-hmr',
+      name: 'juntos-hmr',
 
       handleHotUpdate({ file, server, modules }) {
         // Handle Stimulus controller updates

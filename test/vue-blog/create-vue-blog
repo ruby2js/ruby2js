@@ -30,7 +30,7 @@ echo -e "${GREEN}Installing dependencies...${NC}"
 npm install vue vue-router @hotwired/turbo > /dev/null 2>&1
 
 # Install ruby2js packages from local development paths
-npm install "$RUBY2JS_ROOT/packages/ruby2js-rails" > /dev/null 2>&1
+npm install "$RUBY2JS_ROOT/packages/juntos-dev" > /dev/null 2>&1
 
 # Install Vite and plugin for Vue
 npm install -D vite @vitejs/plugin-vue > /dev/null 2>&1
@@ -51,7 +51,7 @@ cat > vite.config.mjs << 'EOF'
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import ruby2js from 'vite-plugin-ruby2js';
-import { ruby2jsModels } from 'ruby2js-rails/vite-models';
+import { ruby2jsModels } from 'juntos-dev/vite-models';
 
 export default defineConfig({
   plugins: [
@@ -99,7 +99,7 @@ EOF
 
 # Reinstall dependencies to update package.json properly
 npm install > /dev/null 2>&1
-npm install "$RUBY2JS_ROOT/packages/ruby2js-rails" > /dev/null 2>&1
+npm install "$RUBY2JS_ROOT/packages/juntos-dev" > /dev/null 2>&1
 npm install -D "$RUBY2JS_ROOT/packages/vite-plugin-ruby2js" > /dev/null 2>&1
 
 # ============================================================
@@ -769,7 +769,7 @@ import {
   openDatabase,
   defineSchema,
   registerSchema
-} from 'ruby2js-rails/adapters/active_record_dexie.mjs';
+} from 'juntos/adapters/active_record_dexie.mjs';
 import { runSeeds } from './seeds.mjs';
 
 let initialized = false;

@@ -104,7 +104,7 @@ rails({
 For full Rails app transformation with [Juntos](/docs/juntos/):
 
 ```javascript
-import { juntos } from 'ruby2js-rails/vite';
+import { juntos } from 'juntos-dev/vite';
 
 export default juntos({
   database: 'dexie',

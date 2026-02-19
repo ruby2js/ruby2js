@@ -210,7 +210,7 @@ module Ruby2JS
           import { defineConfig } from 'astro/config';
           import tailwind from '@astrojs/tailwind';
           import browserAdapter from './browser-adapter.mjs';
-          import { ruby2jsModels } from 'ruby2js-rails/vite-models';
+          import { ruby2jsModels } from 'juntos-dev/vite-models';
 
           export default defineConfig({
             output: 'server',
@@ -658,7 +658,7 @@ module Ruby2JS
             openDatabase,
             defineSchema,
             registerSchema
-          } from 'ruby2js-rails/adapters/active_record_dexie.mjs';
+          } from 'juntos/adapters/active_record_dexie.mjs';
           import { runSeeds } from './seeds.mjs';
 
           let initialized = false;
@@ -1078,12 +1078,13 @@ module Ruby2JS
           # Install from npm
           system('npm install 2>/dev/null') || warn("npm install failed")
 
-          # Install ruby2js-rails from local if available
-          ruby2js_rails = File.expand_path('../../../packages/ruby2js-rails', __dir__)
-          if File.directory?(ruby2js_rails)
-            system("npm install #{ruby2js_rails} 2>/dev/null")
+          # Install juntos packages from local if available
+          juntos_pkg = File.expand_path('../../../packages/juntos', __dir__)
+          juntos_dev_pkg = File.expand_path('../../../packages/juntos-dev', __dir__)
+          if File.directory?(juntos_pkg)
+            system("npm install #{juntos_pkg} #{juntos_dev_pkg} 2>/dev/null")
           else
-            system('npm install ruby2js-rails 2>/dev/null')
+            system('npm install juntos juntos-dev 2>/dev/null')
           end
         end
       end

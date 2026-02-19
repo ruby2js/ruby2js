@@ -91,7 +91,7 @@ describe('rails preset', () => {
 
   test('includes config plugin with aliases', () => {
     const plugins = rails();
-    const configPlugin = plugins.find(p => p.name === 'ruby2js-rails-config');
+    const configPlugin = plugins.find(p => p.name === 'juntos-config');
 
     assert.ok(configPlugin, 'should include config plugin');
 
@@ -101,7 +101,7 @@ describe('rails preset', () => {
 
   test('includes HMR plugin by default', () => {
     const plugins = rails();
-    const hmrPlugin = plugins.find(p => p.name === 'ruby2js-rails-hmr');
+    const hmrPlugin = plugins.find(p => p.name === 'juntos-hmr');
 
     assert.ok(hmrPlugin, 'should include HMR plugin');
     assert.ok(typeof hmrPlugin.handleHotUpdate, 'function', 'should have handleHotUpdate');
@@ -109,7 +109,7 @@ describe('rails preset', () => {
 
   test('can disable HMR', () => {
     const plugins = rails({ hmr: false });
-    const hmrPlugin = plugins.find(p => p.name === 'ruby2js-rails-hmr');
+    const hmrPlugin = plugins.find(p => p.name === 'juntos-hmr');
 
     assert.strictEqual(hmrPlugin, undefined, 'should not include HMR plugin');
   });
@@ -118,7 +118,7 @@ describe('rails preset', () => {
     const plugins = rails({
       aliases: { '@custom': 'app/custom' }
     });
-    const configPlugin = plugins.find(p => p.name === 'ruby2js-rails-config');
+    const configPlugin = plugins.find(p => p.name === 'juntos-config');
 
     const config = configPlugin.config();
     assert.strictEqual(config.resolve.alias['@custom'], 'app/custom');

@@ -433,7 +433,7 @@ end
 Generates `config/paths.js`:
 
 ```javascript
-import { createPathHelper } from 'ruby2js-rails/path_helper.mjs';
+import { createPathHelper } from 'juntos/path_helper.mjs';
 
 function extract_id(obj) {
   return obj?.id ?? obj;

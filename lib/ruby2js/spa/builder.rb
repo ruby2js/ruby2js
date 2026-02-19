@@ -10,7 +10,7 @@ module Ruby2JS
     #
     # The builder generates a standalone SPA directory with:
     # - Ruby source files (models, controllers, views)
-    # - package.json with ruby2js-rails dependency
+    # - package.json with juntos/juntos-dev dependencies
     # - Config files (database.yml, ruby2js.yml, routes.rb)
     # - index.html entry point
     #
@@ -398,7 +398,8 @@ module Ruby2JS
         # Base dependencies
         dependencies = {
           "ruby2js" => "https://ruby2js.github.io/ruby2js/releases/ruby2js-beta.tgz",
-          "ruby2js-rails" => "https://ruby2js.github.io/ruby2js/releases/ruby2js-rails-beta.tgz"
+          "juntos" => "https://ruby2js.github.io/ruby2js/releases/juntos-beta.tgz",
+          "juntos-dev" => "https://ruby2js.github.io/ruby2js/releases/juntos-dev-beta.tgz"
         }
 
         # Add database-specific dependency
@@ -424,27 +425,27 @@ module Ruby2JS
 
       def dev_script_for(runtime)
         case runtime
-        when :browser then "ruby2js-rails-dev"
-        when :node then "ruby2js-rails-dev --ruby"
-        when :bun then "ruby2js-rails-dev --ruby"
-        when :deno then "ruby2js-rails-dev --ruby"
-        else "ruby2js-rails-dev"
+        when :browser then "juntos-dev"
+        when :node then "juntos-dev --ruby"
+        when :bun then "juntos-dev --ruby"
+        when :deno then "juntos-dev --ruby"
+        else "juntos-dev"
         end
       end
 
       def build_script_for(css)
         case css
-        when :tailwind then "npm run build:css && ruby2js-rails-build"
-        else "ruby2js-rails-build"
+        when :tailwind then "npm run build:css && juntos-build"
+        else "juntos-build"
         end
       end
 
       def start_script_for(runtime)
         case runtime
         when :browser then "npx serve -s -p 3000"
-        when :node then "ruby2js-rails-server"
-        when :bun then "bun node_modules/ruby2js-rails/server.mjs"
-        when :deno then "deno run --allow-all node_modules/ruby2js-rails/server.mjs"
+        when :node then "juntos-server"
+        when :bun then "bun node_modules/juntos-dev/server.mjs"
+        when :deno then "deno run --allow-all node_modules/juntos-dev/server.mjs"
         else "npx serve -s -p 3000"
         end
       end
@@ -603,7 +604,7 @@ module Ruby2JS
 
           ## How It Works
 
-          Ruby source files are transpiled to JavaScript using ruby2js-rails.
+          Ruby source files are transpiled to JavaScript using juntos-dev.
           The application #{runtime_desc} using #{db_desc}.
         MD
 

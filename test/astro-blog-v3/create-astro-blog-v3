@@ -30,7 +30,7 @@ echo -e "${GREEN}Installing dependencies...${NC}"
 npm install astro @hotwired/turbo > /dev/null 2>&1
 
 # Install ruby2js packages from local development paths
-npm install "$RUBY2JS_ROOT/packages/ruby2js-rails" > /dev/null 2>&1
+npm install "$RUBY2JS_ROOT/packages/juntos-dev" > /dev/null 2>&1
 
 # Install esbuild for browser bundling
 npm install -D esbuild > /dev/null 2>&1
@@ -99,7 +99,7 @@ EOF
 cat > astro.config.mjs << 'EOF'
 import { defineConfig } from 'astro/config';
 import browserAdapter from './browser-adapter.mjs';
-import { ruby2jsModels } from 'ruby2js-rails/vite-models';
+import { ruby2jsModels } from 'juntos-dev/vite-models';
 
 export default defineConfig({
   output: 'server',
@@ -420,7 +420,7 @@ import {
   openDatabase,
   defineSchema,
   registerSchema
-} from 'ruby2js-rails/adapters/active_record_dexie.mjs';
+} from 'juntos/adapters/active_record_dexie.mjs';
 import { runSeeds } from './seeds.mjs';
 
 let initialized = false;
@@ -1070,7 +1070,7 @@ EOF
 
 # Reinstall with correct package.json
 npm install > /dev/null 2>&1
-npm install "$RUBY2JS_ROOT/packages/ruby2js-rails" > /dev/null 2>&1
+npm install "$RUBY2JS_ROOT/packages/juntos-dev" > /dev/null 2>&1
 
 echo ""
 echo -e "${GREEN}Astro blog v3 created at: $PROJECT_DIR${NC}"

@@ -41,7 +41,7 @@ const ROOT = resolve(import.meta.dirname, '..');
 // Step 1: juntos init
 if (!existsSync(join(srcDir, 'vite.config.js'))) {
   console.log('Running juntos init...');
-  const cliPath = join(ROOT, 'packages', 'ruby2js-rails', 'cli.mjs');
+  const cliPath = join(ROOT, 'packages', 'juntos-dev', 'cli.mjs');
   execSync(`node ${cliPath} init --no-install`, { cwd: srcDir, stdio: 'inherit' });
 }
 
@@ -52,7 +52,8 @@ if (!opts['skip-install'] && !existsSync(join(srcDir, 'node_modules'))) {
   if (existsSync(tarballs)) {
     const pkgs = [
       join(tarballs, 'ruby2js-beta.tgz'),
-      join(tarballs, 'ruby2js-rails-beta.tgz'),
+      join(tarballs, 'juntos-beta.tgz'),
+      join(tarballs, 'juntos-dev-beta.tgz'),
       join(tarballs, 'vite-plugin-ruby2js-beta.tgz'),
       'dexie', '@hotwired/turbo', '@hotwired/stimulus', 'react', 'react-dom',
     ].join(' ');

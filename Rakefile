@@ -42,7 +42,7 @@ namespace :packages do
       sh 'yarn test'
     end
 
-    Dir.chdir 'packages/ruby2js-rails' do
+    Dir.chdir 'packages/juntos' do
       sh 'npm test'
     end
   end

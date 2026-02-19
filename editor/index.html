@@ -311,7 +311,8 @@
         const [demoResponse, ...packageResponses] = await Promise.all([
           fetch(`${RELEASES}/demo-${demo}.tar.gz`),
           fetch(`${RELEASES}/ruby2js-beta.tgz`),
-          fetch(`${RELEASES}/ruby2js-rails-beta.tgz`),
+          fetch(`${RELEASES}/juntos-beta.tgz`),
+          fetch(`${RELEASES}/juntos-dev-beta.tgz`),
           fetch(`${RELEASES}/vite-plugin-ruby2js-beta.tgz`),
         ]);
 
@@ -331,7 +332,7 @@
         const mountTree = buildMountTree(demoFiles);
 
         // Add package tarballs
-        const packageNames = ['ruby2js-beta.tgz', 'ruby2js-rails-beta.tgz', 'vite-plugin-ruby2js-beta.tgz'];
+        const packageNames = ['ruby2js-beta.tgz', 'juntos-beta.tgz', 'juntos-dev-beta.tgz', 'vite-plugin-ruby2js-beta.tgz'];
         for (let i = 0; i < packageResponses.length; i++) {
           const buf = await packageResponses[i].arrayBuffer();
           mountTree[packageNames[i]] = { file: { contents: new Uint8Array(buf) } };
@@ -481,7 +482,8 @@
         await runCommand(container, xterm, 'npm', [
           'install',
           './ruby2js-beta.tgz',
-          './ruby2js-rails-beta.tgz',
+          './juntos-beta.tgz',
+          './juntos-dev-beta.tgz',
           './vite-plugin-ruby2js-beta.tgz',
           'dexie', '@hotwired/turbo', '@hotwired/stimulus', 'react', 'react-dom'
         ], 'Installing dependencies...');

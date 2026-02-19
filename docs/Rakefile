@@ -324,16 +324,32 @@ task :ruby2js_tarball => [:selfhost_build, releases_dir] do
   end
 end
 
-# Build ruby2js-rails npm package tarball
-# Package now lives at packages/ruby2js-rails/
+# Build juntos and juntos-dev npm package tarballs
+# Packages live at packages/juntos/ and packages/juntos-dev/
 # Depends on selfhost_build to generate build.mjs with npm package imports
-task :ruby2js_rails_tarball => [:vite_plugin_tarball, :selfhost_build] do
-  rails_pkg_dir = "#{root}/packages/ruby2js-rails"
-  Dir.chdir(rails_pkg_dir) do
-    # Clean up old tarballs
-    FileUtils.rm_f Dir.glob("ruby2js-rails-*.tgz")
+task :juntos_tarballs => [:vite_plugin_tarball, :selfhost_build] do
+  # Build juntos (runtime) package
+  juntos_pkg_dir = "#{root}/packages/juntos"
+  Dir.chdir(juntos_pkg_dir) do
+    FileUtils.rm_f Dir.glob("juntos-*.tgz")
 
-    # Set timestamped version
+    version = "6.0.0-beta.#{Time.now.strftime('%Y%m%d%H%M')}"
+    sh "npm version #{version} --no-git-tag-version --allow-same-version"
+
+    sh "npm pack"
+
+    tarball = Dir.glob("juntos-*.tgz").first
+    cp tarball, "#{releases_dir}/juntos-beta.tgz"
+    puts "  juntos-beta.tgz (#{(File.size("#{releases_dir}/juntos-beta.tgz") / 1024.0).round(1)} KB)"
+
+    sh "npm version 6.0.0-beta --no-git-tag-version --allow-same-version"
+  end
+
+  # Build juntos-dev (build tooling) package
+  juntos_dev_pkg_dir = "#{root}/packages/juntos-dev"
+  Dir.chdir(juntos_dev_pkg_dir) do
+    FileUtils.rm_f Dir.glob("juntos-dev-*.tgz")
+
     version = "6.0.0-beta.#{Time.now.strftime('%Y%m%d%H%M')}"
     sh "npm version #{version} --no-git-tag-version --allow-same-version"
 
@@ -345,7 +361,6 @@ task :ruby2js_rails_tarball => [:vite_plugin_tarball, :selfhost_build] do
     sh "npm pkg set dependencies.ruby2js=https://www.ruby2js.com/releases/ruby2js-beta.tgz"
     sh "npm pkg set dependencies.vite-plugin-ruby2js=https://www.ruby2js.com/releases/vite-plugin-ruby2js-beta.tgz"
 
-    # Pack
     sh "npm pack"
 
     # Restore peerDependencies and remove dependencies (keep source clean for development)
@@ -354,12 +369,10 @@ task :ruby2js_rails_tarball => [:vite_plugin_tarball, :selfhost_build] do
     sh "npm pkg delete dependencies.ruby2js"
     sh "npm pkg delete dependencies.vite-plugin-ruby2js"
 
-    # Copy to releases with stable name
-    tarball = Dir.glob("ruby2js-rails-*.tgz").first
-    cp tarball, "#{releases_dir}/ruby2js-rails-beta.tgz"
-    puts "  ruby2js-rails-beta.tgz (#{(File.size("#{releases_dir}/ruby2js-rails-beta.tgz") / 1024.0).round(1)} KB)"
+    tarball = Dir.glob("juntos-dev-*.tgz").first
+    cp tarball, "#{releases_dir}/juntos-dev-beta.tgz"
+    puts "  juntos-dev-beta.tgz (#{(File.size("#{releases_dir}/juntos-dev-beta.tgz") / 1024.0).round(1)} KB)"
 
-    # Reset version for git
     sh "npm version 6.0.0-beta --no-git-tag-version --allow-same-version"
   end
 end
@@ -396,7 +409,7 @@ task :vite_plugin_tarball => [:ruby2js_tarball, releases_dir] do
 end
 
 desc "Build npm package tarballs for beta distribution"
-task :npm_packages => [:ruby2js_tarball, :ruby2js_rails_tarball, :vite_plugin_tarball]
+task :npm_packages => [:ruby2js_tarball, :juntos_tarballs, :vite_plugin_tarball]
 
 task :default => [
   "#{dest}/index.erb",

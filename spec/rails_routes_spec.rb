@@ -57,7 +57,7 @@ describe Ruby2JS::Filter::Rails::Routes do
           resources :articles
         end
       RUBY
-      assert_includes result, 'import { createPathHelper } from "ruby2js-rails/path_helper.mjs"'
+      assert_includes result, 'import { createPathHelper } from "juntos/path_helper.mjs"'
     end
   end
 

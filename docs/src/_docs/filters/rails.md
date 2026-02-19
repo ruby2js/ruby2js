@@ -531,7 +531,7 @@ Path helpers are generated in a separate `config/paths.js` file. They return cal
 
 ```javascript
 // config/paths.js
-import { createPathHelper } from 'ruby2js-rails/path_helper.mjs';
+import { createPathHelper } from 'juntos/path_helper.mjs';
 
 export function articles_path() {
   return createPathHelper('/articles');

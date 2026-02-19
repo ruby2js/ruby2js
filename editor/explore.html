@@ -204,7 +204,8 @@
         const [demoResponse, ...packageResponses] = await Promise.all([
           fetch(`${RELEASES}/demo-${demo}.tar.gz`),
           fetch(`${RELEASES}/ruby2js-beta.tgz`),
-          fetch(`${RELEASES}/ruby2js-rails-beta.tgz`),
+          fetch(`${RELEASES}/juntos-beta.tgz`),
+          fetch(`${RELEASES}/juntos-dev-beta.tgz`),
           fetch(`${RELEASES}/vite-plugin-ruby2js-beta.tgz`),
         ]);
 
@@ -227,7 +228,7 @@
 
         // Add package tarballs as binary files in root
         setProgress(50, 'Preparing packages...');
-        const packageNames = ['ruby2js-beta.tgz', 'ruby2js-rails-beta.tgz', 'vite-plugin-ruby2js-beta.tgz'];
+        const packageNames = ['ruby2js-beta.tgz', 'juntos-beta.tgz', 'juntos-dev-beta.tgz', 'vite-plugin-ruby2js-beta.tgz'];
         for (let i = 0; i < packageResponses.length; i++) {
           const buf = await packageResponses[i].arrayBuffer();
           mountTree[packageNames[i]] = { file: { contents: new Uint8Array(buf) } };
@@ -303,7 +304,8 @@
         xterm.writeln('');
         xterm.writeln('\x1b[33mStep 1:\x1b[0m Install dependencies (one time):');
         xterm.writeln('');
-        xterm.writeln('  npm install ./ruby2js-beta.tgz ./ruby2js-rails-beta.tgz \\');
+        xterm.writeln('  npm install ./ruby2js-beta.tgz ./juntos-beta.tgz \\');
+        xterm.writeln('    ./juntos-dev-beta.tgz \\');
         xterm.writeln('    ./vite-plugin-ruby2js-beta.tgz dexie @hotwired/turbo \\');
         xterm.writeln('    @hotwired/stimulus react react-dom');
         xterm.writeln('');

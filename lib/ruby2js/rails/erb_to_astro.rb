@@ -1104,7 +1104,7 @@ module Ruby2JS
         # Helper imports
         unless @helpers_used.empty?
           helpers = @helpers_used.to_a.join(', ')
-          lines << "import { #{helpers} } from 'ruby2js-rails/helpers.js';"
+          lines << "import { #{helpers} } from 'juntos/helpers.js';"
         end
 
         # Astro Actions import and result handling
@@ -1283,7 +1283,7 @@ module Ruby2JS
         # Helper imports
         unless @helpers_used.empty?
           helpers = @helpers_used.to_a.join(', ')
-          lines << "import { #{helpers} } from 'ruby2js-rails/helpers.js';"
+          lines << "import { #{helpers} } from 'juntos/helpers.js';"
         end
 
         # Astro Actions import for form components

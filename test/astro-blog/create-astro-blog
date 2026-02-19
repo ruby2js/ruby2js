@@ -45,7 +45,7 @@ if [ -n "$RUBY2JS_TARBALL" ]; then
   npm install @astrojs/react react react-dom dexie
 else
   # Default: assume we're in the ruby2js repo for local dev
-  npm install "$REPO_ROOT/demo/selfhost" "$REPO_ROOT/packages/ruby2js-astro" "$REPO_ROOT/packages/vite-plugin-ruby2js" "$REPO_ROOT/packages/ruby2js-rails"
+  npm install "$REPO_ROOT/demo/selfhost" "$REPO_ROOT/packages/ruby2js-astro" "$REPO_ROOT/packages/vite-plugin-ruby2js" "$REPO_ROOT/packages/juntos-dev"
   npm install @astrojs/react react react-dom dexie
 fi
 

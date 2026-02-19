@@ -12,10 +12,10 @@ demo/selfhost/ruby2js.mjs
 demo/selfhost/prism_browser.js
 demo/selfhost/filters/
 demo/selfhost/lib/
-packages/ruby2js-rails/build.mjs
-packages/ruby2js-rails/dist/
-packages/ruby2js-rails/lib/
-packages/ruby2js-rails/ruby2js.js
+packages/juntos-dev/build.mjs
+packages/juntos-dev/dist/
+packages/juntos-dev/lib/
+packages/juntos-dev/ruby2js.js
 
 # Editor swap files
 *.swp

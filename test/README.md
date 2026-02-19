@@ -39,9 +39,9 @@ cd ruby2js
 # 2. Install Ruby dependencies
 bundle install
 
-# 3. Install npm dependencies for selfhost and ruby2js-rails
+# 3. Install npm dependencies for selfhost and juntos
 (cd demo/selfhost && npm install)
-(cd packages/ruby2js-rails && npm install)
+(cd packages/juntos && npm install)
 
 # 4. Build tarballs (creates artifacts/tarballs/)
 bundle exec rake -f demo/selfhost/Rakefile release
@@ -50,7 +50,7 @@ bundle exec rake -f demo/selfhost/Rakefile release
 test/chat/create-chat artifacts/chat
 
 # 6. Install ruby2js packages from tarballs
-npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/ruby2js-rails-beta.tgz
+npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/juntos-beta.tgz artifacts/tarballs/juntos-dev-beta.tgz
 
 # 7. Run smoke test
 node test/smoke-test.mjs artifacts/chat --database dexie

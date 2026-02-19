@@ -31,9 +31,10 @@ WORKDIR /app/demo/selfhost
 RUN npm install
 
 WORKDIR /app
-# Copy the full ruby2js-rails package (demo uses file: dependency which creates symlinks)
-COPY packages/ruby2js-rails/ ./packages/ruby2js-rails/
-WORKDIR /app/packages/ruby2js-rails
+# Copy the juntos packages (demo uses file: dependency which creates symlinks)
+COPY packages/juntos/ ./packages/juntos/
+COPY packages/juntos-dev/ ./packages/juntos-dev/
+WORKDIR /app/packages/juntos
 RUN npm install
 
 # Now copy the rest of the source code (node_modules dirs already populated)

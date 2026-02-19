@@ -739,7 +739,7 @@ module Ruby2JS
             end
           else
             # Import createPathHelper for callable path helpers with HTTP methods
-            statements << s(:import, 'ruby2js-rails/path_helper.mjs',
+            statements << s(:import, 'juntos/path_helper.mjs',
               s(:array, s(:const, nil, :createPathHelper)))
 
             # Generate extract_id helper if we have path helpers with params
@@ -1109,7 +1109,7 @@ module Ruby2JS
           end
 
           # Import createPathHelper for callable path helpers with HTTP methods
-          statements << s(:import, 'ruby2js-rails/path_helper.mjs',
+          statements << s(:import, 'juntos/path_helper.mjs',
             s(:array, s(:const, nil, :createPathHelper)))
 
           # Generate extract_id helper if we have path helpers with params

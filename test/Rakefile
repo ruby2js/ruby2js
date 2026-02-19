@@ -38,7 +38,7 @@ def demo_create_script(demo)
 end
 
 def package_tarballs_exist?
-  %w[ruby2js-beta.tgz ruby2js-rails-beta.tgz vite-plugin-ruby2js-beta.tgz].all? do |name|
+  %w[ruby2js-beta.tgz juntos-beta.tgz juntos-dev-beta.tgz vite-plugin-ruby2js-beta.tgz].all? do |name|
     File.exist?(File.join(TARBALLS, name))
   end
 end
@@ -236,7 +236,8 @@ end
 
 FIZZY_DIR = ENV['FIZZY_DIR'] || File.expand_path('~/git/fizzy')
 RUBY2JS_PKG = File.join(ROOT, 'demo/selfhost')
-RUBY2JS_RAILS_PKG = File.join(ROOT, 'packages/ruby2js-rails')
+JUNTOS_DEV_PKG = File.join(ROOT, 'packages/juntos-dev')
+JUNTOS_PKG = File.join(ROOT, 'packages/juntos')
 
 desc "Build selfhost, eject Fizzy, and run tests"
 task :fizzy, [:timeout] do |t, args|
@@ -257,16 +258,19 @@ task :fizzy, [:timeout] do |t, args|
   fizzy_nm = File.join(FIZZY_DIR, 'node_modules')
   if File.directory?(fizzy_nm)
     FileUtils.rm_rf(File.join(fizzy_nm, 'ruby2js'))
-    FileUtils.rm_rf(File.join(fizzy_nm, 'ruby2js-rails'))
+    FileUtils.rm_rf(File.join(fizzy_nm, 'juntos'))
+    FileUtils.rm_rf(File.join(fizzy_nm, 'juntos-dev'))
     FileUtils.ln_s(RUBY2JS_PKG, File.join(fizzy_nm, 'ruby2js'))
-    FileUtils.ln_s(RUBY2JS_RAILS_PKG, File.join(fizzy_nm, 'ruby2js-rails'))
+    FileUtils.ln_s(JUNTOS_PKG, File.join(fizzy_nm, 'juntos'))
+    FileUtils.ln_s(JUNTOS_DEV_PKG, File.join(fizzy_nm, 'juntos-dev'))
     puts "  Symlinked ruby2js → #{RUBY2JS_PKG}"
-    puts "  Symlinked ruby2js-rails → #{RUBY2JS_RAILS_PKG}"
+    puts "  Symlinked juntos → #{JUNTOS_PKG}"
+    puts "  Symlinked juntos-dev → #{JUNTOS_DEV_PKG}"
   end
 
   # 3. Eject
   puts "\n=== Ejecting Fizzy ==="
-  cli = File.join(RUBY2JS_RAILS_PKG, 'cli.mjs')
+  cli = File.join(JUNTOS_DEV_PKG, 'cli.mjs')
   Dir.chdir(FIZZY_DIR) do
     sh "node #{cli} eject -d sqlite"
   end
@@ -280,11 +284,14 @@ task :fizzy, [:timeout] do |t, args|
 
     # Replace installed packages with symlinks to dev source
     FileUtils.rm_rf('node_modules/ruby2js')
-    FileUtils.rm_rf('node_modules/ruby2js-rails')
+    FileUtils.rm_rf('node_modules/juntos')
+    FileUtils.rm_rf('node_modules/juntos-dev')
     FileUtils.ln_s(RUBY2JS_PKG, 'node_modules/ruby2js')
-    FileUtils.ln_s(RUBY2JS_RAILS_PKG, 'node_modules/ruby2js-rails')
+    FileUtils.ln_s(JUNTOS_PKG, 'node_modules/juntos')
+    FileUtils.ln_s(JUNTOS_DEV_PKG, 'node_modules/juntos-dev')
     puts "  Symlinked ruby2js → #{RUBY2JS_PKG}"
-    puts "  Symlinked ruby2js-rails → #{RUBY2JS_RAILS_PKG}"
+    puts "  Symlinked juntos → #{JUNTOS_PKG}"
+    puts "  Symlinked juntos-dev → #{JUNTOS_DEV_PKG}"
   end
 
   # 5. Run tests
@@ -635,9 +642,9 @@ def generate_system_test_dockerfile(path, demo, database, target)
     # Extract demo
     RUN tar -xzf /tarballs/demo-#{demo_hyphen}.tar.gz --strip-components=1 -C /app
 
-    # Install ruby2js-rails first (includes js-yaml dependency)
+    # Install juntos packages first (includes js-yaml dependency)
     # Then run init which can now read ruby2js.yml
-    RUN npm install /tarballs/ruby2js-rails-beta.tgz && \\
+    RUN npm install /tarballs/juntos-beta.tgz /tarballs/juntos-dev-beta.tgz && \\
         rm -f package-lock.json && \\
         npx juntos init --no-install
 

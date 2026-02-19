@@ -45,8 +45,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      // Point to ruby2js-rails in your built dist
-      'ruby2js-rails': resolve(__dirname, 'workspace/myapp/dist/node_modules/ruby2js-rails')
+      // Point to juntos in your built dist
+      'juntos': resolve(__dirname, 'workspace/myapp/dist/node_modules/juntos')
     }
   }
 });
@@ -452,7 +452,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      'ruby2js-rails': resolve(__dirname, 'workspace/myapp/dist/node_modules/ruby2js-rails'),
+      'juntos': resolve(__dirname, 'workspace/myapp/dist/node_modules/juntos'),
       // Map absolute imports used by React components
       '/lib/': resolve(__dirname, 'workspace/myapp/dist/lib') + '/',
       '/app/': resolve(__dirname, 'workspace/myapp/dist/app') + '/',

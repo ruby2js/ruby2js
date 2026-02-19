@@ -19,8 +19,8 @@ const PROJECT_ROOT = join(__dirname, '..');
 
 // Try node_modules first (CI with installed tarball), then packages (local dev)
 const PACKAGE_LOCATIONS = [
-  join(PROJECT_ROOT, 'node_modules/ruby2js-rails'),
-  join(PROJECT_ROOT, 'packages/ruby2js-rails')
+  join(PROJECT_ROOT, 'node_modules/juntos-dev'),
+  join(PROJECT_ROOT, 'packages/juntos-dev')
 ];
 const PACKAGE_ROOT = PACKAGE_LOCATIONS.find(p => existsSync(join(p, 'build.mjs'))) || PACKAGE_LOCATIONS[1];
 

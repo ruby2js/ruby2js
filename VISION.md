@@ -96,9 +96,9 @@ The transpiler is a **universal adapter** between conventions, not a one-way com
 
 Before building something new, check if the infrastructure already exists:
 
-- **Database adapters** exist in `packages/ruby2js-rails/adapters/`
-- **ISR adapters** exist in `packages/ruby2js-rails/targets/*/isr.mjs`
-- **Target configurations** exist in `packages/ruby2js-rails/targets/`
+- **Database adapters** exist in `packages/juntos/adapters/`
+- **ISR adapters** exist in `packages/juntos/targets/*/isr.mjs`
+- **Target configurations** exist in `packages/juntos/targets/`
 
 If an adapter or pattern exists, **use it**. Don't hard-code what should be pluggable.
 

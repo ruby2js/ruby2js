@@ -96,7 +96,7 @@ let jsOutput;
 try {
   const sourceCode = code || readFileSync(resolve(ROOT, file), 'utf8');
 
-  // Check if using rails filters - need ruby2js-rails package
+  // Check if using rails filters - need juntos-dev package
   const hasRailsFilters = filters.some(f => f.includes('rails'));
 
   // Write a temp script file to avoid shell escaping issues

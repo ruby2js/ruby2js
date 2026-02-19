@@ -12,7 +12,8 @@ module Ruby2js
     # Core dependencies - database adapters are installed on-demand
     RELEASES_URL = 'https://ruby2js.github.io/ruby2js/releases'.freeze
     CORE_DEPENDENCIES = {
-      'ruby2js-rails' => "#{RELEASES_URL}/ruby2js-rails-beta.tgz"
+      'juntos' => "#{RELEASES_URL}/juntos-beta.tgz",
+      'juntos-dev' => "#{RELEASES_URL}/juntos-dev-beta.tgz"
     }.freeze
     DEV_DEPENDENCIES = {
       'vite' => '^6.0.0',
@@ -39,7 +40,7 @@ module Ruby2js
 
       create_file config_path, <<~JS
         import { defineConfig } from 'vite';
-        import { juntos } from 'ruby2js-rails/vite';
+        import { juntos } from 'juntos-dev/vite';
 
         export default defineConfig({
           plugins: juntos()
@@ -127,7 +128,7 @@ module Ruby2js
       create_file binstub_path, <<~SHELL
         #!/bin/sh
         # Juntos - Rails patterns, JavaScript runtimes
-        # This binstub delegates to the juntos CLI from ruby2js-rails
+        # This binstub delegates to the juntos CLI from juntos-dev
         exec npx juntos "$@"
       SHELL
       chmod binstub_path, 0755

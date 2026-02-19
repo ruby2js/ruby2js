@@ -1,4 +1,4 @@
 #!/bin/sh
 # Juntos - Rails patterns, JavaScript runtimes
-# This script delegates to the juntos CLI from ruby2js-rails
+# This script delegates to the juntos CLI from juntos-dev
 exec npx juntos "$@"

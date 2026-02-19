@@ -57,7 +57,7 @@ dist/
 │   └── dialects/                   # SQL dialect (SQLite, PostgreSQL, or MySQL)
 │       └── sqlite.mjs              # Example: SQLite dialect for Turso/D1
 ├── node_modules/
-│   └── ruby2js-rails/              # Shared runtime modules
+│   └── juntos/                     # Shared runtime modules
 │       └── adapters/               # ActiveRecord base classes, query builder, CollectionProxy
 ├── index.html                      # Entry point (browser targets)
 ├── api/[[...path]].js              # Entry point (Vercel)
@@ -250,7 +250,7 @@ Path helpers are generated as callable objects with HTTP methods:
 
 ```javascript
 // config/paths.js
-import { createPathHelper } from 'ruby2js-rails/path_helper.mjs';
+import { createPathHelper } from 'juntos/path_helper.mjs';
 
 export function article_path(article) {
   return createPathHelper(`/articles/${article.id || article}`);
@@ -374,14 +374,14 @@ The original `.rb` files are copied alongside for debugger access. In browser De
 8. **Generate entry point** — Create index.html or serverless handler
 9. **Setup Tailwind** — If detected, configure and build CSS
 
-**Note:** Shared modules (ActiveRecord base classes, query builder, inflector) are imported from the `ruby2js-rails` npm package rather than copied to `dist/`. This keeps builds smaller and provides a single source of truth for the runtime code.
+**Note:** Shared modules (ActiveRecord base classes, query builder, inflector) are imported from the `juntos` npm package rather than copied to `dist/`. This keeps builds smaller and provides a single source of truth for the runtime code.
 
 ## Continuing in JavaScript
 
 After building, you can take `dist/` and develop purely in JavaScript:
 
 1. The generated code follows standard patterns
-2. No Ruby required at runtime—it's pure JavaScript (the `ruby2js-rails` npm package provides the runtime)
+2. No Ruby required at runtime—it's pure JavaScript (the `juntos` npm package provides the runtime)
 3. Add npm packages directly to `dist/package.json`
 4. Modify transpiled files as needed
 

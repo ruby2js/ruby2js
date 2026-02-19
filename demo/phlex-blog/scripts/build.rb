@@ -185,7 +185,7 @@ class PhlexBlogBuilder
       raise "Unknown DATABASE adapter: #{adapter}"
     end
 
-    package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
+    package_dir = File.join(DEMO_ROOT, '../../packages/juntos')
     adapter_src = File.join(package_dir, 'adapters', adapter_file)
     adapter_dest = File.join(@dist_dir, 'lib/active_record.mjs')
     FileUtils.mkdir_p(File.dirname(adapter_dest))
@@ -202,7 +202,7 @@ class PhlexBlogBuilder
     FileUtils.mkdir_p(lib_dest)
 
     target_dir = @target == 'browser' ? 'browser' : 'node'
-    package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
+    package_dir = File.join(DEMO_ROOT, '../../packages/juntos')
 
     target_src = File.join(package_dir, 'targets', target_dir)
     Dir.glob(File.join(target_src, '*.js')).each do |src_path|
@@ -216,7 +216,7 @@ class PhlexBlogBuilder
     lib_dest = File.join(@dist_dir, 'lib')
     FileUtils.mkdir_p(lib_dest)
 
-    package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
+    package_dir = File.join(DEMO_ROOT, '../../packages/juntos')
     src_path = File.join(package_dir, 'phlex_runtime.mjs')
     return unless File.exist?(src_path)
 

@@ -40,7 +40,7 @@ if [ -n "$RUBY2JS_TARBALL" ]; then
   npm install "$RUBY2JS_TARBALL" "$ASTRO_INTEGRATION_TARBALL" "$VITE_PLUGIN_TARBALL" "$RAILS_TARBALL"
   npm install @astrojs/react react react-dom dexie
 else
-  npm install "$REPO_ROOT/demo/selfhost" "$REPO_ROOT/packages/ruby2js-astro" "$REPO_ROOT/packages/vite-plugin-ruby2js" "$REPO_ROOT/packages/ruby2js-rails"
+  npm install "$REPO_ROOT/demo/selfhost" "$REPO_ROOT/packages/ruby2js-astro" "$REPO_ROOT/packages/vite-plugin-ruby2js" "$REPO_ROOT/packages/juntos-dev"
   npm install @astrojs/react react react-dom dexie
 fi
 

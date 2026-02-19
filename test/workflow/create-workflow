@@ -331,7 +331,7 @@ cat > app/views/workflows/Show.jsx.rb << 'RBX'
 import React from 'react'
 import [useState, useEffect], from: 'react'
 import WorkflowCanvas from 'components/WorkflowCanvas'
-import JsonStreamProvider from 'ruby2js-rails/components/JsonStreamProvider.js'
+import JsonStreamProvider from 'juntos/components/JsonStreamProvider.js'
 import [Workflow], from: 'app/models/workflow.rb'
 import [Node], from: 'app/models/node.rb'
 import [Edge], from: 'app/models/edge.rb'
@@ -452,7 +452,7 @@ import React, [useState, useEffect, useCallback], from: 'react'
 # React Flow is browser-only (visual canvas library)
 import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow' # Pragma: browser
 import 'reactflow/dist/style.css' # Pragma: browser
-import [useJsonStream], from: 'ruby2js-rails/components/JsonStreamProvider.js'
+import [useJsonStream], from: 'juntos/components/JsonStreamProvider.js'
 
 export default
 def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:, onDeleteNode:, onUpdateNode:)
@@ -695,7 +695,7 @@ echo "  - Double-click node to edit label"
 echo "  - Select node + Delete key to remove"
 echo "  - Drag handles to connect nodes"
 echo ""
-echo "Real-time components (from ruby2js-rails package):"
+echo "Real-time components (from juntos package):"
 echo "  - JsonStreamProvider: React context for real-time subscriptions"
 echo "  - useJsonStream hook: access broadcast messages in components"
 echo "  - broadcast_json_to: model callback sends JSON events"

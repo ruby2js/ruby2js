@@ -3,7 +3,7 @@
 # Transpiles Ruby models and controllers to JavaScript
 #
 # Can be required: require 'ruby2js/rails/builder'
-# Or transpiled to JS: import { SelfhostBuilder } from 'ruby2js-rails/build.mjs'
+# Or transpiled to JS: import { SelfhostBuilder } from 'juntos-dev/build.mjs'
 
 require 'fileutils'
 require 'json'
@@ -369,7 +369,7 @@ class SelfhostBuilder
     # Check for local packages directory (when running from ruby2js repo)
     # For deploy targets, always use tarball URL since deployed code can't access local files
     gem_root = File.expand_path("../../..", __dir__)
-    local_package = File.join(gem_root, "packages/ruby2js-rails")
+    local_package = File.join(gem_root, "packages/juntos-dev")
     # Path is relative to where package.json lives (root or dist/)
     package_dir = root_install ? (app_root || Dir.pwd) : File.join(app_root || Dir.pwd, 'dist')
 
@@ -386,16 +386,19 @@ class SelfhostBuilder
     deps = if use_local
       relative_path = Pathname.new(local_package).relative_path_from(Pathname.new(package_dir))
       # Also add ruby2js directly - Node's module resolution doesn't follow symlinks
-      # in file: dependencies, so the peerDep in ruby2js-rails isn't found
+      # in file: dependencies, so the peerDep in juntos-dev isn't found
       selfhost_path = Pathname.new(File.join(gem_root, "demo/selfhost")).relative_path_from(Pathname.new(package_dir))
+      juntos_path = Pathname.new(File.join(gem_root, "packages/juntos")).relative_path_from(Pathname.new(package_dir))
       {
-        'ruby2js-rails' => "file:#{relative_path}",
+        'juntos' => "file:#{juntos_path}",
+        'juntos-dev' => "file:#{relative_path}",
         'ruby2js' => "file:#{selfhost_path}"
       }
     else
       {
         'ruby2js' => 'https://ruby2js.github.io/ruby2js/releases/ruby2js-beta.tgz',
-        'ruby2js-rails' => 'https://ruby2js.github.io/ruby2js/releases/ruby2js-rails-beta.tgz'
+        'juntos' => 'https://ruby2js.github.io/ruby2js/releases/juntos-beta.tgz',
+        'juntos-dev' => 'https://ruby2js.github.io/ruby2js/releases/juntos-dev-beta.tgz'
       }
     end
 
@@ -433,15 +436,15 @@ class SelfhostBuilder
 
     # Base scripts - server scripts added at build time based on target
     scripts = {
-      'dev' => 'ruby2js-rails-dev',
-      'dev:ruby' => 'ruby2js-rails-dev --ruby',
-      'build' => 'ruby2js-rails-build',
-      'migrate' => 'ruby2js-rails-migrate',
+      'dev' => 'juntos-dev',
+      'dev:ruby' => 'juntos-dev --ruby',
+      'build' => 'juntos-build',
+      'migrate' => 'juntos-migrate',
       'start' => 'npx serve -s -p 3000',
       # Server scripts included by default - they just won't work without deps
-      'start:node' => 'ruby2js-rails-server',
-      'start:bun' => 'bun node_modules/ruby2js-rails/server.mjs',
-      'start:deno' => 'deno run --allow-all node_modules/ruby2js-rails/server.mjs'
+      'start:node' => 'juntos-server',
+      'start:bun' => 'bun node_modules/juntos-dev/server.mjs',
+      'start:deno' => 'deno run --allow-all node_modules/juntos-dev/server.mjs'
     }
 
     result = {
@@ -575,13 +578,13 @@ class SelfhostBuilder
   # Common importmap entries for all browser builds (turbo added dynamically based on target)
   COMMON_IMPORTMAP_ENTRIES = {
     '@hotwired/stimulus' => '/node_modules/@hotwired/stimulus/dist/stimulus.js',
-    # Shared ruby2js-rails modules (imported by adapters, not copied to dist)
-    'ruby2js-rails/adapters/active_record_base.mjs' => '/node_modules/ruby2js-rails/adapters/active_record_base.mjs',
-    'ruby2js-rails/adapters/active_record_sql.mjs' => '/node_modules/ruby2js-rails/adapters/active_record_sql.mjs',
-    'ruby2js-rails/adapters/relation.mjs' => '/node_modules/ruby2js-rails/adapters/relation.mjs',
-    'ruby2js-rails/adapters/collection_proxy.mjs' => '/node_modules/ruby2js-rails/adapters/collection_proxy.mjs',
-    'ruby2js-rails/adapters/inflector.mjs' => '/node_modules/ruby2js-rails/adapters/inflector.mjs',
-    'ruby2js-rails/adapters/sql_parser.mjs' => '/node_modules/ruby2js-rails/adapters/sql_parser.mjs'
+    # Shared juntos modules (imported by adapters, not copied to dist)
+    'juntos/adapters/active_record_base.mjs' => '/node_modules/juntos/adapters/active_record_base.mjs',
+    'juntos/adapters/active_record_sql.mjs' => '/node_modules/juntos/adapters/active_record_sql.mjs',
+    'juntos/adapters/relation.mjs' => '/node_modules/juntos/adapters/relation.mjs',
+    'juntos/adapters/collection_proxy.mjs' => '/node_modules/juntos/adapters/collection_proxy.mjs',
+    'juntos/adapters/inflector.mjs' => '/node_modules/juntos/adapters/inflector.mjs',
+    'juntos/adapters/sql_parser.mjs' => '/node_modules/juntos/adapters/sql_parser.mjs'
   }.freeze
 
   # Database-specific importmap entries for browser builds
@@ -1253,9 +1256,9 @@ class SelfhostBuilder
 
     # Check for local packages first (development), then npm-installed, finally vendor (legacy)
     # Prefer local source over npm when available so local changes are immediately reflected
-    npm_adapter_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails/adapters')
-    npm_dist_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails/dist/lib')
-    pkg_adapter_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails/adapters')
+    npm_adapter_dir = File.join(@dist_dir, 'node_modules/juntos/adapters')
+    npm_dist_dir = File.join(@dist_dir, 'node_modules/juntos/dist/lib')
+    pkg_adapter_dir = File.join(DEMO_ROOT, '../../packages/juntos/adapters')
     vendor_adapter_dir = File.join(DEMO_ROOT, 'vendor/ruby2js/adapters')
     adapter_dir = if File.exist?(pkg_adapter_dir)
       pkg_adapter_dir
@@ -1267,22 +1270,22 @@ class SelfhostBuilder
       vendor_adapter_dir
     else
       raise <<~ERROR
-        Could not find ruby2js-rails adapters directory.
+        Could not find juntos adapters directory.
         Looked in:
           - #{npm_adapter_dir}
           - #{npm_dist_dir}
           - #{pkg_adapter_dir}
           - #{vendor_adapter_dir}
 
-        Try running: npm install ruby2js-rails
-        Or ensure the ruby2js-rails package is properly installed.
+        Try running: npm install juntos
+        Or ensure the juntos package is properly installed.
       ERROR
     end
     lib_dest = File.join(@dist_dir, 'lib')
     FileUtils.mkdir_p(lib_dest)
 
     # Shared modules (active_record_base, active_record_sql, relation, inflector, sql_parser)
-    # are now imported from ruby2js-rails npm package, not copied to dist.
+    # are now imported from juntos npm package, not copied to dist.
     # This keeps dist smaller and provides a single source of truth.
 
     # Copy dialect files (SQLite, PostgreSQL, or MySQL)
@@ -1399,12 +1402,12 @@ class SelfhostBuilder
   # 3. dist/ node_modules (legacy .juntos architecture)
   # 4. Vendor directory
   def find_adapter_dir()
-    npm_adapter_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails/adapters')
-    npm_dist_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails/dist/lib')
-    pkg_adapter_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails/adapters')
+    npm_adapter_dir = File.join(@dist_dir, 'node_modules/juntos/adapters')
+    npm_dist_dir = File.join(@dist_dir, 'node_modules/juntos/dist/lib')
+    pkg_adapter_dir = File.join(DEMO_ROOT, '../../packages/juntos/adapters')
     vendor_adapter_dir = File.join(DEMO_ROOT, 'vendor/ruby2js/adapters')
     # Vite-native: node_modules at app root
-    app_root_adapter_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails/adapters')
+    app_root_adapter_dir = File.join(DEMO_ROOT, 'node_modules/juntos/adapters')
 
     if File.exist?(pkg_adapter_dir)
       pkg_adapter_dir
@@ -1421,10 +1424,10 @@ class SelfhostBuilder
     end
   end
 
-  # Find the ruby2js-rails package directory, preferring local packages when in dev
+  # Find the juntos-dev package directory, preferring local packages when in dev
   def find_package_dir
-    npm_package_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails')
-    pkg_package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
+    npm_package_dir = File.join(@dist_dir, 'node_modules/juntos-dev')
+    pkg_package_dir = File.join(DEMO_ROOT, '../../packages/juntos-dev')
     vendor_package_dir = File.join(DEMO_ROOT, 'vendor/ruby2js')
 
     # When running from within ruby2js repo, remove stale npm module UNLESS it's

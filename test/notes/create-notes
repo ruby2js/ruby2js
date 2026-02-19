@@ -159,7 +159,7 @@ mkdir -p app/views/notes
 cat > app/views/notes/Index.jsx.rb << 'RBX'
 import React, [useState, useEffect], from: 'react'
 import [notes_path, note_path], from: 'config/routes.rb'
-import JsonStreamProvider, [useJsonStream], from: 'ruby2js-rails/components/JsonStreamProvider'
+import JsonStreamProvider, [useJsonStream], from: 'juntos/components/JsonStreamProvider'
 
 # SearchField component
 def SearchField(value:, onChange:)

@@ -12,7 +12,7 @@
 #   rake test       - Build and run all tests
 #
 # The `local` build produces files that reference local paths (../../demo/selfhost/).
-# The `release` build converts these to npm package imports (ruby2js, ruby2js-rails).
+# The `release` build converts these to npm package imports (ruby2js, juntos, juntos-dev).
 
 require 'json'
 require 'fileutils'
@@ -300,10 +300,11 @@ task :test_transformers => [:npm_install, :build_transformer_specs] do
   end
 end
 
-PACKAGE = File.join(ROOT, 'packages/ruby2js-rails')
+PACKAGE = File.join(ROOT, 'packages/juntos-dev')
+RUNTIME_PACKAGE = File.join(ROOT, 'packages/juntos')
 BUILD_MJS = File.join(PACKAGE, 'build.mjs')
 
-desc "Install npm dependencies for ruby2js-rails package"
+desc "Install npm dependencies for juntos-dev package"
 task :npm_install_package do
   Dir.chdir(PACKAGE) do
     sh "npm install" unless File.exist?('node_modules/js-yaml')
@@ -315,8 +316,8 @@ file BUILD_MJS => ["#{ROOT}/lib/ruby2js/rails/builder.rb", "#{ROOT}/lib/ruby2js/
   # Use stdin instead of file argument to work around autoexports + file read issue
   # Note: node and functions filters must run before esm so require removals happen before esm transforms require→import
   sh bundle_exec("cat #{ROOT}/lib/ruby2js/rails/builder.rb | ruby #{ROOT}/bin/ruby2js --filter selfhost_build --filter node --filter functions --filter esm --filter return --filter pragma --autoexports > #{BUILD_MJS}")
-  # Add shebang and fix relative paths for new location (packages/ruby2js-rails/)
-  # Source is now lib/ruby2js/rails/builder.rb, output is packages/ruby2js-rails/build.mjs
+  # Add shebang and fix relative paths for new location (packages/juntos-dev/)
+  # Source is now lib/ruby2js/rails/builder.rb, output is packages/juntos-dev/build.mjs
   content = "#!/usr/bin/env node\n" + File.read(BUILD_MJS)
   content = content.gsub('../../../selfhost/', '../../demo/selfhost/')
   content = content.gsub('./erb_compiler', '../../demo/selfhost/lib/erb_compiler.js')
@@ -330,19 +331,19 @@ task :build_mjs do
   puts "Built: #{BUILD_MJS}"
 end
 
-desc "Build build.mjs with npm package imports (for ruby2js-rails package)"
+desc "Build build.mjs with npm package imports (for juntos-dev package)"
 task "build_mjs:npm" => :build_mjs do
   content = File.read(BUILD_MJS)
   # Convert relative paths to npm package imports
   # After build_mjs, paths are ../../demo/selfhost/... - convert to ruby2js package
   content = content.gsub('../../demo/selfhost/ruby2js.js', 'ruby2js')
   content = content.gsub('../../demo/selfhost/filters/', 'ruby2js/filters/')
-  # Rails-specific lib files (erb_compiler, migration_sql, seed_sql) stay in ruby2js-rails
+  # Rails-specific lib files (erb_compiler, migration_sql, seed_sql) stay in juntos-dev
   content = content.gsub('../../demo/selfhost/lib/', './lib/')
   File.write(BUILD_MJS, content)
   puts "Converted to npm package imports: #{BUILD_MJS}"
 
-  # Build Rails-specific lib files into ruby2js-rails package
+  # Build Rails-specific lib files into juntos-dev package
   lib_dir = File.join(PACKAGE, 'lib')
   FileUtils.mkdir_p(lib_dir)
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_erb_compiler.rb > #{lib_dir}/erb_compiler.js")
@@ -384,7 +385,7 @@ end
 
 desc "Build everything for local development"
 task :local => [:build, :build_lib, :build_transformers, :build_mjs] do
-  # Copy lib files to packages/ruby2js-rails/lib/ for local vite.mjs imports
+  # Copy lib files to packages/juntos-dev/lib/ for local vite.mjs imports
   package_lib = File.join(PACKAGE, 'lib')
   FileUtils.mkdir_p(package_lib)
   FileUtils.cp Dir.glob("#{SELFHOST}/lib/*.js"), package_lib
@@ -415,6 +416,12 @@ task :release => [:build, :build_lib, :build_transformers, "build_mjs:npm"] do
   vite_plugin_version = "1.0.0-beta.#{timestamp}"
 
   Dir.chdir(SELFHOST) do
+    sh "npm version #{ruby2js_version} --no-git-tag-version --allow-same-version"
+    sh "npm pack --pack-destination #{tarballs_dir}"
+    sh "npm version 6.0.0-beta --no-git-tag-version --allow-same-version"
+  end
+
+  Dir.chdir(RUNTIME_PACKAGE) do
     sh "npm version #{ruby2js_version} --no-git-tag-version --allow-same-version"
     sh "npm pack --pack-destination #{tarballs_dir}"
     sh "npm version 6.0.0-beta --no-git-tag-version --allow-same-version"
@@ -466,7 +473,8 @@ task :release => [:build, :build_lib, :build_transformers, "build_mjs:npm"] do
   Dir.chdir(tarballs_dir) do
     Dir.glob('ruby2js-6*.tgz').each { |f| FileUtils.mv(f, 'ruby2js-beta.tgz') }
     Dir.glob('ruby2js-[0-9]*.tgz').each { |f| FileUtils.mv(f, 'ruby2js-beta.tgz') } if !File.exist?('ruby2js-beta.tgz')
-    Dir.glob('ruby2js-rails-*.tgz').reject { |f| f == 'ruby2js-rails-beta.tgz' }.each { |f| FileUtils.mv(f, 'ruby2js-rails-beta.tgz') }
+    Dir.glob('juntos-6*.tgz').reject { |f| f == 'juntos-beta.tgz' }.each { |f| FileUtils.mv(f, 'juntos-beta.tgz') }
+    Dir.glob('juntos-dev-*.tgz').reject { |f| f == 'juntos-dev-beta.tgz' }.each { |f| FileUtils.mv(f, 'juntos-dev-beta.tgz') }
     Dir.glob('vite-plugin-ruby2js-*.tgz').reject { |f| f == 'vite-plugin-ruby2js-beta.tgz' }.each { |f| FileUtils.mv(f, 'vite-plugin-ruby2js-beta.tgz') }
     Dir.glob('esbuild-plugin-ruby2js-*.tgz').reject { |f| f == 'esbuild-plugin-ruby2js-beta.tgz' }.each { |f| FileUtils.mv(f, 'esbuild-plugin-ruby2js-beta.tgz') }
     Dir.glob('ruby2js-astro-*.tgz').reject { |f| f == 'ruby2js-astro-beta.tgz' }.each { |f| FileUtils.mv(f, 'ruby2js-astro-beta.tgz') }

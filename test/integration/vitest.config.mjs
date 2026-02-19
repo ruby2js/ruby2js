@@ -7,25 +7,25 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // Find the first available demo's dist for module resolution
 const demos = ['blog', 'chat', 'photo_gallery', 'workflow', 'notes'];
-let ruby2jsRailsPath = null;
+let juntosPath = null;
 let workflowDistPath = null;
 
 for (const demo of demos) {
   const distPath = resolve(__dirname, `workspace/${demo}/dist`);
-  const candidatePath = resolve(distPath, 'node_modules/ruby2js-rails');
+  const candidatePath = resolve(distPath, 'node_modules/juntos');
   if (existsSync(candidatePath)) {
-    ruby2jsRailsPath = ruby2jsRailsPath || candidatePath;
+    juntosPath = juntosPath || candidatePath;
     if (demo === 'workflow') {
       workflowDistPath = distPath;
     }
   }
 }
 
-// Fallback to packages directory for ruby2js-rails (local development)
-if (!ruby2jsRailsPath) {
-  const packagePath = resolve(__dirname, '../../packages/ruby2js-rails');
+// Fallback to packages directory for juntos (local development)
+if (!juntosPath) {
+  const packagePath = resolve(__dirname, '../../packages/juntos');
   if (existsSync(packagePath)) {
-    ruby2jsRailsPath = packagePath;
+    juntosPath = packagePath;
   }
 }
 
@@ -39,15 +39,15 @@ const reactDomPath = resolve(__dirname, 'node_modules/react-dom');
 aliases.push({ find: 'react', replacement: reactPath });
 aliases.push({ find: 'react-dom', replacement: reactDomPath });
 
-if (ruby2jsRailsPath) {
-  // Match ruby2js-rails subpath imports and map to package directory
+if (juntosPath) {
+  // Match juntos subpath imports and map to package directory
   aliases.push({
-    find: /^ruby2js-rails\/(.*)$/,
-    replacement: resolve(ruby2jsRailsPath, '$1'),
+    find: /^juntos\/(.*)$/,
+    replacement: resolve(juntosPath, '$1'),
   });
   aliases.push({
-    find: 'ruby2js-rails',
-    replacement: ruby2jsRailsPath,
+    find: 'juntos',
+    replacement: juntosPath,
   });
 }
 // Map absolute imports used by workflow's React components
