@@ -326,6 +326,10 @@ module Ruby2JS
       require 'ruby2js/filter/functions'
       filters << Ruby2JS::Filter::Functions unless filters.include?(Ruby2JS::Filter::Functions)
 
+      # Add ESM filter so import.meta.env.BASE_URL etc. aren't mangled
+      require 'ruby2js/filter/esm'
+      filters << Ruby2JS::Filter::ESM unless filters.include?(Ruby2JS::Filter::ESM)
+
       filters
     end
   end
