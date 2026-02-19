@@ -64,6 +64,7 @@ import {
 } from './transform.mjs';
 
 import { singularize, camelize, pluralize, underscore } from 'juntos/adapters/inflector.mjs';
+import { loadDatabaseConfig as _loadDatabaseConfig, ADAPTER_ALIASES as _ADAPTER_ALIASES } from 'juntos/config.mjs';
 
 // loadConfig is dynamically imported from vite.mjs when needed (in runEject)
 // to avoid loading js-yaml at startup, which may not be installed yet
@@ -1264,86 +1265,21 @@ function loadDatabaseConfig(options) {
   process.env.RAILS_ENV = env;
   process.env.NODE_ENV = env === 'production' ? 'production' : 'development';
 
-  // CLI options take precedence
+  // CLI options take precedence — just fill in defaults
   if (options.database) {
+    if (_ADAPTER_ALIASES[options.database]) {
+      options.database = _ADAPTER_ALIASES[options.database];
+    }
     options.dbName = options.dbName || `${basename(APP_ROOT)}_${env}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
     return;
   }
 
-  // Load from database.yml
-  const configPath = join(APP_ROOT, 'config/database.yml');
-  if (existsSync(configPath)) {
-    try {
-      const content = readFileSync(configPath, 'utf-8');
+  // Delegate to shared loader (handles yaml, naive fallback, multi-db, env overrides, aliasing)
+  const dbConfig = _loadDatabaseConfig(APP_ROOT, { quiet: true });
 
-      if (yaml) {
-        // Use js-yaml for proper YAML parsing (handles anchors like <<: *default)
-        const config = yaml.load(content);
-        const envConfig = config[env];
-
-        if (envConfig) {
-          // Rails 7+ multi-database format nests configs under named keys
-          // (primary, cache, queue, cable). Use "primary" when present.
-          const primaryConfig = (!envConfig.adapter && envConfig.primary) ? envConfig.primary : envConfig;
-          if (primaryConfig.adapter) options.database = options.database || primaryConfig.adapter;
-          if (primaryConfig.database) options.dbName = options.dbName || primaryConfig.database;
-          if (primaryConfig.target) options.target = options.target || primaryConfig.target;
-        }
-      } else {
-        // Fallback: naive parsing (doesn't handle YAML anchors)
-        // Used when js-yaml isn't available (standalone CLI from tarball)
-        const lines = content.split('\n');
-        let currentEnv = null;
-        let inEnv = false;
-
-        for (const line of lines) {
-          const envMatch = line.match(/^(\w+):$/);
-          if (envMatch) {
-            currentEnv = envMatch[1];
-            inEnv = currentEnv === env;
-            continue;
-          }
-
-          if (inEnv && line.startsWith('  ')) {
-            const adapterMatch = line.match(/^\s+adapter:\s*(.+)$/);
-            const databaseMatch = line.match(/^\s+database:\s*(.+)$/);
-            const targetMatch = line.match(/^\s+target:\s*(.+)$/);
-
-            if (adapterMatch) options.database = options.database || adapterMatch[1].trim();
-            if (databaseMatch) options.dbName = options.dbName || databaseMatch[1].trim();
-            if (targetMatch) options.target = options.target || targetMatch[1].trim();
-          }
-        }
-      }
-    } catch (e) {
-      console.warn(`Warning: Could not parse config/database.yml: ${e.message}`);
-    }
-  }
-
-  // Normalize adapter names to canonical Juntos equivalents
-  // This handles Rails adapter names and common variations
-  const ADAPTER_ALIASES = {
-    // IndexedDB variations
-    indexeddb: 'dexie',
-    // SQLite variations (Rails uses sqlite3, npm package is better-sqlite3)
-    sqlite3: 'sqlite',
-    better_sqlite3: 'sqlite',
-    // sql.js variations
-    'sql.js': 'sqljs',
-    // PostgreSQL variations
-    postgres: 'pg',
-    postgresql: 'pg',
-    // MySQL variations (npm package is mysql2)
-    mysql2: 'mysql'
-  };
-  if (options.database && ADAPTER_ALIASES[options.database]) {
-    options.database = ADAPTER_ALIASES[options.database];
-  }
-
-  // Environment variables take precedence over defaults (but not over CLI/config)
-  options.database = options.database || process.env.JUNTOS_DATABASE || 'dexie';
-  options.target = options.target || process.env.JUNTOS_TARGET;
-  options.dbName = options.dbName || `${basename(APP_ROOT)}_${env}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  options.database = options.database || dbConfig.adapter || 'dexie';
+  options.dbName = options.dbName || dbConfig.database;
+  options.target = options.target || dbConfig.target || process.env.JUNTOS_TARGET;
 
   // Infer target from database if not specified
   if (!options.target && DEFAULT_TARGETS[options.database]) {

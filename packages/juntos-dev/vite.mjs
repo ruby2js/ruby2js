@@ -166,53 +166,7 @@ function shouldEnableDualBundle(config) {
 // Configuration loading (vite-specific, uses yaml)
 // ============================================================
 
-/**
- * Load database configuration from environment or config/database.yml.
- * Returns: { adapter: 'dexie', database: 'myapp_dev', ... }
- */
-function loadDatabaseConfig(appRoot, { quiet = false } = {}) {
-  const env = process.env.RAILS_ENV || process.env.NODE_ENV || 'development';
-  const configPath = path.join(appRoot, 'config/database.yml');
-
-  let dbConfig = null;
-  if (fs.existsSync(configPath)) {
-    try {
-      const config = yaml.load(fs.readFileSync(configPath, 'utf8'));
-      if (config && config[env]) {
-        if (!quiet) console.log(`  Using config/database.yml [${env}]`);
-        dbConfig = config[env];
-        // Rails 7+ multi-database format nests configs under named keys
-        // (primary, cache, queue, cable). Use "primary" when present.
-        if (dbConfig && !dbConfig.adapter && dbConfig.primary) {
-          dbConfig = dbConfig.primary;
-        }
-      }
-    } catch (e) {
-      if (!quiet) console.warn(`  Warning: Failed to parse database.yml: ${e.message}`);
-    }
-  }
-
-  // Default config if database.yml not found or empty
-  const appName = path.basename(appRoot);
-  const defaultDbName = `${appName}_${env}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-  dbConfig = dbConfig || { adapter: 'dexie', database: defaultDbName };
-
-  // Handle multi-database configs (Rails 7+ production format with nested keys)
-  if (!dbConfig.database) {
-    dbConfig.database = defaultDbName;
-  }
-
-  // JUNTOS_DATABASE or DATABASE env var overrides adapter only
-  const dbEnv = process.env.JUNTOS_DATABASE || process.env.DATABASE;
-  if (dbEnv) {
-    if (!quiet) {
-      console.log(`  Adapter override: ${process.env.JUNTOS_DATABASE ? 'JUNTOS_DATABASE' : 'DATABASE'}=${dbEnv}`);
-    }
-    dbConfig.adapter = dbEnv.toLowerCase();
-  }
-
-  return dbConfig;
-}
+import { loadDatabaseConfig } from 'juntos/config.mjs';
 
 /**
  * @typedef {Object} JuntosOptions

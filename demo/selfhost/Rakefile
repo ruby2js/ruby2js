@@ -321,6 +321,22 @@ file BUILD_MJS => ["#{ROOT}/lib/ruby2js/rails/builder.rb", "#{ROOT}/lib/ruby2js/
   content = "#!/usr/bin/env node\n" + File.read(BUILD_MJS)
   content = content.gsub('../../../selfhost/', '../../demo/selfhost/')
   content = content.gsub('./erb_compiler', '../../demo/selfhost/lib/erb_compiler.js')
+
+  # Replace duplicated load_database_config with import from shared config.mjs
+  content = content.sub(
+    /^import yaml from "js-yaml";/,
+    "import yaml from \"js-yaml\";\nimport { loadDatabaseConfig as _loadDatabaseConfig } from \"../juntos/config.mjs\";"
+  )
+  # Replace static method body to delegate to shared function
+  content = content.sub(
+    /static load_database_config\(app_root=null.*?\n    return db_config\n  \};/m,
+    <<~JS.chomp
+    static load_database_config(app_root=null, { quiet=false } = {}) {
+        return _loadDatabaseConfig(app_root ?? SelfhostBuilder.DEMO_ROOT, {quiet})
+      };
+    JS
+  )
+
   File.write(BUILD_MJS, content)
 end
 
@@ -340,6 +356,8 @@ task "build_mjs:npm" => :build_mjs do
   content = content.gsub('../../demo/selfhost/filters/', 'ruby2js/filters/')
   # Rails-specific lib files (erb_compiler, migration_sql, seed_sql) stay in juntos-dev
   content = content.gsub('../../demo/selfhost/lib/', './lib/')
+  # Shared config.mjs: relative dev path → npm package import
+  content = content.gsub('../juntos/config.mjs', 'juntos/config.mjs')
   File.write(BUILD_MJS, content)
   puts "Converted to npm package imports: #{BUILD_MJS}"
 

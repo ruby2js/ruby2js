@@ -6,6 +6,18 @@
 import path from 'node:path';
 import fs from 'node:fs';
 
+// Normalize adapter names to canonical Juntos equivalents.
+// Handles Rails adapter names (sqlite3, postgresql) and common variations.
+export const ADAPTER_ALIASES = {
+  indexeddb: 'dexie',
+  sqlite3: 'sqlite',
+  better_sqlite3: 'sqlite',
+  'sql.js': 'sqljs',
+  postgres: 'pg',
+  postgresql: 'pg',
+  mysql2: 'mysql'
+};
+
 // Try to load js-yaml. Available at build time (devDependency),
 // may not be present in production runtime deploys.
 let yaml = null;
@@ -77,6 +89,11 @@ export function loadDatabaseConfig(appRoot, { quiet = false } = {}) {
       console.log(`  Adapter override: ${process.env.JUNTOS_DATABASE ? 'JUNTOS_DATABASE' : 'DATABASE'}=${dbEnv}`);
     }
     dbConfig.adapter = dbEnv.toLowerCase();
+  }
+
+  // Normalize adapter name
+  if (dbConfig.adapter && ADAPTER_ALIASES[dbConfig.adapter]) {
+    dbConfig.adapter = ADAPTER_ALIASES[dbConfig.adapter];
   }
 
   return dbConfig;
