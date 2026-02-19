@@ -63,7 +63,7 @@ import {
   lintRuby
 } from './transform.mjs';
 
-import { singularize, camelize, pluralize, underscore } from './adapters/inflector.mjs';
+import { singularize, camelize, pluralize, underscore } from 'juntos/adapters/inflector.mjs';
 
 // loadConfig is dynamically imported from vite.mjs when needed (in runEject)
 // to avoid loading js-yaml at startup, which may not be installed yet

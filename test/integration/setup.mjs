@@ -9,7 +9,7 @@
 //   node setup.mjs blog               # Specify demo name (default: blog)
 
 import { execSync } from 'child_process';
-import { existsSync, mkdirSync, rmSync, createWriteStream } from 'fs';
+import { existsSync, mkdirSync, rmSync, renameSync, createWriteStream } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { pipeline } from 'stream/promises';
@@ -114,6 +114,12 @@ async function setup() {
   const cliDir = join(tarballs, 'juntos-dev');
   mkdirSync(cliDir, { recursive: true });
   execSync(`tar -xzf ${tarballs}/juntos-dev-beta.tgz -C ${cliDir}`);
+
+  // Install juntos runtime as peer dependency (needed by transform.mjs)
+  const cliNodeModules = join(cliDir, 'package', 'node_modules');
+  mkdirSync(cliNodeModules, { recursive: true });
+  execSync(`tar -xzf ${tarballs}/juntos-beta.tgz -C ${cliNodeModules}`);
+  renameSync(join(cliNodeModules, 'package'), join(cliNodeModules, 'juntos'));
 
   // Run init from local CLI to add Juntos config (package.json, vite.config.js, etc.)
   console.log('\n4. Initializing Juntos config...');
