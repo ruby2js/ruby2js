@@ -38,6 +38,7 @@ import {
   generateModelsModuleForEject,
   generateMigrationsModuleForEject,
   generateViewsModuleForEject,
+  generateTurboStreamModuleForEject,
   generateApplicationRecordForEject,
   generatePackageJsonForEject,
   generateViteConfigForEject,
@@ -2116,7 +2117,7 @@ async function runEject(options) {
         const relPath = base ? `${base}/${entry.name}` : entry.name;
         if (entry.isDirectory()) {
           result = result.concat(collectViewFiles(join(dir, entry.name), relPath));
-        } else if (entry.name.endsWith('.html.erb') || entry.name.endsWith('.jsx.rb')) {
+        } else if (entry.name.endsWith('.html.erb') || entry.name.endsWith('.jsx.rb') || entry.name.endsWith('.turbo_stream.erb')) {
           result.push(relPath);
         }
       }
@@ -2163,6 +2164,19 @@ async function runEject(options) {
             errors.push({ file: relativePath, error: err.message, stack: err.stack });
             console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
           }
+        } else if (relFile.endsWith('.turbo_stream.erb')) {
+          try {
+            const source = readFileSync(fullPath, 'utf-8');
+            const result = await transformErb(source, fullPath, false, config);
+            const relativeOutPath = `app/views/${resource}/${relFile.replace('.turbo_stream.erb', '.turbo_stream.js')}`;
+            let code = fixImportsForEject(result.code, relativeOutPath, config);
+            const outFile = join(outDir, 'app/views', resource, relFile.replace('.turbo_stream.erb', '.turbo_stream.js'));
+            writeFileSync(outFile, code);
+            fileCount++;
+          } catch (err) {
+            errors.push({ file: relativePath, error: err.message, stack: err.stack });
+            console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+          }
         }
       }
     }
@@ -2172,6 +2186,15 @@ async function runEject(options) {
       const viewsIndex = generateViewsModuleForEject(APP_ROOT, resource);
       writeFileSync(join(outDir, 'app/views', resource + '.js'), viewsIndex);
       fileCount++;
+    }
+
+    // Generate turbo stream modules for each resource (if any .turbo_stream.erb files exist)
+    for (const resource of resources) {
+      const turboModule = generateTurboStreamModuleForEject(APP_ROOT, resource);
+      if (turboModule) {
+        writeFileSync(join(outDir, 'app/views', resource + '_turbo_streams.js'), turboModule);
+        fileCount++;
+      }
     }
 
     // Transform layouts

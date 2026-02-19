@@ -2361,6 +2361,39 @@ export { ${members.join(', ')} };
 `;
 }
 
+/**
+ * Generate a turbo stream module for ejected code.
+ * Mirrors the Vite virtual module logic for juntos:views/*_turbo_streams.
+ * Aggregates *.turbo_stream.erb files from a resource's view directory.
+ */
+export function generateTurboStreamModuleForEject(appRoot, resource) {
+  const viewsDir = path.join(appRoot, 'app/views', resource);
+  if (!fs.existsSync(viewsDir)) return null;
+
+  const turboViews = fs.readdirSync(viewsDir)
+    .filter(f => f.endsWith('.turbo_stream.erb') && !f.startsWith('._'))
+    .map(f => {
+      const name = f.replace('.turbo_stream.erb', '');
+      let exportName = name;
+      if (RESERVED.has(exportName)) exportName = '$' + exportName;
+      const outputFile = f.replace('.turbo_stream.erb', '.turbo_stream.js');
+      return { file: f, outputFile, name, exportName };
+    });
+
+  if (turboViews.length === 0) return null;
+
+  const imports = turboViews.map(v =>
+    `import { render as ${v.exportName}_render } from './${resource}/${v.outputFile}';`
+  );
+
+  const className = capitalize(singularize(resource)) + 'TurboStreams';
+  const members = turboViews.map(v => `${v.exportName}: ${v.exportName}_render`);
+
+  return `${imports.join('\n')}
+export const ${className} = { ${members.join(', ')} };
+`;
+}
+
 // ============================================================
 // Transformation functions
 // ============================================================
