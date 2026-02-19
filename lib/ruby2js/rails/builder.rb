@@ -1424,11 +1424,13 @@ class SelfhostBuilder
     end
   end
 
-  # Find the juntos-dev package directory, preferring local packages when in dev
+  # Find the juntos runtime package directory (contains rails_base.js, targets/, etc.)
   def find_package_dir
-    npm_package_dir = File.join(@dist_dir, 'node_modules/juntos-dev')
-    pkg_package_dir = File.join(DEMO_ROOT, '../../packages/juntos-dev')
+    npm_package_dir = File.join(@dist_dir, 'node_modules/juntos')
+    pkg_package_dir = File.join(DEMO_ROOT, '../../packages/juntos')
     vendor_package_dir = File.join(DEMO_ROOT, 'vendor/ruby2js')
+    # Vite-native: node_modules at app root
+    app_root_package_dir = File.join(DEMO_ROOT, 'node_modules/juntos')
 
     # When running from within ruby2js repo, remove stale npm module UNLESS it's
     # already a symlink (from file: dependency in package.json) pointing to local packages
@@ -1437,10 +1439,12 @@ class SelfhostBuilder
       FileUtils.rm_rf(npm_package_dir)
     end
 
-    if File.exist?(npm_package_dir)
-      npm_package_dir
-    elsif File.exist?(pkg_package_dir)
+    if File.exist?(pkg_package_dir)
       pkg_package_dir
+    elsif File.exist?(app_root_package_dir)
+      app_root_package_dir
+    elsif File.exist?(npm_package_dir)
+      npm_package_dir
     else
       vendor_package_dir
     end

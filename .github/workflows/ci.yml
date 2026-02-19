@@ -517,6 +517,10 @@ jobs:
         run: |
           mkdir -p artifacts/cli
           tar -xzf artifacts/tarballs/juntos-dev-beta.tgz -C artifacts/cli
+          # Install juntos runtime as peer dependency (needed by transform.mjs)
+          mkdir -p artifacts/cli/package/node_modules
+          tar -xzf artifacts/tarballs/juntos-beta.tgz -C artifacts/cli/package/node_modules
+          mv artifacts/cli/package/node_modules/package artifacts/cli/package/node_modules/juntos
 
       - name: Build browser demos
         run: |
