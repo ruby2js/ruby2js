@@ -23,8 +23,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import yaml from 'js-yaml';
-import { SelfhostBuilder } from './build.mjs';
-
 /**
  * @typedef {Object} Ruby2jsModelsOptions
  * @property {string} [database] - Database adapter (dexie, d1, sqlite, etc.)

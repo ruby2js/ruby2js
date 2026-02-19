@@ -5,16 +5,12 @@
   "description": "Build tools, Vite plugins, and CLI for Juntos (Ruby2JS Rails) development",
   "bin": {
     "juntos": "./cli.mjs",
-    "juntos-dev": "./dev-server.mjs",
     "juntos-server": "./server.mjs",
-    "juntos-build": "./build.mjs",
     "juntos-migrate": "./migrate.mjs",
     "juntos-vite-ssr": "./vite-ssr-dev.mjs"
   },
   "exports": {
-    "./build.mjs": "./build.mjs",
     "./cli.mjs": "./cli.mjs",
-    "./dev-server.mjs": "./dev-server.mjs",
     "./transform.mjs": "./transform.mjs",
     "./lint.mjs": "./lint.mjs",
     "./migrate.mjs": "./migrate.mjs",
@@ -32,8 +28,6 @@
   },
   "files": [
     "cli.mjs",
-    "build.mjs",
-    "dev-server.mjs",
     "vite.mjs",
     "vite-models.mjs",
     "vite-ssr-dev.mjs",
@@ -60,9 +54,7 @@
     "url": "https://github.com/ruby2js/ruby2js"
   },
   "dependencies": {
-    "chokidar": "^3.5.3",
-    "js-yaml": "^4.1.0",
-    "ws": "^8.14.2"
+    "js-yaml": "^4.1.0"
   },
   "peerDependencies": {
     "juntos": "*",

@@ -191,8 +191,8 @@ directory selfhost_dir => dest
 # This ensures dependency tracking is in one place
 task :selfhost_build do
   Dir.chdir(selfhost_source) do
-    # Build core files, filters, erb_compiler (for website demo), and build.mjs (which includes lib files for npm package)
-    sh "bundle exec rake #{selfhost_source}/ruby2js.js #{selfhost_source}/prism_browser.js #{selfhost_source}/lib/erb_compiler.js build_filters build_mjs:npm"
+    # Build core files, filters, erb_compiler (for website demo), and lib files for npm package
+    sh "bundle exec rake #{selfhost_source}/ruby2js.js #{selfhost_source}/prism_browser.js #{selfhost_source}/lib/erb_compiler.js build_filters build_package_lib"
   end
 end
 

@@ -302,7 +302,6 @@ end
 
 PACKAGE = File.join(ROOT, 'packages/juntos-dev')
 RUNTIME_PACKAGE = File.join(ROOT, 'packages/juntos')
-BUILD_MJS = File.join(PACKAGE, 'build.mjs')
 
 desc "Install npm dependencies for juntos-dev package"
 task :npm_install_package do
@@ -311,57 +310,8 @@ task :npm_install_package do
   end
 end
 
-desc "Transpile builder.rb to build.mjs for selfhost builds"
-file BUILD_MJS => ["#{ROOT}/lib/ruby2js/rails/builder.rb", "#{ROOT}/lib/ruby2js/filter/selfhost_build.rb"] do
-  # Use stdin instead of file argument to work around autoexports + file read issue
-  # Note: node and functions filters must run before esm so require removals happen before esm transforms require→import
-  sh bundle_exec("cat #{ROOT}/lib/ruby2js/rails/builder.rb | ruby #{ROOT}/bin/ruby2js --filter selfhost_build --filter node --filter functions --filter esm --filter return --filter pragma --autoexports > #{BUILD_MJS}")
-  # Add shebang and fix relative paths for new location (packages/juntos-dev/)
-  # Source is now lib/ruby2js/rails/builder.rb, output is packages/juntos-dev/build.mjs
-  content = "#!/usr/bin/env node\n" + File.read(BUILD_MJS)
-  content = content.gsub('../../../selfhost/', '../../demo/selfhost/')
-  content = content.gsub('./erb_compiler', '../../demo/selfhost/lib/erb_compiler.js')
-
-  # Replace duplicated load_database_config with import from shared config.mjs
-  content = content.sub(
-    /^import yaml from "js-yaml";/,
-    "import yaml from \"js-yaml\";\nimport { loadDatabaseConfig as _loadDatabaseConfig } from \"../juntos/config.mjs\";"
-  )
-  # Replace static method body to delegate to shared function
-  content = content.sub(
-    /static load_database_config\(app_root=null.*?\n    return db_config\n  \};/m,
-    <<~JS.chomp
-    static load_database_config(app_root=null, { quiet=false } = {}) {
-        return _loadDatabaseConfig(app_root ?? SelfhostBuilder.DEMO_ROOT, {quiet})
-      };
-    JS
-  )
-
-  File.write(BUILD_MJS, content)
-end
-
-desc "Force rebuild of build.mjs (development version with relative paths)"
-task :build_mjs do
-  rm_f BUILD_MJS
-  Rake::Task[BUILD_MJS].invoke
-  puts "Built: #{BUILD_MJS}"
-end
-
-desc "Build build.mjs with npm package imports (for juntos-dev package)"
-task "build_mjs:npm" => :build_mjs do
-  content = File.read(BUILD_MJS)
-  # Convert relative paths to npm package imports
-  # After build_mjs, paths are ../../demo/selfhost/... - convert to ruby2js package
-  content = content.gsub('../../demo/selfhost/ruby2js.js', 'ruby2js')
-  content = content.gsub('../../demo/selfhost/filters/', 'ruby2js/filters/')
-  # Rails-specific lib files (erb_compiler, migration_sql, seed_sql) stay in juntos-dev
-  content = content.gsub('../../demo/selfhost/lib/', './lib/')
-  # Shared config.mjs: relative dev path → npm package import
-  content = content.gsub('../juntos/config.mjs', 'juntos/config.mjs')
-  File.write(BUILD_MJS, content)
-  puts "Converted to npm package imports: #{BUILD_MJS}"
-
-  # Build Rails-specific lib files into juntos-dev package
+desc "Build Rails-specific lib files into juntos-dev package"
+task :build_package_lib do
   lib_dir = File.join(PACKAGE, 'lib')
   FileUtils.mkdir_p(lib_dir)
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_erb_compiler.rb > #{lib_dir}/erb_compiler.js")
@@ -391,7 +341,6 @@ task :clean do
   rm_rf "#{SELFHOST}/lib"
   rm_f "#{SELFHOST}/ruby2js.js"
   rm_f "#{SELFHOST}/prism_browser.js"
-  rm_f BUILD_MJS
   rm_f File.join(PACKAGE, 'lib/erb_compiler.js')
   rm_f File.join(PACKAGE, 'lib/migration_sql.js')
   rm_f File.join(PACKAGE, 'lib/seed_sql.js')
@@ -402,7 +351,7 @@ end
 # ===========================================================================
 
 desc "Build everything for local development"
-task :local => [:build, :build_lib, :build_transformers, :build_mjs] do
+task :local => [:build, :build_lib, :build_transformers] do
   # Copy lib files to packages/juntos-dev/lib/ for local vite.mjs imports
   package_lib = File.join(PACKAGE, 'lib')
   FileUtils.mkdir_p(package_lib)
@@ -424,7 +373,7 @@ task :local => [:build, :build_lib, :build_transformers, :build_mjs] do
 end
 
 desc "Build everything for npm release (tarballs in artifacts/tarballs/)"
-task :release => [:build, :build_lib, :build_transformers, "build_mjs:npm"] do
+task :release => [:build, :build_lib, :build_transformers, :build_package_lib] do
   tarballs_dir = File.join(ROOT, 'artifacts/tarballs')
   FileUtils.mkdir_p(tarballs_dir)
 

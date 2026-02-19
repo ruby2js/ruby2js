@@ -12,7 +12,6 @@ demo/selfhost/ruby2js.mjs
 demo/selfhost/prism_browser.js
 demo/selfhost/filters/
 demo/selfhost/lib/
-packages/juntos-dev/build.mjs
 packages/juntos-dev/dist/
 packages/juntos-dev/lib/
 packages/juntos-dev/ruby2js.js
