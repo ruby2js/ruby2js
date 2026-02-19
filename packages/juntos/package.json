@@ -1,0 +1,72 @@
+{
+  "name": "juntos",
+  "version": "6.0.0-beta",
+  "type": "module",
+  "description": "ActiveRecord-like ORM for JavaScript with multi-database support",
+  "scripts": {
+    "test": "node --test 'test/**/*.mjs'"
+  },
+  "exports": {
+    "./adapters/*": "./adapters/*",
+    "./components/*": "./components/*",
+    "./targets/*": "./targets/*",
+    "./rpc/client.mjs": "./rpc/client.mjs",
+    "./rpc/server.mjs": "./rpc/server.mjs",
+    "./config.mjs": "./config.mjs",
+    "./path_helper.mjs": "./path_helper.mjs",
+    "./path_helper_browser.mjs": "./path_helper_browser.mjs",
+    "./helpers.js": "./helpers.js",
+    "./helpers": "./helpers.js",
+    "./rails_base.js": "./rails_base.js",
+    "./rails_server.js": "./rails_server.js",
+    "./erb_runtime.mjs": "./erb_runtime.mjs",
+    "./phlex_runtime.mjs": "./phlex_runtime.mjs",
+    "./server.mjs": "./server.mjs",
+    "./testing": "./testing.mjs",
+    "./testing.mjs": "./testing.mjs",
+    "./url_helpers.mjs": "./url_helpers.mjs"
+  },
+  "files": [
+    "adapters/",
+    "components/",
+    "rpc/",
+    "targets/",
+    "config.mjs",
+    "helpers.js",
+    "rails_base.js",
+    "rails_server.js",
+    "server.mjs",
+    "erb_runtime.mjs",
+    "phlex_runtime.mjs",
+    "path_helper.mjs",
+    "path_helper_browser.mjs",
+    "testing.mjs",
+    "turbo_cable_simple.js",
+    "url_helpers.mjs"
+  ],
+  "keywords": [
+    "activerecord",
+    "orm",
+    "database",
+    "sqlite",
+    "postgres",
+    "mysql",
+    "dexie",
+    "edge",
+    "serverless"
+  ],
+  "author": "Sam Ruby",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruby2js/ruby2js"
+  },
+  "peerDependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "peerDependenciesMeta": {
+    "js-yaml": {
+      "optional": true
+    }
+  }
+}

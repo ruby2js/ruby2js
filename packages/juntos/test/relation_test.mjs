@@ -1,6 +1,6 @@
 // Tests for Relation class and SQL building
 //
-// Run with: node --test packages/ruby2js-rails/test/relation_test.mjs
+// Run with: node --test packages/juntos/test/relation_test.mjs
 
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -1937,5 +1937,259 @@ describe('toSQL()', () => {
     const fakeModel = { name: 'FakeModel' };
     const rel = new Relation(fakeModel);
     assert.throws(() => rel.toSQL(), /requires a model that extends ActiveRecordSQL/);
+  });
+});
+
+// =============================================================================
+// Comprehensive toSQL() query pattern tests
+// =============================================================================
+
+describe('toSQL() query patterns', () => {
+  // Model with associations for join testing
+  class Article extends ActiveRecordSQL {
+    static tableName = 'articles';
+    static get useNumberedParams() { return false; }
+    static associations = {
+      author: { type: 'belongs_to', model: 'Author', foreignKey: 'author_id' },
+      comments: { type: 'has_many', model: 'Comment', foreignKey: 'article_id' },
+      category: { type: 'belongs_to', model: 'Category', foreignKey: 'category_id' }
+    };
+    static async _execute() { return { rows: [] }; }
+    static _getRows(r) { return r.rows; }
+    static _getLastInsertId() { return 1; }
+  }
+
+  class ArticlePg extends ActiveRecordSQL {
+    static tableName = 'articles';
+    static get useNumberedParams() { return true; }
+    static associations = Article.associations;
+    static async _execute() { return { rows: [] }; }
+    static _getRows(r) { return r.rows; }
+    static _getLastInsertId() { return 1; }
+  }
+
+  modelRegistry['Article'] = Article;
+
+  describe('WHERE patterns', () => {
+    it('single equality', () => {
+      const { sql, values } = MockModel.where({ name: 'Alice' }).toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE name = ?');
+      assert.deepEqual(values, ['Alice']);
+    });
+
+    it('multiple equalities (AND)', () => {
+      const { sql, values } = MockModel.where({ name: 'Alice', active: true }).toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE name = ? AND active = ?');
+      assert.deepEqual(values, ['Alice', true]);
+    });
+
+    it('IN clause with array', () => {
+      const { sql, values } = MockModel.where({ role: ['admin', 'mod'] }).toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE role IN (?, ?)');
+      assert.deepEqual(values, ['admin', 'mod']);
+    });
+
+    it('IS NULL for null value', () => {
+      const { sql } = MockModel.where({ deleted_at: null }).toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE deleted_at IS NULL');
+    });
+
+    it('NOT conditions', () => {
+      const { sql, values } = MockModel.where({ active: true }).not({ role: 'guest' }).toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ? AND NOT (role = ?)');
+      assert.deepEqual(values, [true, 'guest']);
+    });
+
+    it('NOT IS NULL', () => {
+      const { sql } = MockModel.where().not({ deleted_at: null }).toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE NOT (deleted_at IS NULL)');
+    });
+
+    it('NOT IN clause', () => {
+      const { sql, values } = MockModel.where().not({ id: [1, 2, 3] }).toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE NOT (id IN (?, ?, ?))');
+      assert.deepEqual(values, [1, 2, 3]);
+    });
+
+    it('OR conditions', () => {
+      const { sql, values } = MockModel.where({ admin: true }).or({ moderator: true }).toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE (admin = ?) OR (moderator = ?)');
+      assert.deepEqual(values, [true, true]);
+    });
+
+    it('OR with Relation', () => {
+      const rel = MockModel.where({ admin: true }).or(MockModel.where({ role: 'mod', active: true }));
+      const { sql, values } = rel.toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE (admin = ?) OR (role = ? AND active = ?)');
+      assert.deepEqual(values, [true, 'mod', true]);
+    });
+
+    it('raw SQL with placeholder', () => {
+      const { sql, values } = MockModel.where('age > ?', 21).toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE age > ?');
+      assert.deepEqual(values, [21]);
+    });
+
+    it('raw SQL with multiple placeholders', () => {
+      const { sql, values } = MockModel.where('age > ? AND age < ?', 18, 65).toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE age > ? AND age < ?');
+      assert.deepEqual(values, [18, 65]);
+    });
+
+    it('chained where calls (AND)', () => {
+      const { sql, values } = MockModel.where({ active: true }).where({ role: 'admin' }).toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ? AND role = ?');
+      assert.deepEqual(values, [true, 'admin']);
+    });
+
+    it('mixed hash and raw SQL', () => {
+      const { sql, values } = MockModel.where({ active: true }).where('score > ?', 100).toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ? AND score > ?');
+      assert.deepEqual(values, [true, 100]);
+    });
+  });
+
+  describe('ORDER patterns', () => {
+    it('string column (ASC default)', () => {
+      const { sql } = MockModel.order('name').toSQL();
+      assert.equal(sql, 'SELECT * FROM users ORDER BY name ASC');
+    });
+
+    it('object with desc', () => {
+      const { sql } = MockModel.order({ created_at: 'desc' }).toSQL();
+      assert.equal(sql, 'SELECT * FROM users ORDER BY created_at DESC');
+    });
+
+    it('symbol-style :desc', () => {
+      const { sql } = MockModel.order({ name: ':desc' }).toSQL();
+      assert.equal(sql, 'SELECT * FROM users ORDER BY name DESC');
+    });
+  });
+
+  describe('LIMIT and OFFSET', () => {
+    it('limit only', () => {
+      const { sql } = MockModel.limit(10).toSQL();
+      assert.equal(sql, 'SELECT * FROM users LIMIT 10');
+    });
+
+    it('offset only', () => {
+      const { sql } = MockModel.offset(20).toSQL();
+      assert.equal(sql, 'SELECT * FROM users OFFSET 20');
+    });
+
+    it('limit + offset', () => {
+      const { sql } = MockModel.limit(10).offset(20).toSQL();
+      assert.equal(sql, 'SELECT * FROM users LIMIT 10 OFFSET 20');
+    });
+  });
+
+  describe('SELECT and DISTINCT', () => {
+    it('select specific columns', () => {
+      const { sql } = MockModel.select('name', 'email').toSQL();
+      assert.equal(sql, 'SELECT name, email FROM users');
+    });
+
+    it('distinct', () => {
+      const { sql } = MockModel.distinct().toSQL();
+      assert.equal(sql, 'SELECT DISTINCT * FROM users');
+    });
+
+    it('distinct with select', () => {
+      const { sql } = MockModel.distinct().select('name').toSQL();
+      assert.equal(sql, 'SELECT DISTINCT name FROM users');
+    });
+  });
+
+  describe('JOIN patterns', () => {
+    it('simple belongs_to join', () => {
+      const { sql } = Article.joins('author').toSQL();
+      assert.match(sql, /INNER JOIN authors ON articles\.author_id = authors\.id/);
+    });
+
+    it('simple has_many join', () => {
+      const { sql } = Article.joins('comments').toSQL();
+      assert.match(sql, /INNER JOIN comments ON comments\.article_id = articles\.id/);
+    });
+
+    it('join uses table.* for select', () => {
+      const { sql } = Article.joins('comments').toSQL();
+      assert.match(sql, /SELECT articles\.\*/);
+    });
+
+    it('missing() uses LEFT JOIN + IS NULL', () => {
+      const { sql } = Article.where().missing('comments').toSQL();
+      assert.match(sql, /LEFT JOIN comments/);
+      assert.match(sql, /comments\.id IS NULL/);
+    });
+  });
+
+  describe('complex combinations', () => {
+    it('where + order + limit + offset', () => {
+      const { sql, values } = MockModel
+        .where({ active: true })
+        .order({ name: 'asc' })
+        .limit(10)
+        .offset(20)
+        .toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ? ORDER BY name ASC LIMIT 10 OFFSET 20');
+      assert.deepEqual(values, [true]);
+    });
+
+    it('where + not + or + order', () => {
+      const { sql, values } = MockModel
+        .where({ active: true })
+        .not({ banned: true })
+        .or({ role: 'admin' })
+        .order('name')
+        .toSQL();
+      assert.match(sql, /WHERE.*active.*OR.*role/);
+      assert.deepEqual(values, [true, true, 'admin']);
+    });
+
+    it('join + where + select + distinct', () => {
+      const { sql, values } = Article
+        .joins('comments')
+        .where({ published: true })
+        .select('title')
+        .distinct()
+        .toSQL();
+      assert.match(sql, /SELECT DISTINCT title FROM articles/);
+      assert.match(sql, /INNER JOIN comments/);
+      assert.match(sql, /WHERE published = \?/);
+      assert.deepEqual(values, [true]);
+    });
+
+    it('where with raw + hash + not + limit', () => {
+      const { sql, values } = MockModel
+        .where({ active: true })
+        .where('score > ?', 50)
+        .not({ role: 'bot' })
+        .limit(5)
+        .toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ? AND NOT (role = ?) AND score > ? LIMIT 5');
+      assert.deepEqual(values, [true, 'bot', 50]);
+    });
+  });
+
+  describe('postgres numbered params', () => {
+    it('uses $1, $2 for all patterns', () => {
+      const { sql, values } = ArticlePg
+        .where({ published: true })
+        .where('views > ?', 100)
+        .not({ draft: true })
+        .toSQL();
+      assert.match(sql, /published = \$1/);
+      assert.match(sql, /NOT \(draft = \$2\)/);
+      assert.match(sql, /views > \$3/);
+      assert.deepEqual(values, [true, true, 100]);
+    });
+
+    it('numbers IN clause params correctly', () => {
+      const { sql, values } = ArticlePg
+        .where({ status: ['published', 'archived'] })
+        .toSQL();
+      assert.match(sql, /status IN \(\$1, \$2\)/);
+      assert.deepEqual(values, ['published', 'archived']);
+    });
   });
 });

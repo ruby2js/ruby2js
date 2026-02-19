@@ -1,0 +1,84 @@
+{
+  "name": "juntos-dev",
+  "version": "6.0.0-beta",
+  "type": "module",
+  "description": "Build tools, Vite plugins, and CLI for Juntos (Ruby2JS Rails) development",
+  "bin": {
+    "juntos": "./cli.mjs",
+    "juntos-dev": "./dev-server.mjs",
+    "juntos-server": "./server.mjs",
+    "juntos-build": "./build.mjs",
+    "juntos-migrate": "./migrate.mjs",
+    "juntos-vite-ssr": "./vite-ssr-dev.mjs"
+  },
+  "exports": {
+    "./build.mjs": "./build.mjs",
+    "./cli.mjs": "./cli.mjs",
+    "./dev-server.mjs": "./dev-server.mjs",
+    "./transform.mjs": "./transform.mjs",
+    "./lint.mjs": "./lint.mjs",
+    "./migrate.mjs": "./migrate.mjs",
+    "./vite": "./vite.mjs",
+    "./vite.mjs": "./vite.mjs",
+    "./vite-models": "./vite-models.mjs",
+    "./vite-models.mjs": "./vite-models.mjs",
+    "./vite-ssr-dev": "./vite-ssr-dev.mjs",
+    "./vite-ssr-dev.mjs": "./vite-ssr-dev.mjs",
+    "./astro": "./dist/astro_component_transformer.mjs",
+    "./svelte": "./dist/svelte_component_transformer.mjs",
+    "./vue": "./dist/vue_component_transformer.mjs",
+    "./dist/*": "./dist/*",
+    "./lib/*": "./lib/*"
+  },
+  "files": [
+    "cli.mjs",
+    "build.mjs",
+    "dev-server.mjs",
+    "vite.mjs",
+    "vite-models.mjs",
+    "vite-ssr-dev.mjs",
+    "transform.mjs",
+    "lint.mjs",
+    "migrate.mjs",
+    "ruby2js.js",
+    "dist/",
+    "lib/"
+  ],
+  "keywords": [
+    "juntos",
+    "ruby2js",
+    "rails",
+    "vite",
+    "cli",
+    "build",
+    "transpiler"
+  ],
+  "author": "Sam Ruby",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruby2js/ruby2js"
+  },
+  "dependencies": {
+    "chokidar": "^3.5.3",
+    "js-yaml": "^4.1.0",
+    "ws": "^8.14.2"
+  },
+  "peerDependencies": {
+    "juntos": "*",
+    "ruby2js": "*",
+    "vite": "^7.0.0",
+    "vite-plugin-ruby2js": "*"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    },
+    "vite-plugin-ruby2js": {
+      "optional": true
+    },
+    "ruby2js": {
+      "optional": true
+    }
+  }
+}
