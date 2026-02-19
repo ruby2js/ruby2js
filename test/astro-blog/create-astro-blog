@@ -192,9 +192,9 @@ __END__
 </head>
 <body>
   <nav>
-    <a href="/">Home</a>
-    <a href="/posts">Posts</a>
-    <a href="/about">About</a>
+    <a href={import.meta.env.BASE_URL}>Home</a>
+    <a href={import.meta.env.BASE_URL + "posts"}>Posts</a>
+    <a href={import.meta.env.BASE_URL + "about"}>About</a>
   </nav>
   <div class="container">
     <slot />
@@ -222,16 +222,16 @@ __END__
     <section style="margin-bottom: 2rem;">
       <h2>Three Levels of Ruby</h2>
       <ul style="list-style: disc; padding-left: 1.5rem;">
-        <li><strong>Level 1:</strong> Static markdown (<a href="/about">About page</a>)</li>
+        <li><strong>Level 1:</strong> Static markdown (<a href={import.meta.env.BASE_URL + "about"}>About page</a>)</li>
         <li><strong>Level 2:</strong> Astro pages in <code>.astro.rb</code> (this page)</li>
-        <li><strong>Level 3:</strong> Preact islands in <code>.jsx.rb</code> or <code>.erb.rb</code> (<a href="/posts">Posts page</a>)</li>
+        <li><strong>Level 3:</strong> Preact islands in <code>.jsx.rb</code> or <code>.erb.rb</code> (<a href={import.meta.env.BASE_URL + "posts"}>Posts page</a>)</li>
       </ul>
     </section>
 
     <section>
       <h2>Get Started</h2>
       <p>
-        Visit the <a href="/posts">Posts page</a> to create and view blog posts.
+        Visit the <a href={import.meta.env.BASE_URL + "posts"}>Posts page</a> to create and view blog posts.
         Posts are stored in your browser's IndexedDB.
       </p>
     </section>
@@ -295,7 +295,7 @@ __END__
   <article>
     <PostDetail client:load slug={slug} />
     <footer style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
-      <a href="/posts">&larr; Back to all posts</a>
+      <a href={import.meta.env.BASE_URL + "posts"}>&larr; Back to all posts</a>
     </footer>
   </article>
 </Layout>
@@ -500,7 +500,7 @@ def PostList()
   renderPost = ->(post) {
     %x{<article key={post.id} class="post-card">
       <h3>
-        <a href={"/posts/" + post.slug}>{post.title}</a>
+        <a href={import.meta.env.BASE_URL + "posts/" + post.slug}>{post.title}</a>
       </h3>
       <time style={{color: "var(--color-muted)", fontSize: "0.875rem"}}>
         {new Date(post.created_at).toLocaleDateString()}
@@ -681,13 +681,13 @@ def PostDetail(slug:)
   }
 
   return %x{<p class="loading">Loading post...</p>} if loading
-  return %x{<p>Post not found. <a href="/posts">Back to posts</a></p>} unless post
+  return %x{<p>Post not found. <a href={import.meta.env.BASE_URL + "posts"}>Back to posts</a></p>} unless post
 
   if deleted
     return %x{
       <div style={{textAlign: "center", padding: "2rem"}}>
         <p style={{color: "var(--color-muted)"}}>Post deleted successfully.</p>
-        <a href="/posts" style={{marginTop: "1rem", display: "inline-block"}}>&larr; Back to all posts</a>
+        <a href={import.meta.env.BASE_URL + "posts"} style={{marginTop: "1rem", display: "inline-block"}}>&larr; Back to all posts</a>
       </div>
     }
   end
@@ -716,7 +716,7 @@ def PostDetail(slug:)
       <button onClick={handleDelete} style={{background: "#dc2626"}}>
         Delete
       </button>
-      <a href="/posts" style={{marginLeft: "auto", color: "var(--color-muted)"}}>
+      <a href={import.meta.env.BASE_URL + "posts"} style={{marginLeft: "auto", color: "var(--color-muted)"}}>
         &larr; Back to posts
       </a>
     </div>
