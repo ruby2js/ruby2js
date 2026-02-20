@@ -1018,6 +1018,8 @@ function createStructurePlugin(config, appRoot) {
       if (!isServerTarget(config.target)) return;
 
       const distDir = path.join(appRoot, 'dist');
+      if (!fs.existsSync(distDir)) return;
+
       const nodeModulesLink = path.join(distDir, 'node_modules');
       const nodeModulesTarget = path.join(appRoot, 'node_modules');
 
