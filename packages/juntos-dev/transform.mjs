@@ -1201,7 +1201,7 @@ export function generatePackageJsonForEject(appName, config = {}) {
   const RELEASES_BASE = 'https://ruby2js.github.io/ruby2js/releases';
 
   // Determine if this is a browser target
-  const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
+  const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun'];
   const isBrowserTarget = browserTargets.includes(config.target);
 
   const scripts = {
@@ -2083,7 +2083,7 @@ export function generateViteConfigForEject(config = {}) {
   const adapterFile = getActiveRecordAdapterFile(config.database);
 
   // Determine if this is a browser target
-  const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
+  const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun'];
   const isBrowserTarget = browserTargets.includes(config.target);
 
   // Build aliases - always include app paths

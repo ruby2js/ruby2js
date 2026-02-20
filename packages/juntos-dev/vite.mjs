@@ -1077,7 +1077,7 @@ function createConfigPlugin(config, appRoot) {
 
       // For dev mode with browser targets, don't set rollupOptions.input
       // (HTML is served virtually by configureServer, no real file needed)
-      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
+      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun'];
       const isBrowserTarget = browserTargets.includes(config.target);
       const isDevMode = command === 'serve';
 
@@ -1171,7 +1171,7 @@ export { application };`,
 
     // Serve virtual index.html for the root URL in dev mode
     configureServer(server) {
-      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
+      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun'];
       if (!browserTargets.includes(config.target)) return;
 
       // Generate index.html content once
@@ -1207,7 +1207,7 @@ export { application };`,
 
     // Flatten .browser/ output to dist root for browser targets
     async closeBundle() {
-      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
+      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun'];
       if (!browserTargets.includes(config.target)) return;
 
       const distDir = path.join(appRoot, 'dist');
@@ -1226,8 +1226,81 @@ export { application };`,
       // Remove the empty .browser/ directory
       await fs.promises.rmdir(browserOutDir);
       console.log('[juntos] Flattened .browser/ output to dist/');
+
+      // Generate Electrobun config files
+      if (config.target === 'electrobun') {
+        generateElectrobunConfig(distDir, appRoot);
+      }
     }
   };
+}
+
+/**
+ * Generate Electrobun configuration files in dist/.
+ * Creates electrobun.config.ts and bun/index.ts.
+ */
+function generateElectrobunConfig(distDir, appRoot) {
+  const appName = detectAppName(appRoot);
+  const identifier = 'com.example.' + appName.toLowerCase().replace(/\s+/g, '');
+
+  // Generate electrobun.config.ts
+  const configContent = `import type { ElectrobunConfig } from "electrobun/config";
+
+const config: ElectrobunConfig = {
+  name: ${JSON.stringify(appName)},
+  identifier: ${JSON.stringify(identifier)},
+  mainEntry: "bun/index.ts",
+  views: {
+    "main-ui": {
+      entry: "index.html"
+    }
+  },
+  window: {
+    width: 1200,
+    height: 800,
+    title: ${JSON.stringify(appName)}
+  }
+};
+
+export default config;
+`;
+
+  fs.writeFileSync(path.join(distDir, 'electrobun.config.ts'), configContent);
+
+  // Generate bun/index.ts (Bun main process entry point)
+  const bunDir = path.join(distDir, 'bun');
+  if (!fs.existsSync(bunDir)) {
+    fs.mkdirSync(bunDir, { recursive: true });
+  }
+
+  const bunEntry = `import { BrowserWindow, BrowserView } from "electrobun/bun";
+
+// Define RPC handlers for communication with the WebView
+const rpc = BrowserView.defineRPC({
+  handlers: {
+    requests: {
+      // Add custom request handlers here
+      // Example: readFile: async ({path}: {path: string}) => await Bun.file(path).text()
+    },
+    messages: {
+      // Add custom message handlers here
+      // Example: logToBun: ({msg}: {msg: string}) => console.log(msg)
+    }
+  }
+});
+
+// Create the main window
+const win = new BrowserWindow({
+  title: ${JSON.stringify(appName)},
+  width: 1200,
+  height: 800,
+  url: "views://main-ui/index.html",
+  rpc
+});
+`;
+
+  fs.writeFileSync(path.join(bunDir, 'index.ts'), bunEntry);
+  console.log('[juntos] Generated Electrobun config files');
 }
 
 /**
@@ -1321,6 +1394,12 @@ function getRollupOptions(target, database) {
       return {
         input: '.browser/index.html',
         external: ['@tauri-apps/api']
+      };
+
+    case 'electrobun':
+      return {
+        input: '.browser/index.html',
+        external: ['electrobun/bun', 'electrobun/view']
       };
 
     case 'node':
@@ -1445,7 +1524,7 @@ function getDatabasePackages(database) {
  * and ensures files exist when Vite's rollup resolver needs them for builds.
  */
 function createBrowserEntryPlugin(config, appRoot) {
-  const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
+  const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun'];
   const isBrowserTarget = browserTargets.includes(config.target);
 
   // Virtual module ID for main.js
@@ -2205,6 +2284,7 @@ function createVirtualPlugin(config, appRoot) {
     'capacitor': 'capacitor',
     'electron': 'electron',
     'tauri': 'tauri',
+    'electrobun': 'electrobun',
     'cloudflare': 'cloudflare',
     'node': 'node',
     'bun': 'bun',
@@ -2245,6 +2325,7 @@ function createVirtualPlugin(config, appRoot) {
     'capacitor': 'active_storage_indexeddb.mjs',
     'electron': 'active_storage_indexeddb.mjs',
     'tauri': 'active_storage_indexeddb.mjs',
+    'electrobun': 'active_storage_indexeddb.mjs',
     'pwa': 'active_storage_indexeddb.mjs',
     'node': 'active_storage_disk.mjs',
     'bun': 'active_storage_disk.mjs',

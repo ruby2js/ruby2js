@@ -24,6 +24,7 @@ These targets require transpilation. Rails can't run here; Juntos can:
 | **[Capacitor](/docs/juntos/deploying/capacitor)** | iOS/Android mobile apps | Dexie, sql.js, HTTP-based |
 | **[Electron](/docs/juntos/deploying/electron)** | Desktop apps (macOS/Windows/Linux) | SQLite, sql.js, HTTP-based |
 | **[Tauri](/docs/juntos/deploying/tauri)** | Lightweight desktop apps | sql.js, PGlite, HTTP-based |
+| **[Electrobun](/docs/juntos/deploying/electrobun)** | Ultra-lightweight desktop apps (Bun backend) | sql.js, PGlite, HTTP-based |
 
 ## Also Works
 
@@ -42,15 +43,15 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 
 ## Quick Comparison
 
-| Aspect | Browser | Node.js | Fly.io | Vercel | Cloudflare | Capacitor | Electron | Tauri |
-|--------|---------|---------|--------|--------|------------|-----------|----------|-------|
-| Infrastructure | None (static) | Server/container | Container | On-demand | On-demand | App stores | User install | User install |
-| Scaling | N/A | Manual | Automatic | Automatic | Automatic | Per-device | Per-device | Per-device |
-| Cold starts | None | N/A | ~200-500ms | ~50-250ms | ~5-50ms | None | None | None |
-| Database | Client-side | TCP/file | MPG (Postgres) | HTTP APIs | D1 binding | Client-side | File/client | Client-side |
-| Native APIs | Limited | N/A | N/A | N/A | N/A | Full device | Full OS | Rust backend |
-| Distribution | URL | Deploy | Deploy | Deploy | Deploy | App Store | DMG/EXE | DMG/EXE |
-| Bundle size | N/A | N/A | N/A | N/A | N/A | ~5MB | ~150MB | ~3-10MB |
+| Aspect | Browser | Node.js | Fly.io | Vercel | Cloudflare | Capacitor | Electron | Tauri | Electrobun |
+|--------|---------|---------|--------|--------|------------|-----------|----------|-------|------------|
+| Infrastructure | None (static) | Server/container | Container | On-demand | On-demand | App stores | User install | User install | User install |
+| Scaling | N/A | Manual | Automatic | Automatic | Automatic | Per-device | Per-device | Per-device | Per-device |
+| Cold starts | None | N/A | ~200-500ms | ~50-250ms | ~5-50ms | None | None | None | None |
+| Database | Client-side | TCP/file | MPG (Postgres) | HTTP APIs | D1 binding | Client-side | File/client | Client-side | Client-side |
+| Native APIs | Limited | N/A | N/A | N/A | N/A | Full device | Full OS | Rust backend | Bun/TypeScript |
+| Distribution | URL | Deploy | Deploy | Deploy | Deploy | App Store | DMG/EXE | DMG/EXE | DMG/EXE |
+| Bundle size | N/A | N/A | N/A | N/A | N/A | ~5MB | ~150MB | ~3-10MB | ~14MB |
 
 ## Choosing a Target
 
@@ -95,6 +96,13 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 - Lower memory usage is important
 - You're comfortable with Rust for custom native features
 - You want the smallest possible bundle size
+- *Rails can't do this*
+
+**Choose Electrobun if:**
+- You want ultra-fast startup (<50ms) and tiny updates (~14KB patches)
+- You prefer TypeScript over Rust for native desktop features
+- Low memory usage is important (15-30MB)
+- You're comfortable with the Bun runtime
 - *Rails can't do this*
 
 ## Default Target Inference

@@ -1588,15 +1588,15 @@ const RUNTIME_PACKAGES = {
 const VALID_TARGETS = {
   // Browser-only databases
   dexie: ['browser', 'capacitor'],
-  sqljs: ['browser', 'capacitor', 'electron', 'tauri'],
-  pglite: ['browser', 'node', 'capacitor', 'electron', 'tauri'],
+  sqljs: ['browser', 'capacitor', 'electron', 'tauri', 'electrobun'],
+  pglite: ['browser', 'node', 'capacitor', 'electron', 'tauri', 'electrobun'],
   // Node.js databases
   sqlite: ['node', 'bun', 'electron'],
   pg: ['node', 'bun', 'deno', 'electron'],
   mysql: ['node', 'bun', 'electron'],
   // Serverless databases
-  neon: ['node', 'vercel', 'vercel-edge', 'capacitor', 'electron', 'tauri'],
-  turso: ['node', 'vercel', 'vercel-edge', 'cloudflare', 'capacitor', 'electron', 'tauri'],
+  neon: ['node', 'vercel', 'vercel-edge', 'capacitor', 'electron', 'tauri', 'electrobun'],
+  turso: ['node', 'vercel', 'vercel-edge', 'cloudflare', 'capacitor', 'electron', 'tauri', 'electrobun'],
   d1: ['cloudflare']
 };
 
