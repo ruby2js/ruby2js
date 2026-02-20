@@ -1311,29 +1311,48 @@ module Ruby2JS
         def generate_imports
           imports = []
 
-          # Import React if views use React.createElement (for hooks support during SSR)
-          if @rails_needs_react || @rails_needs_render_view
+          # Check if this controller has JSX views (vs ERB-only)
+          has_jsx_views = false
+          if @rails_needs_render_view && @options[:file]
+            views_dir = @options[:file].to_s
+              .sub(%r{app/controllers/}, 'app/views/')
+              .sub(/_controller\.rb$/, '')
+            if File.directory?(views_dir)
+              has_jsx_views = Dir.glob("#{views_dir}/*.{jsx,tsx}").any?
+            end
+          end
+
+          # Import React only when JSX views exist
+          if @rails_needs_react || has_jsx_views
             imports << s(:send, nil, :import,
               s(:const, nil, :React),
               s(:str, "react"))
           end
 
-          # Add renderView helper if needed - detects ERB (async) vs JSX (React component)
-          # ERB views are async functions returning strings; JSX views are React components needing createElement
+          # Add renderView helper if needed
           if @rails_needs_render_view
-            # function renderView(View, props) {
-            #   return View.constructor.name === 'AsyncFunction' ? View(props) : React.createElement(View, props);
-            # }
-            # Use :attr for property access (View.constructor.name, not View.constructor().name())
-            imports << s(:def, :renderView,
-              s(:args, s(:arg, :View), s(:arg, :props)),
-              s(:if,
-                s(:send,
-                  s(:attr, s(:attr, s(:lvar, :View), :constructor), :name),
-                  :===,
-                  s(:str, "AsyncFunction")),
-                s(:send, s(:lvar, :View), nil, s(:lvar, :props)),
-                s(:send, s(:const, nil, :React), :createElement, s(:lvar, :View), s(:lvar, :props))))
+            if has_jsx_views
+              # JSX views need React.createElement; ERB views are async functions
+              # function renderView(View, props) {
+              #   return View.constructor.name === 'AsyncFunction' ? View(props) : React.createElement(View, props);
+              # }
+              imports << s(:def, :renderView,
+                s(:args, s(:arg, :View), s(:arg, :props)),
+                s(:return,
+                  s(:if,
+                    s(:send,
+                      s(:attr, s(:attr, s(:lvar, :View), :constructor), :name),
+                      :===,
+                      s(:str, "AsyncFunction")),
+                    s(:send, s(:lvar, :View), nil, s(:lvar, :props)),
+                    s(:send, s(:const, nil, :React), :createElement, s(:lvar, :View), s(:lvar, :props)))))
+            else
+              # ERB-only: no React needed, just call the view function
+              # function renderView(View, props) { return View(props) }
+              imports << s(:def, :renderView,
+                s(:args, s(:arg, :View), s(:arg, :props)),
+                s(:return, s(:send, s(:lvar, :View), nil, s(:lvar, :props))))
+            end
           end
 
           # Import each referenced model (skip if already imported via require/require_relative)
