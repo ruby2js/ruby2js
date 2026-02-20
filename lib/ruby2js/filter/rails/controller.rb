@@ -956,7 +956,15 @@ module Ruby2JS
 
           if html_block
             # Both JSON and HTML have explicit blocks
-            html_branch = s(:return, transform_ivars_to_locals(html_block))
+            # For multi-statement blocks, extract prefix statements and only
+            # wrap the last statement with return (avoid return on assignment)
+            transformed_html = transform_ivars_to_locals(html_block)
+            html_branch = if transformed_html.respond_to?(:type) && transformed_html.type == :begin && transformed_html.children.length > 1
+                            html_prefix = transformed_html.children[0..-2]
+                            s(:begin, *html_prefix, s(:return, transformed_html.children.last))
+                          else
+                            s(:return, transformed_html)
+                          end
             s(:begin,
               accept_var,
               s(:if, condition, json_branch, html_branch))

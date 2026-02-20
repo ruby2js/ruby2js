@@ -374,6 +374,30 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).must_match(/return\s*\{[\s\S]*redirect:/)
     end
 
+    it "handles multi-statement format.html block with redirect_to" do
+      source = <<~RUBY
+        class PeopleController < ApplicationController
+          def update
+            respond_to do |format|
+              if @person.update(params)
+                format.html {
+                  redirect_url = params[:return_to].presence || person_url(@person)
+                  redirect_to redirect_url, notice: "Updated."
+                }
+                format.json { render :show }
+              end
+            end
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # The redirect hash must be the return value, not the assignment
+      _(result).must_match(/return\s*\{[\s\S]*redirect:[\s\S]*notice:/)
+      # Assignment should NOT have return
+      _(result).wont_match(/return\s+redirect_url\s*=/)
+    end
+
     it "wraps redirect_to inside if/else with return" do
       # redirect_to inside a conditional (not respond_to) also needs return
       source = <<~RUBY
