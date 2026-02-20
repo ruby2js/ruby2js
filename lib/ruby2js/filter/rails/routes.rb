@@ -726,6 +726,19 @@ module Ruby2JS
               [s(:const, nil, ctrl[:controller_name].to_sym)])
           end
 
+          # Deduplicate path helpers by name (later route overrides earlier,
+          # matching Rails behavior where last-defined route wins)
+          seen_names = {}
+          unique_helpers = []
+          @rails_path_helpers.each do |h|
+            name = h[:name].to_s
+            unless seen_names[name]
+              seen_names[name] = true
+              unique_helpers.push(h)
+            end
+          end
+          @rails_path_helpers = unique_helpers
+
           # Check if we should import from paths.js or inline path helpers
           if @options[:paths_file]
             # Import path helpers from paths.js
