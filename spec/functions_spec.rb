@@ -640,6 +640,11 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'a.reduce(($acc, [k, v]) => {let $key = k.toString(); ($acc[$key] = $acc[$key] ?? []).push([k, v]); return $acc}, {})'
     end
 
+    it "should handle group_by with nested destructuring" do
+      to_js( 'a.group_by {|(value, dance), count| dance}' ).
+        must_equal 'a.reduce(($acc, [[value, dance], count]) => {let $key = dance; ($acc[$key] = $acc[$key] ?? []).push([[value, dance], count]); return $acc}, {})'
+    end
+
     it "should handle map with destructuring" do
       to_js( 'a.map {|k, v| k + v}' ).
         must_equal 'a.map(([k, v]) => k + v)'

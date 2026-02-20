@@ -99,6 +99,18 @@ module Ruby2JS
         names
       end
 
+      # Reconstruct an arg/mlhs node as an lvar/array expression
+      # :arg -> s(:lvar, name), :mlhs -> s(:array, *children)
+      def arg_to_lvar_expr(node)
+        if node.type == :mlhs
+          s(:array, *node.children.map { |c| arg_to_lvar_expr(c) })
+        elsif node.type == :arg
+          s(:lvar, node.children[0])
+        else
+          node
+        end
+      end
+
       # Suffix all leaf arg names in an args structure (for sort_by comparison)
       def suffix_args(node, suffix)
         if node.type == :mlhs
@@ -1370,11 +1382,10 @@ module Ruby2JS
           # Check if we have multiple args (destructuring case)
           if args.children.length > 1
             # Multiple args: use destructuring and push the whole item as array
-            arg_names = args.children.map { |arg| arg.children.first }
             # Create mlhs for destructuring: ([a, b]) => ...
             mlhs_arg = s(:mlhs, *args.children)
-            # Push the reconstructed array [a, b]
-            item_to_push = s(:array, *arg_names.map { |name| s(:lvar, name) })
+            # Push the reconstructed array [a, b] (handles nested mlhs)
+            item_to_push = s(:array, *args.children.map { |arg| arg_to_lvar_expr(arg) })
             reduce_arg = s(:args, s(:arg, :$acc), mlhs_arg)
           else
             # Single arg: simple case

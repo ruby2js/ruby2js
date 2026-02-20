@@ -108,6 +108,12 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include 'question_text'
     end
 
+    it "should handle fields_for without [object Object] in map args" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @billable) do |form| %><%= form.fields_for :questions do |q| %><%= q.hidden_field :id %><% end %><% end %>')
+      result.wont_include '[object Object]'
+    end
+
     it "should handle submit with custom label" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_for @user do |f| %><%= f.submit "Create Account" %><% end %>')

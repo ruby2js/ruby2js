@@ -643,9 +643,14 @@ module Ruby2JS
         body_value = parts_to_value(body_parts)
 
         # Build: collection.map(lvar => body_value).join("")
+        map_args = if lvar.type == :mlhs
+          s(:args, lvar)
+        else
+          s(:args, s(:arg, lvar.children[0]))
+        end
         map_block = s(:block,
           s(:send, collection, :map),
-          s(:args, s(:arg, lvar.children[0])),
+          map_args,
           body_value)
         join_call = s(:send, map_block, :join, s(:str, ""))
 
