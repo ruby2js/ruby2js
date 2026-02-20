@@ -163,8 +163,8 @@ export class Application extends BrowserApplication {
   static #electrobun = null;
 
   static get isElectrobun() {
-    // Detection: check for electrobun view module availability
-    return typeof Electroview !== 'undefined';
+    return typeof window !== 'undefined' &&
+           typeof window.__electrobunWindowId !== 'undefined';
   }
 
   static get electrobun() {
@@ -246,12 +246,21 @@ Electrobun loads bundled assets via `views://` instead of relative paths or `fil
 
 **4. Runtime detection**
 
-Without a global like `window.__TAURI__`, detection options:
-- Import-time: If `electrobun/view` import succeeds, we're in Electrobun (module availability)
-- Build-time: The Juntos build sets a flag (e.g., `globalThis.__ELECTROBUN__ = true`)
-- Environment: Check for Electrobun-specific globals that may exist but aren't documented yet
+Electrobun injects [global properties](https://blackboard.sh/electrobun/docs/apis/browser/global-properties/) into every webview automatically, even without instantiating `Electroview`:
 
-**Recommendation:** Build-time flag injected by the Vite/build config, similar to how frameworks use `import.meta.env`.
+- `window.__electrobunWebviewId` — identifies the webview instance
+- `window.__electrobunWindowId` — identifies the parent window
+
+Detection follows the same pattern as Electron and Tauri:
+
+```javascript
+static get isElectrobun() {
+  return typeof window !== 'undefined' &&
+         typeof window.__electrobunWindowId !== 'undefined';
+}
+```
+
+This is mechanical — no build-time flags needed.
 
 ## Risks and Open Questions
 
