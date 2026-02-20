@@ -358,7 +358,7 @@ module Ruby2JS
         # Force underscored_private for class_extend since function-style
         # constructors can't use ES2022 private fields (#foo syntax)
         saved_underscored_private = @underscored_private
-        @underscored_private = true if @ast.type == :class_extend
+        @underscored_private = true if @ast.type == :class_extend || @ast.type == :class_module
 
         # add locally visible interfaces to rbstack.  See send.rb, const.rb
         @rbstack.push visible
