@@ -19,6 +19,11 @@ import { CollectionProxy } from 'juntos/adapters/collection_proxy.mjs';
 import { Reference, HasOneReference } from 'juntos/adapters/reference.mjs';
 import { singularize } from 'juntos/adapters/inflector.mjs';
 
+// Throw this inside a transaction block to trigger ROLLBACK without an error
+export class Rollback extends Error {
+  constructor() { super('ActiveRecord::Rollback'); this.name = 'Rollback'; }
+}
+
 // Model registry for association resolution (populated by Application.registerModels)
 export const modelRegistry = {};
 
@@ -49,6 +54,24 @@ export class ActiveRecordSQL extends ActiveRecordBase {
 
   static _getLastInsertId(result) {
     throw new Error('Subclass must implement _getLastInsertId(result)');
+  }
+
+  // --- Transaction support ---
+
+  // Execute callback inside a BEGIN/COMMIT/ROLLBACK block.
+  // If the callback throws Rollback, the transaction is rolled back silently (returns undefined).
+  // Any other error triggers ROLLBACK and re-throws.
+  static async transaction(callback) {
+    await this._execute('BEGIN', []);
+    try {
+      const result = await callback();
+      await this._execute('COMMIT', []);
+      return result;
+    } catch (err) {
+      await this._execute('ROLLBACK', []);
+      if (err instanceof Rollback) return undefined;
+      throw err;
+    }
   }
 
   // --- Class Methods (chainable - return Relation) ---
@@ -100,6 +123,11 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     return new Relation(this).joins(...associations);
   }
 
+  // Returns a Relation with GROUP BY
+  static group(...columns) {
+    return new Relation(this).group(...columns);
+  }
+
   // --- Class Methods (terminal - execute immediately) ---
 
   static async find(id) {
@@ -140,6 +168,31 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     return new Relation(this).exists();
   }
 
+  // Alias for exists
+  static async any() {
+    return new Relation(this).any();
+  }
+
+  // Return a single value
+  static async pick(...columns) {
+    return new Relation(this).pick(...columns);
+  }
+
+  // Return exactly one record; raises if zero or more than one
+  static async sole() {
+    return new Relation(this).sole();
+  }
+
+  // Find by conditions, throw if not found
+  static async findByBang(conditions) {
+    return new Relation(this).findByBang(conditions);
+  }
+
+  // Find and destroy records matching conditions
+  static async destroyBy(conditions) {
+    return new Relation(this).destroyBy(conditions);
+  }
+
   // Find a record matching attrs, or create one if not found
   static async findOrCreateBy(attrs) {
     const existing = await this.findBy(attrs);
@@ -155,6 +208,14 @@ export class ActiveRecordSQL extends ActiveRecordBase {
   // Aggregate: minimum value of a column
   static async minimum(col) {
     return new Relation(this).minimum(col);
+  }
+
+  // Update all records matching conditions (direct SQL, no callbacks)
+  static async updateAll(attrs, conditions) {
+    if (conditions) {
+      return this.where(conditions).updateAll(attrs);
+    }
+    return new Relation(this).updateAll(attrs);
   }
 
   // Delete all records matching conditions (direct SQL, no callbacks)
@@ -220,6 +281,85 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     const result = await this._execute(sql, values);
     const rows = this._getRows(result);
     return rows[0]?.[aliasName] ?? null;
+  }
+
+  // Execute a grouped COUNT query: returns {key: count} or {[k1,k2]: count}
+  static async _executeGroupCount(rel) {
+    const groupCols = Array.isArray(rel._group) ? rel._group : [rel._group];
+    const selectCols = [...groupCols, 'COUNT(*) as count'].join(', ');
+    const aggRel = Object.create(rel);
+    aggRel._select = [selectCols];
+    const { sql, values } = this._buildRelationSQL(aggRel);
+    const result = await this._execute(sql, values);
+    const rows = this._getRows(result);
+    const hash = {};
+    for (const row of rows) {
+      const key = groupCols.length === 1 ? row[groupCols[0]] : groupCols.map(c => row[c]);
+      hash[key] = parseInt(row.count);
+    }
+    return hash;
+  }
+
+  // Execute a grouped aggregate (SUM, MAX, MIN, AVG): returns {key: value}
+  static async _executeGroupAggregate(rel, func, col) {
+    const groupCols = Array.isArray(rel._group) ? rel._group : [rel._group];
+    const aliasName = func.toLowerCase();
+    const selectCols = [...groupCols, `${func}(${col}) as ${aliasName}`].join(', ');
+    const aggRel = Object.create(rel);
+    aggRel._select = [selectCols];
+    const { sql, values } = this._buildRelationSQL(aggRel);
+    const result = await this._execute(sql, values);
+    const rows = this._getRows(result);
+    const hash = {};
+    for (const row of rows) {
+      const key = groupCols.length === 1 ? row[groupCols[0]] : groupCols.map(c => row[c]);
+      hash[key] = row[aliasName];
+    }
+    return hash;
+  }
+
+  // Execute a bulk UPDATE query for a Relation
+  // Returns the raw result (adapter-dependent)
+  static async _executeUpdateAll(rel, attrs) {
+    const values = [];
+    const paramIndex = { value: 1 };
+
+    // Build SET clause
+    const sets = [];
+    for (const [key, value] of Object.entries(attrs)) {
+      sets.push(`${key} = ${this._param(paramIndex.value++)}`);
+      values.push(this._formatValue(value));
+    }
+
+    let sql = `UPDATE ${this.tableName} SET ${sets.join(', ')}`;
+
+    // Build WHERE clause from relation conditions
+    const whereParts = [];
+
+    if (rel._conditions.length > 0) {
+      const { parts, vals } = this._buildConditionsSQL(rel._conditions, paramIndex);
+      if (parts.length > 0) {
+        whereParts.push(...parts);
+        values.push(...vals);
+      }
+    }
+
+    if (rel._rawConditions && rel._rawConditions.length > 0) {
+      for (const raw of rel._rawConditions) {
+        let sqlPart = raw.sql;
+        for (const val of raw.values) {
+          sqlPart = sqlPart.replace('?', this._param(paramIndex.value++));
+          values.push(this._formatValue(val));
+        }
+        whereParts.push(sqlPart);
+      }
+    }
+
+    if (whereParts.length > 0) {
+      sql += ` WHERE ${whereParts.join(' AND ')}`;
+    }
+
+    return this._execute(sql, values);
   }
 
   // Execute a DELETE query for a Relation
@@ -471,9 +611,9 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     const joinClauses = [];
 
     if (rel._joins && rel._joins.length > 0) {
-      for (const assocName of rel._joins) {
-        const joinSQL = this._buildJoinClause(assocName, 'INNER JOIN');
-        if (joinSQL) joinClauses.push(joinSQL);
+      for (const joinSpec of rel._joins) {
+        const clauses = this._buildJoinClauses(joinSpec, 'INNER JOIN', this);
+        joinClauses.push(...clauses);
       }
     }
 
@@ -577,6 +717,12 @@ export class ActiveRecordSQL extends ActiveRecordBase {
       }
     }
 
+    // GROUP BY
+    if (rel._group) {
+      const groupCols = Array.isArray(rel._group) ? rel._group.join(', ') : rel._group;
+      sql += ` GROUP BY ${groupCols}`;
+    }
+
     // ORDER BY (skip for count queries)
     if (!options.count && rel._order) {
       const [col, dir] = this._parseOrder(rel._order);
@@ -596,35 +742,108 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     return { sql, values };
   }
 
-  // Build a JOIN clause for an association name.
-  // Uses the model's static associations map to resolve the target table and FK.
-  static _buildJoinClause(assocName, joinType) {
-    const assoc = this.associations?.[assocName];
+  // Build JOIN clause(s) for an association, which may be:
+  //   - a string: 'comments'
+  //   - a nested object: { entry: 'lead' } or { entry: ['lead', 'follow'] }
+  // Returns an array of SQL strings.
+  static _buildJoinClauses(assocSpec, joinType, sourceModel) {
+    sourceModel = sourceModel || this;
+
+    if (typeof assocSpec === 'string') {
+      const clause = this._buildSingleJoinClause(assocSpec, joinType, sourceModel);
+      return clause ? [clause.sql] : [];
+    }
+
+    if (typeof assocSpec === 'object' && !Array.isArray(assocSpec)) {
+      const clauses = [];
+      for (const [parentAssoc, nested] of Object.entries(assocSpec)) {
+        // Join the parent association
+        const parentClause = this._buildSingleJoinClause(parentAssoc, joinType, sourceModel);
+        if (parentClause) {
+          clauses.push(parentClause.sql);
+          // Recursively join nested associations from the parent's model
+          const ParentModel = this._resolveAssocModel(parentAssoc, sourceModel);
+          if (ParentModel) {
+            const nestedList = Array.isArray(nested) ? nested : [nested];
+            for (const nestedAssoc of nestedList) {
+              const nestedClauses = this._buildJoinClauses(nestedAssoc, joinType, ParentModel);
+              clauses.push(...nestedClauses);
+            }
+          }
+        }
+      }
+      return clauses;
+    }
+
+    return [];
+  }
+
+  // Build a single JOIN clause for one association name on a given source model.
+  // Returns { sql, model } or null.
+  static _buildSingleJoinClause(assocName, joinType, sourceModel) {
+    const assoc = sourceModel.associations?.[assocName];
     if (!assoc) return null;
 
     const AssocModel = this._resolveModel(assoc.model);
     const assocTable = AssocModel.tableName;
 
+    let sql;
     if (assoc.type === 'has_one' || assoc.type === 'has_many') {
-      // has_one/has_many: FK is on the associated table
-      const fk = singularize(this.tableName) + '_id';
-      return `${joinType} ${assocTable} ON ${assocTable}.${fk} = ${this.tableName}.id`;
+      const fk = assoc.foreignKey || singularize(sourceModel.tableName) + '_id';
+      sql = `${joinType} ${assocTable} ON ${assocTable}.${fk} = ${sourceModel.tableName}.id`;
     } else if (assoc.type === 'belongs_to') {
-      // belongs_to: FK is on this table
-      const fk = assocName + '_id';
-      return `${joinType} ${assocTable} ON ${this.tableName}.${fk} = ${assocTable}.id`;
+      const fk = assoc.foreignKey || assocName + '_id';
+      sql = `${joinType} ${assocTable} ON ${sourceModel.tableName}.${fk} = ${assocTable}.id`;
     }
-    return null;
+
+    return sql ? { sql, model: AssocModel } : null;
+  }
+
+  // Resolve the target model for an association on a source model
+  static _resolveAssocModel(assocName, sourceModel) {
+    const assoc = sourceModel.associations?.[assocName];
+    if (!assoc) return null;
+    return this._resolveModel(assoc.model);
+  }
+
+  // Legacy single-clause helper (used by _buildRelationSQL for missing())
+  static _buildJoinClause(assocName, joinType) {
+    const result = this._buildSingleJoinClause(assocName, joinType, this);
+    return result ? result.sql : null;
   }
 
   // Build SQL clauses from an array of condition objects
   // Returns { parts: string[], vals: any[] }
+  // Supports nested hash for joined tables: where({studios: {id: x}}) → studios.id = ?
   static _buildConditionsSQL(conditions, paramIndex) {
     const parts = [];
     const vals = [];
 
     for (const cond of conditions) {
       for (let [key, value] of Object.entries(cond)) {
+        // Nested hash for joined table columns: {table_name: {col: val}}
+        if (value !== null && typeof value === 'object' && !Array.isArray(value)
+            && !this._isRange(value) && !(value.id && this.associations?.[key])) {
+          // Check if this looks like a table reference (not a model instance)
+          const hasTableLikeKey = !('_begin' in value) && !('begin' in value);
+          if (hasTableLikeKey) {
+            for (const [col, colVal] of Object.entries(value)) {
+              const qualifiedCol = `${key}.${col}`;
+              if (Array.isArray(colVal)) {
+                const placeholders = colVal.map(() => this._param(paramIndex.value++)).join(', ');
+                parts.push(`${qualifiedCol} IN (${placeholders})`);
+                vals.push(...colVal.map(v => this._formatValue(v)));
+              } else if (colVal === null || colVal === undefined) {
+                parts.push(`${qualifiedCol} IS NULL`);
+              } else {
+                parts.push(`${qualifiedCol} = ${this._param(paramIndex.value++)}`);
+                vals.push(this._formatValue(colVal));
+              }
+            }
+            continue;
+          }
+        }
+
         // Resolve association names to FK columns (e.g., account -> account_id)
         const assoc = this.associations?.[key];
         if (assoc && assoc.type === 'belongs_to') {
@@ -913,6 +1132,9 @@ export class ActiveRecordSQL extends ActiveRecordBase {
 
   // Snake case aliases
   static find_or_create_by(attrs) { return this.findOrCreateBy(attrs); }
+  static find_by_bang(conditions) { return this.findByBang(conditions); }
+  static update_all(attrs, conditions) { return this.updateAll(attrs, conditions); }
   static delete_all(conditions) { return this.deleteAll(conditions); }
   static destroy_all() { return this.destroyAll(); }
+  static destroy_by(conditions) { return this.destroyBy(conditions); }
 }

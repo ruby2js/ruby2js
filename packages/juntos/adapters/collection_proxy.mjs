@@ -101,6 +101,10 @@ export class CollectionProxy {
 
   // --- Bulk operations ---
 
+  async updateAll(attrs) {
+    return this.toRelation().updateAll(attrs);
+  }
+
   async destroyAll() {
     return this.toRelation().destroyAll();
   }
@@ -113,10 +117,25 @@ export class CollectionProxy {
     return this.toRelation().findOrCreateBy(attrs);
   }
 
+  async destroyBy(conditions) {
+    return this.toRelation().destroyBy(conditions);
+  }
+
+  // Chaining methods that return Relation
+  group(...columns) {
+    return this.toRelation().group(...columns);
+  }
+
+  pluck(...columns) {
+    return this.toRelation().pluck(...columns);
+  }
+
   // Snake case aliases
+  update_all(attrs) { return this.updateAll(attrs); }
   destroy_all() { return this.destroyAll(); }
   delete_all() { return this.deleteAll(); }
   find_or_create_by(attrs) { return this.findOrCreateBy(attrs); }
+  destroy_by(conditions) { return this.destroyBy(conditions); }
 
   // --- Chaining (returns Relation) ---
 

@@ -2193,3 +2193,654 @@ describe('toSQL() query patterns', () => {
     });
   });
 });
+
+// =============================================================================
+// Phase 5: Runtime expansion tests
+// =============================================================================
+
+import { Rollback } from '../adapters/active_record_sql.mjs';
+
+// --- update_all ---
+
+describe('update_all', () => {
+  beforeEach(() => {
+    MockModel.resetQueries();
+    MockPostgresModel.resetQueries();
+  });
+
+  it('builds UPDATE with SET and WHERE', async () => {
+    await MockModel.where({ role: 'guest' }).updateAll({ status: 'inactive' });
+
+    assert.equal(MockModel._executedQueries.length, 1);
+    const { sql, params } = MockModel._executedQueries[0];
+    assert.equal(sql, 'UPDATE users SET status = ? WHERE role = ?');
+    assert.deepEqual(params, ['inactive', 'guest']);
+  });
+
+  it('builds UPDATE without WHERE for unscoped', async () => {
+    await MockModel.updateAll({ active: false });
+
+    assert.equal(MockModel._executedQueries.length, 1);
+    const { sql, params } = MockModel._executedQueries[0];
+    assert.equal(sql, 'UPDATE users SET active = ?');
+    assert.deepEqual(params, [false]);
+  });
+
+  it('builds UPDATE with multiple SET columns', async () => {
+    await MockModel.where({ id: 1 }).updateAll({ name: 'Bob', role: 'admin' });
+
+    const { sql, params } = MockModel._executedQueries[0];
+    assert.equal(sql, 'UPDATE users SET name = ?, role = ? WHERE id = ?');
+    assert.deepEqual(params, ['Bob', 'admin', 1]);
+  });
+
+  it('works with postgres numbered params', async () => {
+    await MockPostgresModel.where({ draft: true }).updateAll({ published: true });
+
+    const { sql, params } = MockPostgresModel._executedQueries[0];
+    assert.equal(sql, 'UPDATE posts SET published = $1 WHERE draft = $2');
+    assert.deepEqual(params, [true, true]);
+  });
+
+  it('works with raw SQL conditions', async () => {
+    await MockModel.where('score > ?', 100).updateAll({ featured: true });
+
+    const { sql, params } = MockModel._executedQueries[0];
+    assert.equal(sql, 'UPDATE users SET featured = ? WHERE score > ?');
+    assert.deepEqual(params, [true, 100]);
+  });
+
+  it('has snake_case alias', async () => {
+    await MockModel.where({ id: 1 }).update_all({ name: 'test' });
+    assert.equal(MockModel._executedQueries.length, 1);
+  });
+
+  it('is available as static method', async () => {
+    await MockModel.updateAll({ active: false });
+    assert.equal(MockModel._executedQueries.length, 1);
+  });
+
+  it('static method accepts conditions', async () => {
+    await MockModel.updateAll({ status: 'banned' }, { role: 'spam' });
+    assert.equal(MockModel._executedQueries.length, 1);
+    const { sql } = MockModel._executedQueries[0];
+    assert.match(sql, /UPDATE users SET status = \? WHERE role = \?/);
+  });
+});
+
+// --- transaction ---
+
+describe('transaction', () => {
+  class TransactionModel extends ActiveRecordSQL {
+    static tableName = 'items';
+    static get useNumberedParams() { return false; }
+    static _executedQueries = [];
+
+    static async _execute(sql, params) {
+      this._executedQueries.push({ sql, params });
+      return { rows: [] };
+    }
+
+    static _getRows(result) { return result.rows; }
+    static _getLastInsertId(result) { return 1; }
+
+    static resetQueries() {
+      this._executedQueries = [];
+    }
+  }
+
+  beforeEach(() => {
+    TransactionModel.resetQueries();
+  });
+
+  it('wraps callback in BEGIN/COMMIT', async () => {
+    await TransactionModel.transaction(async () => {
+      await TransactionModel._execute('INSERT INTO items VALUES (?)', [1]);
+    });
+
+    const queries = TransactionModel._executedQueries.map(q => q.sql);
+    assert.deepEqual(queries, ['BEGIN', 'INSERT INTO items VALUES (?)', 'COMMIT']);
+  });
+
+  it('returns callback result on success', async () => {
+    const result = await TransactionModel.transaction(async () => {
+      return 42;
+    });
+    assert.equal(result, 42);
+  });
+
+  it('rolls back on error and re-throws', async () => {
+    await assert.rejects(
+      async () => {
+        await TransactionModel.transaction(async () => {
+          throw new Error('boom');
+        });
+      },
+      /boom/
+    );
+
+    const queries = TransactionModel._executedQueries.map(q => q.sql);
+    assert.deepEqual(queries, ['BEGIN', 'ROLLBACK']);
+  });
+
+  it('rolls back silently on Rollback error', async () => {
+    const result = await TransactionModel.transaction(async () => {
+      throw new Rollback();
+    });
+
+    assert.equal(result, undefined);
+    const queries = TransactionModel._executedQueries.map(q => q.sql);
+    assert.deepEqual(queries, ['BEGIN', 'ROLLBACK']);
+  });
+
+  it('Rollback is exported and has correct name', () => {
+    const err = new Rollback();
+    assert.equal(err.name, 'Rollback');
+    assert.ok(err instanceof Error);
+  });
+});
+
+// --- group() ---
+
+describe('group()', () => {
+  describe('chainable method', () => {
+    it('sets _group and returns new Relation', () => {
+      const rel1 = new Relation(MockModel);
+      const rel2 = rel1.group('status');
+
+      assert.equal(rel1._group, null);
+      assert.equal(rel2._group, 'status');
+      assert.notEqual(rel1, rel2);
+    });
+
+    it('accepts multiple columns', () => {
+      const rel = new Relation(MockModel).group('status', 'role');
+      assert.deepEqual(rel._group, ['status', 'role']);
+    });
+
+    it('clones _group', () => {
+      const rel1 = new Relation(MockModel).group('status');
+      const rel2 = rel1._clone();
+      assert.equal(rel2._group, 'status');
+    });
+  });
+
+  describe('SQL building', () => {
+    it('builds GROUP BY clause', () => {
+      const { sql } = MockModel.group('status').toSQL();
+      assert.equal(sql, 'SELECT * FROM users GROUP BY status');
+    });
+
+    it('builds GROUP BY with multiple columns', () => {
+      const { sql } = MockModel.group('status', 'role').toSQL();
+      assert.equal(sql, 'SELECT * FROM users GROUP BY status, role');
+    });
+
+    it('combines GROUP BY with WHERE', () => {
+      const { sql, values } = MockModel.where({ active: true }).group('role').toSQL();
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ? GROUP BY role');
+      assert.deepEqual(values, [true]);
+    });
+
+    it('GROUP BY comes before ORDER BY', () => {
+      const { sql } = MockModel.group('role').order('role').toSQL();
+      assert.equal(sql, 'SELECT * FROM users GROUP BY role ORDER BY role ASC');
+    });
+  });
+
+  describe('group().count()', () => {
+    class GroupCountModel extends ActiveRecordSQL {
+      static tableName = 'users';
+      static get useNumberedParams() { return false; }
+      static _lastQuery = null;
+
+      static async _execute(sql, params) {
+        this._lastQuery = { sql, params };
+        // Return grouped count data
+        return { rows: [
+          { status: 'active', count: 42 },
+          { status: 'inactive', count: 18 },
+          { status: 'pending', count: 5 }
+        ]};
+      }
+
+      static _getRows(result) { return result.rows; }
+      static _getLastInsertId(result) { return 1; }
+    }
+
+    it('returns {key: count} hash', async () => {
+      const result = await GroupCountModel.group('status').count();
+
+      assert.deepEqual(result, {
+        active: 42,
+        inactive: 18,
+        pending: 5
+      });
+    });
+
+    it('executes SELECT with group column and COUNT', async () => {
+      await GroupCountModel.group('status').count();
+
+      assert.ok(GroupCountModel._lastQuery.sql.includes('status, COUNT(*)'));
+      assert.ok(GroupCountModel._lastQuery.sql.includes('GROUP BY status'));
+    });
+  });
+
+  describe('group().sum()', () => {
+    class GroupSumModel extends ActiveRecordSQL {
+      static tableName = 'orders';
+      static get useNumberedParams() { return false; }
+      static _lastQuery = null;
+
+      static async _execute(sql, params) {
+        this._lastQuery = { sql, params };
+        return { rows: [
+          { status: 'completed', sum: 1500 },
+          { status: 'pending', sum: 300 }
+        ]};
+      }
+
+      static _getRows(result) { return result.rows; }
+      static _getLastInsertId(result) { return 1; }
+    }
+
+    it('returns {key: sum} hash', async () => {
+      const result = await GroupSumModel.group('status').sum('amount');
+
+      assert.deepEqual(result, {
+        completed: 1500,
+        pending: 300
+      });
+    });
+
+    it('executes SELECT with group column and SUM', async () => {
+      await GroupSumModel.group('status').sum('amount');
+
+      assert.ok(GroupSumModel._lastQuery.sql.includes('SUM(amount)'));
+      assert.ok(GroupSumModel._lastQuery.sql.includes('GROUP BY status'));
+    });
+  });
+
+  describe('static group()', () => {
+    it('returns a Relation with group', () => {
+      const rel = MockModel.group('status');
+      assert.ok(rel instanceof Relation);
+      assert.equal(rel._group, 'status');
+    });
+  });
+});
+
+// --- Nested hash joins ---
+
+describe('Nested hash joins', () => {
+  // Models for testing nested joins
+  class Studio extends ActiveRecordSQL {
+    static tableName = 'studios';
+    static get useNumberedParams() { return false; }
+    static associations = {
+      entries: { type: 'has_many', model: 'Entry' }
+    };
+    static async _execute() { return { rows: [] }; }
+    static _getRows(r) { return r.rows; }
+    static _getLastInsertId() { return 1; }
+  }
+
+  class Entry extends ActiveRecordSQL {
+    static tableName = 'entries';
+    static get useNumberedParams() { return false; }
+    static associations = {
+      studio: { type: 'belongs_to', model: 'Studio', foreignKey: 'studio_id' },
+      lead: { type: 'belongs_to', model: 'Person', foreignKey: 'lead_id' },
+      follow: { type: 'belongs_to', model: 'Person', foreignKey: 'follow_id' }
+    };
+    static async _execute() { return { rows: [] }; }
+    static _getRows(r) { return r.rows; }
+    static _getLastInsertId() { return 1; }
+  }
+
+  class Person extends ActiveRecordSQL {
+    static tableName = 'people';
+    static get useNumberedParams() { return false; }
+    static associations = {};
+    static async _execute() { return { rows: [] }; }
+    static _getRows(r) { return r.rows; }
+    static _getLastInsertId() { return 1; }
+  }
+
+  // Register models
+  modelRegistry['Studio'] = Studio;
+  modelRegistry['Entry'] = Entry;
+  modelRegistry['Person'] = Person;
+
+  it('joins simple string association', () => {
+    const { sql } = Studio.joins('entries').toSQL();
+    assert.match(sql, /INNER JOIN entries ON entries\.studio_id = studios\.id/);
+  });
+
+  it('joins nested hash: {entry: :lead}', () => {
+    const { sql } = Studio.joins({ entries: 'lead' }).toSQL();
+    assert.match(sql, /INNER JOIN entries ON entries\.studio_id = studios\.id/);
+    assert.match(sql, /INNER JOIN people ON entries\.lead_id = people\.id/);
+  });
+
+  it('joins nested hash with array: {entry: [:lead, :follow]}', () => {
+    // Note: both lead and follow point to Person (same table)
+    // This will produce two joins to the same table - valid SQL with aliases in more complex cases
+    const { sql } = Studio.joins({ entries: ['lead', 'follow'] }).toSQL();
+    assert.match(sql, /INNER JOIN entries/);
+    // Both lead and follow are belongs_to Person
+    const joinCount = (sql.match(/INNER JOIN people/g) || []).length;
+    assert.equal(joinCount, 2);
+  });
+});
+
+// --- WHERE on joined table columns ---
+
+describe('WHERE on joined table columns', () => {
+  class Card extends ActiveRecordSQL {
+    static tableName = 'cards';
+    static get useNumberedParams() { return false; }
+    static associations = {
+      studio: { type: 'belongs_to', model: 'StudioModel', foreignKey: 'studio_id' }
+    };
+    static async _execute() { return { rows: [] }; }
+    static _getRows(r) { return r.rows; }
+    static _getLastInsertId() { return 1; }
+  }
+
+  class StudioModel extends ActiveRecordSQL {
+    static tableName = 'studios';
+    static get useNumberedParams() { return false; }
+    static associations = {};
+    static async _execute() { return { rows: [] }; }
+    static _getRows(r) { return r.rows; }
+    static _getLastInsertId() { return 1; }
+  }
+
+  modelRegistry['StudioModel'] = StudioModel;
+
+  it('builds WHERE with table-qualified column', () => {
+    const { sql, values } = Card.joins('studio').where({ studios: { id: 456 } }).toSQL();
+
+    assert.match(sql, /INNER JOIN studios/);
+    assert.match(sql, /WHERE studios\.id = \?/);
+    assert.deepEqual(values, [456]);
+  });
+
+  it('builds WHERE with multiple table-qualified columns', () => {
+    const { sql, values } = Card.joins('studio')
+      .where({ studios: { name: 'Test', active: true } }).toSQL();
+
+    assert.match(sql, /studios\.name = \?/);
+    assert.match(sql, /studios\.active = \?/);
+    assert.deepEqual(values, ['Test', true]);
+  });
+
+  it('builds WHERE with IN on joined table', () => {
+    const { sql, values } = Card.joins('studio')
+      .where({ studios: { id: [1, 2, 3] } }).toSQL();
+
+    assert.match(sql, /studios\.id IN \(\?, \?, \?\)/);
+    assert.deepEqual(values, [1, 2, 3]);
+  });
+
+  it('builds WHERE with IS NULL on joined table', () => {
+    const { sql } = Card.joins('studio')
+      .where({ studios: { deleted_at: null } }).toSQL();
+
+    assert.match(sql, /studios\.deleted_at IS NULL/);
+  });
+
+  it('combines table-qualified and regular WHERE', () => {
+    const { sql, values } = Card.joins('studio')
+      .where({ active: true })
+      .where({ studios: { name: 'Test' } }).toSQL();
+
+    assert.match(sql, /active = \?/);
+    assert.match(sql, /studios\.name = \?/);
+    assert.deepEqual(values, [true, 'Test']);
+  });
+});
+
+// --- any() ---
+
+describe('any()', () => {
+  class AnyModel extends ActiveRecordSQL {
+    static tableName = 'items';
+    static get useNumberedParams() { return false; }
+
+    static async _execute(sql, params) {
+      return { rows: [{ '1': 1 }] };
+    }
+    static _getRows(result) { return result.rows; }
+    static _getLastInsertId() { return 1; }
+  }
+
+  it('returns true when records exist', async () => {
+    const result = await new Relation(AnyModel).any();
+    assert.equal(result, true);
+  });
+
+  it('returns false when no records exist', async () => {
+    class EmptyModel extends AnyModel {
+      static async _execute() { return { rows: [] }; }
+    }
+    const result = await new Relation(EmptyModel).any();
+    assert.equal(result, false);
+  });
+
+  it('is available as static method', async () => {
+    const result = await AnyModel.any();
+    assert.equal(result, true);
+  });
+});
+
+// --- pick() ---
+
+describe('pick()', () => {
+  class PickModel extends ActiveRecordSQL {
+    static tableName = 'items';
+    static get useNumberedParams() { return false; }
+    static _lastQuery = null;
+
+    static async _execute(sql, params) {
+      this._lastQuery = { sql, params };
+      if (sql.includes('SELECT name')) {
+        return { rows: [{ name: 'Alice' }] };
+      }
+      if (sql.includes('SELECT id, name')) {
+        return { rows: [{ id: 1, name: 'Alice' }] };
+      }
+      return { rows: [] };
+    }
+    static _getRows(result) { return result.rows; }
+    static _getLastInsertId() { return 1; }
+  }
+
+  it('returns single value for one column', async () => {
+    const result = await new Relation(PickModel).pick('name');
+    assert.equal(result, 'Alice');
+  });
+
+  it('returns array for multiple columns', async () => {
+    const result = await new Relation(PickModel).pick('id', 'name');
+    assert.deepEqual(result, [1, 'Alice']);
+  });
+
+  it('returns null when no records', async () => {
+    class EmptyModel extends PickModel {
+      static async _execute() { return { rows: [] }; }
+    }
+    const result = await new Relation(EmptyModel).pick('name');
+    assert.equal(result, null);
+  });
+
+  it('uses LIMIT 1', async () => {
+    await new Relation(PickModel).pick('name');
+    assert.ok(PickModel._lastQuery.sql.includes('LIMIT 1'));
+  });
+
+  it('is available as static method', async () => {
+    const result = await PickModel.pick('name');
+    assert.equal(result, 'Alice');
+  });
+});
+
+// --- sole() ---
+
+describe('sole()', () => {
+  it('returns the single record', async () => {
+    class SingleModel extends ActiveRecordSQL {
+      static tableName = 'items';
+      static get useNumberedParams() { return false; }
+      static async _execute() { return { rows: [{ id: 1, name: 'Only' }] }; }
+      static _getRows(result) { return result.rows; }
+      static _getLastInsertId() { return 1; }
+      constructor(attrs) { super(attrs); Object.assign(this, attrs); }
+    }
+
+    const item = await new Relation(SingleModel).sole();
+    assert.equal(item.name, 'Only');
+  });
+
+  it('throws when no records', async () => {
+    class EmptyModel extends ActiveRecordSQL {
+      static tableName = 'items';
+      static name = 'EmptyModel';
+      static get useNumberedParams() { return false; }
+      static async _execute() { return { rows: [] }; }
+      static _getRows(result) { return result.rows; }
+      static _getLastInsertId() { return 1; }
+    }
+
+    await assert.rejects(
+      async () => await new Relation(EmptyModel).sole(),
+      /no records found/
+    );
+  });
+
+  it('throws when multiple records', async () => {
+    class MultiModel extends ActiveRecordSQL {
+      static tableName = 'items';
+      static name = 'MultiModel';
+      static get useNumberedParams() { return false; }
+      static async _execute() { return { rows: [{ id: 1 }, { id: 2 }] }; }
+      static _getRows(result) { return result.rows; }
+      static _getLastInsertId() { return 1; }
+      constructor(attrs) { super(attrs); Object.assign(this, attrs); }
+    }
+
+    await assert.rejects(
+      async () => await new Relation(MultiModel).sole(),
+      /more than one record found/
+    );
+  });
+
+  it('is available as static method', async () => {
+    class SoleModel extends ActiveRecordSQL {
+      static tableName = 'items';
+      static get useNumberedParams() { return false; }
+      static async _execute() { return { rows: [{ id: 1 }] }; }
+      static _getRows(result) { return result.rows; }
+      static _getLastInsertId() { return 1; }
+      constructor(attrs) { super(attrs); Object.assign(this, attrs); }
+    }
+
+    const item = await SoleModel.sole();
+    assert.equal(item.id, 1);
+  });
+});
+
+// --- findByBang / find_by! ---
+
+describe('findByBang (find_by!)', () => {
+  class FindModel extends ActiveRecordSQL {
+    static tableName = 'items';
+    static name = 'FindModel';
+    static get useNumberedParams() { return false; }
+    static async _execute(sql) {
+      if (sql.includes('name')) {
+        return { rows: [{ id: 1, name: 'Found' }] };
+      }
+      return { rows: [] };
+    }
+    static _getRows(result) { return result.rows; }
+    static _getLastInsertId() { return 1; }
+    constructor(attrs) { super(attrs); Object.assign(this, attrs); }
+  }
+
+  it('returns record when found', async () => {
+    const item = await new Relation(FindModel).findByBang({ name: 'Found' });
+    assert.equal(item.name, 'Found');
+  });
+
+  it('throws when not found', async () => {
+    class EmptyFindModel extends ActiveRecordSQL {
+      static tableName = 'items';
+      static name = 'EmptyFindModel';
+      static get useNumberedParams() { return false; }
+      static async _execute() { return { rows: [] }; }
+      static _getRows(result) { return result.rows; }
+      static _getLastInsertId() { return 1; }
+    }
+    await assert.rejects(
+      async () => await new Relation(EmptyFindModel).findByBang({ name: 'missing' }),
+      /EmptyFindModel not found/
+    );
+  });
+
+  it('has snake_case alias', async () => {
+    const item = await new Relation(FindModel).find_by_bang({ name: 'Found' });
+    assert.equal(item.name, 'Found');
+  });
+
+  it('is available as static method', async () => {
+    const item = await FindModel.findByBang({ name: 'Found' });
+    assert.equal(item.name, 'Found');
+  });
+});
+
+// --- destroyBy ---
+
+describe('destroyBy', () => {
+  let destroyedIds = [];
+
+  class DestroyModel extends ActiveRecordSQL {
+    static tableName = 'items';
+    static get useNumberedParams() { return false; }
+    static async _execute() { return { rows: [{ id: 1 }, { id: 2 }] }; }
+    static _getRows(result) { return result.rows; }
+    static _getLastInsertId() { return 1; }
+
+    constructor(attrs) {
+      super(attrs);
+      Object.assign(this, attrs);
+      this._persisted = true;
+    }
+
+    async destroy() {
+      destroyedIds.push(this.id);
+      return true;
+    }
+  }
+
+  beforeEach(() => {
+    destroyedIds = [];
+  });
+
+  it('finds and destroys matching records', async () => {
+    const records = await new Relation(DestroyModel).destroyBy({ status: 'old' });
+    assert.equal(records.length, 2);
+    assert.deepEqual(destroyedIds, [1, 2]);
+  });
+
+  it('has snake_case alias', async () => {
+    await new Relation(DestroyModel).destroy_by({ status: 'old' });
+    assert.deepEqual(destroyedIds, [1, 2]);
+  });
+
+  it('is available as static method', async () => {
+    await DestroyModel.destroyBy({ status: 'old' });
+    assert.deepEqual(destroyedIds, [1, 2]);
+  });
+});

@@ -23,6 +23,7 @@ export class Relation {
     this._includes = [];
     this._joins = [];      // INNER JOIN associations
     this._missing = [];    // LEFT JOIN ... WHERE id IS NULL (where().missing())
+    this._group = null;    // GROUP BY column(s)
   }
 
   // --- Chainable methods (return new Relation) ---
@@ -87,9 +88,17 @@ export class Relation {
   }
 
   // INNER JOIN on an association: Card.joins("closure")
+  // Supports nested: Card.joins({entry: [:lead, :follow]})
   joins(...associations) {
     const rel = this._clone();
     rel._joins = [...rel._joins, ...associations];
+    return rel;
+  }
+
+  // GROUP BY column(s): User.group('status').count() → {active: 5, inactive: 2}
+  group(...columns) {
+    const rel = this._clone();
+    rel._group = columns.length === 1 ? columns[0] : columns;
     return rel;
   }
 
@@ -138,7 +147,18 @@ export class Relation {
   }
 
   async count() {
+    if (this._group) {
+      return this.model._executeGroupCount(this);
+    }
     return this.model._executeCount(this);
+  }
+
+  // Aggregate: sum of a column. When grouped, returns {key: sum}.
+  async sum(col) {
+    if (this._group) {
+      return this.model._executeGroupAggregate(this, 'SUM', col);
+    }
+    return this.model._executeAggregate(this, 'SUM', col);
   }
 
   // Check if any records exist: User.where({admin: true}).exists()
@@ -146,9 +166,33 @@ export class Relation {
     return this.model._executeExists(this);
   }
 
+  // Alias for exists: User.where({admin: true}).any()
+  async any() {
+    return this.exists();
+  }
+
   // Return values instead of models: User.pluck('name') or User.pluck('id', 'name')
   async pluck(...columns) {
     return this.model._executePluck(this, columns);
+  }
+
+  // Return a single value: User.where({admin: true}).pick('name') → 'Alice'
+  async pick(...columns) {
+    const results = await this.model._executePluck(this.limit(1), columns);
+    if (results.length === 0) return null;
+    return results[0];
+  }
+
+  // Return exactly one record; raises if zero or more than one
+  async sole() {
+    const results = await this.limit(2).toArray();
+    if (results.length === 0) {
+      throw new Error(`${this.model.name}: no records found`);
+    }
+    if (results.length > 1) {
+      throw new Error(`${this.model.name}: more than one record found`);
+    }
+    return results[0];
   }
 
   async toArray() {
@@ -163,6 +207,12 @@ export class Relation {
   // Aggregate: minimum value of a column
   async minimum(col) {
     return this.model._executeAggregate(this, 'MIN', col);
+  }
+
+  // Update all matching records (direct SQL, no callbacks)
+  // Usage: User.where({role: 'guest'}).updateAll({status: 'inactive'})
+  async updateAll(attrs) {
+    return this.model._executeUpdateAll(this, attrs);
   }
 
   // Destroy all matching records (loads each, calls destroy for callbacks)
@@ -191,10 +241,31 @@ export class Relation {
     return this.model.create(createAttrs);
   }
 
+  // Find by conditions, throw if not found (Rails find_by!)
+  async findByBang(conditions) {
+    const result = await this.findBy(conditions);
+    if (!result) {
+      throw new Error(`${this.model.name} not found`);
+    }
+    return result;
+  }
+
+  // Find and destroy records matching conditions
+  async destroyBy(conditions) {
+    const records = await this.where(conditions).toArray();
+    for (const record of records) {
+      await record.destroy();
+    }
+    return records;
+  }
+
   // Snake case aliases
+  update_all(attrs) { return this.updateAll(attrs); }
   destroy_all() { return this.destroyAll(); }
   delete_all() { return this.deleteAll(); }
   find_or_create_by(attrs) { return this.findOrCreateBy(attrs); }
+  find_by_bang(conditions) { return this.findByBang(conditions); }
+  destroy_by(conditions) { return this.destroyBy(conditions); }
 
   // Alias for Rails compatibility: Article.includes(:comments).all
   all() {
@@ -260,6 +331,7 @@ export class Relation {
     rel._includes = [...this._includes];
     rel._joins = [...this._joins];
     rel._missing = [...this._missing];
+    rel._group = this._group;
     return rel;
   }
 

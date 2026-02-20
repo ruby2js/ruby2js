@@ -331,7 +331,26 @@ module Ruby2JS
         def on_send(node)
           target, method, *args = node.children
 
-          # Only handle when processing a model
+          # --- AR method renames (run regardless of model context) ---
+
+          # any? on AR chains: rename to :any so functions filter doesn't
+          # convert to .length > 0 (which breaks on Relation objects).
+          # Use :send! to force parens (.any() not .any property access).
+          if method == :any? && args.empty? && target&.type == :send
+            chain_start = target
+            chain_start = chain_start.children[0] while chain_start&.type == :send
+            if chain_start&.type == :const
+              return process s(:send!, target, :any)
+            end
+          end
+
+          # find_by! → findByBang: preserve "raise on not found" semantics.
+          # The converter strips ! from method names, losing the distinction.
+          if method == :find_by!
+            return process s(:send!, target, :findByBang, *args)
+          end
+
+          # Only handle remaining transforms when processing a model
           return super unless @rails_model
 
           # Only handle unqualified (implicit self) calls

@@ -1,6 +1,7 @@
 require 'minitest/autorun'
 require 'ruby2js/filter/rails/model'
 require 'ruby2js/filter/esm'
+require 'ruby2js/filter/functions'
 
 describe Ruby2JS::Filter::Rails::Model do
   def to_js(string, options = {})
@@ -642,6 +643,33 @@ describe Ruby2JS::Filter::Rails::Model do
         end
       RUBY
       refute_includes result, "import { Person }"
+    end
+  end
+
+  describe "any? on AR chains" do
+    it "converts any? to .any() method call on AR chains" do
+      result = to_js('Article.where(status: "published").any?')
+      assert_includes result, '.any()'
+      refute_includes result, '.length > 0'
+    end
+
+    it "preserves any? as .length > 0 on non-AR chains" do
+      result = to_js('[1, 2, 3].any?',
+        filters: [Ruby2JS::Filter::Rails::Model, Ruby2JS::Filter::Functions])
+      assert_includes result, '.length > 0'
+    end
+  end
+
+  describe "find_by!" do
+    it "converts find_by! to findByBang" do
+      result = to_js('Article.find_by!(slug: "hello")')
+      assert_includes result, 'findByBang'
+      refute_includes result, 'find_by('
+    end
+
+    it "passes arguments through to findByBang" do
+      result = to_js('Article.find_by!(title: "test", status: "published")')
+      assert_includes result, 'findByBang({title: "test", status: "published"})'
     end
   end
 end

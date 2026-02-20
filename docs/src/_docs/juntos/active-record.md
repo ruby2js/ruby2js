@@ -59,6 +59,22 @@ article = Article.find_by(slug: "hello-world")
 article = Article.find_by(status: "published", featured: true)
 ```
 
+### find_by!(conditions)
+
+Like `find_by`, but raises an error if no record is found:
+
+```ruby
+article = Article.find_by!(slug: "hello-world")  # Error if not found
+```
+
+### find_or_create_by(attributes)
+
+Finds the first record matching attributes, or creates one:
+
+```ruby
+tag = Tag.find_or_create_by(name: "ruby")
+```
+
 ### all
 
 Returns all records:
@@ -184,6 +200,40 @@ articles.each do |article|
 end
 ```
 
+### joins(associations)
+
+Performs INNER JOINs on associations:
+
+```ruby
+# Simple join
+Article.joins(:comments).where(comments: { approved: true })
+
+# Nested joins
+Studio.joins(entries: [:lead, :follow])
+```
+
+### group(columns)
+
+Groups results for aggregate queries:
+
+```ruby
+# Count by group
+Article.group(:status).count
+# => { "published" => 42, "draft" => 18 }
+
+# Sum by group
+Order.group(:status).sum(:amount)
+# => { "completed" => 1500, "pending" => 300 }
+```
+
+### missing(associations)
+
+Finds records missing an associated record (LEFT JOIN ... WHERE IS NULL):
+
+```ruby
+Article.where.missing(:comments)  # Articles with no comments
+```
+
 ## Terminal Methods
 
 These methods execute the query and return results:
@@ -198,6 +248,31 @@ Article.pluck(:id, :title)                   # [[1, "First"], [2, "Second"]]
 Article.where(status: "published").pluck(:title)
 ```
 
+### pick(columns)
+
+Returns a single value (or array) from the first matching record:
+
+```ruby
+Article.where(featured: true).pick(:title)   # "Hello World"
+Article.pick(:id, :title)                    # [1, "Hello World"]
+```
+
+### sole
+
+Returns exactly one record. Raises if zero or more than one found:
+
+```ruby
+admin = User.where(role: "admin").sole  # Error if 0 or 2+ admins
+```
+
+### any?
+
+Returns `true` if any matching records exist (alias for `exists?`):
+
+```ruby
+Article.where(status: "published").any?
+```
+
 ### to_a
 
 Executes the query and returns an array of records:
@@ -205,6 +280,65 @@ Executes the query and returns an array of records:
 ```ruby
 articles = Article.where(status: "published").to_a
 ```
+
+## Bulk Operations
+
+### update_all(attributes)
+
+Updates all matching records directly with SQL (no callbacks):
+
+```ruby
+Article.where(status: "draft").update_all(status: "archived")
+User.update_all(active: false)
+```
+
+### delete_all
+
+Deletes all matching records directly with SQL (no callbacks):
+
+```ruby
+Article.where(status: "archived").delete_all
+```
+
+### destroy_all
+
+Loads each matching record and calls `destroy` (runs callbacks):
+
+```ruby
+Article.where(status: "archived").destroy_all
+```
+
+### destroy_by(conditions)
+
+Finds and destroys records matching conditions:
+
+```ruby
+Article.destroy_by(status: "spam")
+```
+
+## Transactions
+
+Wrap multiple operations in a database transaction:
+
+```ruby
+Article.transaction do
+  article.update!(status: "published")
+  Notification.create!(message: "New article!")
+  # If either fails, both are rolled back
+end
+```
+
+Raise `ActiveRecord::Rollback` to abort silently:
+
+```ruby
+Article.transaction do
+  article.update!(status: "published")
+  raise ActiveRecord::Rollback if some_condition?
+  # Transaction is rolled back, no error raised
+end
+```
+
+Transactions use real `BEGIN`/`COMMIT`/`ROLLBACK` SQL on all SQL adapters.
 
 ## Raw SQL Conditions
 
@@ -219,6 +353,15 @@ Article.where("created_at BETWEEN ? AND ?", start_date, end_date)
 
 # LIKE queries
 Article.where("title LIKE ?", "%Ruby%")
+```
+
+### WHERE on Joined Tables
+
+When using `joins`, reference columns on joined tables with a nested hash:
+
+```ruby
+Article.joins(:comments).where(comments: { approved: true })
+Card.joins(:studio).where(studios: { id: studio_id, active: true })
 ```
 
 **Note:** For Dexie (IndexedDB), simple conditions (`>`, `<`, `>=`, `<=`, `=`) are translated to Dexie's query API. Complex conditions fall back to JavaScript filtering after fetching.
@@ -297,6 +440,15 @@ CollectionProxy supports chainable queries:
 article.comments.where(approved: true)
 article.comments.order(created_at: :desc).limit(5)
 article.comments.where(approved: true).count
+```
+
+### Bulk operations
+
+```ruby
+article.comments.update_all(approved: true)
+article.comments.delete_all
+article.comments.destroy_all
+article.comments.find_or_create_by(body: "Welcome!")
 ```
 
 ## Instance Methods
@@ -441,11 +593,10 @@ Juntos implements the most commonly used Active Record features. The following a
 
 ### Query Methods
 
-- `joins` — Use `includes` for eager loading instead
-- `group` / `having` — Aggregate queries
+- `having` — Filter on aggregate results
 - `eager_load` / `preload` — Use `includes`
 - `reorder` / `unscope` — Query modification
-- `lock` — Row locking
+- `find_each` / `find_in_batches` — Batch processing
 
 ### Advanced Features
 
@@ -453,7 +604,7 @@ Juntos implements the most commonly used Active Record features. The following a
 - Subqueries
 - CTEs (Common Table Expressions)
 - Window functions
-- `find_each` / `find_in_batches` — Batch processing
+- Scopes (named query shortcuts)
 
 ### Associations
 

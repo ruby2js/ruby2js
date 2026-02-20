@@ -336,9 +336,12 @@ export class ActiveRecordBase {
     return callback ? await callback() : undefined;
   }
 
-  // Transaction wrapper — executes callback and returns result.
-  // For single-connection in-memory SQLite this is a simple pass-through.
+  // Transaction wrapper — delegates to class-level transaction if available,
+  // otherwise a simple pass-through for in-memory adapters.
   async transaction(callback) {
+    if (typeof this.constructor.transaction === 'function') {
+      return this.constructor.transaction(() => callback.call(this));
+    }
     return await callback.call(this);
   }
 
