@@ -56,7 +56,8 @@ class NotesController < ApplicationController
   before_action :set_note, only: [:show, :edit, :update, :destroy]
 
   def index
-    @notes = Note.order(updated_at: :desc)
+    @notes = Note.recent
+    @notes = @notes.search(params[:q]) if params[:q].present?
 
     respond_to do |format|
       format.html
@@ -289,7 +290,7 @@ def NotesApp()
   selectedNote = notes.find { |n| n.id == selectedId }
 
   handleCreate = -> {
-    notes_path.post(note: { title: "Untitled", body: "" }).json do |note|
+    notes_path.post(note: { title: "Untitled", body: "..." }).json do |note|
       setNotes([note, *notes])
       setSelectedId(note.id)
     end
@@ -389,7 +390,7 @@ import [note_path, notes_path], from: 'config/routes.rb'
 
 # Show component for a single note
 export default def Show(note:)
-  handleBack = -> { window.location.href = notes_path }
+  handleBack = -> { window.location.href = notes_path() }
 
   %x{
     <div className="max-w-2xl mx-auto p-6">
