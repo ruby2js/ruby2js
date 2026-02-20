@@ -1494,16 +1494,33 @@ module Ruby2JS
           block_body = block_body.children.first if block_body&.type == :return
 
           arg_name = args.children.first.children.first
-          key_a = replace_lvar(block_body, arg_name, :a)
-          key_b = replace_lvar(block_body, arg_name, :b)
 
-          # Build: a, b => key(a) >= key(b) ? a : b
-          comparison = s(:if, s(:send, key_a, :>=, key_b), s(:lvar, :a), s(:lvar, :b))
+          if block_body&.type == :begin
+            # Multi-statement block: use temp variables to avoid
+            # inlining statements into expression position
+            prefix = block_body.children[0..-2]
+            key_expr = block_body.children.last
+            prefix_a = prefix.map { |stmt| replace_lvar(stmt, arg_name, :a) }
+            key_expr_a = replace_lvar(key_expr, arg_name, :a)
+            prefix_b = prefix.map { |stmt| replace_lvar(stmt, arg_name, :b) }
+            key_expr_b = replace_lvar(key_expr, arg_name, :b)
+            comparison = s(:if,
+              s(:send, s(:lvar, :_ka), :>=, s(:lvar, :_kb)),
+              s(:lvar, :a), s(:lvar, :b))
+            body = s(:begin,
+              *prefix_a, s(:lvasgn, :_ka, key_expr_a),
+              *prefix_b, s(:lvasgn, :_kb, key_expr_b),
+              comparison)
+          else
+            key_a = replace_lvar(block_body, arg_name, :a)
+            key_b = replace_lvar(block_body, arg_name, :b)
+            body = s(:if, s(:send, key_a, :>=, key_b), s(:lvar, :a), s(:lvar, :b))
+          end
 
           reduce_block = s(:block,
             s(:send, nil, :proc),
             s(:args, s(:arg, :a), s(:arg, :b)),
-            s(:autoreturn, comparison))
+            s(:autoreturn, body))
 
           process s(:send, target, :reduce, reduce_block)
 
@@ -1517,16 +1534,33 @@ module Ruby2JS
           block_body = block_body.children.first if block_body&.type == :return
 
           arg_name = args.children.first.children.first
-          key_a = replace_lvar(block_body, arg_name, :a)
-          key_b = replace_lvar(block_body, arg_name, :b)
 
-          # Build: a, b => key(a) <= key(b) ? a : b
-          comparison = s(:if, s(:send, key_a, :<=, key_b), s(:lvar, :a), s(:lvar, :b))
+          if block_body&.type == :begin
+            # Multi-statement block: use temp variables to avoid
+            # inlining statements into expression position
+            prefix = block_body.children[0..-2]
+            key_expr = block_body.children.last
+            prefix_a = prefix.map { |stmt| replace_lvar(stmt, arg_name, :a) }
+            key_expr_a = replace_lvar(key_expr, arg_name, :a)
+            prefix_b = prefix.map { |stmt| replace_lvar(stmt, arg_name, :b) }
+            key_expr_b = replace_lvar(key_expr, arg_name, :b)
+            comparison = s(:if,
+              s(:send, s(:lvar, :_ka), :<=, s(:lvar, :_kb)),
+              s(:lvar, :a), s(:lvar, :b))
+            body = s(:begin,
+              *prefix_a, s(:lvasgn, :_ka, key_expr_a),
+              *prefix_b, s(:lvasgn, :_kb, key_expr_b),
+              comparison)
+          else
+            key_a = replace_lvar(block_body, arg_name, :a)
+            key_b = replace_lvar(block_body, arg_name, :b)
+            body = s(:if, s(:send, key_a, :<=, key_b), s(:lvar, :a), s(:lvar, :b))
+          end
 
           reduce_block = s(:block,
             s(:send, nil, :proc),
             s(:args, s(:arg, :a), s(:arg, :b)),
-            s(:autoreturn, comparison))
+            s(:autoreturn, body))
 
           process s(:send, target, :reduce, reduce_block)
 

@@ -1097,6 +1097,24 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'items.reduce((a, b) => a.price * a.qty <= b.price * b.qty ? a : b)'
     end
 
+    it "should handle min_by with multi-statement block" do
+      result = to_js( "items.min_by do |x|\n  score = weights[x]\n  penalty = x.count * 10\n  score + penalty\nend" )
+      result.must_include 'let _ka = score + penalty'
+      result.must_include 'let _kb = score + penalty'
+      result.must_include 'return _ka <= _kb ? a : b'
+      result.must_include 'weights[a]'
+      result.must_include 'weights[b]'
+    end
+
+    it "should handle max_by with multi-statement block" do
+      result = to_js( "items.max_by do |x|\n  score = weights[x]\n  penalty = x.count * 10\n  score + penalty\nend" )
+      result.must_include 'let _ka = score + penalty'
+      result.must_include 'let _kb = score + penalty'
+      result.must_include 'return _ka >= _kb ? a : b'
+      result.must_include 'weights[a]'
+      result.must_include 'weights[b]'
+    end
+
     it "should handle sort_by with nested destructuring" do
       to_js( 'scores.sort_by { |(pid, cid), _| cid }' ).
         must_include '[[pid_a, cid_a], __a]'
