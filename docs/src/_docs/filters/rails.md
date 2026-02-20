@@ -727,11 +727,15 @@ Both `form_for` and `form_with` accept `class:` and `data:` options:
 | `f.file_field :avatar`         | `<input type="file" name="model[avatar]" ...>`                                       |
 | `f.label :name`                | `<label for="model_name">Name</label>`                                               |
 | `f.select :category`           | `<select name="model[category]" ...></select>`                                       |
+| `f.collection_select :person`  | `<select name="model[person]" ...></select>`                                         |
+| `f.rich_text_area :body`       | `<textarea name="model[body]" ...>${model.body ?? ''}</textarea>`                    |
 | `f.submit "Save"`              | `<input type="submit" value="Save">`                                                 |
 | `f.button "Click"`             | `<button type="submit">Click</button>`                                               |
 | `f.fields_for :items`          | Loop over nested association with nested form builder                                |
 
 Additional input types: `number_field`, `tel_field`, `url_field`, `search_field`, `date_field`, `time_field`, `datetime_local_field`, `month_field`, `week_field`, `color_field`, `range_field`.
+
+Field names accept both symbols and strings: `f.text_field :name` and `f.text_field "name"` produce the same output. Labels also support dynamic expressions: `f.label(@event.open? ? :open : :closed)` generates a `<label>` with the evaluated expression as content.
 
 **HTML attributes on form fields:**
 

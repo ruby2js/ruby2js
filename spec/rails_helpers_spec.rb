@@ -715,6 +715,109 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include '<video src="'
       result.must_include 'controls'
     end
+
+    it "should handle image_tag with variable argument" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= image_tag @logo, class: "hero" %>')
+      result.must_include '<img src="'
+      result.must_include 'class="hero"'
+      result.wont_include '${}'
+    end
+
+    it "should handle image_tag with ternary expression" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= image_tag @locked ? "lock.svg" : "unlock.svg", height: "60" %>')
+      result.must_include '<img src="'
+      result.must_include 'height="60"'
+      result.wont_include '${}'
+    end
+  end
+
+  describe 'form builder with string arguments' do
+    it "should handle label with string argument" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @entry) do |form| %><%= form.label "pair" %><% end %>')
+      result.must_include '<label'
+      result.must_include 'Pair</label>'
+      result.wont_include '${}'
+    end
+
+    it "should handle label with dynamic expression" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @event) do |form| %><%= form.label @event.open? ? :open_scoring : :closed_scoring %><% end %>')
+      result.must_include '<label>'
+      result.must_include '</label>'
+      result.wont_include '${}'
+    end
+
+    it "should handle select with string argument" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @entry) do |form| %><%= form.select "pair" %><% end %>')
+      result.must_include '<select'
+      result.must_include 'entry[pair]'
+      result.wont_include '${}'
+    end
+
+    it "should handle text_field with string argument" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @entry) do |form| %><%= form.text_field "name", class: "input" %><% end %>')
+      result.must_include 'type="text"'
+      result.must_include 'entry[name]'
+      result.must_include 'class="input"'
+      result.wont_include '${}'
+    end
+
+    it "should handle text_area with string argument" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @entry) do |form| %><%= form.text_area "body" %><% end %>')
+      result.must_include '<textarea'
+      result.must_include 'entry[body]'
+      result.wont_include '${}'
+    end
+
+    it "should handle file_field with string argument" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @entry) do |form| %><%= form.file_field "attachment" %><% end %>')
+      result.must_include 'type="file"'
+      result.must_include 'entry[attachment]'
+      result.wont_include '${}'
+    end
+  end
+
+  describe 'rich_text_area and collection_select' do
+    it "should handle rich_text_area with symbol argument" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @post) do |form| %><%= form.rich_text_area :body %><% end %>')
+      result.must_include '<textarea'
+      result.must_include 'post[body]'
+      result.must_include '</textarea>'
+      result.wont_include '${}'
+    end
+
+    it "should handle rich_text_area with string argument" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @post) do |form| %><%= form.rich_text_area "body" %><% end %>')
+      result.must_include '<textarea'
+      result.must_include 'post[body]'
+      result.wont_include '${}'
+    end
+
+    it "should handle collection_select with symbol argument" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @task) do |form| %><%= form.collection_select :person_id %><% end %>')
+      result.must_include '<select'
+      result.must_include 'task[person_id]'
+      result.must_include '</select>'
+      result.wont_include '${}'
+    end
+
+    it "should handle collection_select with string argument" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @task) do |form| %><%= form.collection_select "person_id" %><% end %>')
+      result.must_include '<select'
+      result.must_include 'task[person_id]'
+      result.wont_include '${}'
+    end
   end
 
   describe 'layout mode' do

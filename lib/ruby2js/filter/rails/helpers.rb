@@ -1477,14 +1477,54 @@ module Ruby2JS
         #   -> import _asset_logo_png from '../../assets/images/logo.png';
         #   -> `<img src="${_asset_logo_png}" alt="Logo">`
         #
+        # Extract HTML attributes from remaining args (hash argument)
+        # Returns a formatted attribute string like ' class="foo" id="bar"'
+        def extract_tag_attrs(args)
+          attrs = []
+          if args[1]&.type == :hash
+            args[1].children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              if key.type == :sym && value.type == :str
+                attrs << [key.children[0], value.children[0]]
+              elsif key.type == :sym && value.type == :true
+                attrs << [key.children[0], true]
+              elsif key.type == :sym && value.type == :false
+                attrs << [key.children[0], false]
+              end
+            end
+          end
+
+          attr_str = attrs.map { |k, v|
+            v == true ? k.to_s : "#{k}=\"#{v}\""
+          }.join(' ')
+          attr_str.empty? ? '' : " #{attr_str}"
+        end
+
         # asset_path "file.pdf"
         #   -> import _asset_file_pdf from '../../assets/file.pdf';
         #   -> _asset_file_pdf
         def process_asset_tag(tag_type, args)
           first_arg = args[0]
 
-          # Only handle string literals for now
-          return nil unless first_arg&.type == :str
+          unless first_arg&.type == :str
+            # Non-string argument: generate HTML tag with dynamic src expression
+            processed_src = process(first_arg)
+            attr_part = extract_tag_attrs(args)
+
+            return case tag_type
+            when :image_tag
+              s(:dstr, s(:str, '<img src="'), s(:begin, processed_src), s(:str, "\"#{attr_part}>"))
+            when :asset_path, :image_path
+              processed_src
+            when :video_tag
+              s(:dstr, s(:str, '<video src="'), s(:begin, processed_src), s(:str, "\"#{attr_part}></video>"))
+            when :audio_tag
+              s(:dstr, s(:str, '<audio src="'), s(:begin, processed_src), s(:str, "\"#{attr_part}></audio>"))
+            when :favicon_link_tag
+              s(:dstr, s(:str, '<link rel="icon" href="'), s(:begin, processed_src), s(:str, "\"#{attr_part}>"))
+            end
+          end
 
           asset_path = first_arg.children[0]
 
@@ -1512,22 +1552,7 @@ module Ruby2JS
           # Track this asset for import generation
           @erb_asset_imports << { var_name: var_name, import_path: import_path }
 
-          # Extract HTML attributes from remaining args (hash argument)
-          # Use array of pairs for JS compatibility (Object.map doesn't exist)
-          attrs = []
-          if args[1]&.type == :hash
-            args[1].children.each do |pair|
-              key = pair.children[0]
-              value = pair.children[1]
-              if key.type == :sym && value.type == :str
-                attrs << [key.children[0], value.children[0]]
-              elsif key.type == :sym && value.type == :true
-                attrs << [key.children[0], true]
-              elsif key.type == :sym && value.type == :false
-                attrs << [key.children[0], false]
-              end
-            end
-          end
+          attr_part = extract_tag_attrs(args)
 
           # Generate the appropriate output based on tag type
           case tag_type
@@ -1537,10 +1562,6 @@ module Ruby2JS
 
           when :image_tag
             # Generate: `<img src="${var_name}" alt="..." ...>`
-            attr_str = attrs.map { |k, v|
-              v == true ? k.to_s : "#{k}=\"#{v}\""
-            }.join(' ')
-            attr_part = attr_str.empty? ? '' : " #{attr_str}"
             s(:dstr,
               s(:str, '<img src="'),
               s(:begin, s(:lvar, var_name.to_sym)),
@@ -1548,10 +1569,6 @@ module Ruby2JS
 
           when :video_tag
             # Generate: `<video src="${var_name}" ...></video>`
-            attr_str = attrs.map { |k, v|
-              v == true ? k.to_s : "#{k}=\"#{v}\""
-            }.join(' ')
-            attr_part = attr_str.empty? ? '' : " #{attr_str}"
             s(:dstr,
               s(:str, '<video src="'),
               s(:begin, s(:lvar, var_name.to_sym)),
@@ -1559,10 +1576,6 @@ module Ruby2JS
 
           when :audio_tag
             # Generate: `<audio src="${var_name}" ...></audio>`
-            attr_str = attrs.map { |k, v|
-              v == true ? k.to_s : "#{k}=\"#{v}\""
-            }.join(' ')
-            attr_part = attr_str.empty? ? '' : " #{attr_str}"
             s(:dstr,
               s(:str, '<audio src="'),
               s(:begin, s(:lvar, var_name.to_sym)),
@@ -1911,7 +1924,7 @@ module Ruby2JS
                :date_field, :time_field, :datetime_field, :datetime_local_field,
                :month_field, :week_field, :color_field, :range_field
             field_name = args.first
-            if field_name&.type == :sym
+            if field_name&.type == :sym || field_name&.type == :str
               name = field_name.children.first.to_s
               input_type = method.to_s.sub(/_field$/, '')
               input_type = 'text' if input_type == 'text'
@@ -1948,7 +1961,7 @@ module Ruby2JS
 
           when :text_area, :textarea
             field_name = args.first
-            if field_name&.type == :sym
+            if field_name&.type == :sym || field_name&.type == :str
               name = field_name.children.first.to_s
 
               # Check for conditional classes
@@ -2037,7 +2050,7 @@ module Ruby2JS
 
           when :label
             field_name = args.first
-            if field_name&.type == :sym
+            if field_name&.type == :sym || field_name&.type == :str
               name = field_name.children.first.to_s
               # Inline capitalize for JS compatibility (see inflector.rb)
               label_text = name.gsub('_', ' ')
@@ -2045,13 +2058,18 @@ module Ruby2JS
               extra_attrs = build_field_attrs(options)
               html = %(<label for="#{model}_#{name}"#{extra_attrs}>#{label_text}</label>)
               s(:str, html)
-            else
-              nil
+            elsif field_name
+              # Dynamic label - generate <label> with expression as text
+              extra_attrs = build_field_attrs(options)
+              s(:dstr,
+                s(:str, "<label#{extra_attrs}>"),
+                s(:begin, process(field_name)),
+                s(:str, '</label>'))
             end
 
           when :select
             field_name = args.first
-            if field_name&.type == :sym
+            if field_name&.type == :sym || field_name&.type == :str
               name = field_name.children.first.to_s
               extra_attrs = build_field_attrs(options)
               html = %(<select name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs}></select>)
@@ -2097,10 +2115,35 @@ module Ruby2JS
           when :file_field
             # File inputs cannot have value pre-filled (browser security)
             field_name = args.first
-            if field_name&.type == :sym
+            if field_name&.type == :sym || field_name&.type == :str
               name = field_name.children.first.to_s
               extra_attrs = build_field_attrs(options)
               html = %(<input type="file" name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs}>)
+              s(:str, html)
+            else
+              nil
+            end
+
+          when :rich_text_area
+            field_name = args.first
+            if field_name&.type == :sym || field_name&.type == :str
+              name = field_name.children.first.to_s
+              extra_attrs = build_field_attrs(options)
+              value_expr = model_is_new ? s(:str, '') : s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))
+              s(:dstr,
+                s(:str, %(<textarea name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs}>)),
+                s(:begin, value_expr),
+                s(:str, '</textarea>'))
+            else
+              nil
+            end
+
+          when :collection_select
+            field_name = args.first
+            if field_name&.type == :sym || field_name&.type == :str
+              name = field_name.children.first.to_s
+              extra_attrs = build_field_attrs(options)
+              html = %(<select name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs}></select>)
               s(:str, html)
             else
               nil
