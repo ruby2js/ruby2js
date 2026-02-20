@@ -230,17 +230,15 @@ class DesktopController < Stimulus::Controller
 end
 ```
 
-**2. Build pipeline: Vite vs Bun bundler**
+**2. Build pipeline: Vite + Bun**
 
-Electrobun uses Bun's bundler and its own CLI (`bunx electrobun init`, `bun start`), not Vite. Options:
+[Vite works out of the box with Bun](https://bun.com/docs/guides/ecosystem/vite) — just use `bunx --bun vite` instead of `npx vite`. This means the existing Juntos Vite pipeline works unchanged. The build flow:
 
-- **Option A: Vite output → Electrobun input.** Use Vite to build the frontend as usual, then configure `electrobun.config.ts` to point at the Vite output. Electrobun's `url` option can load from `views://` which maps to bundled files. This keeps the existing Juntos Vite pipeline intact.
+1. `bunx --bun vite build` — Vite handles Ruby2JS transpilation and bundling (same as other targets)
+2. `electrobun.config.ts` points at the Vite output directory
+3. Electrobun's CLI packages it into the desktop app
 
-- **Option B: Replace Vite with Bun bundler.** Use Bun's built-in bundler for the Electrobun target. Simpler for Electrobun but diverges from all other Juntos targets.
-
-- **Option C: Generate electrobun.config.ts alongside Vite config.** `juntos build -t electrobun` generates both, letting Electrobun's CLI handle the final packaging while Vite handles the Ruby2JS transpilation.
-
-**Recommendation: Option A** (or C as refinement). Vite handles the Ruby-to-JS transpilation and bundling; Electrobun's config points at the Vite output directory. This minimizes changes to the existing build system.
+`juntos build -t electrobun` generates the `electrobun.config.ts` alongside the standard Vite config. No alternative bundler path is needed.
 
 **3. Asset URL scheme**
 
@@ -263,7 +261,7 @@ Without a global like `window.__TAURI__`, detection options:
 
 3. **RPC schema extensibility** — How do users add custom Bun-side commands? The runtime target needs a clean extension point (override `defineRPC()`).
 
-4. **Vite compatibility** — Needs verification that Vite-bundled output works correctly when loaded via Electrobun's `views://` scheme.
+4. **`views://` scheme** — Needs verification that Vite-bundled output works correctly when loaded via Electrobun's `views://` asset scheme. Vite itself runs fine on Bun (`bunx --bun vite`).
 
 5. **No `preload.js` equivalent** — Electron's preload script runs before page scripts and can set up APIs. Electrobun's `preload` option exists on `BrowserWindow` but works differently (runs after HTML parsing). Need to verify this is sufficient for the Juntos runtime initialization.
 
@@ -271,8 +269,8 @@ Without a global like `window.__TAURI__`, detection options:
 
 1. **Pragma + target arrays** — Mechanical, low risk, enables `# Pragma: electrobun` immediately
 2. **Runtime target** — `packages/juntos/targets/electrobun/rails.js` with the Electroview singleton pattern
-3. **Build config generation** — `electrobun.config.ts` template in `juntos build -t electrobun`
-4. **Vite integration** — Verify Vite output + `views://` scheme works, add Rollup externals
+3. **Build config generation** — `electrobun.config.ts` template in `juntos build -t electrobun` (Vite runs on Bun natively, so existing pipeline works)
+4. **Asset scheme** — Verify Vite output + `views://` scheme works, add Rollup externals
 5. **Documentation** — Deployment guide with prerequisites, build steps, Stimulus examples
 6. **Demo** — Port an existing demo (blog or notes) to Electrobun target
 
