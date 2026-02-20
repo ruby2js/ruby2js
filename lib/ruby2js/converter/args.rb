@@ -6,6 +6,20 @@ module Ruby2JS
    #   (restarg :b)
    #   (blockarg :c))
 
+    # Deduplicate underscore parameters for JS compatibility.
+    # Ruby allows multiple _ params; JS arrow functions forbid duplicate names.
+    # Renames second and subsequent _ to _$2, _$3, etc.
+    def dedup_underscores(node, count)
+      if node.type == :arg && node.children[0] == :_
+        count[0] += 1
+        count[0] > 1 ? s(:arg, :"_$#{count[0]}") : node
+      elsif node.type == :mlhs
+        s(:mlhs, *node.children.map { |c| dedup_underscores(c, count) })
+      else
+        node
+      end
+    end
+
     handle :args do |*args|
       kwargs = []
       while args.last and
@@ -20,6 +34,10 @@ module Ruby2JS
         args.push s(:arg, *kwargs.last.children)
         kwargs = []
       end
+
+      # Deduplicate _ params (Ruby allows multiple, JS doesn't)
+      count = [0]
+      args = args.map { |arg| dedup_underscores(arg, count) }
 
       parse_all(*args, join: ', ')
       if not kwargs.empty?

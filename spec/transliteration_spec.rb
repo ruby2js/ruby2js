@@ -1715,6 +1715,12 @@ describe Ruby2JS do
       to_js('def foo(x, **attrs); attrs; end').
         must_equal('function foo(x, attrs) {attrs}')
     end
+
+    it 'should deduplicate underscore parameters' do
+      # Ruby allows multiple _ params; JS arrow functions forbid duplicates
+      to_js('a.map { |_, _| 1 }').
+        must_equal('a.map((_, _$2) => 1)')
+    end
   end
 
   describe 'module extensions' do
