@@ -547,9 +547,9 @@ Linted 12 files: 0 errors, 2 warnings
 
 **Default vs strict ambiguous method warnings:**
 
-By default, the linter only warns about methods where the JavaScript fallthrough is **silently wrong** — operators like `<<` (bitwise shift instead of append), `+`/`-`/`&`/`|` on arrays (arithmetic instead of set operations), `dup` (no JS equivalent), `delete`/`clear`/`empty?` (wrong for certain types), and `include?` (wrong for Hash/Set).
+By default, the linter only warns about methods where the JavaScript fallthrough is **silently wrong** — operators like `<<` (bitwise shift instead of append), `+`/`-`/`&`/`|` on arrays (arithmetic instead of set operations), `dup` (no JS equivalent), and `delete`/`clear` (wrong for certain types).
 
-With `--strict`, additional warnings appear for methods where the default JavaScript is **usually correct** but could be wrong for less common types like `Map`, `Set`, or `Proc`: `[]`, `[]=`, `key?`, `merge`, `any?`, `replace`, `first`, `to_h`, `compact`, and `flatten`.
+With `--strict`, additional warnings appear for methods where the default JavaScript is **usually correct** but could be wrong for less common types: `include?`, `empty?`, `each`/`map`/`select`/`flat_map`/`each_with_index` (block iteration with 2+ args on unknown types), `[]`, `[]=`, `key?`, `merge`, `any?`, `replace`, `first`, `to_h`, `compact`, and `flatten`.
 
 ### Fixing ambiguous method warnings
 

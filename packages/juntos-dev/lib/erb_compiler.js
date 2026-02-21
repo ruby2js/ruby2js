@@ -80,9 +80,8 @@ export class ErbCompiler {
       let trim_trailing = tag.endsWith("-");
       if (trim_trailing) tag = tag.slice(0, -1);
 
-      // Check for ERB comment BEFORE trimming: <%# is a comment, <% # is code
+      // Check for ERB comment BEFORE stripping: <%# is a comment, <% # is code
       let is_erb_comment = tag.startsWith("#");
-
       tag = tag.trim();
       let is_output_expr = false;
 

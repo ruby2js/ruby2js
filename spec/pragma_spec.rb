@@ -1502,8 +1502,8 @@ describe Ruby2JS::Filter::Pragma do
       _(d[:valid_types]).must_include :string
     end
 
-    it "should report ambiguous include?" do
-      diags = lint('obj.include?(key)')
+    it "should report ambiguous include? in strict mode" do
+      diags = lint('obj.include?(key)', strict: true)
       d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'include?' }
       _(d).wont_be_nil
       _(d[:valid_types]).must_include :hash
@@ -1519,8 +1519,8 @@ describe Ruby2JS::Filter::Pragma do
       _(d[:valid_types]).must_include :string
     end
 
-    it "should report ambiguous empty?" do
-      diags = lint('obj.empty?')
+    it "should report ambiguous empty? in strict mode" do
+      diags = lint('obj.empty?', strict: true)
       d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'empty?' }
       _(d).wont_be_nil
       _(d[:valid_types]).must_include :hash
@@ -1565,8 +1565,8 @@ describe Ruby2JS::Filter::Pragma do
       _(d[:line]).must_equal 2
     end
 
-    it "should report ambiguous hash iteration with 2+ block args" do
-      diags = lint('obj.each { |k, v| puts k }')
+    it "should report ambiguous hash iteration with 2+ block args in strict mode" do
+      diags = lint('obj.each { |k, v| puts k }', strict: true)
       d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'each' }
       _(d).wont_be_nil
       _(d[:valid_types]).must_include :hash

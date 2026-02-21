@@ -805,7 +805,7 @@ module Ruby2JS
             # target.has(arg) - Set membership check
             return process s(:send, target, :has, args.first)
           else
-            record_ambiguous_diagnostic(node, method, [:hash, :set]) if target
+            record_ambiguous_diagnostic(node, method, [:hash, :set], strict: true) if target
           end
           # Note: array and string both use .includes() which functions filter handles
 
@@ -955,7 +955,7 @@ module Ruby2JS
             # target.size === 0 (JS Sets/Maps use .size not .length)
             return process s(:send, s(:attr, target, :size), :==, s(:int, 0))
           else
-            record_ambiguous_diagnostic(node, method, [:hash, :set, :map]) if target
+            record_ambiguous_diagnostic(node, method, [:hash, :set, :map], strict: true) if target
           end
           # Note: array and string use .length which functions filter handles
 
@@ -1332,7 +1332,7 @@ module Ruby2JS
              [:each, :each_pair, :map, :collect, :select, :flat_map, :each_with_index].include?(lint_method)
             lint_type = var_type(lint_target) || infer_type(lint_target)
             unless lint_type
-              record_ambiguous_diagnostic(node, lint_method, [:hash])
+              record_ambiguous_diagnostic(node, lint_method, [:hash], strict: true)
             end
           end
         end
