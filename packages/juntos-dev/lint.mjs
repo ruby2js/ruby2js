@@ -71,11 +71,18 @@ function walkNode(node, diagnostics, filePath) {
 
   switch (type) {
     case 'def': {
-      // method_missing is not transpilable
       const methodName = children[0];
+
+      // method_missing is not transpilable
       if (methodName === 'method_missing') {
         pushDiag(diagnostics, node, filePath, 'error', 'method_missing',
           "method_missing cannot be transpiled to JavaScript");
+      }
+
+      // Operator method definitions — JS has no operator overloading
+      if (/^(<=>|<<?|>>?|<=>|[+\-*\/%&|^~]=?|={2,3}|!={0,2}|\[\]=?|[<>]=?|\*\*)$/.test(methodName)) {
+        pushDiag(diagnostics, node, filePath, 'error', 'operator_method',
+          `operator method 'def ${methodName}' cannot be transpiled — JavaScript has no operator overloading`);
       }
       break;
     }

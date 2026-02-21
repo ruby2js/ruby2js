@@ -952,29 +952,29 @@ module Ruby2JS
             elsif parent == :NilClass
               # obj === null || obj === undefined
               S(:or,
-                s(:send, target, :===, s(:nil)),
-                s(:send, target, :===, s(:send, nil, :undefined)))
+                s(:send, process(target), :===, s(:nil)),
+                s(:send, process(target), :===, s(:send, nil, :undefined)))
             elsif parent == :TrueClass
               # obj === true
-              S(:send, target, :===, s(:true))
+              S(:send, process(target), :===, s(:true))
             elsif parent == :FalseClass
               # obj === false
-              S(:send, target, :===, s(:false))
+              S(:send, process(target), :===, s(:false))
             elsif parent == :Boolean
               # typeof obj === "boolean"
-              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "boolean"))
+              S(:send, s(:send, nil, :typeof, process(target)), :===, s(:str, "boolean"))
             elsif parent == :Proc || parent == :Function
               # typeof obj === "function"
-              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "function"))
+              S(:send, s(:send, nil, :typeof, process(target)), :===, s(:str, "function"))
             elsif parent == :Regexp
               # obj instanceof RegExp
-              S(:instanceof, target, s(:const, nil, :RegExp))
+              S(:instanceof, process(target), s(:const, nil, :RegExp))
             elsif parent == :Exception || parent == :Error
               # obj instanceof Error
-              S(:instanceof, target, s(:const, nil, :Error))
+              S(:instanceof, process(target), s(:const, nil, :Error))
             else
               # User-defined classes: obj instanceof ClassName
-              S(:instanceof, target, args[0])
+              S(:instanceof, process(target), args[0])
             end
           else
             super
