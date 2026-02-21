@@ -284,18 +284,31 @@ module Ruby2JS
             return process node.updated(nil, [name, actual_value])
           end
 
-          # Fall back to inference from value
+          # Infer type and hash value type from value
           inferred = infer_type(value)
-          @var_types[name] = inferred if inferred
-
-          # Track Hash.new value types
           vtype = infer_hash_value_type(value)
+
+          # Set proc types BEFORE super so recursive proc calls (proc[x])
+          # are recognized during RHS processing. Defer other types until
+          # AFTER super so the old variable type applies to the RHS
+          # (e.g. values = values.map {}.to_h — RHS values is still an array)
+          if inferred == :proc
+            @var_types[name] = inferred
+            inferred = nil
+          end
+        end
+
+        result = super
+
+        if inferred
+          @var_types[name] = inferred
           @var_value_types[name] = vtype if vtype
         end
-        super
+
+        result
       end
 
-      # Track instance variable types from assignments
+      # Track instance variable types from assignments (same pattern as on_lvasgn)
       def on_ivasgn(node)
         name, value = node.children
         if value
@@ -304,25 +317,31 @@ module Ruby2JS
           if t_let
             actual_value, type_sym = t_let
             @var_types[name] = type_sym
-            # Also store in class-scoped ivar_types if in initialize
             @ivar_types[name] = type_sym if @in_initialize
             # Replace T.let(value, Type) with just value
             return process node.updated(nil, [name, actual_value])
           end
 
-          # Fall back to inference from value
+          # Infer type and hash value type from value
           inferred = infer_type(value)
-          if inferred
-            @var_types[name] = inferred
-            # Also store in class-scoped ivar_types if in initialize
-            @ivar_types[name] = inferred if @in_initialize
-          end
-
-          # Track Hash.new value types
           vtype = infer_hash_value_type(value)
+
+          if inferred == :proc
+            @var_types[name] = inferred
+            @ivar_types[name] = inferred if @in_initialize
+            inferred = nil
+          end
+        end
+
+        result = super
+
+        if inferred
+          @var_types[name] = inferred
+          @ivar_types[name] = inferred if @in_initialize
           @var_value_types[name] = vtype if vtype
         end
-        super
+
+        result
       end
 
       # Get the inferred type for a variable reference
