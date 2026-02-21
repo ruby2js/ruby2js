@@ -35,10 +35,11 @@ export class SvelteTemplateCompiler {
   constructor(template, options={}) {
     this.#template = template;
 
-    this.#options = {
-      ...SvelteTemplateCompiler.DEFAULT_OPTIONS,
-      ...options
-    };
+    this.#options = Object.assign(
+      {},
+      SvelteTemplateCompiler.DEFAULT_OPTIONS,
+      options
+    );
 
     this.#errors = [];
     this.#warnings = []

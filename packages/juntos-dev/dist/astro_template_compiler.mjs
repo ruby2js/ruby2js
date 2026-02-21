@@ -36,10 +36,11 @@ export class AstroTemplateCompiler {
   constructor(template, options={}) {
     this.#template = template;
 
-    this.#options = {
-      ...AstroTemplateCompiler.DEFAULT_OPTIONS,
-      ...options
-    };
+    this.#options = Object.assign(
+      {},
+      AstroTemplateCompiler.DEFAULT_OPTIONS,
+      options
+    );
 
     this.#errors = [];
     this.#warnings = []
@@ -321,6 +322,8 @@ export class AstroTemplateCompiler {
       filters.push(Ruby2JS.Filter.Functions)
     };
 
+    // Add ESM filter so import.meta.env.BASE_URL etc. aren't mangled
+        if (!filters.includes(Ruby2JS.Filter.ESM)) filters.push(Ruby2JS.Filter.ESM);
     return filters
   }
 }

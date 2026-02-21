@@ -106,7 +106,13 @@ export class ErbPnodeTransformer {
 
   constructor(source, options={}) {
     this.#source = source;
-    this.#options = {...ErbPnodeTransformer.DEFAULT_OPTIONS, ...options};
+
+    this.#options = Object.assign(
+      {},
+      ErbPnodeTransformer.DEFAULT_OPTIONS,
+      options
+    );
+
     this.#errors = []
   };
 

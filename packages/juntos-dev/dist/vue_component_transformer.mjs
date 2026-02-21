@@ -51,10 +51,11 @@ export class VueComponentTransformer {
   constructor(source, options={}) {
     this.#source = source;
 
-    this.#options = {
-      ...VueComponentTransformer.DEFAULT_OPTIONS,
-      ...options
-    };
+    this.#options = Object.assign(
+      {},
+      VueComponentTransformer.DEFAULT_OPTIONS,
+      options
+    );
 
     this.#errors = [];
     this.#refs = [];
@@ -66,7 +67,12 @@ export class VueComponentTransformer {
   // Transform the component, returning a Result
   get transform() {
     // Build conversion options with SFC and camelCase filters
-    let convertOptions = {...this.#options, template: "vue"};
+    let convertOptions = Object.assign(
+      {},
+      this.#options,
+      {template: "vue"}
+    );
+
     convertOptions.filters ??= [];
 
     // Add SFC filter for @var → const var = ref(value) transformation

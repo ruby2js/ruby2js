@@ -1087,7 +1087,9 @@ const Ruby2JS = (() => {
         parts = node.unescaped.value.split(/(\n)/).filter(item => !(item.length === 0));
         children = [];
 
-        parts.forEach((part, i) => {
+        for (let i = 0; i < parts.length; i++) {
+          let part = parts[i];
+
           if (part === "\n") {
             if (children.at(-1)) {
               children[children.length - 1] = this.s(
@@ -1100,7 +1102,7 @@ const Ruby2JS = (() => {
           } else {
             children.push(this.s("str", part))
           }
-        });
+        };
 
         if (node.unescaped.value.endsWith("\n") && children.at(-1) && !children.at(-1).children[0].endsWith("\n")) {
           children[children.length - 1] = this.s(
@@ -3026,7 +3028,11 @@ const Ruby2JS = (() => {
         };
 
         diffs = [];
-        mark.forEach((a, i) => diffs.push(a - this._mark[i]))
+
+        for (let i = 0; i < mark.length; i++) {
+          let a = mark[i];
+          diffs.push(a - this._mark[i])
+        }
       };
 
       while (this._mark[0] < mark[0]) {
@@ -3074,7 +3080,8 @@ const Ruby2JS = (() => {
       let use_erb = this._erb_source && this._erb_position_map;
       let erb_buffer = use_erb ? this.erb_source_buffer : null;
 
-      this._lines.forEach((line, row) => {
+      for (let row = 0; row < this._lines.length; row++) {
+        let line = this._lines[row];
         let col = line.indent;
 
         for (let token of line.tokens) {
@@ -3134,7 +3141,7 @@ const Ruby2JS = (() => {
 
           col += token.length
         }
-      });
+      };
 
       this._sourcemap = {
         version: 3,
@@ -3166,16 +3173,16 @@ const Ruby2JS = (() => {
       this._name = name ?? "";
       this._line_offsets = [0];
 
-      Array.from(source).forEach((char, i) => {
+      for (let i = 0; i < Array.from(source).length; i++) {
+        let char = Array.from(source)[i];
         if (char === "\n") this._line_offsets.push(i + 1)
-      })
+      }
     };
 
     same_source(other) {
       return other instanceof ErbSourceBuffer && this._source.object_id === other.source.object_id
     };
 
-    // Use find_index instead of bsearch_index for JS compatibility
     line_for_position(pos) {
       return this._line_offsets.findIndex(offset => offset > pos) ?? this._line_offsets.length
     };
@@ -3813,6 +3820,20 @@ const Ruby2JS = (() => {
       if (this._ast) return walk(this._ast)
     };
 
+    on_alias(new_name, old_name) {
+      let new_id = (new_name.children.first ?? "").toString().replace(
+        /[?!=]$/m,
+        ""
+      );
+
+      let old_id = (old_name.children.first ?? "").toString().replace(
+        /[?!=]$/m,
+        ""
+      );
+
+      return this.put(`this.${this.jsvar(new_id) ?? ""} = this.${this.jsvar(old_id) ?? ""}`)
+    };
+
     on_arg(arg, unknown=null) {
       if (unknown) {
         throw new Error(`argument ${JSON.stringify(unknown) ?? ""}`, this._ast)
@@ -3868,6 +3889,20 @@ const Ruby2JS = (() => {
       if (name) return this.put(this.jsvar(name))
     };
 
+    dedup_underscores(node, count) {
+      if (node.type === "arg" && node.children[0] === "_") {
+        count[0]++;
+        return count[0] > 1 ? this.s("arg", `_$${count[0] ?? ""}`) : node
+      } else if (node.type === "mlhs") {
+        return this.s(
+          "mlhs",
+          ...node.children.map(c => this.dedup_underscores(c, count))
+        )
+      } else {
+        return node
+      }
+    };
+
     on_args(...args) {
       let kwargs = [];
 
@@ -3880,13 +3915,16 @@ const Ruby2JS = (() => {
         kwargs = []
       };
 
+      let count = [0];
+      args = args.map(arg => this.dedup_underscores(arg, count));
       this.parse_all(...args, {join: ", "});
 
       if (kwargs.length !== 0) {
         if (args.length !== 0) this.put(", ");
         this.put("{ ");
 
-        kwargs.forEach((kw, index) => {
+        for (let index = 0; index < kwargs.length; index++) {
+          let kw = kwargs[index];
           if (index !== 0) this.put(", ");
 
           if (kw.type === "kwarg") {
@@ -3904,7 +3942,7 @@ const Ruby2JS = (() => {
             this.put("...");
             this.put(this.jsvar(kw.children.first))
           }
-        });
+        };
 
         this.put(" }");
         if (!kwargs.some(kw => kw.type === "kwarg")) return this.put(" = {}")
@@ -4183,7 +4221,7 @@ const Ruby2JS = (() => {
               }
             };
 
-            let merge = Object.fromEntries([
+            let merge = Object.fromEntries(Object.entries([
               ...body[i].children[1].to_a,
               ...body[j].children[1].to_a
             ].reduce(
@@ -4194,7 +4232,7 @@ const Ruby2JS = (() => {
               },
 
               {}
-            ).map(([name, values]) => (
+            )).map(([name, values]) => (
               [
                 name,
                 values.map(item => item.last).reduce((a, b) => ({...a, ...b}))
@@ -4210,7 +4248,7 @@ const Ruby2JS = (() => {
     };
 
     on_block(call, args, block) {
-      let has_break_value, rewrite_break, rewritten_block, $function;
+      let $var, expression, has_break_value, rewrite_break, rewritten_block, $function;
 
       if (args == null) {
         let uses_it = false;
@@ -4303,6 +4341,17 @@ const Ruby2JS = (() => {
             this._vars = vars
           }
         }
+      } else if (args.children.length === 1 && call.children.first && call.children.first.type === "begin" && call.children[1] === "each" && [
+        "irange",
+        "erange"
+      ].includes(call.children.first.children.first.type)) {
+        $var = this.s("lvasgn", args.children.first.children.first);
+        expression = call.children.first.children.first;
+
+        return this.parse(this._ast.updated(
+          "for",
+          [$var, expression, block ?? this.s("begin")]
+        ))
       } else if (call.children[0] == null && call.children[1] === "loop" && args.children.length === 0) {
         has_break_value = false;
 
@@ -4461,13 +4510,15 @@ const Ruby2JS = (() => {
           ));
 
           if (has_splat) {
-            whens.forEach((node, index) => {
+            for (let index = 0; index < whens.length; index++) {
+              let node = whens[index];
               let $masgn_temp = node.children.slice();
               let code = $masgn_temp.pop();
               let values = $masgn_temp;
               this.put(index === 0 ? "if (" : " else if (");
 
-              values.forEach((value, vi) => {
+              for (let vi = 0; vi < values.length; vi++) {
+                let value = values[vi];
                 if (vi > 0) this.put(" || ");
 
                 if (value.type === "splat") {
@@ -4480,12 +4531,12 @@ const Ruby2JS = (() => {
                   this.put(" === ");
                   this.parse(value)
                 }
-              });
+              };
 
               this.puts(") {");
               this.parse(code, "statement");
               this.put("}")
-            });
+            };
 
             if (other) {
               this.puts(" else {");
@@ -4495,7 +4546,8 @@ const Ruby2JS = (() => {
           } else if (has_range) {
             this.puts("switch (true) {");
 
-            whens.forEach((node, index) => {
+            for (let index = 0; index < whens.length; index++) {
+              let node = whens[index];
               if (index !== 0) this.puts("");
               let $masgn_temp = node.children.slice();
               let code = $masgn_temp.pop();
@@ -4541,7 +4593,7 @@ const Ruby2JS = (() => {
                 this.put(`${this._sep ?? ""}`);
                 if (last?.type !== "return") this.put(`break${this._sep ?? ""}`)
               }
-            });
+            };
 
             if (other) {
               this.put(`${this._nl ?? ""}default:${this._ws ?? ""}`);
@@ -4558,7 +4610,8 @@ const Ruby2JS = (() => {
               this.puts("switch (true) {")
             };
 
-            whens.forEach((node, index) => {
+            for (let index = 0; index < whens.length; index++) {
+              let node = whens[index];
               if (index !== 0) this.puts("");
               let $masgn_temp = node.children.slice();
               let code = $masgn_temp.pop();
@@ -4581,7 +4634,7 @@ const Ruby2JS = (() => {
                 this.put(`${this._sep ?? ""}`);
                 if (last?.type !== "return") this.put(`break${this._sep ?? ""}`)
               }
-            });
+            };
 
             if (other) {
               this.put(`${this._nl ?? ""}default:${this._ws ?? ""}`);
@@ -5100,7 +5153,11 @@ const Ruby2JS = (() => {
           // inhibit ivar substitution within a class definition.  See ivars.rb
           [ivars, this.ivars] = [this.ivars, null];
           saved_underscored_private = this._underscored_private;
-          if (this._ast.type === "class_extend") this._underscored_private = true;
+
+          if (this._ast.type === "class_extend" || this._ast.type === "class_module") {
+            this._underscored_private = true
+          };
+
           this._rbstack.push(visible);
 
           if (inheritance) {
@@ -5578,7 +5635,11 @@ const Ruby2JS = (() => {
           [class_parent, this._class_parent] = [this._class_parent, inheritance];
           [ivars, this.ivars] = [this.ivars, null];
           saved_underscored_private = this._underscored_private;
-          if (this._ast.type === "class_extend") this._underscored_private = true;
+
+          if (this._ast.type === "class_extend" || this._ast.type === "class_module") {
+            this._underscored_private = true
+          };
+
           this._rbstack.push(visible);
 
           if (inheritance) {
@@ -6056,7 +6117,11 @@ const Ruby2JS = (() => {
           [class_parent, this._class_parent] = [this._class_parent, inheritance];
           [ivars, this.ivars] = [this.ivars, null];
           saved_underscored_private = this._underscored_private;
-          if (this._ast.type === "class_extend") this._underscored_private = true;
+
+          if (this._ast.type === "class_extend" || this._ast.type === "class_module") {
+            this._underscored_private = true
+          };
+
           this._rbstack.push(visible);
 
           if (inheritance) {
@@ -6534,7 +6599,11 @@ const Ruby2JS = (() => {
           [class_parent, this._class_parent] = [this._class_parent, inheritance];
           [ivars, this.ivars] = [this.ivars, null];
           saved_underscored_private = this._underscored_private;
-          if (this._ast.type === "class_extend") this._underscored_private = true;
+
+          if (this._ast.type === "class_extend" || this._ast.type === "class_module") {
+            this._underscored_private = true
+          };
+
           this._rbstack.push(visible);
 
           if (inheritance) {
@@ -6960,17 +7029,20 @@ const Ruby2JS = (() => {
 
               if (ast.type === "send" && ast.children.first == null) {
                 if (ast.children[1] === "attr_accessor") {
-                  return ast.children.slice(2).forEach((child_sym, index2) => (
+                  for (let index2 = 0; index2 < ast.children.slice(2).length; index2++) {
+                    let child_sym = ast.children.slice(2)[index2];
                     ivars.add(`@${child_sym.children.first ?? ""}`)
-                  ))
+                  }
                 } else if (ast.children[1] === "attr_reader") {
-                  return ast.children.slice(2).forEach((child_sym, index2) => (
+                  for (let index2 = 0; index2 < ast.children.slice(2).length; index2++) {
+                    let child_sym = ast.children.slice(2)[index2];
                     ivars.add(`@${child_sym.children.first ?? ""}`)
-                  ))
+                  }
                 } else if (ast.children[1] === "attr_writer") {
-                  return ast.children.slice(2).forEach((child_sym, index2) => (
+                  for (let index2 = 0; index2 < ast.children.slice(2).length; index2++) {
+                    let child_sym = ast.children.slice(2)[index2];
                     ivars.add(`@${child_sym.children.first ?? ""}`)
-                  ))
+                  }
                 }
               }
             };
@@ -7166,27 +7238,30 @@ const Ruby2JS = (() => {
               let p = this.underscored_private ? "_" : "#";
 
               if (m.children[1] === "attr_accessor") {
-                m.children.slice(2).forEach((child_sym, index2) => {
+                for (let index2 = 0; index2 < m.children.slice(2).length; index2++) {
+                  let child_sym = m.children.slice(2)[index2];
                   if (index2 !== 0) this.put(this._sep);
                   let $var = child_sym.children.first;
                   this._rbstack.last[$var] = this.s("self");
                   this.put(`get ${$var ?? ""}() {${this._nl ?? ""}return this.${p ?? ""}${$var ?? ""}${this._nl ?? ""}}${this._sep ?? ""}`);
                   this.put(`set ${$var ?? ""}(${$var ?? ""}) {${this._nl ?? ""}this.${p ?? ""}${$var ?? ""} = ${$var ?? ""}${this._nl ?? ""}}`)
-                })
+                }
               } else if (m.children[1] === "attr_reader") {
-                m.children.slice(2).forEach((child_sym, index2) => {
+                for (let index2 = 0; index2 < m.children.slice(2).length; index2++) {
+                  let child_sym = m.children.slice(2)[index2];
                   if (index2 !== 0) this.put(this._sep);
                   let $var = child_sym.children.first;
                   this._rbstack.last[$var] = this.s("self");
                   this.put(`get ${$var ?? ""}() {${this._nl ?? ""}return this.${p ?? ""}${$var ?? ""}${this._nl ?? ""}}`)
-                })
+                }
               } else if (m.children[1] === "attr_writer") {
-                m.children.slice(2).forEach((child_sym, index2) => {
+                for (let index2 = 0; index2 < m.children.slice(2).length; index2++) {
+                  let child_sym = m.children.slice(2)[index2];
                   if (index2 !== 0) this.put(this._sep);
                   let $var = child_sym.children.first;
                   this._rbstack.last[$var] = this.s("self");
                   this.put(`set ${$var ?? ""}(${$var ?? ""}) {${this._nl ?? ""}this.${p ?? ""}${$var ?? ""} = ${$var ?? ""}${this._nl ?? ""}}`)
-                })
+                }
               } else if (m.children[1] === "private") {
                 visibility = "private";
                 skipped = true
@@ -7223,7 +7298,8 @@ const Ruby2JS = (() => {
               if (sclass_body?.type === "begin") sclass_body = sclass_body.children;
               if (!Array.isArray(sclass_body)) sclass_body = [sclass_body];
 
-              sclass_body.compact.forEach((smethod, sindex) => {
+              for (let sindex = 0; sindex < sclass_body.compact.length; sindex++) {
+                let smethod = sclass_body.compact[sindex];
                 if (sindex !== 0) this.put(this._sep);
 
                 if (smethod.type === "def") {
@@ -7284,7 +7360,7 @@ const Ruby2JS = (() => {
                   // Other statements in class << self (like constants)
                   this.parse(smethod)
                 }
-              })
+              }
             } else if (m.type === "defineProps") {
               skipped = true;
               this._namespace.defineProps(m.children.first);
@@ -7409,7 +7485,6 @@ const Ruby2JS = (() => {
                 this.s("lvar", "prop")
               )
             } else {
-              // method_missing with method name and arguments.
               forward = this.s(
                 "block",
                 this.s("send", null, "proc"),
@@ -7753,12 +7828,22 @@ const Ruby2JS = (() => {
       if (!name) Object.assign(vars, this._vars);
 
       if (args && args.children.length !== 0) {
-        for (let arg of args.children) {
+        let register_arg_vars = (arg) => {
           if (arg.type === "shadowarg") {
             delete vars[arg.children.first]
+          } else if (arg.type === "mlhs") {
+            for (let child of arg.children) {
+              register_arg_vars(child)
+            }
+          } else if (arg.type === "splat") {
+            if (arg.children.first) return register_arg_vars(arg.children.first)
           } else {
-            vars[arg.children.first] = true
+            return vars[arg.children.first] = true
           }
+        };
+
+        for (let arg of args.children) {
+          register_arg_vars(arg)
         }
       };
 
@@ -8083,12 +8168,22 @@ const Ruby2JS = (() => {
       if (!name) Object.assign(vars, this._vars);
 
       if (args && args.children.length !== 0) {
-        for (let arg of args.children) {
+        let register_arg_vars = (arg) => {
           if (arg.type === "shadowarg") {
             delete vars[arg.children.first]
+          } else if (arg.type === "mlhs") {
+            for (let child of arg.children) {
+              register_arg_vars(child)
+            }
+          } else if (arg.type === "splat") {
+            if (arg.children.first) return register_arg_vars(arg.children.first)
           } else {
-            vars[arg.children.first] = true
+            return vars[arg.children.first] = true
           }
+        };
+
+        for (let arg of args.children) {
+          register_arg_vars(arg)
         }
       };
 
@@ -8413,12 +8508,22 @@ const Ruby2JS = (() => {
       if (!name) Object.assign(vars, this._vars);
 
       if (args && args.children.length !== 0) {
-        for (let arg of args.children) {
+        let register_arg_vars = (arg) => {
           if (arg.type === "shadowarg") {
             delete vars[arg.children.first]
+          } else if (arg.type === "mlhs") {
+            for (let child of arg.children) {
+              register_arg_vars(child)
+            }
+          } else if (arg.type === "splat") {
+            if (arg.children.first) return register_arg_vars(arg.children.first)
           } else {
-            vars[arg.children.first] = true
+            return vars[arg.children.first] = true
           }
+        };
+
+        for (let arg of args.children) {
+          register_arg_vars(arg)
         }
       };
 
@@ -8743,12 +8848,22 @@ const Ruby2JS = (() => {
       if (!name) Object.assign(vars, this._vars);
 
       if (args && args.children.length !== 0) {
-        for (let arg of args.children) {
+        let register_arg_vars = (arg) => {
           if (arg.type === "shadowarg") {
             delete vars[arg.children.first]
+          } else if (arg.type === "mlhs") {
+            for (let child of arg.children) {
+              register_arg_vars(child)
+            }
+          } else if (arg.type === "splat") {
+            if (arg.children.first) return register_arg_vars(arg.children.first)
           } else {
-            vars[arg.children.first] = true
+            return vars[arg.children.first] = true
           }
+        };
+
+        for (let arg of args.children) {
+          register_arg_vars(arg)
         }
       };
 
@@ -9073,12 +9188,22 @@ const Ruby2JS = (() => {
       if (!name) Object.assign(vars, this._vars);
 
       if (args && args.children.length !== 0) {
-        for (let arg of args.children) {
+        let register_arg_vars = (arg) => {
           if (arg.type === "shadowarg") {
             delete vars[arg.children.first]
+          } else if (arg.type === "mlhs") {
+            for (let child of arg.children) {
+              register_arg_vars(child)
+            }
+          } else if (arg.type === "splat") {
+            if (arg.children.first) return register_arg_vars(arg.children.first)
           } else {
-            vars[arg.children.first] = true
+            return vars[arg.children.first] = true
           }
+        };
+
+        for (let arg of args.children) {
+          register_arg_vars(arg)
         }
       };
 
@@ -9204,7 +9329,11 @@ const Ruby2JS = (() => {
 
     on_restarg(name=null) {
       this.put("...");
-      if (name) return this.put(this.jsvar(name))
+
+      if (name) {
+        this.put(this.jsvar(name));
+        return this._vars[name] ??= true
+      }
     };
 
     on_defs(target, method, args, body) {
@@ -10192,10 +10321,11 @@ const Ruby2JS = (() => {
       };
 
       if (!final_export) {
-        return args.forEach((arg, index) => {
+        for (let index = 0; index < args.length; index++) {
+          let arg = args[index];
           if (index !== 0) this.put(", ");
           this.parse(arg)
-        })
+        }
       }
     };
 
@@ -10335,7 +10465,7 @@ const Ruby2JS = (() => {
           return this.parse(this.s("str", value.to_str))
         } else if (typeof value === "object" && value != null && "to_int" in value && typeof value.to_int === "number" && Number.isInteger(value.to_int)) {
           return this.parse(this.s("int", value.to_int))
-        } else if (typeof value === "object" && value != null && "to_sym" in value && typeof value.to_sym === "symbol") {
+        } else if (typeof value === "object" && value != null && "to_sym" in value && typeof value === "symbol") {
           return this.parse(this.s("sym", value))
         } else {
           return this.parse(this.s("str", JSON.stringify(value)))
@@ -10521,6 +10651,8 @@ const Ruby2JS = (() => {
           };
 
           this.scope(recovers.first.children.last);
+
+          // find reference to exception ($!)
           this.sput("}")
         } else {
           let catch_var = $var ?? this.s("gvar", "$EXCEPTION");
@@ -10537,7 +10669,8 @@ const Ruby2JS = (() => {
               first = false;
               this.put("if (");
 
-              exceptions.children.forEach((exception, index) => {
+              for (let index = 0; index < exceptions.children.length; index++) {
+                let exception = exceptions.children[index];
                 if (index !== 0) this.put(" || ");
 
                 if (exception.type === "const" && exception.children[0] == null && exception.children[1] === "String") {
@@ -10549,7 +10682,7 @@ const Ruby2JS = (() => {
                   this.put(" instanceof ");
                   this.parse(exception)
                 }
-              });
+              };
 
               this.puts(") {")
             } else {
@@ -11161,10 +11294,11 @@ const Ruby2JS = (() => {
 
         this.put("[");
 
-        lhs.children.forEach((child, index) => {
+        for (let index = 0; index < lhs.children.length; index++) {
+          let child = lhs.children[index];
           if (index !== 0) this.put(", ");
           this.parse(child)
-        });
+        };
 
         this.put("] = ");
         return rhs.type === "splat" ? this.parse(rhs.children.first) : this.parse(rhs)
@@ -11184,7 +11318,8 @@ const Ruby2JS = (() => {
 
           this.put("[");
 
-          lhs.children.forEach((child, index) => {
+          for (let index = 0; index < lhs.children.length; index++) {
+            let child = lhs.children[index];
             if (index !== 0) this.put(", ");
 
             if (child.type === "send" && (child.children[1] ?? "").toString().endsWith("=")) {
@@ -11193,14 +11328,15 @@ const Ruby2JS = (() => {
             } else {
               this.parse(child)
             }
-          });
+          };
 
           this.put("] = [");
 
-          rhs.children.forEach((child, index) => {
+          for (let index = 0; index < rhs.children.length; index++) {
+            let child = rhs.children[index];
             if (index !== 0) this.put(", ");
             this.parse(child)
-          });
+          };
 
           return this.put("]")
         } else {
@@ -11215,13 +11351,15 @@ const Ruby2JS = (() => {
           }
         };
 
-        lhs.children.forEach(($var, i) => (
+        for (let i = 0; i < lhs.children.length; i++) {
+          let $var = lhs.children[i];
+
           block.push(this.s(
             $var.type,
             ...$var.children,
             this.s("send", rhs, "[]", this.s("int", i))
           ))
-        ));
+        };
 
         return this.parse(this.s("begin", ...block), this._state)
       }
@@ -11299,7 +11437,9 @@ const Ruby2JS = (() => {
       let omit = [];
       body = [...body] // Copy array so we can modify defs nodes (works in Ruby and JS);
 
-      body.forEach((node, i) => {
+      for (let i = 0; i < body.length; i++) {
+        let node = body[i];
+
         if (node.type === "send" && node.children.first == null) {
           if (["public", "private", "protected"].includes(node.children[1])) {
             if (node.children.length === 2) {
@@ -11318,7 +11458,7 @@ const Ruby2JS = (() => {
           }
         };
 
-        if (visibility !== "public" && !is_concern) return;
+        if (visibility !== "public" && !is_concern) continue;
 
         if (node.type === "casgn" && node.children.first == null) {
           symbols.push(node.children[1])
@@ -11396,7 +11536,7 @@ const Ruby2JS = (() => {
         } else if (node.type === "module") {
           symbols.push(node.children.first.children.last)
         }
-      });
+      };
 
       let accessor_list = [];
 
@@ -11456,9 +11596,11 @@ const Ruby2JS = (() => {
       };
 
       if (predicate_symbols.length !== 0) {
-        body.forEach((node, i) => {
+        for (let i = 0; i < body.length; i++) {
+          let node = body[i];
+
           if (typeof node !== "object" || node == null || !("type" in node) || node.type !== "def") {
-            return
+            continue
           };
 
           let fn_name = (node.children[0] ?? "").toString().replace(
@@ -11466,15 +11608,15 @@ const Ruby2JS = (() => {
             ""
           );
 
-          if (!predicate_symbols.includes(fn_name)) return;
+          if (!predicate_symbols.includes(fn_name)) continue;
           let fn_body = node.children[2];
-          if (!fn_body) return;
+          if (!fn_body) continue;
 
           body[i] = node.updated(
             null,
             [node.children[0], node.children[1], this.s("autoreturn", fn_body)]
           )
-        })
+        }
       };
 
       let regular_syms = symbols.filter(sym => !(predicate_symbols.includes(sym)));
@@ -11593,7 +11735,9 @@ const Ruby2JS = (() => {
       let omit = [];
       body = [...body] // Copy array so we can modify defs nodes (works in Ruby and JS);
 
-      body.forEach((node, i) => {
+      for (let i = 0; i < body.length; i++) {
+        let node = body[i];
+
         if (node.type === "send" && node.children.first == null) {
           if (["public", "private", "protected"].includes(node.children[1])) {
             if (node.children.length === 2) {
@@ -11612,7 +11756,7 @@ const Ruby2JS = (() => {
           }
         };
 
-        if (visibility !== "public" && !is_concern) return;
+        if (visibility !== "public" && !is_concern) continue;
 
         if (node.type === "casgn" && node.children.first == null) {
           symbols.push(node.children[1])
@@ -11690,7 +11834,7 @@ const Ruby2JS = (() => {
         } else if (node.type === "module") {
           symbols.push(node.children.first.children.last)
         }
-      });
+      };
 
       let accessor_list = [];
 
@@ -11750,9 +11894,11 @@ const Ruby2JS = (() => {
       };
 
       if (predicate_symbols.length !== 0) {
-        body.forEach((node, i) => {
+        for (let i = 0; i < body.length; i++) {
+          let node = body[i];
+
           if (typeof node !== "object" || node == null || !("type" in node) || node.type !== "def") {
-            return
+            continue
           };
 
           let fn_name = (node.children[0] ?? "").toString().replace(
@@ -11760,15 +11906,15 @@ const Ruby2JS = (() => {
             ""
           );
 
-          if (!predicate_symbols.includes(fn_name)) return;
+          if (!predicate_symbols.includes(fn_name)) continue;
           let fn_body = node.children[2];
-          if (!fn_body) return;
+          if (!fn_body) continue;
 
           body[i] = node.updated(
             null,
             [node.children[0], node.children[1], this.s("autoreturn", fn_body)]
           )
-        })
+        }
       };
 
       let regular_syms = symbols.filter(sym => !(predicate_symbols.includes(sym)));
@@ -12403,7 +12549,12 @@ const Ruby2JS = (() => {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
-          throw new Error(`${receiver.children.first.type ?? ""} can only be converted to array currently`, receiver.children.first)
+          let to_a_node = this.s("send", receiver, "to_a");
+
+          return this.parse(this._ast.updated(
+            null,
+            [to_a_node, ...this._ast.children.slice(1)]
+          ))
         }
       };
 
@@ -12676,10 +12827,11 @@ const Ruby2JS = (() => {
           this.parse(current);
           this.put(".push(");
 
-          operations.forEach((arg, index) => {
+          for (let index = 0; index < operations.length; index++) {
+            let arg = operations[index];
             if (index > 0) this.put(", ");
             this.parse(arg)
-          });
+          };
 
           return this.put(")")
         } else {
@@ -12888,7 +13040,6 @@ const Ruby2JS = (() => {
           } else if (this._ast.type === "attr" || this._ast.type === "await_attr") {
             this.put(this.jsvar(method_name))
           } else if (this._state === "statement") {
-            // to declare a variable you never assign to.
             this.put(`${this.jsvar(method_name) ?? ""}()`)
           } else {
             this.parse(this._ast.updated("lvasgn", [method_name]), this._state)
@@ -12940,7 +13091,12 @@ const Ruby2JS = (() => {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
-          throw new Error(`${receiver.children.first.type ?? ""} can only be converted to array currently`, receiver.children.first)
+          let to_a_node = this.s("send", receiver, "to_a");
+
+          return this.parse(this._ast.updated(
+            null,
+            [to_a_node, ...this._ast.children.slice(1)]
+          ))
         }
       };
 
@@ -13213,10 +13369,11 @@ const Ruby2JS = (() => {
           this.parse(current);
           this.put(".push(");
 
-          operations.forEach((arg, index) => {
+          for (let index = 0; index < operations.length; index++) {
+            let arg = operations[index];
             if (index > 0) this.put(", ");
             this.parse(arg)
-          });
+          };
 
           return this.put(")")
         } else {
@@ -13476,7 +13633,12 @@ const Ruby2JS = (() => {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
-          throw new Error(`${receiver.children.first.type ?? ""} can only be converted to array currently`, receiver.children.first)
+          let to_a_node = this.s("send", receiver, "to_a");
+
+          return this.parse(this._ast.updated(
+            null,
+            [to_a_node, ...this._ast.children.slice(1)]
+          ))
         }
       };
 
@@ -13749,10 +13911,11 @@ const Ruby2JS = (() => {
           this.parse(current);
           this.put(".push(");
 
-          operations.forEach((arg, index) => {
+          for (let index = 0; index < operations.length; index++) {
+            let arg = operations[index];
             if (index > 0) this.put(", ");
             this.parse(arg)
-          });
+          };
 
           return this.put(")")
         } else {
@@ -14012,7 +14175,12 @@ const Ruby2JS = (() => {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
-          throw new Error(`${receiver.children.first.type ?? ""} can only be converted to array currently`, receiver.children.first)
+          let to_a_node = this.s("send", receiver, "to_a");
+
+          return this.parse(this._ast.updated(
+            null,
+            [to_a_node, ...this._ast.children.slice(1)]
+          ))
         }
       };
 
@@ -14285,10 +14453,11 @@ const Ruby2JS = (() => {
           this.parse(current);
           this.put(".push(");
 
-          operations.forEach((arg, index) => {
+          for (let index = 0; index < operations.length; index++) {
+            let arg = operations[index];
             if (index > 0) this.put(", ");
             this.parse(arg)
-          });
+          };
 
           return this.put(")")
         } else {
@@ -14548,7 +14717,12 @@ const Ruby2JS = (() => {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
-          throw new Error(`${receiver.children.first.type ?? ""} can only be converted to array currently`, receiver.children.first)
+          let to_a_node = this.s("send", receiver, "to_a");
+
+          return this.parse(this._ast.updated(
+            null,
+            [to_a_node, ...this._ast.children.slice(1)]
+          ))
         }
       };
 
@@ -14821,10 +14995,11 @@ const Ruby2JS = (() => {
           this.parse(current);
           this.put(".push(");
 
-          operations.forEach((arg, index) => {
+          for (let index = 0; index < operations.length; index++) {
+            let arg = operations[index];
             if (index > 0) this.put(", ");
             this.parse(arg)
-          });
+          };
 
           return this.put(")")
         } else {
@@ -15084,7 +15259,12 @@ const Ruby2JS = (() => {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
-          throw new Error(`${receiver.children.first.type ?? ""} can only be converted to array currently`, receiver.children.first)
+          let to_a_node = this.s("send", receiver, "to_a");
+
+          return this.parse(this._ast.updated(
+            null,
+            [to_a_node, ...this._ast.children.slice(1)]
+          ))
         }
       };
 
@@ -15357,10 +15537,11 @@ const Ruby2JS = (() => {
           this.parse(current);
           this.put(".push(");
 
-          operations.forEach((arg, index) => {
+          for (let index = 0; index < operations.length; index++) {
+            let arg = operations[index];
             if (index > 0) this.put(", ");
             this.parse(arg)
-          });
+          };
 
           return this.put(")")
         } else {
@@ -15620,7 +15801,12 @@ const Ruby2JS = (() => {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
-          throw new Error(`${receiver.children.first.type ?? ""} can only be converted to array currently`, receiver.children.first)
+          let to_a_node = this.s("send", receiver, "to_a");
+
+          return this.parse(this._ast.updated(
+            null,
+            [to_a_node, ...this._ast.children.slice(1)]
+          ))
         }
       };
 
@@ -15893,10 +16079,11 @@ const Ruby2JS = (() => {
           this.parse(current);
           this.put(".push(");
 
-          operations.forEach((arg, index) => {
+          for (let index = 0; index < operations.length; index++) {
+            let arg = operations[index];
             if (index > 0) this.put(", ");
             this.parse(arg)
-          });
+          };
 
           return this.put(")")
         } else {
@@ -16156,7 +16343,12 @@ const Ruby2JS = (() => {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
-          throw new Error(`${receiver.children.first.type ?? ""} can only be converted to array currently`, receiver.children.first)
+          let to_a_node = this.s("send", receiver, "to_a");
+
+          return this.parse(this._ast.updated(
+            null,
+            [to_a_node, ...this._ast.children.slice(1)]
+          ))
         }
       };
 
@@ -16429,10 +16621,11 @@ const Ruby2JS = (() => {
           this.parse(current);
           this.put(".push(");
 
-          operations.forEach((arg, index) => {
+          for (let index = 0; index < operations.length; index++) {
+            let arg = operations[index];
             if (index > 0) this.put(", ");
             this.parse(arg)
-          });
+          };
 
           return this.put(")")
         } else {
@@ -16681,6 +16874,7 @@ const Ruby2JS = (() => {
     };
 
     on_csend(receiver, method, ...args) {
+      // they need to be converted to instanceof/constructor checks
       if (["is_a?", "kind_of?", "instance_of?"].includes(method) && args.length === 1) {
         this.parse(receiver);
         this.put(" && ");
@@ -16930,7 +17124,8 @@ const Ruby2JS = (() => {
     };
 
     on_undef(...syms) {
-      return syms.forEach((sym, index) => {
+      for (let index = 0; index < syms.length; index++) {
+        let sym = syms[index];
         if (index !== 0) this.put(this._sep);
 
         if (sym.type === "sym") {
@@ -16939,7 +17134,7 @@ const Ruby2JS = (() => {
           this.put("delete ");
           this.parse(sym)
         }
-      })
+      }
     };
 
     on_until(condition, block) {
@@ -17283,8 +17478,8 @@ const Ruby2JS = (() => {
       this.put("<");
       this.put(nodename);
 
-      Object.entries(attrs).forEach(([name, value]) => {
-        if (value == null) return;
+      for (let [name, value] of Object.entries(attrs)) {
+        if (value == null) continue;
         this.put(" ");
         this.put(name);
         this.put("=");
@@ -17296,7 +17491,7 @@ const Ruby2JS = (() => {
           this.parse(value);
           this.put("}")
         }
-      });
+      };
 
       if (children.length === 0) {
         return this.put("/>")
@@ -17307,8 +17502,9 @@ const Ruby2JS = (() => {
           this.put(this._nl)
         };
 
-        children.forEach((child, index) => {
-          if (child == null) return;
+        for (let index = 0; index < children.length; index++) {
+          let child = children[index];
+          if (child == null) continue;
           if (index !== 0) this.put(this._nl);
 
           if (child.type === "str") {
@@ -17329,7 +17525,7 @@ const Ruby2JS = (() => {
               }
             }
           }
-        });
+        };
 
         if (children.length !== 1 || children.first?.type === "xnode") {
           this.put(this._nl)
@@ -17362,10 +17558,11 @@ const Ruby2JS = (() => {
       let tag_str;
 
       if (tag == null) {
-        return children.forEach((child, index) => {
+        for (let index = 0; index < children.length; index++) {
+          let child = children[index];
           if (index > 0) this.put(this._sep);
           this.parse(child)
-        })
+        }
       } else {
         tag_str = (tag ?? "").toString();
 
@@ -17383,10 +17580,11 @@ const Ruby2JS = (() => {
             } else {
               this.put("(");
 
-              children.forEach((child, idx) => {
+              for (let idx = 0; idx < children.length; idx++) {
+                let child = children[idx];
                 if (idx > 0) this.put(", ");
                 this.parse(child)
-              });
+              };
 
               this.put(")")
             }
@@ -18006,6 +18204,7 @@ const Ruby2JS = (() => {
   Converter._handlers = [];
   ;
   ;
+  Converter._handlers.push("alias");
   Converter._handlers.push("arg");
   Converter._handlers.push("blockarg");
   Converter._handlers.push("shadowarg");
@@ -18776,7 +18975,12 @@ const Ruby2JS = (() => {
     };
 
     get apply_filters() {
-      let filter_options = {...this._options, filters: this._filters};
+      let filter_options = Object.assign(
+        {},
+        this._options,
+        {filters: this._filters}
+      );
+
       let filters = [...this._filters];
 
       for (let filter of filters) {
@@ -18842,12 +19046,13 @@ const Ruby2JS = (() => {
       let node_ends = [];
       let node_sources = [];
 
-      nodes.forEach((n, i) => {
+      for (let i = 0; i < nodes.length; i++) {
+        let n = nodes[i];
         node_lines[i] = this.node_line_number(n);
         node_starts[i] = this.node_start_pos(n);
         node_ends[i] = this.node_end_pos(n);
         node_sources[i] = this.node_source_name(n)
-      });
+      };
 
       let num_nodes = nodes.length;
       let indices = [...Array(num_nodes).keys()];
@@ -18878,14 +19083,15 @@ const Ruby2JS = (() => {
       let trailing_comments = [];
       let matched_comments = {} // Track which comments became trailing (by object_id or index);
 
-      nodes.forEach((node, i) => {
+      for (let i = 0; i < nodes.length; i++) {
+        let node = nodes[i];
         let line = node_lines[i];
-        if (!line) return;
+        if (!line) continue;
         let same_line = comments_by_line[line];
-        if (!same_line) return;
+        if (!same_line) continue;
         let node_end = node_ends[i];
         let node_source = node_sources[i];
-        if (!node_end) return;
+        if (!node_end) continue;
 
         for (let comment of same_line) {
           let comment_start = this.comment_start_pos(comment);
@@ -18899,7 +19105,7 @@ const Ruby2JS = (() => {
             matched_comments[comment_id] = {node, end_pos: node_end, comment}
           }
         }
-      });
+      };
 
       for (let match of Object.values(matched_comments)) {
         trailing_comments.push([match.node, match.comment])
@@ -18936,6 +19142,7 @@ const Ruby2JS = (() => {
 
     collect_located_nodes(node, result) {
       if (typeof node !== "object" || node == null || !("type" in node) || typeof node !== "object" || node == null || !("children" in node)) {
+        // Store trailing and orphan comments under special keys
         return
       };
 
@@ -19068,6 +19275,7 @@ const Ruby2JS = (() => {
 
       if (prepend.length === 0) return;
 
+      // Use Parser::AST::Node in Ruby, Ruby2JS::Node in JS selfhost
       this._ast = typeof Parser !== 'undefined' && typeof Parser.AST.Node !== 'undefined' ? new Parser.AST.Node("begin", [
         ...prepend,
         this._ast
@@ -19791,7 +19999,7 @@ export function convert(source, options={}) {
 
   let comments = associateComments(ast, wrapped_comments);
   comments.set("_raw", wrapped_comments);
-  let pipeline_options = {...options, source};
+  let pipeline_options = Object.assign({}, options, {source});
 
   let filters = (options.filters ?? []).map((f) => {
     let resolved, capitalized;

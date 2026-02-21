@@ -35,7 +35,13 @@ export class VueTemplateCompiler {
 
   constructor(template, options={}) {
     this.#template = template;
-    this.#options = {...VueTemplateCompiler.DEFAULT_OPTIONS, ...options};
+
+    this.#options = Object.assign(
+      {},
+      VueTemplateCompiler.DEFAULT_OPTIONS,
+      options
+    );
+
     this.#errors = [];
     this.#warnings = []
   };

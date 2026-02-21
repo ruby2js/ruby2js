@@ -40,10 +40,11 @@ export class AstroComponentTransformer {
   constructor(source, options={}) {
     this.#source = source;
 
-    this.#options = {
-      ...AstroComponentTransformer.DEFAULT_OPTIONS,
-      ...options
-    };
+    this.#options = Object.assign(
+      {},
+      AstroComponentTransformer.DEFAULT_OPTIONS,
+      options
+    );
 
     this.#errors = [];
     this.#imports = {models: new Set}
@@ -52,7 +53,12 @@ export class AstroComponentTransformer {
   // Transform the component, returning a Result
   get transform() {
     // Build conversion options with SFC and camelCase filters
-    let convertOptions = {...this.#options, template: "astro"};
+    let convertOptions = Object.assign(
+      {},
+      this.#options,
+      {template: "astro"}
+    );
+
     convertOptions.filters ??= [];
 
     // Add ESM filter for import/export handling

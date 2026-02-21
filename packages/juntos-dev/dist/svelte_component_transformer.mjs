@@ -45,10 +45,11 @@ export class SvelteComponentTransformer {
   constructor(source, options={}) {
     this.#source = source;
 
-    this.#options = {
-      ...SvelteComponentTransformer.DEFAULT_OPTIONS,
-      ...options
-    };
+    this.#options = Object.assign(
+      {},
+      SvelteComponentTransformer.DEFAULT_OPTIONS,
+      options
+    );
 
     this.#errors = [];
     this.#vars = [];
@@ -66,7 +67,12 @@ export class SvelteComponentTransformer {
   // Transform the component, returning a Result
   get transform() {
     // Build conversion options with SFC and camelCase filters
-    let convertOptions = {...this.#options, template: "svelte"};
+    let convertOptions = Object.assign(
+      {},
+      this.#options,
+      {template: "svelte"}
+    );
+
     convertOptions.filters ??= [];
 
     // Add SFC filter for @var → let var transformation
