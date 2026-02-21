@@ -512,7 +512,7 @@ npx juntos lint --include "app/models/**"    # Only lint models
 **What it does:**
 
 1. Discovers Ruby files in `app/models/`, `app/controllers/`, `app/javascript/controllers/`, `app/views/`, `config/routes.rb`, and `db/seeds.rb`
-2. **Phase 1 — Structural checks:** Walks the raw AST to detect patterns that cannot be transpiled to JavaScript (e.g., `method_missing`, `eval`, `retry`)
+2. **Phase 1 — Structural checks:** Walks the raw AST to detect patterns that cannot be transpiled to JavaScript (e.g., `method_missing`, `eval`, `retry`, operator method definitions like `def <=>`)
 3. **Phase 2 — Type-ambiguity checks:** Runs the full transpilation with lint mode enabled. The pragma filter reports methods whose JavaScript output depends on the receiver type (Array, Hash, Set, etc.) when neither a `# Pragma:` annotation nor type inference can determine the type
 4. Prints diagnostics with file, line, and column, then exits with code 1 if any errors are found
 
@@ -540,6 +540,7 @@ Linted 12 files: 0 errors, 2 warnings
 | `redo_statement` | warning | `redo` has no direct JavaScript equivalent |
 | `ruby_catch_throw` | warning | Ruby `catch`/`throw` differs from JavaScript `try`/`catch` |
 | `prepend_call` | warning | `prepend` has no JavaScript equivalent |
+| `operator_method` | error | Operator method definitions (e.g., `def <=>`) cannot be transpiled — JavaScript has no operator overloading |
 | `force_encoding` | warning | `force_encoding` has no JavaScript equivalent (JS strings are always UTF-16) |
 | `parse_error` | error | File could not be parsed |
 | `conversion_error` | error | File could not be converted |

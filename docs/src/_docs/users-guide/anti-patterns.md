@@ -64,6 +64,37 @@ instance_eval(&block)
 
 **Alternative:** Restructure to avoid dynamic evaluation.
 
+### Operator Overloading
+
+Ruby allows defining operator methods (`<=>`, `+`, `==`, `[]`, etc.) on classes. JavaScript has no operator overloading, so these definitions produce invalid syntax:
+
+```ruby
+# Won't work
+class Money
+  def <=>(other)
+    cents <=> other.cents
+  end
+
+  def +(other)
+    Money.new(cents + other.cents)
+  end
+end
+```
+
+**Alternative:** Use named methods instead:
+
+```ruby
+class Money
+  def compare_to(other)
+    cents - other.cents
+  end
+
+  def plus(other)
+    Money.new(cents + other.cents)
+  end
+end
+```
+
 ### `send` and `public_send`
 
 Basic `send` is supported:
@@ -401,6 +432,7 @@ str.force_encoding("UTF-8")
 | `superclass`         | ✅ Safe    | Parent class            |
 | Symbols              | ⚠️ Caution | Work as strings         |
 | `method_missing`     | ❌ Avoid   | Explicit methods        |
+| Operator methods     | ❌ Avoid   | Named methods           |
 | `eval`               | ❌ Avoid   | Restructure             |
 | `prepend`            | ❌ Avoid   | MRO incompatible        |
 | `retry`/`redo`       | ❌ Avoid   | Explicit loops          |
