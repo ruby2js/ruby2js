@@ -772,22 +772,22 @@ describe Ruby2JS::Filter::Functions do
 
     it "should handle merge" do
       to_js( 'b={}; a = a.merge(b)' ).
-        must_equal  "let b = {}; let a = {...a, ...b}"
+        must_equal  "let b = {}; let a = Object.assign({}, a, b)"
     end
 
     it "should handle merge with a constant hash" do
       # simple LHS
       to_js( 'a = a.merge(b: 1)' ).
-        must_equal  "let a = {...a, b: 1}"
+        must_equal  "let a = Object.assign({}, a, {b: 1})"
 
       # computed LHS
       to_js( 'a.b.merge(b: 1)' ).
-        must_equal  "{...a.b, b: 1}"
+        must_equal  "Object.assign({}, a.b, {b: 1})"
     end
 
     it "should handle merge without receiver" do
       to_js( 'merge(other)' ).
-        must_equal '{...other}'
+        must_equal 'Object.assign({}, other)'
     end
 
     it "should handle merge!" do

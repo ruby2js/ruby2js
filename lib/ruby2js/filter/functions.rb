@@ -422,8 +422,10 @@ module Ruby2JS
           process S(:send, target, :splice, start, len, s(:splat, value))
 
         elsif method == :merge
+          # Use Object.assign({}, ...) instead of {...spread} to avoid
+          # statement-level { being parsed as a block in JS
           args.unshift target if target
-          process S(:hash, *args.map {|arg| s(:kwsplat, arg)})
+          process S(:send, s(:const, nil, :Object), :assign, s(:hash), *args)
 
         elsif method == :merge!
           process S(:assign, target, *args)
@@ -923,21 +925,21 @@ module Ruby2JS
             parent = args[0].children.last
             if parent == :Array
               # Array.isArray(obj)
-              S(:send, s(:const, nil, :Array), :isArray, target)
+              S(:send, s(:const, nil, :Array), :isArray, process(target))
             elsif parent == :Integer
               # typeof obj === "number" && Number.isInteger(obj)
               S(:and,
-                s(:send, s(:send, nil, :typeof, target), :===, s(:str, "number")),
-                s(:send, s(:const, nil, :Number), :isInteger, target))
+                s(:send, s(:send, nil, :typeof, process(target)), :===, s(:str, "number")),
+                s(:send, s(:const, nil, :Number), :isInteger, process(target)))
             elsif [:Float, :Numeric].include? parent
               # typeof obj === "number"
-              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "number"))
+              S(:send, s(:send, nil, :typeof, process(target)), :===, s(:str, "number"))
             elsif parent == :String
               # typeof obj === "string"
-              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "string"))
+              S(:send, s(:send, nil, :typeof, process(target)), :===, s(:str, "string"))
             elsif parent == :Symbol
               # typeof obj === "symbol"
-              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "symbol"))
+              S(:send, s(:send, nil, :typeof, process(target)), :===, s(:str, "symbol"))
             elsif parent == :Hash
               # typeof obj === "object" && obj !== null && !Array.isArray(obj)
               # Process target for each use so earlier filters (e.g., erb ivar->lvar)
