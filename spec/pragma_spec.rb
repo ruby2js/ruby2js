@@ -1658,6 +1658,29 @@ describe Ruby2JS::Filter::Pragma do
     end
   end
 
+  describe "enhanced type inference" do
+    it "should infer array from ternary with nil" do
+      to_js('x = flag ? [] : nil; x << item').must_include 'x.push(item)'
+    end
+
+    it "should infer array from or with typed fallback" do
+      to_js('x = val || []; x << item').must_include 'x.push(item)'
+    end
+
+    it "should infer value type from Hash.new block" do
+      to_js('h = Hash.new { |h, k| h[k] = [] }; h[:key] << item').must_include '.push(item)'
+    end
+
+    it "should infer value type from Hash.new default" do
+      # Hash.new(0) values are numeric, so + should not be array spread
+      to_js('h = Hash.new(0); h[:key] + x').wont_include '[...'
+    end
+
+    it "should infer value type from ||= on hash subscript" do
+      to_js('h = {}; h[:key] ||= []; h[:key] << item').must_include '.push(item)'
+    end
+  end
+
   describe "automatic class reopening detection" do
     it "should treat class as extension when preceded by Struct.new" do
       js = to_js('Color = Struct.new(:name, :value); class Color; def to_s; value; end; end')

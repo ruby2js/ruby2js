@@ -447,6 +447,44 @@ n = items.count        # n inferred as number
 n + offset             # No warning — n is known numeric
 ```
 
+### Conditional and Fallback Inference
+
+Types are inferred through ternary expressions and `||` fallbacks when one
+branch has a recognizable type:
+
+```ruby
+# Ternary with nil — infers from the non-nil branch
+items = enabled ? [] : nil
+items << "hello" if items
+# => let items = enabled ? [] : null; if (items) items.push("hello")
+
+# Or fallback — infers from the typed branch
+items = get_items() || []
+items << "hello"
+# => let items = get_items() ?? []; items.push("hello")
+```
+
+### Hash Value Type Tracking
+
+When a hash is created with `Hash.new` using a default value or block,
+Ruby2JS tracks the type of the hash's values. This allows correct
+disambiguation when accessing values via `hash[key]`:
+
+```ruby
+# Hash.new with default value — values are numbers
+counts = Hash.new(0)
+counts[:key] + 1       # No warning — value type is numeric
+
+# Hash.new with block — values are arrays
+groups = Hash.new { |h, k| h[k] = [] }
+groups[:key] << item   # Uses push() — value type is array
+
+# ||= also records value types
+buckets = {}
+buckets[:key] ||= []
+buckets[:key] << item  # Uses push() — value type is array
+```
+
 ### Sorbet T.let
 
 Ruby2JS recognizes [Sorbet](https://sorbet.org/)'s `T.let` type annotations.

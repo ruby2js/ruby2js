@@ -124,6 +124,8 @@ module Ruby2JS
         @var_types_stack = []  # Stack for scope management
         @ivar_types = {}       # Track instance variable types (class-scoped)
         @ivar_types_stack = [] # Stack for class scope management
+        @var_value_types = {}  # Track value types for hash/map variables
+        @var_value_types_stack = [] # Stack for scope management
         @in_initialize = false # Track if we're in an initialize method
         @const_classes = {}    # Track constants assigned class-like values (Struct.new, Class.new)
       end
@@ -193,6 +195,24 @@ module Ruby2JS
               return :array
             end
           end
+        end
+
+        # Ternary: cond ? typed_expr : nil  or  cond ? nil : typed_expr
+        if node.type == :if
+          _cond, true_branch, false_branch = node.children
+          true_type = true_branch ? infer_type(true_branch) : nil
+          false_type = false_branch ? infer_type(false_branch) : nil
+          if true_type && (false_branch.nil? || false_branch.type == :nil)
+            return true_type
+          elsif false_type && (true_branch.nil? || true_branch.type == :nil)
+            return false_type
+          end
+        end
+
+        # Or: val || default — infer from whichever branch has a known type
+        if node.type == :or
+          left, right = node.children
+          return infer_type(right) || infer_type(left)
         end
 
         nil
@@ -267,6 +287,10 @@ module Ruby2JS
           # Fall back to inference from value
           inferred = infer_type(value)
           @var_types[name] = inferred if inferred
+
+          # Track Hash.new value types
+          vtype = infer_hash_value_type(value)
+          @var_value_types[name] = vtype if vtype
         end
         super
       end
@@ -293,6 +317,10 @@ module Ruby2JS
             # Also store in class-scoped ivar_types if in initialize
             @ivar_types[name] = inferred if @in_initialize
           end
+
+          # Track Hash.new value types
+          vtype = infer_hash_value_type(value)
+          @var_value_types[name] = vtype if vtype
         end
         super
       end
@@ -313,9 +341,86 @@ module Ruby2JS
       end
 
       # Get the resolved type for any expression node.
-      # Checks: variable tracking, then expression-level inference.
+      # Checks: variable tracking, hash subscript value types, then
+      # expression-level inference.
       def node_type(node)
-        var_type(node) || infer_type(node)
+        return nil unless node
+        type = var_type(node)
+        return type if type
+
+        # Check hash subscript: hash[key] — look up value type of hash variable
+        if node.type == :send
+          receiver, method = node.children
+          if method == :[]
+            vtype = var_value_type(receiver)
+            return vtype if vtype
+          end
+        end
+
+        infer_type(node)
+      end
+
+      # Get the value type for a hash/map variable (what type are its values?)
+      def var_value_type(node)
+        return nil unless node
+        case node.type
+        when :lvar
+          @var_value_types[node.children.first]
+        when :ivar
+          @var_value_types[node.children.first]
+        else
+          nil
+        end
+      end
+
+      # Infer the value type from a Hash.new pattern:
+      #   Hash.new(0) → :number (default value type)
+      #   Hash.new { |h,k| h[k] = [] } → :array (block body assigns typed value)
+      def infer_hash_value_type(node)
+        return nil unless node
+
+        # Hash.new(default_value) — infer from default value
+        if node.type == :send
+          receiver, method, *args = node.children
+          if method == :new && receiver&.type == :const &&
+              receiver.children.last == :Hash && args.length == 1
+            return infer_type(args.first)
+          end
+        end
+
+        # Hash.new { |h, k| h[k] = value } — infer from block body
+        if node.type == :block
+          call = node.children.first
+          if call&.type == :send
+            receiver, method = call.children
+            if method == :new && receiver&.type == :const &&
+                receiver.children.last == :Hash
+              body = node.children[2]
+              # Look for h[k] = value pattern (indexasgn or send with []=)
+              if body
+                value_node = extract_hash_new_block_value(body)
+                return infer_type(value_node) if value_node
+              end
+            end
+          end
+        end
+
+        nil
+      end
+
+      # Extract the assigned value from Hash.new block body
+      # Handles: h[k] = value (which is s(:send, h, :[]=, k, value))
+      def extract_hash_new_block_value(body)
+        return nil unless body
+        if body.type == :send && body.children[1] == :[]=
+          return body.children.last
+        end
+        # Handle begin block: last expression
+        if body.type == :begin
+          last = body.children.last
+          return extract_hash_new_block_value(last) if last
+        end
+        nil
       end
 
       # Handle array compound assignments that differ between Ruby and JS
@@ -379,11 +484,14 @@ module Ruby2JS
       # Scope management: push/pop @var_types at scope boundaries
       def push_var_types_scope
         @var_types_stack.push @var_types
+        @var_value_types_stack.push @var_value_types
         @var_types = {}
+        @var_value_types = {}
       end
 
       def pop_var_types_scope
         @var_types = @var_types_stack.pop || {}
+        @var_value_types = @var_value_types_stack.pop || {}
       end
 
       # Scope management for class-scoped instance variable types
@@ -572,6 +680,20 @@ module Ruby2JS
       # Note: We check es2020 here because ?? is available then.
       # The converter will decide whether to use ??= (ES2021+) or expand to a = a ?? b
       def on_or_asgn(node)
+        # Track value types for hash[key] ||= typed_value patterns
+        target, value = node.children
+        if target&.type == :send && target.children[1] == :[]= && value
+          receiver = target.children[0]
+          vtype = infer_type(value)
+          if vtype && receiver
+            var_name = case receiver.type
+              when :lvar, :ivar then receiver.children.first
+              else nil
+            end
+            @var_value_types[var_name] = vtype if var_name
+          end
+        end
+
         if pragma?(node, :nullish) && es2020
           process s(:nullish_asgn, *node.children)
         elsif pragma?(node, :logical)
