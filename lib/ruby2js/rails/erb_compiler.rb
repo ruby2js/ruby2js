@@ -69,6 +69,9 @@ class ErbCompiler
       trim_trailing = tag.end_with?("-")
       tag = tag[0...-1] if trim_trailing
 
+      # Check for ERB comment BEFORE stripping: <%# is a comment, <% # is code
+      is_erb_comment = tag.start_with?("#")
+
       tag = tag.strip
 
       is_output_expr = false
@@ -104,9 +107,9 @@ class ErbCompiler
         ruby_expr_end = ruby_expr_start + expr.length
         @position_map << [ruby_expr_start, ruby_expr_end, erb_expr_start, erb_expr_end]
         is_output_expr = true
-      elsif tag.start_with?("#")
+      elsif is_erb_comment
         # ERB comment: <%# comment %> - skip entirely (don't add to output)
-        # Comments can span multiple lines, so we can't use Ruby # comments
+        # Only matches <%# (no space before #), not <% # which is Ruby code with a comment
         nil  # explicit no-op for transpiler
       else
         # Code block: <% code %> - use newline, not semicolon

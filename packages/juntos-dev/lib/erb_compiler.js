@@ -79,6 +79,10 @@ export class ErbCompiler {
       // Handle -%> (trim trailing newline)
       let trim_trailing = tag.endsWith("-");
       if (trim_trailing) tag = tag.slice(0, -1);
+
+      // Check for ERB comment BEFORE trimming: <%# is a comment, <% # is code
+      let is_erb_comment = tag.startsWith("#");
+
       tag = tag.trim();
       let is_output_expr = false;
 
@@ -134,9 +138,9 @@ export class ErbCompiler {
         ]);
 
         is_output_expr = true
-      } else if (tag.startsWith("#")) {
+      } else if (is_erb_comment) {
         // ERB comment: <%# comment %> - skip entirely (don't add to output)
-        // Comments can span multiple lines, so we can't use Ruby # comments
+        // Only matches <%# (no space before #), not <% # which is Ruby code with a comment
         null // explicit no-op for transpiler
       } else {
         // Code block: <% code %> - use newline, not semicolon
