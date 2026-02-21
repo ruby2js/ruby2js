@@ -171,13 +171,16 @@ module Ruby2JS
       vars = {}
       vars.merge! @vars unless name
       if args and !args.children.empty?
-        args.children.each do |arg|
+        register_arg_vars = ->(arg) do
           if arg.type == :shadowarg
             vars.delete(arg.children.first)
+          elsif arg.type == :mlhs
+            arg.children.each { |child| register_arg_vars.call(child) }
           else
             vars[arg.children.first] = true
           end
         end
+        args.children.each { |arg| register_arg_vars.call(arg) }
       end
 
       # Add async if explicitly marked or if body contains await
