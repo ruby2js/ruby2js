@@ -1663,6 +1663,24 @@ describe Ruby2JS::Filter::Pragma do
       assert_equal 2, plus_warnings.length
       assert_equal [1, 2], plus_warnings.map { |w| w[:line] }
     end
+
+    it "should include receiver_name for variable receivers" do
+      d = lint("x << 1")
+      assert_equal 1, d.length
+      assert_equal 'x', d.first[:receiver_name]
+    end
+
+    it "should include receiver_name for ivar receivers" do
+      d = lint("@items << 1")
+      assert_equal 1, d.length
+      assert_equal '@items', d.first[:receiver_name]
+    end
+
+    it "should include receiver_name from chained calls" do
+      d = lint("person.delete(:lead)")
+      assert_equal 1, d.length
+      assert_equal 'person', d.first[:receiver_name]
+    end
   end
 
   describe "enhanced type inference" do

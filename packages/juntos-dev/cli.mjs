@@ -1139,7 +1139,8 @@ function parseCommonArgs(args) {
     only: null,       // --only comma-separated list (shorthand for include-only)
     // Lint options
     disable: [],      // --disable rules (can be repeated)
-    strict: false     // --strict: enable strict lint warnings
+    strict: false,    // --strict: enable strict lint warnings
+    summary: false    // --summary: show untyped variable summary
   };
 
   const remaining = [];
@@ -1234,6 +1235,8 @@ function parseCommonArgs(args) {
       options.disable.push(arg.slice(10));
     } else if (arg === '--strict') {
       options.strict = true;
+    } else if (arg === '--summary') {
+      options.summary = true;
     } else {
       remaining.push(arg);
     }
@@ -3286,6 +3289,7 @@ async function runLint(files, options) {
   let totalErrors = 0;
   let totalWarnings = 0;
   let filesWithIssues = 0;
+  const allDiagnostics = [];
 
   for (const filePath of filePaths) {
     const source = readFileSync(filePath, 'utf8');
@@ -3307,6 +3311,7 @@ async function runLint(files, options) {
 
     if (diagnostics.length === 0) continue;
     filesWithIssues++;
+    allDiagnostics.push(...diagnostics);
 
     for (const d of diagnostics) {
       const sev = d.severity === 'error' ? '\x1b[31merror\x1b[0m' : '\x1b[33mwarning\x1b[0m';
@@ -3326,6 +3331,39 @@ async function runLint(files, options) {
 
   console.log('');
   console.log(`Linted ${filePaths.length} files: ${totalErrors} errors, ${totalWarnings} warnings`);
+
+  // Summary: group ambiguous_method warnings by receiver name
+  if (options.summary && allDiagnostics.length > 0) {
+    const byName = new Map();
+    for (const d of allDiagnostics) {
+      if (d.rule !== 'ambiguous_method' || !d.receiver_name) continue;
+      const name = d.receiver_name;
+      if (!byName.has(name)) byName.set(name, { count: 0, methods: new Set() });
+      const entry = byName.get(name);
+      entry.count++;
+      entry.methods.add(d.method);
+    }
+
+    if (byName.size > 0) {
+      // Sort by count descending
+      const sorted = [...byName.entries()].sort((a, b) => b[1].count - a[1].count);
+      const unnamed = allDiagnostics.filter(d => d.rule === 'ambiguous_method' && !d.receiver_name).length;
+
+      console.log('');
+      console.log('Untyped variables (add type hints to resolve):');
+      console.log('  Count  Name                Methods');
+      console.log('  -----  ------------------  -------');
+      for (const [name, { count, methods }] of sorted) {
+        const methodList = [...methods].sort().join(', ');
+        console.log(`  ${String(count).padStart(5)}  ${name.padEnd(18)}  ${methodList}`);
+      }
+      if (unnamed > 0) {
+        console.log(`  ${String(unnamed).padStart(5)}  (expression)        (non-variable receivers)`);
+      }
+      console.log('');
+      console.log(`  ${sorted.length} unique variable names, ${allDiagnostics.filter(d => d.rule === 'ambiguous_method').length} total ambiguous warnings`);
+    }
+  }
 
   if (totalErrors > 0) {
     process.exit(1);
@@ -4038,6 +4076,7 @@ switch (command) {
       console.log('Usage: juntos lint [options] [files...]\n\nScan Ruby files for transpilation issues.\n');
       console.log('Options:');
       console.log('  --strict                 Enable strict warnings (rare but possible issues)');
+      console.log('  --summary                Show untyped variable summary (for type hints)');
       console.log('  --disable RULE           Disable a lint rule (can be repeated)');
       console.log('  --include PATTERN        Include only matching files (glob)');
       console.log('  --exclude PATTERN        Exclude matching files (glob)');

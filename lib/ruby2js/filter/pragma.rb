@@ -677,10 +677,33 @@ module Ruby2JS
         return if @reported_diagnostics[key]
         @reported_diagnostics[key] = true
 
+        # Extract receiver name for summary reporting
+        receiver = node.children.first
+        receiver_name = nil
+        if receiver
+          case receiver.type
+          when :lvar, :ivar, :gvar, :cvar
+            receiver_name = receiver.children.first.to_s
+          when :send
+            # For chained calls like obj.method, use the root variable
+            root = receiver
+            while root&.type == :send && root.children.first
+              root = root.children.first
+            end
+            if root&.type == :lvar || root&.type == :ivar
+              receiver_name = root.children.first.to_s
+            elsif root&.type == :send && root.children.first.nil?
+              # Bare method/variable: s(:send, nil, :name)
+              receiver_name = root.children[1].to_s
+            end
+          end
+        end
+
         diagnostics.push({
           severity: :warning,
           rule: :ambiguous_method,
           method: method.to_s,
+          receiver_name: receiver_name,
           line: line,
           column: column,
           file: file,
