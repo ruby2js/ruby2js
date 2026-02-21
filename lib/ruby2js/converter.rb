@@ -547,6 +547,7 @@ end
 
 # see https://github.com/whitequark/parser/blob/master/doc/AST_FORMAT.md
 
+require_relative 'converter/alias'
 require_relative 'converter/arg'
 require_relative 'converter/args'
 require_relative 'converter/array'

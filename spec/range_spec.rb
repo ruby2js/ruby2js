@@ -65,6 +65,42 @@ describe 'Range Converter' do
     end
   end
 
+  describe 'ranges with each block' do
+    it 'should convert inclusive range each to for loop' do
+      js = to_js('(1..3).each {|i| puts i}')
+      _(js).must_include 'for (let i = 1; i <= 3; i++)'
+      _(js).wont_include '$Range'
+    end
+
+    it 'should convert exclusive range each to for loop' do
+      js = to_js('(0...n).each {|i| puts i}')
+      _(js).must_include 'for (let i = 0; i < n; i++)'
+    end
+  end
+
+  describe 'ranges with other methods' do
+    def to_js_no_filters(string)
+      Ruby2JS.convert(string, filters: []).to_s
+    end
+
+    it 'should convert range.all? to array.every' do
+      js = to_js_no_filters('(0...size).all? {|i| check(i)}')
+      _(js).must_include '[...Array(size).keys()]'
+      _(js).must_include '.all'
+    end
+
+    it 'should convert range.map to array.map' do
+      js = to_js_no_filters('(0...n).map {|i| items[i]}')
+      _(js).must_include '[...Array(n).keys()]'
+      _(js).must_include '.map'
+    end
+
+    it 'should convert irange.select to array.select' do
+      js = to_js_no_filters('(1..10).select {|i| i.odd?}')
+      _(js).must_include '.select'
+    end
+  end
+
   describe 'ranges in case statements' do
     it 'should use comparison operators for inclusive range' do
       js = to_js('case x; when 1..10; puts "in range"; end')

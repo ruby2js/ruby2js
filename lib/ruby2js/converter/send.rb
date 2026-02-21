@@ -22,17 +22,18 @@ module Ruby2JS
         return parse node if node != @ast
       end
 
-      # :irange support
-      # - currently only .to_a
+      # :irange/:erange support
       if \
         receiver and
         receiver.type == :begin and
         [:irange, :erange].include? receiver.children.first.type
       then
-        unless method == :to_a
-          raise Error.new("#{receiver.children.first.type} can only be converted to array currently", receiver.children.first)
-        else
+        if method == :to_a
           return range_to_array(receiver.children.first)
+        else
+          # Convert range to array, then chain the method call
+          to_a_node = s(:send, receiver, :to_a)
+          return parse @ast.updated(nil, [to_a_node, *@ast.children[1..]])
         end
       end
 

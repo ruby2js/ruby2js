@@ -72,6 +72,17 @@ module Ruby2JS
         end
 
       elsif \
+        args.children.length == 1 and
+        call.children.first and call.children.first.type == :begin and
+        call.children[1] == :each and
+        [:irange, :erange].include? call.children.first.children.first.type
+      then
+        # convert (range).each { |var| ... } to a for loop
+        var = s(:lvasgn, args.children.first.children.first)
+        expression = call.children.first.children.first
+        parse @ast.updated(:for, [var, expression, block || s(:begin)])
+
+      elsif \
         call.children[0] == nil and call.children[1] == :loop and
         args.children.length == 0
       then

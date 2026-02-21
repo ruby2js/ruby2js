@@ -263,6 +263,18 @@ describe Ruby2JS do
     end
   end
 
+  describe 'alias' do
+    it "should convert alias to this assignment" do
+      to_js( 'alias new_method old_method' ).
+        must_equal 'this.new_method = this.old_method'
+    end
+
+    it "should strip trailing punctuation from alias names" do
+      to_js( 'alias visible? hidden?' ).
+        must_equal 'this.visible = this.hidden'
+    end
+  end
+
   describe 'boolean' do
     it "should parse boolean" do
       to_js( "true; false" ).must_equal 'true; false'
