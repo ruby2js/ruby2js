@@ -176,6 +176,8 @@ module Ruby2JS
             vars.delete(arg.children.first)
           elsif arg.type == :mlhs
             arg.children.each { |child| register_arg_vars.call(child) }
+          elsif arg.type == :splat
+            register_arg_vars.call(arg.children.first) if arg.children.first
           else
             vars[arg.children.first] = true
           end

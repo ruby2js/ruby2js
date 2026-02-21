@@ -246,6 +246,11 @@ describe Ruby2JS do
         must_equal "function f(a, ...args) {let block = args.pop()}"
     end
 
+    it "should not redeclare splat in mlhs callback arg" do
+      result = to_js('scores.each {|(score, *students), count| students = students.map {|s| s}}')
+      result.wont_include 'let students = students'
+    end
+
     it "should handle splats in array literals" do
       to_js( "[*a,1,2,*b,3,4,*c]" ).
         must_equal "[...a, 1, 2, ...b, 3, 4, ...c]"
