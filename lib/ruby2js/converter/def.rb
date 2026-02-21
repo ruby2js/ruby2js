@@ -289,7 +289,10 @@ module Ruby2JS
 
     handle :restarg do |name=nil|
       put '...'
-      put jsvar(name) if name
+      if name
+        put jsvar(name)
+        @vars[name] ||= true
+      end
     end
   end
 end

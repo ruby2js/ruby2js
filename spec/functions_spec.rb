@@ -302,6 +302,12 @@ describe Ruby2JS::Filter::Functions do
       result.must_include 'break'
     end
 
+    it "should not redeclare splat block arg on reassignment" do
+      result = to_js("items.each {|score, *students| students = students.map {|s| s.to_s}}")
+      result.must_include 'for (let [score, ...students] of items)'
+      result.wont_include 'let students = students'
+    end
+
     it "should handle first" do
       to_js( 'a.first' ).must_equal 'a[0]'
       to_js( 'a.first(n)' ).must_equal 'a.slice(0, n)'
