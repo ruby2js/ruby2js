@@ -434,10 +434,12 @@ module Ruby2JS
     def initialize(source, name = nil)
       @source = source
       @name = name || ''
-      # Build line offset table for line_for_position
+      # Build line offset table using byte positions (Prism uses byte offsets)
       @line_offsets = [0]
-      source.each_char.with_index do |char, i|
-        @line_offsets << (i + 1) if char == "\n"
+      byte_pos = 0
+      source.each_char do |char|
+        byte_pos += char.bytesize
+        @line_offsets << byte_pos if char == "\n"
       end
     end
 
@@ -451,12 +453,12 @@ module Ruby2JS
       @source.object_id.hash
     end
 
-    # Return line number (1-based) for a character position
+    # Return line number (1-based) for a byte position
     def line_for_position(pos)
       @line_offsets.bsearch_index { |offset| offset > pos } || @line_offsets.length
     end
 
-    # Return column number (0-based) for a character position
+    # Return column number (0-based, in bytes) for a byte position
     def column_for_position(pos)
       line_idx = (@line_offsets.bsearch_index { |offset| offset > pos } || @line_offsets.length) - 1
       pos - @line_offsets[line_idx]
@@ -474,8 +476,9 @@ module Ruby2JS
     end
 
     # Return the source text for this range (like Parser::Source::Range#source)
+    # Uses byteslice since Prism provides byte offsets
     def source
-      @source_buffer.source[@begin_pos...@end_pos]
+      @source_buffer.source.byteslice(@begin_pos...@end_pos)
     end
 
     # Return line number (1-based) for start of range
