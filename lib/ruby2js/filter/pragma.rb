@@ -93,6 +93,29 @@ module Ruby2JS
         proc: :proc,     # proc/lambda - callable with []
       }.freeze
 
+      # Methods with known return types (for type inference on :send nodes)
+      METHODS_RETURNING_ARRAY = %i[
+        to_a keys values split chars bytes lines
+        sort reverse uniq compact flatten shuffle sample
+        take drop pluck
+      ].freeze
+
+      METHODS_RETURNING_NUMBER = %i[
+        to_i to_f length size count max min sum
+        abs ceil floor round ord
+      ].freeze
+
+      METHODS_RETURNING_STRING = %i[
+        to_s to_str inspect
+        upcase downcase capitalize strip lstrip rstrip
+        chomp chop squeeze tr gsub sub
+        encode force_encoding
+      ].freeze
+
+      METHODS_RETURNING_HASH = %i[
+        to_h
+      ].freeze
+
       def initialize(*args)
         super
         @pragmas = {}
@@ -135,6 +158,17 @@ module Ruby2JS
             when :String then return :string
             end
           end
+
+          # Methods with known return types
+          if METHODS_RETURNING_ARRAY.include?(method)
+            return :array
+          elsif METHODS_RETURNING_NUMBER.include?(method)
+            return :number
+          elsif METHODS_RETURNING_STRING.include?(method)
+            return :string
+          elsif METHODS_RETURNING_HASH.include?(method)
+            return :hash
+          end
         end
 
         # Hash.new { block } - treat as :map (will become $Hash)
@@ -151,8 +185,12 @@ module Ruby2JS
               return :proc
             end
             # group_by { } returns a hash (Object in JS)
+            # map/select/reject/flat_map/sort_by with block return arrays
             if method == :group_by
               return :hash
+            elsif [:map, :select, :reject, :flat_map, :sort_by, :collect,
+                   :filter_map, :each_with_object].include?(method)
+              return :array
             end
           end
         end
@@ -272,6 +310,12 @@ module Ruby2JS
         else
           nil
         end
+      end
+
+      # Get the resolved type for any expression node.
+      # Checks: variable tracking, then expression-level inference.
+      def node_type(node)
+        var_type(node) || infer_type(node)
       end
 
       # Handle array compound assignments that differ between Ruby and JS
@@ -970,8 +1014,8 @@ module Ruby2JS
             # [...a, ...b]
             return process s(:array, s(:splat, target), s(:splat, args.first))
           elsif target && args.length == 1 &&
-              ![:int, :float, :str].include?(target.type) &&
-              ![:int, :float, :str].include?(args.first.type)
+              ![:number, :string].include?(node_type(target)) &&
+              ![:number, :string].include?(node_type(args.first))
             record_ambiguous_diagnostic(node, method, [:array])
           end
 
@@ -993,8 +1037,8 @@ module Ruby2JS
               negated
             )
           elsif target && args.length == 1 &&
-              ![:int, :float, :str].include?(target.type) &&
-              ![:int, :float, :str].include?(args.first.type)
+              ![:number, :string].include?(node_type(target)) &&
+              ![:number, :string].include?(node_type(args.first))
             record_ambiguous_diagnostic(node, method, [:array])
           end
 

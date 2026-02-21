@@ -1634,6 +1634,28 @@ describe Ruby2JS::Filter::Pragma do
       d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == '-' }
       _(d).wont_be_nil
     end
+
+    it "should not warn about + when operand has known numeric type from method" do
+      diags = lint('items.length + other.size')
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == '+' }
+      _(ambiguous).must_be_empty
+    end
+
+    it "should not warn about - when variable was assigned a number" do
+      diags = lint('x = items.count; x - y')
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == '-' }
+      _(ambiguous).must_be_empty
+    end
+
+    it "should not warn about + when operand is a string method" do
+      diags = lint('name.upcase + suffix')
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == '+' }
+      _(ambiguous).must_be_empty
+    end
+
+    it "should infer array type from to_a and transform +" do
+      to_js('x = items.to_a; x + other').must_include '[...x, ...other]'
+    end
   end
 
   describe "automatic class reopening detection" do

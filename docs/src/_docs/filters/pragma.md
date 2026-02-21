@@ -339,10 +339,11 @@ s.replace("other") # Pragma: string
 
 ## Type Inference
 
-Ruby2JS can automatically infer variable types from literals and constructor
-calls, reducing the need for explicit pragma annotations. When a variable is
-assigned a value with a recognizable type, subsequent operations on that
-variable will use the appropriate JavaScript equivalent.
+Ruby2JS can automatically infer variable types from literals, constructor
+calls, and method return types, reducing the need for explicit pragma
+annotations. When a variable is assigned a value with a recognizable type,
+subsequent operations on that variable will use the appropriate JavaScript
+equivalent.
 
 ### Inferred Types
 
@@ -361,6 +362,18 @@ Types are inferred from:
 - `Array.new` → array
 - `Hash.new` → hash
 - `String.new` → string
+
+**Method return types:**
+- Array-returning: `to_a`, `keys`, `values`, `split`, `chars`, `bytes`,
+  `lines`, `sort`, `reverse`, `uniq`, `compact`, `flatten`, `shuffle`,
+  `sample`, `take`, `drop`, `pluck`
+- Number-returning: `to_i`, `to_f`, `length`, `size`, `count`, `max`, `min`,
+  `sum`, `abs`, `ceil`, `floor`, `round`, `ord`
+- String-returning: `to_s`, `to_str`, `upcase`, `downcase`, `capitalize`,
+  `strip`, `chomp`, `chop`, `gsub`, `sub`, `tr`, `squeeze`
+- Hash-returning: `to_h`
+- Block methods: `map`, `select`, `reject`, `flat_map`, `sort_by`, `collect`,
+  `filter_map` → array; `group_by` → hash
 
 **Callable types:**
 - `proc { }` → proc (callable with `[]`)
@@ -394,10 +407,44 @@ config = {}
 config.empty?
 # => let config = {}; Object.keys(config).length === 0
 
+# Type inferred from method return - no pragma needed
+words = sentence.split(" ")
+words << "end"
+# => let words = sentence.split(" "); words.push("end")
+
+results = data.select { |x| x > 0 }
+results += extra
+# => let results = data.filter(x => x > 0); results.push(...extra)
+
+pairs = entries.to_h
+pairs.delete(:key)
+# => let pairs = entries.to_h; delete pairs.key
+
 # Proc/lambda calls are converted
 fn = proc { |x| x * 2 }
 fn[5]
 # => let fn = x => x * 2; fn(5)
+```
+
+### Literal Context for `+` and `-`
+
+When either operand of `+` or `-` is a numeric or string literal, the
+operation is unambiguously numeric addition or string concatenation — never
+array concat or difference. No warning is produced and no pragma is needed:
+
+```ruby
+count + 1              # Numeric — no warning
+items.length - offset  # items.length inferred as number — no warning
+path + "/"             # String literal — no warning
+x + y                  # Both unknown — warning (could be array concat)
+```
+
+Similarly, when either operand is a variable or expression with a known
+numeric or string type, the warning is suppressed:
+
+```ruby
+n = items.count        # n inferred as number
+n + offset             # No warning — n is known numeric
 ```
 
 ### Sorbet T.let
@@ -514,7 +561,8 @@ in other methods are only tracked within that method.
 
 You still need pragmas when:
 
-1. **No assignment visible:** The variable comes from a parameter or external source
+1. **No assignment visible:** The variable comes from a parameter with no
+   type-inferrable operations, or from a custom method with unknown return type
 2. **Type changes:** A variable is reassigned to a different type
 3. **Override needed:** You want different behavior than the inferred type
 
@@ -523,8 +571,19 @@ def process(data)   # data type unknown
   data << item # Pragma: array  # Pragma needed
 end
 
-items = get_items() # Return type unknown
+items = get_items() # Custom method — return type unknown
 items << x # Pragma: set        # Pragma needed
+```
+
+Note that method return types are now recognized, so many cases that
+previously required pragmas are now auto-resolved:
+
+```ruby
+def process(data)
+  data.length + 1      # No pragma needed — .length is numeric
+  parts = data.split(",")
+  parts << "end"       # No pragma needed — .split returns array
+end
 ```
 
 ## Behavior Pragmas
