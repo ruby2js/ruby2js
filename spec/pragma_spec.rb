@@ -1604,6 +1604,36 @@ describe Ruby2JS::Filter::Pragma do
       _(d).wont_be_nil
       _(d[:valid_types]).must_include :set
     end
+
+    it "should not warn about + with numeric literal operand" do
+      diags = lint('x + 1')
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == '+' }
+      _(ambiguous).must_be_empty
+    end
+
+    it "should not warn about - with numeric literal operand" do
+      diags = lint('x - 1')
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == '-' }
+      _(ambiguous).must_be_empty
+    end
+
+    it "should not warn about + with string literal operand" do
+      diags = lint('x + "/"')
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == '+' }
+      _(ambiguous).must_be_empty
+    end
+
+    it "should warn about + with unknown operands" do
+      diags = lint('x + y')
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == '+' }
+      _(d).wont_be_nil
+    end
+
+    it "should warn about - with unknown operands" do
+      diags = lint('x - y')
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == '-' }
+      _(d).wont_be_nil
+    end
   end
 
   describe "automatic class reopening detection" do

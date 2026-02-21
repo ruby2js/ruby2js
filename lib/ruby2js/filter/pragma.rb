@@ -969,8 +969,10 @@ module Ruby2JS
           if type == :array && target && args.length == 1
             # [...a, ...b]
             return process s(:array, s(:splat, target), s(:splat, args.first))
-          else
-            record_ambiguous_diagnostic(node, method, [:array]) if target
+          elsif target && args.length == 1 &&
+              ![:int, :float, :str].include?(target.type) &&
+              ![:int, :float, :str].include?(args.first.type)
+            record_ambiguous_diagnostic(node, method, [:array])
           end
 
         # a - b → a.filter(x => !b.includes(x))  (difference - JS - gives NaN)
@@ -990,8 +992,10 @@ module Ruby2JS
               s(:args, x_arg),
               negated
             )
-          else
-            record_ambiguous_diagnostic(node, method, [:array]) if target
+          elsif target && args.length == 1 &&
+              ![:int, :float, :str].include?(target.type) &&
+              ![:int, :float, :str].include?(args.first.type)
+            record_ambiguous_diagnostic(node, method, [:array])
           end
 
         # a & b → a.filter(x => b.includes(x))  (intersection - JS & is bitwise)
