@@ -1140,6 +1140,16 @@ module Ruby2JS
       #
       # Also handles shadowargs - block-local variables that shadow outer scope
       # These create JS-scoped let declarations, so we preserve outer types
+      # Check if a block body contains break or next statements (which are
+      # invalid inside forEach callbacks but valid inside for...of loops)
+      def contains_break_or_next?(node)
+        return false unless node.respond_to?(:type)
+        return true if node.type == :break || node.type == :next
+        # Don't descend into nested blocks/lambdas - they have their own scope
+        return false if [:block, :lambda].include?(node.type)
+        node.children.any? { |c| contains_break_or_next?(c) }
+      end
+
       def on_block(node)
         call, args, body = node.children
 
@@ -1172,7 +1182,6 @@ module Ruby2JS
 
           if [:each, :each_pair].include?(method) && target
             # Transform: hash.each { |k,v| body }
-            # Into: Object.entries(hash).forEach(([k,v]) => body)
             entries_call = s(:send,
               s(:const, nil, :Object), :entries, target)
 
@@ -1183,7 +1192,20 @@ module Ruby2JS
               args
             end
 
-            # Create new block without location to avoid re-triggering pragma
+            if contains_break_or_next?(body)
+              # Use for...of when body contains break/next (invalid in forEach)
+              # Into: for (let [k,v] of Object.entries(hash)) { body }
+              lvasgn = if args.children.length > 1
+                s(:mlhs, *args.children.map { |a| s(:lvasgn, a.children.first) })
+              elsif args.children.length == 1
+                s(:lvasgn, args.children.first.children.first)
+              else
+                s(:lvasgn, :_)
+              end
+              return process node.updated(:for_of, [lvasgn, entries_call, body])
+            end
+
+            # Into: Object.entries(hash).forEach(([k,v]) => body)
             return process s(:block,
               s(:send, entries_call, :forEach),
               new_args,

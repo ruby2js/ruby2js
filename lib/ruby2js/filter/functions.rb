@@ -1824,9 +1824,40 @@ module Ruby2JS
             call.children[2], s(:deff, nil, *node.children[1..-1])])
 
         elsif method == :each_with_index and call.children.length == 2
-          # array.each_with_index { |item, i| ... } => array.forEach((item, i) => ...)
-          call = call.updated(nil, [call.children.first, :forEach])
-          node.updated(nil, [process(call), *node.children[1..-1].map { |c| process(c) }])
+          # array.each_with_index { |item, i| ... }
+          # => for (let i = 0; i < array.length; i++) { let item = array[i]; ... }
+          args_children = node.children[1].children
+          first_arg = args_children[0]
+          index_arg = args_children[1]&.children&.first || :_i
+          target = call.children.first
+          body = node.children[2]
+
+          # Build item assignment based on arg type
+          if first_arg&.type == :mlhs
+            # Destructured: |([k,v]), i| => let [k, v] = target[i]
+            lhs = s(:mlhs, *first_arg.children.map { |a| s(:lvasgn, a.children.first) })
+            item_assign = s(:masgn, lhs,
+              s(:send, target, :[], s(:lvar, index_arg)))
+          else
+            # Simple: |item, i| => let item = target[i]
+            item_name = first_arg&.children&.first || :_item
+            item_assign = s(:lvasgn, item_name,
+              s(:send, target, :[], s(:lvar, index_arg)))
+          end
+
+          body = if body&.type == :begin
+            body.updated(nil, [item_assign, *body.children])
+          elsif body
+            s(:begin, item_assign, body)
+          else
+            item_assign
+          end
+
+          process s(:for,
+            s(:lvasgn, index_arg),
+            s(:erange, s(:int, 0),
+              s(:attr, target, :length)),
+            body)
 
         else
           super

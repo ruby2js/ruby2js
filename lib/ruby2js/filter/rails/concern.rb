@@ -12,7 +12,7 @@ module Ruby2JS
         CONCERN_SELF_EXCEPTIONS = %i[
           require require_relative puts print p pp raise fail
           Array Hash String Integer Float
-          lambda proc
+          lambda proc loop
         ].freeze
 
         # ActiveRecord instance methods that are always method calls, never

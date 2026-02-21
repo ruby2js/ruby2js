@@ -959,7 +959,14 @@ describe Ruby2JS::Filter::Pragma do
 
       it "should disambiguate each_with_index for hash" do
         to_js_with_functions('h = {}; h.each_with_index { |(k, v), i| puts i }').
-          must_include 'Object.entries(h).forEach'
+          must_include 'Object.entries(h)'
+      end
+
+      it "should use for..of for hash each with break" do
+        result = to_js_with_functions(
+          'h = {a: 1}; h.each { |k, v| break if v > 0 }')
+        result.must_include 'for (let [k, v] of Object.entries(h))'
+        result.must_include 'break'
       end
 
       it "should disambiguate .any? and .empty? for hash" do

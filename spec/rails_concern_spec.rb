@@ -243,4 +243,23 @@ describe Ruby2JS::Filter::Rails::Concern do
       assert_includes result, 'publish'
     end
   end
+
+  describe "loop do in concerns" do
+    it "should preserve loop do as while(true) with break" do
+      result = to_js(<<~RUBY)
+        module Cleanup
+          extend ActiveSupport::Concern
+          def cleanup(items)
+            loop do
+              item = items.find { |i| i[:stale] }
+              break unless item
+              items.delete(item)
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'while (true)'
+      assert_includes result, 'break'
+    end
+  end
 end

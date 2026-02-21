@@ -291,9 +291,15 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'let a = 0; for (let i of [1, 2, 3]) {a += i}'
     end
 
-    it "should map each_with_index to forEach" do
+    it "should map each_with_index to for loop" do
       to_js( 'a = 0; [1,2,3].each_with_index {|n, i| a += n}').
-        must_equal 'let a = 0; [1, 2, 3].forEach((n, i) => a += n)'
+        must_include 'for (let i = 0; i < [1, 2, 3].length; i++)'
+    end
+
+    it "should support break in each_with_index" do
+      result = to_js( 'items.each_with_index {|item, i| break if item.nil?}')
+      result.must_include 'for (let i = 0; i < items.length; i++)'
+      result.must_include 'break'
     end
 
     it "should handle first" do
