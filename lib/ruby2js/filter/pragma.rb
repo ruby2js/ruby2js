@@ -671,6 +671,12 @@ module Ruby2JS
         # (common with selfhost converter where source buffer names aren't set)
         file = source_name || @options[:file]
 
+        # Deduplicate: skip if we already reported this exact location and method
+        key = [file, line, column, method.to_s]
+        @reported_diagnostics ||= {}
+        return if @reported_diagnostics[key]
+        @reported_diagnostics[key] = true
+
         diagnostics.push({
           severity: :warning,
           rule: :ambiguous_method,

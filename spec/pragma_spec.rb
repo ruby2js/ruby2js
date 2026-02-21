@@ -1656,6 +1656,13 @@ describe Ruby2JS::Filter::Pragma do
     it "should infer array type from to_a and transform +" do
       to_js('x = items.to_a; x + other').must_include '[...x, ...other]'
     end
+
+    it "should deduplicate warnings for the same location" do
+      d = lint("x = a + b\ny = a + b")
+      plus_warnings = d.select { |w| w[:method] == '+' }
+      assert_equal 2, plus_warnings.length
+      assert_equal [1, 2], plus_warnings.map { |w| w[:line] }
+    end
   end
 
   describe "enhanced type inference" do
@@ -1679,6 +1686,7 @@ describe Ruby2JS::Filter::Pragma do
     it "should infer value type from ||= on hash subscript" do
       to_js('h = {}; h[:key] ||= []; h[:key] << item').must_include '.push(item)'
     end
+
   end
 
   describe "automatic class reopening detection" do
