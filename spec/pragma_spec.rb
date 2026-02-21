@@ -1733,4 +1733,121 @@ describe Ruby2JS::Filter::Pragma do
       js.must_include 'class MAX'
     end
   end
+
+  describe "type_hints option" do
+    def to_js_with_hints(string, hints, options={})
+      _(Ruby2JS.convert(string, options.merge(
+        eslevel: options[:eslevel] || 2021,
+        or: options[:or] || :logical,
+        filters: [Ruby2JS::Filter::Pragma],
+        type_hints: hints
+      )).to_s)
+    end
+
+    def lint_with_hints(string, hints, options={})
+      diagnostics = []
+      Ruby2JS.convert(string, options.merge(
+        eslevel: options[:eslevel] || 2021,
+        filters: [Ruby2JS::Filter::Pragma],
+        lint: true,
+        diagnostics: diagnostics,
+        type_hints: hints
+      ))
+      diagnostics
+    end
+
+    it "should resolve << as array push with type hint" do
+      to_js_with_hints('items << x', { items: 'array' }).
+        must_include 'items.push(x)'
+    end
+
+    it "should resolve dup as hash spread with type hint" do
+      to_js_with_hints('copy = items.dup', { items: 'hash' }).
+        must_include '{...items}'
+    end
+
+    it "should resolve delete as array splice with type hint" do
+      to_js_with_hints('items.delete(x)', { items: 'array' }).
+        must_include 'splice'
+    end
+
+    it "should be overridden by code inference (higher priority)" do
+      # items is assigned [], so inferred as array — hint says hash, but inference wins
+      to_js_with_hints('items = []; items << x', { items: 'hash' }).
+        must_include 'items.push(x)'
+    end
+
+    it "should be overridden by pragma comment (highest priority)" do
+      to_js_with_hints('items << x # Pragma: set', { items: 'array' }).
+        must_include 'items.add(x)'
+    end
+
+    it "should suppress lint warnings when hint resolves type" do
+      diags = lint_with_hints('items << x', { items: 'array' })
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == '<<' }
+      _(ambiguous).must_be_empty
+    end
+
+    it "should work for instance variables" do
+      to_js_with_hints('@items << x', { '@items': 'array' }).
+        must_include 'push(x)'
+    end
+
+    it "should accept symbol keys in type_hints" do
+      to_js_with_hints('items << x', { items: :array }).
+        must_include 'items.push(x)'
+    end
+
+    it "should ignore unknown type values" do
+      # 'unknown' is not in the known types list, should be ignored
+      diags = lint_with_hints('items << x', { items: 'unknown' })
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == '<<' }
+      _(ambiguous.length).must_be :>=, 1
+    end
+
+    it "should work with + operator for array type hint" do
+      to_js_with_hints('result = a + b', { a: 'array' }).
+        must_include '...a, ...b'
+    end
+
+    it "should work with number type hint for + (no warning)" do
+      diags = lint_with_hints('total = a + b', { a: 'number' })
+      ambiguous = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == '+' }
+      _(ambiguous).must_be_empty
+    end
+  end
+
+  describe "arg_types in diagnostics" do
+    def lint(string, options={})
+      diagnostics = []
+      Ruby2JS.convert(string, options.merge(
+        eslevel: options[:eslevel] || 2021,
+        filters: [Ruby2JS::Filter::Pragma],
+        lint: true,
+        diagnostics: diagnostics
+      ))
+      diagnostics
+    end
+
+    it "should include arg_types for delete with symbol arg" do
+      diags = lint('obj.delete(:key)')
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'delete' }
+      _(d).wont_be_nil
+      _(d[:arg_types]).must_include 'sym'
+    end
+
+    it "should include arg_types for << with string arg" do
+      diags = lint('obj << "hello"')
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == '<<' }
+      _(d).wont_be_nil
+      _(d[:arg_types]).must_include 'str'
+    end
+
+    it "should have empty arg_types for dup (no args)" do
+      diags = lint('obj.dup')
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'dup' }
+      _(d).wont_be_nil
+      _(d[:arg_types]).must_equal []
+    end
+  end
 end

@@ -494,6 +494,8 @@ npx juntos lint [options] [files...]
 | Option | Description |
 |--------|-------------|
 | `--strict` | Enable strict warnings for rare but possible issues |
+| `--summary` | Show untyped variable summary (for planning type hints) |
+| `--suggest` | Auto-generate type hints in `config/ruby2js.yml` |
 | `--disable RULE` | Disable a rule (can be repeated) |
 | `--include PATTERN` | Include only matching files (glob, can be repeated) |
 | `--exclude PATTERN` | Exclude matching files (glob, can be repeated) |
@@ -507,6 +509,8 @@ npx juntos lint app/models/article.rb        # Lint a specific file
 npx juntos lint --strict                     # Include strict warnings
 npx juntos lint --disable ambiguous_method   # Skip type-ambiguity warnings
 npx juntos lint --include "app/models/**"    # Only lint models
+npx juntos lint --summary                    # Show untyped variable summary
+npx juntos lint --suggest                    # Auto-generate type hints
 ```
 
 **What it does:**
@@ -576,6 +580,18 @@ items = T.let([], Array)
 items.delete(x)        # → items.splice(items.indexOf(x), 1)
 ```
 
+**4. Add type hints** in `config/ruby2js.yml`:
+
+```yaml
+lint:
+  type_hints:
+    items: array
+```
+
+Type hints apply globally as a low-priority default. They are overridden by
+local type inference and pragma comments. Use `juntos lint --suggest` to
+auto-generate hints based on usage patterns.
+
 See the [Pragmas documentation](/docs/users-guide/pragmas) for the full list of type disambiguation pragmas.
 
 ### Configuration in ruby2js.yml
@@ -589,7 +605,21 @@ lint:
     - "app/models/**"
   exclude:
     - "app/models/concerns/**"
+  type_hints:
+    params: hash
+    positions: array
+    remaining_seats: number
 ```
+
+The `type_hints` section maps variable names to their types. Supported types: `array`, `hash`, `string`, `number`, `set`, `map`, `proc`. These hints act as a global fallback — they are overridden by local type inference (e.g., `items = []`) and pragma comments (e.g., `# Pragma: array`).
+
+### Recommended workflow
+
+1. Run `juntos lint --summary` to see which variables produce the most warnings
+2. Run `juntos lint --suggest` to auto-generate type hints from usage patterns
+3. Review `config/ruby2js.yml` — adjust any incorrect guesses
+4. Run `juntos lint` to see remaining warnings
+5. Add `# Pragma:` comments for the remaining cases
 
 ## Database Adapters
 

@@ -128,11 +128,26 @@ module Ruby2JS
         @var_value_types_stack = [] # Stack for scope management
         @in_initialize = false # Track if we're in an initialize method
         @const_classes = {}    # Track constants assigned class-like values (Struct.new, Class.new)
+        @global_type_hints = {} # name → type symbol, from config file
       end
 
       def options=(options)
         super
         @pragma_target = options[:target]
+
+        # Load type hints from options (set by CLI from config file)
+        # Use .keys.each pattern for JS compatibility (hash.each transpiles to
+        # for..of which fails on plain JS objects)
+        if options[:type_hints]
+          known_types = [:array, :hash, :string, :number, :set, :map, :proc]
+          hints = options[:type_hints]
+          hints.keys.each do |name|
+            sym = hints[name].to_s.to_sym
+            if known_types.include?(sym)
+              @global_type_hints[name.to_s.to_sym] = sym
+            end
+          end
+        end
       end
 
       # Infer type from an AST node (literal or constructor call)
@@ -345,15 +360,23 @@ module Ruby2JS
       end
 
       # Get the inferred type for a variable reference
+      # Precedence: pragma > code inference > T.let > global hint (from config)
       def var_type(node)
         return nil unless node
         case node.type
         when :lvar
-          @var_types[node.children.first]
-        when :ivar
-          # Check method-scoped first, then class-scoped
           name = node.children.first
-          @var_types[name] || @ivar_types[name]
+          @var_types[name] || @global_type_hints[name]
+        when :ivar
+          # Check method-scoped first, then class-scoped, then global hints
+          name = node.children.first
+          @var_types[name] || @ivar_types[name] || @global_type_hints[name]
+        when :send
+          # Bare method/variable: s(:send, nil, :name) — check global hints
+          if node.children.first.nil? && node.children.length == 2
+            name = node.children[1]
+            @global_type_hints[name]
+          end
         else
           nil
         end
@@ -699,6 +722,14 @@ module Ruby2JS
           end
         end
 
+        # Capture argument literal types for heuristic analysis in --suggest
+        arg_types = []
+        if node.children.length > 2
+          node.children[2..].each do |arg|
+            arg_types.push(arg.type.to_s) if arg.respond_to?(:type)
+          end
+        end
+
         diagnostics.push({
           severity: :warning,
           rule: :ambiguous_method,
@@ -708,6 +739,7 @@ module Ruby2JS
           column: column,
           file: file,
           valid_types: valid_types,
+          arg_types: arg_types,
           message: "ambiguous method '#{method}' - receiver type unknown"
         })
       end

@@ -1140,7 +1140,8 @@ function parseCommonArgs(args) {
     // Lint options
     disable: [],      // --disable rules (can be repeated)
     strict: false,    // --strict: enable strict lint warnings
-    summary: false    // --summary: show untyped variable summary
+    summary: false,   // --summary: show untyped variable summary
+    suggest: false    // --suggest: auto-generate type hints
   };
 
   const remaining = [];
@@ -1237,6 +1238,8 @@ function parseCommonArgs(args) {
       options.strict = true;
     } else if (arg === '--summary') {
       options.summary = true;
+    } else if (arg === '--suggest') {
+      options.suggest = true;
     } else {
       remaining.push(arg);
     }
@@ -3298,7 +3301,10 @@ async function runLint(files, options) {
 
     let diagnostics;
     try {
-      diagnostics = await lintRuby(source, filePath, section, config, APP_ROOT, { strict: options.strict });
+      diagnostics = await lintRuby(source, filePath, section, config, APP_ROOT, {
+        strict: options.strict,
+        type_hints: lintConfig.type_hints || {}
+      });
     } catch (err) {
       diagnostics = [{
         severity: 'error', rule: 'lint_error',
@@ -3365,9 +3371,194 @@ async function runLint(files, options) {
     }
   }
 
+  // --suggest: auto-generate type hints from diagnostic patterns
+  if (options.suggest && allDiagnostics.length > 0) {
+    const suggestions = suggestTypeHints(allDiagnostics);
+
+    if (suggestions.high.length > 0 || suggestions.medium.length > 0) {
+      const totalSuggestions = suggestions.high.length + suggestions.medium.length;
+      const coveredWarnings = suggestions.high.reduce((n, s) => n + s.count, 0)
+        + suggestions.medium.reduce((n, s) => n + s.count, 0);
+
+      console.log('');
+      console.log(`Type hint suggestions (${totalSuggestions} variables, covering ${coveredWarnings} of ${totalWarnings} warnings):`);
+
+      if (suggestions.high.length > 0) {
+        console.log('');
+        console.log('  High confidence:');
+        for (const s of suggestions.high) {
+          console.log(`    ${s.name.padEnd(24)} ${s.type.padEnd(10)} # ${s.reason}`);
+        }
+      }
+
+      if (suggestions.medium.length > 0) {
+        console.log('');
+        console.log('  Medium confidence:');
+        for (const s of suggestions.medium) {
+          console.log(`    ${s.name.padEnd(24)} ${s.type.padEnd(10)} # ${s.reason}`);
+        }
+      }
+
+      if (suggestions.skipped.length > 0) {
+        const skippedWarnings = suggestions.skipped.reduce((n, s) => n + s.count, 0);
+        console.log('');
+        console.log(`  Skipped (${suggestions.skipped.length} variables, ${skippedWarnings} warnings):`);
+        for (const s of suggestions.skipped) {
+          console.log(`    ${s.name.padEnd(24)} # ${s.reason}`);
+        }
+      }
+
+      // Write to config file
+      const configPath = join(APP_ROOT, 'config/ruby2js.yml');
+      const newHints = {};
+      for (const s of [...suggestions.high, ...suggestions.medium]) {
+        newHints[s.name] = s.type;
+      }
+
+      let existingConfig = {};
+      if (existsSync(configPath) && yaml) {
+        try {
+          existingConfig = yaml.load(readFileSync(configPath, 'utf8')) || {};
+        } catch { /* ignore parse errors */ }
+      }
+
+      // Merge: existing entries take precedence (user corrections not overwritten)
+      const existingHints = existingConfig.lint?.type_hints || {};
+      const mergedHints = { ...newHints, ...existingHints };
+
+      if (Object.keys(mergedHints).length > 0) {
+        if (!existingConfig.lint) existingConfig.lint = {};
+        existingConfig.lint.type_hints = mergedHints;
+
+        if (yaml) {
+          // Ensure config directory exists
+          const configDir = join(APP_ROOT, 'config');
+          if (!existsSync(configDir)) mkdirSync(configDir, { recursive: true });
+
+          writeFileSync(configPath, yaml.dump(existingConfig, { lineWidth: -1 }));
+          console.log('');
+          console.log(`Written to ${relative(APP_ROOT, configPath)} (lint.type_hints section)`);
+        } else {
+          console.log('');
+          console.log('Warning: js-yaml not available, cannot write config file.');
+          console.log('Add the following to config/ruby2js.yml manually:');
+          console.log('');
+          console.log('lint:');
+          console.log('  type_hints:');
+          for (const [name, type] of Object.entries(mergedHints)) {
+            console.log(`    ${name}: ${type}`);
+          }
+        }
+      }
+    } else {
+      console.log('');
+      console.log('No type hint suggestions could be generated from the current warnings.');
+    }
+  }
+
   if (totalErrors > 0) {
     process.exit(1);
   }
+}
+
+/**
+ * Analyze lint diagnostics and suggest type hints based on usage patterns.
+ *
+ * @param {Array} diagnostics - All collected diagnostic objects
+ * @returns {{ high: Array, medium: Array, skipped: Array }} Categorized suggestions
+ */
+function suggestTypeHints(diagnostics) {
+  // Collect all ambiguous_method warnings grouped by receiver name
+  const byName = new Map();
+  for (const d of diagnostics) {
+    if (d.rule !== 'ambiguous_method' || !d.receiver_name) continue;
+    const name = d.receiver_name;
+    if (!byName.has(name)) byName.set(name, { methods: new Set(), argTypes: [], count: 0 });
+    const entry = byName.get(name);
+    entry.methods.add(d.method);
+    entry.count++;
+    if (d.arg_types) entry.argTypes.push(...d.arg_types);
+  }
+
+  const high = [];
+  const medium = [];
+  const skipped = [];
+
+  // Name-based patterns for number detection
+  const numberSuffixes = /_(?:count|total|size|seats|score|index|id|number|level|base|amount|price|quantity|weight|height|width|depth|length|offset|limit|max|min|sum|avg|rate|ratio|percent|position|rank|order|step|threshold)$/;
+
+  for (const [name, { methods, argTypes, count }] of byName) {
+    const methodArr = [...methods];
+
+    // --- High confidence rules ---
+
+    // Only << methods → array (string << is rare in modern Ruby)
+    if (methodArr.length === 1 && methods.has('<<')) {
+      high.push({ name, type: 'array', count, reason: 'only used with <<' });
+      continue;
+    }
+
+    // Only & or | methods → array (bitwise ops on objects are rare)
+    if (methodArr.every(m => m === '&' || m === '|')) {
+      high.push({ name, type: 'array', count, reason: 'only used with & or |' });
+      continue;
+    }
+
+    // dup + any array method (<<, +) → array
+    if (methods.has('dup') && (methods.has('<<') || (methods.has('+') && methods.has('&')))) {
+      high.push({ name, type: 'array', count, reason: 'dup + array operations' });
+      continue;
+    }
+
+    // delete + << on same var → array (hash doesn't use <<)
+    if (methods.has('delete') && methods.has('<<')) {
+      high.push({ name, type: 'array', count, reason: 'delete + << (hash does not use <<)' });
+      continue;
+    }
+
+    // Name matches number suffix patterns
+    if (numberSuffixes.test(name)) {
+      high.push({ name, type: 'number', count, reason: `name pattern: *_${name.match(numberSuffixes)[0].slice(1)}` });
+      continue;
+    }
+
+    // Name is 'params' → hash (Rails convention)
+    if (name === 'params') {
+      high.push({ name, type: 'hash', count, reason: 'Rails convention' });
+      continue;
+    }
+
+    // --- Medium confidence rules ---
+
+    // Only +/- methods (no array indicators like <<, &, |) → number
+    if (methodArr.every(m => m === '+' || m === '-') && !methods.has('<<')) {
+      medium.push({ name, type: 'number', count, reason: 'only +/- operations' });
+      continue;
+    }
+
+    // Only delete (no <<) → hash (hash delete is more common)
+    if (methodArr.length === 1 && methods.has('delete') && !methods.has('<<')) {
+      medium.push({ name, type: 'hash', count, reason: 'only delete operations' });
+      continue;
+    }
+
+    // dup alone → hash (hash dup is common in Rails)
+    if (methodArr.length === 1 && methods.has('dup')) {
+      medium.push({ name, type: 'hash', count, reason: 'only dup (common for hashes)' });
+      continue;
+    }
+
+    // --- Low confidence: skip ---
+    const methodList = methodArr.sort().join(', ');
+    skipped.push({ name, count, reason: `mixed ${methodList} — add pragma or type hint manually` });
+  }
+
+  // Sort each category by count descending
+  high.sort((a, b) => b.count - a.count);
+  medium.sort((a, b) => b.count - a.count);
+  skipped.sort((a, b) => b.count - a.count);
+
+  return { high, medium, skipped };
 }
 
 // ============================================
@@ -4077,6 +4268,7 @@ switch (command) {
       console.log('Options:');
       console.log('  --strict                 Enable strict warnings (rare but possible issues)');
       console.log('  --summary                Show untyped variable summary (for type hints)');
+      console.log('  --suggest                Auto-generate type hints in config/ruby2js.yml');
       console.log('  --disable RULE           Disable a lint rule (can be repeated)');
       console.log('  --include PATTERN        Include only matching files (glob)');
       console.log('  --exclude PATTERN        Exclude matching files (glob)');
@@ -4098,6 +4290,7 @@ switch (command) {
       console.log('  juntos lint app/models/article.rb        # Lint specific file');
       console.log('  juntos lint --strict                     # Include strict warnings');
       console.log('  juntos lint --disable ambiguous_method   # Skip ambiguity warnings');
+      console.log('  juntos lint --suggest                    # Auto-generate type hints');
       process.exit(0);
     }
     runLint(commandArgs, options).catch(err => {

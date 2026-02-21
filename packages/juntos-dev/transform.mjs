@@ -2536,7 +2536,8 @@ export async function lintRuby(source, filePath, section, config, appRoot, lintO
       target: config.target,
       lint: true,
       strict: !!lintOptions.strict,
-      diagnostics: diagnostics  // shared mutable array - pragma filter pushes to it
+      diagnostics: diagnostics,  // shared mutable array - pragma filter pushes to it
+      ...(lintOptions.type_hints ? { type_hints: lintOptions.type_hints } : {})
     };
 
     convert(source, options);
