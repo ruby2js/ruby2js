@@ -1725,7 +1725,7 @@ describe Ruby2JS::Filter::Pragma do
     end
 
     it "should include receiver_name from chained calls" do
-      d = lint("person.delete(:lead)")
+      d = lint("person.delete(item)")
       assert_equal 1, d.length
       assert_equal 'person', d.first[:receiver_name]
     end
@@ -1877,11 +1877,17 @@ describe Ruby2JS::Filter::Pragma do
       diagnostics
     end
 
-    it "should include arg_types for delete with symbol arg" do
+    it "should skip diagnostic for delete with literal key" do
       diags = lint('obj.delete(:key)')
       d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'delete' }
+      _(d).must_be_nil
+    end
+
+    it "should include arg_types for delete with variable arg" do
+      diags = lint('obj.delete(item)')
+      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'delete' }
       _(d).wont_be_nil
-      _(d[:arg_types]).must_include 'sym'
+      _(d[:arg_types]).must_include 'send'
     end
 
     it "should include arg_types for << with string arg" do

@@ -97,7 +97,7 @@ module Ruby2JS
       METHODS_RETURNING_ARRAY = %i[
         to_a keys values split chars bytes lines
         sort reverse uniq compact flatten shuffle sample
-        take drop pluck
+        take drop pluck all
       ].freeze
 
       METHODS_RETURNING_NUMBER = %i[
@@ -109,7 +109,7 @@ module Ruby2JS
         to_s to_str inspect
         upcase downcase capitalize strip lstrip rstrip
         chomp chop squeeze tr gsub sub
-        encode force_encoding
+        encode force_encoding to_csv
       ].freeze
 
       METHODS_RETURNING_HASH = %i[
@@ -165,6 +165,15 @@ module Ruby2JS
         # if the type is in our known set of keys first.
         if [:array, :hash, :str, :dstr, :xstr, :int, :float, :regexp, :proc].include?(node.type)
           return TYPE_INFERENCE[node.type]
+        end
+
+        # Well-known module constants (File::RDWR, Process::RLIMIT_CPU, etc.)
+        if node.type == :const
+          parent = node.children.first
+          if parent&.type == :const &&
+             [:File, :Process, :Signal, :IO].include?(parent.children.last)
+            return :number
+          end
         end
 
         # Constructor calls: Set.new, Map.new, Array.new, Hash.new, String.new
@@ -226,6 +235,8 @@ module Ruby2JS
             return true_type
           elsif false_type && (true_branch.nil? || true_branch.type == :nil)
             return false_type
+          elsif true_type && false_type && true_type == false_type
+            return true_type
           end
         end
 
@@ -1022,7 +1033,7 @@ module Ruby2JS
           type = if pragma?(node, :array) then :array
                  elsif pragma?(node, :hash) then :hash
                  elsif pragma?(node, :string) then :string
-                 else var_type(target)
+                 else node_type(target)
                  end
 
           if type == :array
@@ -1044,7 +1055,7 @@ module Ruby2JS
           type = if pragma?(node, :array) then :array
                  elsif pragma?(node, :set) then :set
                  elsif pragma?(node, :string) then :string
-                 else var_type(target)
+                 else node_type(target)
                  end
 
           if type == :array && args.length == 1
@@ -1100,7 +1111,9 @@ module Ruby2JS
               return process s(:send, target, :splice,
                 s(:send, target, :indexOf, args.first), s(:int, 1))
             elsif type.nil?
-              record_ambiguous_diagnostic(node, method, [:set, :map, :array]) if target
+              unless args.length == 1 && [:str, :sym].include?(args.first&.type)
+                record_ambiguous_diagnostic(node, method, [:set, :map, :array]) if target
+              end
             end
             # hash delete falls through to super (functions filter handles it)
           end
@@ -1113,7 +1126,7 @@ module Ruby2JS
             type = if pragma?(node, :set) then :set
                    elsif pragma?(node, :map) then :map
                    elsif pragma?(node, :hash) then :hash
-                   else var_type(target)
+                   else node_type(target)
                    end
 
             if (type == :set || type == :map) && args.length == 0
