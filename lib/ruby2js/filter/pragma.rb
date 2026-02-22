@@ -912,6 +912,11 @@ module Ruby2JS
 
       # Track constant assignments that create class-like values
       # This enables automatic detection of class reopening (e.g., Struct.new + class)
+      def on_cvasgn(node)
+        return s(:hide) if pragma?(node, :skip)
+        super
+      end
+
       def on_casgn(node)
         cbase, name, value = node.children
 
