@@ -269,6 +269,11 @@ module Ruby2JS
           args.length == 1 and
           args[0].type == :str
         then
+          # Strip requires for Ruby-only stdlib modules (built-in in JS)
+          if method == :require && %w[json ostruct].include?(args[0].children.first)
+            return s(:begin)
+          end
+
           if @options[:file]
             return convert_require_to_import(node, method, args[0].children.first)
           else

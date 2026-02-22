@@ -72,6 +72,14 @@ describe Ruby2JS::Filter::ESM do
         must_include 'import "./foo.js"'
     end
 
+    it "should strip require 'ostruct'" do
+      to_js("require 'ostruct'").must_equal ''
+    end
+
+    it "should strip require 'json'" do
+      to_js("require 'json'").must_equal ''
+    end
+
     it "should convert require to import with explicit exports" do
       # Skip in browser context or selfhost (no filesystem access)
       return skip() if defined?(Window) or defined?(RUBY2JS_SELFHOST)
