@@ -39,4 +39,27 @@ describe Ruby2JS::Filter::Rails::Logger do
       assert_equal 'logger.info("msg")', to_js('logger.info "msg"')
     end
   end
+
+  describe "Rails.env" do
+    it "converts Rails.env.test? to import.meta.env.MODE check" do
+      assert_equal 'import.meta.env.MODE === "test"', to_js('Rails.env.test?')
+    end
+
+    it "converts Rails.env.development?" do
+      assert_equal 'import.meta.env.MODE === "development"', to_js('Rails.env.development?')
+    end
+
+    it "converts Rails.env.production?" do
+      assert_equal 'import.meta.env.MODE === "production"', to_js('Rails.env.production?')
+    end
+
+    it "converts bare Rails.env to import.meta.env.MODE" do
+      assert_equal 'import.meta.env.MODE', to_js('Rails.env')
+    end
+
+    it "handles unless Rails.env.test?" do
+      result = to_js('validate :valid_date? unless Rails.env.test?')
+      assert_includes result, 'import.meta.env.MODE !== "test"'
+    end
+  end
 end

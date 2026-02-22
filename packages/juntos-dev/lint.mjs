@@ -132,6 +132,13 @@ function walkNode(node, diagnostics, filePath) {
           "force_encoding has no JavaScript equivalent (JS strings are always UTF-16)");
       }
 
+      // Rails.root
+      if (method === 'root' && children[0]?.type === 'const' &&
+          children[0].children?.[0] === null && children[0].children?.[1] === 'Rails') {
+        pushDiag(diagnostics, node, filePath, 'warning', 'rails_root',
+          "Rails.root has no JavaScript equivalent — use a configuration value or environment variable");
+      }
+
       // is_a?(OpenStruct) / kind_of?(OpenStruct)
       if ((method === 'is_a?' || method === 'kind_of?') && children.length > 2) {
         const arg = children[2];
