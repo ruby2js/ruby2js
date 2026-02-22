@@ -84,6 +84,9 @@ module Ruby2JS
           @in_callback_block = false  # Track when processing callback body
           @uses_broadcast = false  # Track if model uses broadcast methods
           @inside_class_method = false  # Track when inside def self.X
+          @rails_includes = []  # Track include ConcernName statements
+          @has_concern_includes = false  # Whether model includes any concerns
+          @is_factory_concern = false  # Whether processing a concern factory
         end
 
         # Detect model class and transform
@@ -92,6 +95,12 @@ module Ruby2JS
 
           # Always create fresh Set for each class
           @rails_model_refs = Set.new
+
+          # Concern factory path: dispatched from concern filter
+          if @concern_factory_pending
+            @concern_factory_pending = false
+            return process_concern_factory(node)
+          end
 
           # Skip if already processing (prevent infinite recursion)
           return super if @rails_model_processing
@@ -150,6 +159,17 @@ module Ruby2JS
             s(:const, nil, class_name.children.last) : class_name
           # When extending ActiveRecord::Base, change extends to just ActiveRecord
           js_superclass = extends_ar_base ? s(:const, nil, :ActiveRecord) : superclass
+
+          # Wrap superclass in concern factory chain if model includes concerns
+          # include A; include B → extends B(A(Super))
+          if @rails_includes && @rails_includes.any?
+            @rails_includes.each do |concern_const|
+              concern_name = concern_const.children.last
+              js_superclass = s(:send, nil, concern_name, js_superclass)
+            end
+            @has_concern_includes = true
+          end
+
           exported_class = s(:send, nil, :export,
             node.updated(nil, [export_class_name, js_superclass, transformed_body]))
 
@@ -238,6 +258,18 @@ module Ruby2JS
             model_import_nodes.push(active_storage_import)
           end
 
+          # Import concern factories for include statements
+          if @rails_includes && @rails_includes.any?
+            @rails_includes.each do |concern_const|
+              concern_name = concern_const.children.last.to_s
+              concern_file = concern_name.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '')
+              concern_import = s(:send, nil, :import,
+                s(:array, s(:const, nil, concern_name.to_sym)),
+                s(:str, "./concerns/#{concern_file}.js"))
+              model_import_nodes.push(concern_import)
+            end
+          end
+
           # Check if model includes url_helpers (for polymorphic_url/polymorphic_path import)
           if @rails_url_helpers
             url_helpers_import = s(:send, nil, :import,
@@ -297,6 +329,82 @@ module Ruby2JS
           @rails_primary_abstract_class = false
           @rails_model_private_methods = {}
           @rails_model_refs = Set.new
+          @rails_includes = []
+          @has_concern_includes = false
+
+          result
+        end
+
+        # Process a concern module as a factory function:
+        # const ConcernName = (Base) => class extends Base { ... }
+        def process_concern_factory(node)
+          class_name, superclass, body = node.children
+
+          @rails_model_name = class_name.children.last.to_s
+          @rails_model_class_name = class_name
+          @rails_model = true
+          @rails_model_processing = true
+          @is_factory_concern = true
+
+          # Collect DSL declarations from body (reuses all model collection logic)
+          collect_model_metadata(body)
+
+          # Record metadata
+          record_model_metadata
+
+          # Transform body (generates static properties, association methods, etc.)
+          transformed_body = transform_model_body(body)
+
+          # Build factory class
+          export_class_name = class_name.children.first ?
+            s(:const, nil, class_name.children.last) : class_name
+
+          # Inject __factory__ marker into body for class converter to detect
+          if transformed_body.type == :begin
+            factory_body = transformed_body.updated(nil,
+              [s(:send, nil, :__factory__), *transformed_body.children])
+          else
+            factory_body = s(:begin, s(:send, nil, :__factory__), transformed_body)
+          end
+
+          factory_class = node.updated(nil, [export_class_name, superclass, factory_body])
+
+          # Generate imports
+          import_nodes = generate_concern_imports
+
+          # Wrap in export
+          exported_class = s(:send, nil, :export, factory_class)
+
+          if import_nodes.any?
+            begin_node = s(:begin, *import_nodes, exported_class)
+          else
+            begin_node = exported_class
+          end
+
+          result = process(begin_node)
+          @comments.set(result, []) if result.respond_to?(:type) && result.type == :begin
+
+          @is_factory_concern = false
+
+          # Clean up model state
+          @rails_model = nil
+          @rails_model_name = nil
+          @rails_model_class_name = nil
+          @rails_model_processing = false
+          @rails_associations = []
+          @rails_validations = []
+          @rails_callbacks = {}
+          @rails_scopes = []
+          @rails_enums = []
+          @rails_broadcasts_to = []
+          @rails_attachments = []
+          @rails_nested_attributes = []
+          @rails_url_helpers = false
+          @rails_primary_abstract_class = false
+          @rails_model_private_methods = {}
+          @rails_model_refs = Set.new
+          @rails_includes = []
+          @has_concern_includes = false
 
           result
         end
@@ -863,6 +971,9 @@ module Ruby2JS
             when :include
               if args.length == 1 && is_url_helpers_include?(args[0])
                 @rails_url_helpers = true
+              elsif args.length == 1 && args[0]&.type == :const
+                @rails_includes ||= []
+                @rails_includes.push(args[0])
               end
             when *CALLBACKS
               collect_callback(method_name, args)
@@ -1234,34 +1345,40 @@ module Ruby2JS
           children = body ? (body.type == :begin ? body.children : [body]) : []
           transformed = []
 
-          if @rails_primary_abstract_class
-            # Abstract class: add static primaryAbstractClass = true, skip table_name
-            transformed << s(:send, s(:self), :primaryAbstractClass=,
-              s(:true))
-          else
-            # Add table_name as a static getter (not a method) so it can be accessed as this.table_name
-            # Use underscore for proper CamelCase handling (NotNow -> not_now -> not_nows)
-            leaf_name = Ruby2JS::Inflector.underscore(@rails_model_name)
-            # For namespaced models (Card::NotNow), Rails prefixes with parent table name
-            # when parent is an AR model: card_not_nows
-            parent_const = @rails_model_class_name.children.first
-            if parent_const && parent_const.type == :const
-              parent_name = Ruby2JS::Inflector.underscore(parent_const.children.last.to_s)
-              table_name = Ruby2JS::Inflector.pluralize("#{parent_name}_#{leaf_name}")
+          # Factory concerns don't generate table_name (they don't have their own table)
+          unless @is_factory_concern
+            if @rails_primary_abstract_class
+              # Abstract class: add static primaryAbstractClass = true, skip table_name
+              transformed << s(:send, s(:self), :primaryAbstractClass=,
+                s(:true))
             else
-              table_name = Ruby2JS::Inflector.pluralize(leaf_name)
+              # Add table_name as a static getter (not a method) so it can be accessed as this.table_name
+              # Use underscore for proper CamelCase handling (NotNow -> not_now -> not_nows)
+              leaf_name = Ruby2JS::Inflector.underscore(@rails_model_name)
+              # For namespaced models (Card::NotNow), Rails prefixes with parent table name
+              # when parent is an AR model: card_not_nows
+              parent_const = @rails_model_class_name.children.first
+              if parent_const && parent_const.type == :const
+                parent_name = Ruby2JS::Inflector.underscore(parent_const.children.last.to_s)
+                table_name = Ruby2JS::Inflector.pluralize("#{parent_name}_#{leaf_name}")
+              else
+                table_name = Ruby2JS::Inflector.pluralize(leaf_name)
+              end
+              transformed << s(:send, s(:self), :table_name=,
+                s(:str, table_name))
             end
-            transformed << s(:send, s(:self), :table_name=,
-              s(:str, table_name))
           end
 
           in_private = false
           children.each do |child|
             next unless child
 
-            # Skip private keyword
+            # Skip private keyword (but keep for factory concerns so class converter adds _ prefix)
             if child.type == :send && child.children[0].nil? && child.children[1] == :private
               in_private = true
+              if @is_factory_concern
+                transformed << child
+              end
               next
             end
 
@@ -1272,8 +1389,11 @@ module Ruby2JS
               next if CALLBACKS.include?(method)
             end
 
-            # Keep non-private methods
-            if child.type == :def && !in_private
+            # For factory concerns, keep ALL methods (including private) since concerns
+            # mix all methods into the host class
+            if @is_factory_concern
+              transformed << process(child)
+            elsif child.type == :def && !in_private
               transformed << process(child)
             elsif !in_private && child.type != :def
               # Pass through other class-level code
@@ -1291,7 +1411,8 @@ module Ruby2JS
           transformed << resolve_defaults if resolve_defaults
 
           # Generate static associations metadata for eager loading
-          if @rails_associations.any?
+          # Also generate when factory concern or model includes concerns (for spread composition)
+          if @rails_associations.any? || @is_factory_concern || @has_concern_includes
             assoc_pairs = @rails_associations.map do |assoc|
               # Derive class name from association name or options[:class_name]
               # For has_many, singularize and capitalize: comments -> Comment
@@ -1325,6 +1446,12 @@ module Ruby2JS
               end
               s(:pair, s(:sym, assoc[:name]), s(:hash, *props))
             end
+
+            # Add ...super.associations spread for factory concerns and models with includes
+            if @is_factory_concern || @has_concern_includes
+              assoc_pairs.unshift(s(:kwsplat, s(:jsliteral, "super.associations")))
+            end
+
             transformed << s(:send, s(:self), :associations=, s(:hash, *assoc_pairs))
           end
 
@@ -1838,6 +1965,43 @@ module Ruby2JS
           end
 
           node
+        end
+
+        # Generate import statements for a concern factory
+        def generate_concern_imports
+          imports = []
+
+          # Need CollectionProxy if has_many, Reference if belongs_to, etc.
+          has_has_many = @rails_associations.any? { |a| a[:type] == :has_many }
+          has_belongs_to = @rails_associations.any? { |a| a[:type] == :belongs_to }
+          has_has_one = @rails_associations.any? { |a| a[:type] == :has_one }
+          has_associations = @rails_associations.any?
+
+          # Build import list from application_record
+          import_list = []
+          import_list.push(s(:const, nil, :CollectionProxy)) if has_has_many
+          import_list.push(s(:const, nil, :modelRegistry)) if has_associations
+          import_list.push(s(:const, nil, :Reference)) if has_belongs_to
+          import_list.push(s(:const, nil, :HasOneReference)) if has_has_one
+
+          if import_list.any?
+            imports.push(s(:send, nil, :import,
+              s(:array, *import_list),
+              s(:str, "../application_record.js")))
+          end
+
+          # Import included concerns
+          if @concern_factory_includes
+            @concern_factory_includes.each do |concern_const|
+              concern_name = concern_const.children.last.to_s
+              concern_file = concern_name.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '')
+              imports.push(s(:send, nil, :import,
+                s(:array, s(:const, nil, concern_name.to_sym)),
+                s(:str, "./#{concern_file}.js")))
+            end
+          end
+
+          imports
         end
 
         def generate_destroy_method

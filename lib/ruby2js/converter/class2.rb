@@ -20,9 +20,17 @@ module Ruby2JS
         m&.type == :begin ? m.children : m
       end.compact
 
+      # Detect factory concern mode (__factory__ marker in body)
+      is_factory = body.any? { |m|
+        m&.type == :send && m.children[0].nil? && m.children[1] == :__factory__
+      }
+      body = body.reject { |m|
+        m&.type == :send && m.children[0].nil? && m.children[1] == :__factory__
+      } if is_factory
+
       # Anonymous classes with include/extend need special handling:
       # wrap in IIFE with temp variable so we can reference the class
-      if name.nil?
+      if !is_factory && name.nil?
         has_include = body.any? do |m|
           m.type == :send && m.children[0].nil? &&
             [:include, :extend].include?(m.children[1])
@@ -41,11 +49,18 @@ module Ruby2JS
         end
       end
 
-      proxied = body.find do |node|
+      proxied = is_factory ? nil : body.find { |node|
         node.type == :def and node.children.first == :method_missing
-      end
+      }
 
-      if not name
+      if is_factory
+        # Factory concern: const Name = (Base) => class extends Chain {
+        put 'const '
+        parse name
+        put ' = (Base) => class extends '
+        parse inheritance
+        put " {"
+      elsif not name
         put 'class'
       elsif name.type == :const and name.children.first == nil
         put 'class '
@@ -57,16 +72,22 @@ module Ruby2JS
         put ' = class'
       end
 
-      if inheritance
-        put ' extends '
-        parse inheritance
-      end
+      unless is_factory
+        if inheritance
+          put ' extends '
+          parse inheritance
+        end
 
-      put " {"
+        put " {"
+      end
 
       begin
         class_name, @class_name = @class_name, name
         class_parent, @class_parent = @class_parent, inheritance
+        # Force underscored_private for factory concerns so instance vars
+        # are shared with the host model (# private fields are per-class)
+        saved_underscored_private = @underscored_private
+        @underscored_private = true if is_factory
         @rbstack.push(@namespace.getOwnProps)
         @rbstack.last.merge!(@namespace.find(inheritance)) if inheritance
         constructor = []
@@ -403,7 +424,7 @@ module Ruby2JS
               skipped = true
             end
 
-          elsif es2022 and \
+          elsif (es2022 || is_factory) and \
             m.type == :send and m.children.first.type == :self and \
             m.children[1].to_s.end_with? '='
 
@@ -568,6 +589,7 @@ module Ruby2JS
         end
 
       ensure
+        @underscored_private = saved_underscored_private
         @class_name = class_name
         @class_parent = class_parent
         @namespace.defineProps @rbstack.pop

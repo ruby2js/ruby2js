@@ -51,7 +51,6 @@ module Ruby2JS
 
       symbols = []
       predicate_symbols = []  # Track methods originally named with ? suffix
-      is_concern = false  # Set by __concern__ marker from rails/concern filter
       visibility = :public
       omit = []
       body = [*body]  # Copy array so we can modify defs nodes (works in Ruby and JS)
@@ -68,17 +67,10 @@ module Ruby2JS
                 symbols << sym.children.first if sym.type == :sym
               end
             end
-          elsif node.children[1] == :__concern__
-            is_concern = true
-            omit << node
           end
         end
 
-        # In concerns, include all methods (public and private) in the return
-        # object. Ruby concerns mix all methods into the host class — even
-        # private ones become host class methods. In JS, the IIFE return is
-        # spread onto the prototype via Object.assign.
-        next unless visibility == :public || is_concern
+        next unless visibility == :public
 
         if node.type == :casgn and node.children.first == nil
           symbols << node.children[1]

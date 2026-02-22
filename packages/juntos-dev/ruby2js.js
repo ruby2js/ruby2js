@@ -2994,6 +2994,7 @@ const Ruby2JS = (() => {
       return this._str
     };
 
+    // Returns the translated position, or nil if the position is not in a mapped range.
     translate_ruby_to_erb_position(ruby_pos) {
       if (!this._erb_position_map) return null;
 
@@ -3099,7 +3100,6 @@ const Ruby2JS = (() => {
                 buffer = erb_buffer;
                 pos = erb_pos
               } else {
-                // Position not mapped - skip this token for source mapping
                 col += token.length;
                 continue
               }
@@ -3108,6 +3108,7 @@ const Ruby2JS = (() => {
               pos = ruby_pos
             };
 
+            // For ErbSourceBuffer, use same_source? method; for others use ==
             let source_index = sources.findIndex(s => (
               typeof buffer === "object" && buffer != null && "same_source?" in buffer ? buffer.same_source(s) : s === buffer
             ));
@@ -3184,11 +3185,11 @@ const Ruby2JS = (() => {
       return other instanceof ErbSourceBuffer && this._source.object_id === other.source.object_id
     };
 
-    // Use find_index instead of bsearch_index for JS compatibility
     line_for_position(pos) {
       return this._line_offsets.findIndex(offset => offset > pos) ?? this._line_offsets.length
     };
 
+    // Return column number (0-based) for a character position
     column_for_position(pos) {
       let line_idx = (this._line_offsets.findIndex(offset => offset > pos) ?? this._line_offsets.length) - 1;
       return pos - this._line_offsets[line_idx]
@@ -6850,7 +6851,17 @@ const Ruby2JS = (() => {
 
       body = body.flatMap(m => m?.type === "begin" ? m.children : m).compact;
 
-      if (name == null) {
+      let is_factory = body.some(m => (
+        m?.type === "send" && m.children[0] == null && m.children[1] === "__factory__"
+      ));
+
+      if (is_factory) {
+        body = body.filter(m => (
+          !(m?.type === "send" && m.children[0] == null && m.children[1] === "__factory__")
+        ))
+      };
+
+      if (!is_factory && name == null) {
         let has_include = body.some(m => (
           m.type === "send" && m.children[0] == null && ["include", "extend"].includes(m.children[1])
         ));
@@ -6884,11 +6895,17 @@ const Ruby2JS = (() => {
         }
       };
 
-      let proxied = body.find(node => (
+      let proxied = is_factory ? null : body.find(node => (
         node.type === "def" && node.children.first === "method_missing"
       ));
 
-      if (!name) {
+      if (is_factory) {
+        this.put("const ");
+        this.parse(name);
+        this.put(" = (Base) => class extends ");
+        this.parse(inheritance);
+        this.put(" {")
+      } else if (!name) {
         this.put("class")
       } else if (name.type === "const" && name.children.first == null) {
         this.put("class ");
@@ -6900,21 +6917,26 @@ const Ruby2JS = (() => {
         this.put(" = class")
       };
 
-      if (inheritance) {
-        this.put(" extends ");
-        this.parse(inheritance)
-      };
+      if (!is_factory) {
+        if (inheritance) {
+          this.put(" extends ");
+          this.parse(inheritance)
+        };
 
-      this.put(" {");
+        this.put(" {")
+      };
 
       {
         let class_name;
         let class_parent;
+        let saved_underscored_private;
 
         try {
           let ivars, cvars, walk, references_args, scan_vis, rename, forward, proxy;
           [class_name, this._class_name] = [this._class_name, name];
           [class_parent, this._class_parent] = [this._class_parent, inheritance];
+          saved_underscored_private = this._underscored_private;
+          if (is_factory) this._underscored_private = true;
           this._rbstack.push(this._namespace.getOwnProps());
 
           if (inheritance) {
@@ -6985,7 +7007,7 @@ const Ruby2JS = (() => {
                   base_node = this.s("private_method", prefix, base_node)
                 };
 
-                this._rbstack.last[prop] = base_node;
+                this._rbstack.last[prop] = base_node // receiver (e.g., self);
 
                 if (/[?!]$/m.test((prop ?? "").toString())) {
                   let key = (prop ?? "").toString().replace(/[?!]$/m, "");
@@ -7286,7 +7308,7 @@ const Ruby2JS = (() => {
 
                 skipped = true
               }
-            } else if (this.es2022 && m.type === "send" && m.children.first.type === "self" && (m.children[1] ?? "").toString().endsWith("=")) {
+            } else if ((this.es2022 || is_factory) && m.type === "send" && m.children.first.type === "self" && (m.children[1] ?? "").toString().endsWith("=")) {
               this.put("static ");
 
               this.parse(m.updated(
@@ -7357,7 +7379,6 @@ const Ruby2JS = (() => {
                     this._class_method = null
                   }
                 } else {
-                  // Other statements in class << self (like constants)
                   this.parse(smethod)
                 }
               }
@@ -7550,6 +7571,7 @@ const Ruby2JS = (() => {
             return this.parse(proxy)
           }
         } finally {
+          this._underscored_private = saved_underscored_private;
           this._class_name = class_name;
           this._class_parent = class_parent;
           this._namespace.defineProps(this._rbstack.pop())
@@ -10754,6 +10776,10 @@ const Ruby2JS = (() => {
       return this.parse(expr)
     };
 
+    on_jsliteral(str) {
+      return this.put(str)
+    };
+
     number_format(number) {
       if (!this.es2021) return (number ?? "").toString();
       let parts = (number ?? "").toString().split(".");
@@ -11432,7 +11458,6 @@ const Ruby2JS = (() => {
       this._underscored_private = true;
       let symbols = [];
       let predicate_symbols = [] // Track methods originally named with ? suffix;
-      let is_concern = false // Set by __concern__ marker from rails/concern filter;
       let visibility = "public";
       let omit = [];
       body = [...body] // Copy array so we can modify defs nodes (works in Ruby and JS);
@@ -11452,13 +11477,10 @@ const Ruby2JS = (() => {
                 if (sym.type === "sym") symbols.push(sym.children.first)
               }
             }
-          } else if (node.children[1] === "__concern__") {
-            is_concern = true;
-            omit.push(node)
           }
         };
 
-        if (visibility !== "public" && !is_concern) continue;
+        if (visibility !== "public") continue;
 
         if (node.type === "casgn" && node.children.first == null) {
           symbols.push(node.children[1])
@@ -11730,7 +11752,6 @@ const Ruby2JS = (() => {
       this._underscored_private = true;
       let symbols = [];
       let predicate_symbols = [] // Track methods originally named with ? suffix;
-      let is_concern = false // Set by __concern__ marker from rails/concern filter;
       let visibility = "public";
       let omit = [];
       body = [...body] // Copy array so we can modify defs nodes (works in Ruby and JS);
@@ -11750,13 +11771,10 @@ const Ruby2JS = (() => {
                 if (sym.type === "sym") symbols.push(sym.children.first)
               }
             }
-          } else if (node.children[1] === "__concern__") {
-            is_concern = true;
-            omit.push(node)
           }
         };
 
-        if (visibility !== "public" && !is_concern) continue;
+        if (visibility !== "public") continue;
 
         if (node.type === "casgn" && node.children.first == null) {
           symbols.push(node.children[1])
@@ -16948,12 +16966,12 @@ const Ruby2JS = (() => {
       return this.parse(expr)
     };
 
+    // do string concatenation when possible
     collapse_strings(node) {
       let left = node.children[0];
       if (!left) return node;
       let right = node.children[2];
 
-      // recursively evaluate left hand side
       if (left.type === "send" && left.children.length === 3 && left.children[1] === "+") {
         left = this.collapse_strings(left)
       };
@@ -16992,11 +17010,9 @@ const Ruby2JS = (() => {
 
       if (start.type === "int" && start.children.first === 0) {
         if (finish.type === "int") {
-          // output cleaner code if we know the value already
           length = finish.children.first + (node.type === "irange" ? 1 : 0);
           return this.put(`[...Array(${length ?? ""}).keys()]`)
         } else {
-          // If this is variable/expression we need to parse it properly
           this.put("[...Array(");
           this.parse(finish);
           this.put(node.type === "irange" ? "+1" : "");
@@ -17010,7 +17026,6 @@ const Ruby2JS = (() => {
           length = finish_value - start_value + (node.type === "irange" ? 1 : 0);
           start_output = (start_value ?? "").toString()
         } else {
-          // For non-literal values, serialize AST nodes to JS strings via capture
           start_output = this.capture(() => this.parse(start));
           let finish_output = this.capture(() => this.parse(finish));
           length = `(${finish_output ?? ""}-${start_output ?? ""}` + (node.type === "irange" ? "+1" : "") + ")";
@@ -17232,7 +17247,7 @@ const Ruby2JS = (() => {
 
           while (child && child.type === "lvasgn") {
             if (!(child.children[0] in this._vars)) undecls.push(child.children[0]);
-            child = child.children[1] // Set by __concern__ marker from rails/concern filter
+            child = child.children[1]
           };
 
           if (undecls.length !== 0) {
@@ -17306,7 +17321,7 @@ const Ruby2JS = (() => {
 
           while (child && child.type === "lvasgn") {
             if (!(child.children[0] in this._vars)) undecls.push(child.children[0]);
-            child = child.children[1] // Set by __concern__ marker from rails/concern filter
+            child = child.children[1]
           };
 
           if (undecls.length !== 0) {
@@ -17999,6 +18014,7 @@ const Ruby2JS = (() => {
         if (!first) this.put(", ");
         first = false;
 
+        // Output key (quote if needed)
         if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/m.test(key)) {
           this.put(key)
         } else {
@@ -18302,6 +18318,7 @@ const Ruby2JS = (() => {
   Converter._handlers.push("octal");
   Converter._handlers.push("debugger");
   Converter._handlers.push("typeof");
+  Converter._handlers.push("jsliteral");
   Converter._handlers.push("and");
   Converter._handlers.push("or");
   Converter._handlers.push("nullish");
@@ -19168,7 +19185,6 @@ const Ruby2JS = (() => {
 
     collect_located_nodes(node, result) {
       if (typeof node !== "object" || node == null || !("type" in node) || typeof node !== "object" || node == null || !("children" in node)) {
-        // Store trailing and orphan comments under special keys
         return
       };
 

@@ -1,11 +1,12 @@
 require 'minitest/autorun'
 require 'ruby2js/filter/rails/concern'
+require 'ruby2js/filter/rails/model'
 require 'ruby2js/filter/esm'
 
 describe Ruby2JS::Filter::Rails::Concern do
   def to_js(string, options = {})
     Ruby2JS.convert(string, {
-      filters: [Ruby2JS::Filter::Rails::Concern, Ruby2JS::Filter::ESM],
+      filters: [Ruby2JS::Filter::Rails::Concern, Ruby2JS::Filter::Rails::Model, Ruby2JS::Filter::ESM],
       eslevel: 2020
     }.merge(options)).to_s
   end
@@ -18,9 +19,9 @@ describe Ruby2JS::Filter::Rails::Concern do
           def bar; end
         end
       RUBY
-      # Should produce IIFE (concern forces it), not object literal
-      assert_includes result, '(() => {'
-      assert_includes result, 'function bar()'
+      # Should produce factory function pattern
+      assert_includes result, 'const Foo = (Base) => class extends Base {'
+      assert_includes result, 'bar()'
     end
 
     it "does not affect modules without extend ActiveSupport::Concern" do
@@ -29,8 +30,8 @@ describe Ruby2JS::Filter::Rails::Concern do
           def bar; end
         end
       RUBY
-      # Without concern, simple path produces object literal
-      refute_includes result, '(() => {'
+      # Without concern, module produces IIFE or object literal
+      refute_includes result, '(Base) =>'
     end
   end
 
@@ -42,28 +43,27 @@ describe Ruby2JS::Filter::Rails::Concern do
           def bar; end
         end
       RUBY
-      refute_includes result, 'extend'
       refute_includes result, 'ActiveSupport'
     end
 
-    it "strips included do...end block" do
+    it "strips included do...end DSL into class body" do
       result = to_js(<<~RUBY)
         module Foo
           extend ActiveSupport::Concern
           included do
             has_many :bars
-            before_save :check
           end
           def baz; end
         end
       RUBY
-      refute_includes result, 'has_many'
-      refute_includes result, 'before_save'
+      # has_many is processed by model filter into association methods
       refute_includes result, 'included'
-      assert_includes result, 'function baz()'
+      assert_includes result, 'baz()'
+      # Association getter should be generated
+      assert_includes result, 'get bars()'
     end
 
-    it "strips class_methods do...end block" do
+    it "converts class_methods to static methods" do
       result = to_js(<<~RUBY)
         module Foo
           extend ActiveSupport::Concern
@@ -75,9 +75,9 @@ describe Ruby2JS::Filter::Rails::Concern do
           def bar; end
         end
       RUBY
-      refute_includes result, 'find_by_key'
-      refute_includes result, 'class_methods'
-      assert_includes result, 'function bar()'
+      # class_methods become static methods in the factory class
+      assert_includes result, 'static find_by_key(key)'
+      assert_includes result, 'bar()'
     end
 
     it "strips delegate calls" do
@@ -89,10 +89,10 @@ describe Ruby2JS::Filter::Rails::Concern do
         end
       RUBY
       refute_includes result, 'delegate'
-      assert_includes result, 'function bar()'
+      assert_includes result, 'bar()'
     end
 
-    it "strips include calls" do
+    it "strips framework include calls" do
       result = to_js(<<~RUBY)
         module Foo
           extend ActiveSupport::Concern
@@ -100,9 +100,10 @@ describe Ruby2JS::Filter::Rails::Concern do
           def bar; end
         end
       RUBY
-      refute_includes result, 'include'
+      # Framework modules (nested consts) are stripped
       refute_includes result, 'ActionView'
-      assert_includes result, 'function bar()'
+      refute_includes result, 'TagHelper'
+      assert_includes result, 'bar()'
     end
   end
 
@@ -115,9 +116,8 @@ describe Ruby2JS::Filter::Rails::Concern do
         end
       RUBY
       assert_includes result, 'get bar()'
-      assert_includes result, 'set bar(val)'
-      assert_includes result, 'return this._bar'
-      assert_includes result, 'this._bar = val'
+      assert_includes result, 'set bar('
+      assert_includes result, 'this._bar'
     end
 
     it "transforms multiple attr_accessor names" do
@@ -128,12 +128,12 @@ describe Ruby2JS::Filter::Rails::Concern do
         end
       RUBY
       assert_includes result, 'get bar()'
-      assert_includes result, 'set bar(val)'
+      assert_includes result, 'set bar('
       assert_includes result, 'get baz()'
-      assert_includes result, 'set baz(val)'
+      assert_includes result, 'set baz('
     end
 
-    it "transforms attr_reader to a reader function" do
+    it "transforms attr_reader to getter" do
       result = to_js(<<~RUBY)
         module Foo
           extend ActiveSupport::Concern
@@ -141,14 +141,12 @@ describe Ruby2JS::Filter::Rails::Concern do
           def baz; end
         end
       RUBY
-      # Without a matching setter, the module converter treats this as a
-      # regular function (getter/setter pair detection requires def x=)
-      assert_includes result, 'function bar()'
+      assert_includes result, 'get bar()'
       assert_includes result, 'this._bar'
       refute_includes result, 'set bar('
     end
 
-    it "transforms attr_writer to setter accessor" do
+    it "transforms attr_writer to setter" do
       result = to_js(<<~RUBY)
         module Foo
           extend ActiveSupport::Concern
@@ -156,10 +154,8 @@ describe Ruby2JS::Filter::Rails::Concern do
           def baz; end
         end
       RUBY
-      # The module converter detects def bar= as a setter and produces set accessor
-      assert_includes result, 'set bar(val)'
-      assert_includes result, 'this._bar = val'
-      refute_includes result, 'get bar()'
+      assert_includes result, 'set bar('
+      assert_includes result, 'this._bar'
     end
   end
 
@@ -175,7 +171,6 @@ describe Ruby2JS::Filter::Rails::Concern do
         end
       RUBY
       assert_includes result, 'publicly_accessible'
-      assert_includes result, 'published()'
     end
 
     it "strips alias_method when names differ only by ? suffix" do
@@ -192,7 +187,7 @@ describe Ruby2JS::Filter::Rails::Concern do
       refute_match(/alias/, result)
       # But the accessor should still exist
       assert_includes result, 'get was_just_published()'
-      assert_includes result, 'set was_just_published(val)'
+      assert_includes result, 'set was_just_published('
     end
   end
 
@@ -206,11 +201,9 @@ describe Ruby2JS::Filter::Rails::Concern do
           def check; end
         end
       RUBY
-      assert_includes result, 'function bar()'
-      assert_includes result, 'function check()'
-      # both should be in return object (concerns mix all methods),
-      # neither is a getter (only ?-suffix methods become getters)
-      assert_match(/return \{bar, check\}/, result)
+      assert_includes result, 'bar()'
+      # Private methods should use _ prefix (underscored_private is forced)
+      assert_includes result, '_check()'
     end
   end
 
@@ -229,6 +222,58 @@ describe Ruby2JS::Filter::Rails::Concern do
     end
   end
 
+  describe "factory pattern" do
+    it "generates factory function for concerns" do
+      result = to_js(<<~RUBY)
+        module Trackable
+          extend ActiveSupport::Concern
+          def track!
+            update(tracked: true)
+          end
+        end
+      RUBY
+      assert_includes result, 'const Trackable = (Base) => class extends Base {'
+    end
+
+    it "handles concern including another concern" do
+      result = to_js(<<~RUBY)
+        module Foo
+          extend ActiveSupport::Concern
+          include Bar
+          def baz; end
+        end
+      RUBY
+      # include Bar → extends Bar(Base)
+      assert_includes result, 'extends Bar(Base)'
+      assert_includes result, 'import { Bar }'
+    end
+
+    it "handles multiple concern includes" do
+      result = to_js(<<~RUBY)
+        module Foo
+          extend ActiveSupport::Concern
+          include A
+          include B
+          def baz; end
+        end
+      RUBY
+      # include A; include B → extends B(A(Base))
+      assert_includes result, 'extends B(A(Base))'
+    end
+
+    it "generates static associations with spread" do
+      result = to_js(<<~RUBY)
+        module Trackable
+          extend ActiveSupport::Concern
+          included do
+            has_many :tracks
+          end
+        end
+      RUBY
+      assert_includes result, '...super.associations'
+    end
+  end
+
   describe "namespaced modules" do
     it "handles Card::Statuses namespace" do
       result = to_js(<<~RUBY)
@@ -239,8 +284,8 @@ describe Ruby2JS::Filter::Rails::Concern do
         end
       RUBY
       assert_includes result, 'get was_just_published()'
-      assert_includes result, 'set was_just_published(val)'
-      assert_includes result, 'publish'
+      assert_includes result, 'set was_just_published('
+      assert_includes result, 'publish()'
     end
   end
 

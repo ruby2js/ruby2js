@@ -26,6 +26,8 @@ module Ruby2JS
         def initialize(*args)
           super
           @rails_concern = nil
+          @concern_factory_pending = false
+          @concern_factory_includes = nil
         end
 
         def on_module(node)
@@ -45,30 +47,10 @@ module Ruby2JS
 
           @rails_concern = true
           @concern_enum_bangs = {}
+          @has_one_names = []
 
-          # Transform body
-          new_body = transform_concern_body(body)
-
-          # Force the IIFE path in the module converter by adding a public marker.
-          # This ensures concerns use underscored_private (@x -> this._x) instead of
-          # ES2022 private fields (#x) which are invalid in object literals.
-          # The module converter omits bare public markers from output.
-          # Also mark as concern so module converter makes zero-arg methods getters.
-          unless new_body.empty?
-            new_body.unshift(s(:send, nil, :public))
-            new_body.unshift(s(:send, nil, :__concern__))
-          end
-
-          # Rebuild module with cleaned body
-          if new_body.empty?
-            new_body_node = nil
-          elsif new_body.length == 1
-            new_body_node = new_body.first
-          else
-            new_body_node = s(:begin, *new_body)
-          end
-
-          result = node.updated(nil, [name, new_body_node])
+          # Transform body into class body (extracts included do, class_methods, etc.)
+          class_body, extends_chain, concern_includes = transform_concern_to_class_body(body)
 
           # Record concern metadata for cross-file filter context
           if @options[:metadata]
@@ -78,7 +60,7 @@ module Ruby2JS
 
             # Collect method names from transformed body
             method_names = []
-            new_body.each do |n|
+            class_body.each do |n|
               if n.respond_to?(:type) && n.type == :def
                 method_names.push(n.children[0].to_s)
               end
@@ -87,8 +69,27 @@ module Ruby2JS
             meta['concerns'][concern_name] = { 'methods' => method_names }
           end
 
+          # Build class body node
+          if class_body.empty?
+            body_node = nil
+          elsif class_body.length == 1
+            body_node = class_body.first
+          else
+            body_node = s(:begin, *class_body)
+          end
+
+          # Build synthetic class: class ConcernName < extends_chain
+          class_node = s(:class, name, extends_chain, body_node)
+
+          # Dispatch to model filter's concern factory path
+          @concern_factory_pending = true
+          @concern_factory_includes = concern_includes
+          result = process(class_node)
+          @concern_factory_pending = false
+          @concern_factory_includes = nil
+
           @rails_concern = nil
-          super(result)
+          result
         end
 
         private
@@ -105,10 +106,10 @@ module Ruby2JS
             node.children[2].children[0].children[1] == :ActiveSupport
         end
 
-        def transform_concern_body(body)
+        def transform_concern_to_class_body(body)
           result = []
-          host_names = []  # Names from included do block (associations, scopes)
-          @has_one_names = []  # Track has_one association names for loaded-flag checks
+          extends_chain = s(:lvar, :Base)
+          concern_includes = []
 
           body.each do |node|
             next unless node.respond_to?(:type)
@@ -122,29 +123,9 @@ module Ruby2JS
                   next if concern_extend?(node)
                   result << node
 
-                when :attr_accessor
-                  # Transform to getter + setter def pairs
-                  node.children[2..-1].each do |sym_node|
-                    attr = sym_node.children.first
-                    result << s(:def, attr, s(:args),
-                      s(:ivar, :"@#{attr}"))
-                    result << s(:def, :"#{attr}=", s(:args, s(:arg, :val)),
-                      s(:ivasgn, :"@#{attr}", s(:lvar, :val)))
-                  end
-
-                when :attr_reader
-                  node.children[2..-1].each do |sym_node|
-                    attr = sym_node.children.first
-                    result << s(:def, attr, s(:args),
-                      s(:ivar, :"@#{attr}"))
-                  end
-
-                when :attr_writer
-                  node.children[2..-1].each do |sym_node|
-                    attr = sym_node.children.first
-                    result << s(:def, :"#{attr}=", s(:args, s(:arg, :val)),
-                      s(:ivasgn, :"@#{attr}", s(:lvar, :val)))
-                  end
+                when :attr_accessor, :attr_reader, :attr_writer
+                  # Pass through to class converter
+                  result << node
 
                 when :alias_method
                   new_name = node.children[2].children.first
@@ -170,10 +151,17 @@ module Ruby2JS
                   # Skip visibility with specific method names (e.g., private :foo)
 
                 when :include
-                  # Strip include calls in concerns — framework modules
-                  # (e.g., ActionView::Helpers::TagHelper) don't exist in JS.
-                  # The including class handles its own includes.
-                  next
+                  # Build extends chain for concern-including-concern:
+                  # include A; include B → extends B(A(Base))
+                  # Only simple consts (include Trackable), not nested framework
+                  # modules (include ActionView::Helpers::TagHelper)
+                  arg = node.children[2]
+                  if arg&.type == :const && arg.children[0].nil?
+                    concern_name = arg.children.last
+                    extends_chain = s(:send, nil, concern_name, extends_chain)
+                    concern_includes.push(arg)
+                  end
+                  # Nested consts (framework modules) are stripped
 
                 else
                   # Keep other send nodes
@@ -184,13 +172,35 @@ module Ruby2JS
               end
 
             when :block
-              # Strip included do...end and class_methods do...end
               if node.children[0].type == :send &&
-                 node.children[0].children[0].nil? &&
-                 [:included, :class_methods].include?(node.children[0].children[1])
-                # Extract association/scope names before stripping
-                extract_included_names(node, host_names)
-                next
+                 node.children[0].children[0].nil?
+                block_type = node.children[0].children[1]
+
+                if block_type == :included
+                  # Extract included do body as direct class body DSL nodes
+                  # (has_many, scope, enum, callbacks become class body children)
+                  extract_included_names(node, [])  # For enum bang extraction
+                  block_body = node.children[2]
+                  if block_body
+                    children = block_body.type == :begin ? block_body.children : [block_body]
+                    children.each { |child| result << child }
+                  end
+                  next
+                elsif block_type == :class_methods
+                  # Convert class_methods to static methods (defs with self receiver)
+                  block_body = node.children[2]
+                  if block_body
+                    children = block_body.type == :begin ? block_body.children : [block_body]
+                    children.each do |child|
+                      if child.type == :def
+                        result << s(:defs, s(:self), *child.children)
+                      else
+                        result << child
+                      end
+                    end
+                  end
+                  next
+                end
               end
               result << node
 
@@ -206,8 +216,7 @@ module Ruby2JS
 
           # Rewrite bare method calls in concern methods to use self. prefix.
           # In Ruby, any s(:send, nil, :name) is an implicit self call. In JS
-          # concerns (IIFEs), these must be explicit this. so they resolve on
-          # the host model prototype after mixing.
+          # class methods, these must be explicit this. so they resolve correctly.
           result.map! do |n|
             if n.respond_to?(:type) && (n.type == :def || n.type == :defs)
               rewrite_concern_sends(n)
@@ -216,7 +225,23 @@ module Ruby2JS
             end
           end
 
-          result
+          # Mark non-predicate instance methods as :defm so the class converter
+          # outputs them as methods (not getters). Predicate methods (?-suffix)
+          # stay as :def to become getters in the class.
+          result.map! do |n|
+            if n.respond_to?(:type) && n.type == :def
+              name_str = n.children[0].to_s
+              if !name_str.end_with?('?') && !name_str.end_with?('=')
+                n.updated(:defm, n.children)
+              else
+                n
+              end
+            else
+              n
+            end
+          end
+
+          [result, extends_chain, concern_includes]
         end
 
         # Extract association and scope names from the included do...end block
@@ -349,13 +374,12 @@ module Ruby2JS
 
         # Recursively rewrite bare sends to use self. prefix.
         # In concerns, ALL s(:send, nil, :name) are implicit self calls
-        # that must become this.name for prototype mixing to work.
+        # that must become this.name for class inheritance to work.
         def rewrite_node(node, locals, method_name = nil)
           return node unless node.respond_to?(:type)
 
           # Handle super/zsuper in concern methods.
           # In Rails, super on an attribute method returns the raw DB value.
-          # In concerns (IIFEs), there's no class hierarchy for super to call.
           # Rewrite to this.attributes["method_name"] for raw attribute access.
           if method_name && (node.type == :zsuper || node.type == :super)
             return s(:send,
@@ -428,11 +452,6 @@ module Ruby2JS
           end
 
           # Handle csend (safe navigation) with known AR mutation methods.
-          # Ruby's &. is always a method call, but the converter checks
-          # source location for () to decide parens. Nodes rewritten by
-          # this filter preserve original location (no parens in Ruby source),
-          # so is_method? returns false → property access. Fix: create a
-          # fresh node via s() (no location) for known mutation methods.
           if node.type == :csend
             csend_method = node.children[1]
             new_children = node.children.map { |child|
@@ -446,9 +465,7 @@ module Ruby2JS
           end
 
           # Handle transaction blocks: make callback async and await each
-          # statement so that AR operations (destroy, create, etc.) complete
-          # in order. Without this, the callback is sync and async operations
-          # inside are fire-and-forget promises.
+          # statement so that AR operations complete in order.
           if node.type == :block
             send_child = node.children[0]
             if send_child&.respond_to?(:type) && send_child.type == :send
@@ -479,11 +496,6 @@ module Ruby2JS
           node.updated(nil, new_children)
         end
         # Rewrite a transaction do...end block to use async callback with awaits.
-        # Input AST:  s(:block, s(:send, nil, :transaction), s(:args), body)
-        # Output AST: s(:send, nil, :await,
-        #               s(:send, s(:self), :transaction,
-        #                 s(:block, s(:send, nil, :async), s(:args),
-        #                   s(:begin, s(:send, nil, :await, stmt1), ...))))
         def rewrite_transaction_block(node, locals, method_name)
           _send_node, args_node, body = node.children
 
@@ -511,25 +523,20 @@ module Ruby2JS
                 new_body)))
         end
 
-        # Wrap a statement with await. For assignments and setters,
-        # put await on the RHS to avoid invalid JS like
-        # await(let x = expr) or (await this.x) = expr.
+        # Wrap a statement with await.
         def wrap_with_await(node)
           return node unless node.respond_to?(:type)
 
           case node.type
           when :lvasgn
-            # let x = value → let x = await value
             name, value = node.children
             s(:lvasgn, name, s(:send, nil, :await, value))
           when :ivasgn
-            # @x = value → this._x = await value
             name, value = node.children
             s(:ivasgn, name, s(:send, nil, :await, value))
           when :send
             target, method, *args = node.children
             if method && method.to_s.end_with?('=') && target && args.length == 1
-              # this.attr = value → this.attr = await value
               s(:send, target, method, s(:send, nil, :await, args[0]))
             else
               s(:send, nil, :await, node)

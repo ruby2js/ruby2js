@@ -28,6 +28,11 @@ module Ruby2JS
       parse expr
     end
 
+    # raw JavaScript literal (output string as-is, no quoting)
+    handle :jsliteral do |str|
+      put str
+    end
+
     def number_format(number)
       return number.to_s unless es2021
       parts = number.to_s.split('.')

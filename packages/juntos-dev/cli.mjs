@@ -31,7 +31,6 @@ import {
   findViewResources,
   findControllers,
   getBuildOptions,
-  mergeConcernDeclarations,
   createMetadata,
   buildAppManifest,
   deriveAssociationMap,
@@ -979,9 +978,6 @@ function buildAssociationMapFromRuby(modelsDir) {
     try {
       let content = readFileSync(join(modelsDir, file), 'utf-8');
 
-      // Merge concern declarations so belongs_to in concerns are found
-      content = mergeConcernDeclarations(content, modelsDir);
-
       // Extract class name
       const classMatch = content.match(/class\s+(\w+)\s*</);
       if (!classMatch) continue;
@@ -1847,9 +1843,8 @@ async function runEject(options) {
   const errors = [];  // Track errors but continue processing
 
   // Pre-analyze all models: populates metadata and caches transform results.
-  // This replaces the inline model-transform loop — buildAppManifest calls
-  // mergeConcernDeclarations and transformRuby for each model, threading
-  // a shared metadata object through all transforms.
+  // buildAppManifest calls transformRuby for each model, threading a shared
+  // metadata object through all transforms.
   const { metadata, modelCache } = await buildAppManifest(APP_ROOT, config, { mode: 'eject' });
 
   // Write cached model transforms to disk
@@ -1873,9 +1868,6 @@ async function runEject(options) {
           } else {
             // Fallback: transform directly (e.g., nested model not in cache)
             let source = readFileSync(filePath, 'utf-8');
-            if (!file.includes('/')) {
-              source = mergeConcernDeclarations(source, modelsDir);
-            }
             const result = await transformRuby(source, filePath, null, config, APP_ROOT, metadata);
             const relativeOutPath = `app/models/${file.replace('.rb', '.js')}`;
             code = fixImportsForEject(result.code, relativeOutPath, config);
@@ -1891,61 +1883,6 @@ async function runEject(options) {
         } catch (err) {
           errors.push({ file: relativePath, error: err.message, stack: err.stack });
           console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
-        }
-      }
-
-      // Mix concern methods into model prototypes.
-      // After transpilation, model subdirectory files (e.g., card/closeable.js)
-      // export concern objects with methods. We inject imports and Object.assign
-      // calls to apply those methods onto the model class prototype.
-      for (const file of modelFiles) {
-        if (file.includes('/')) continue; // Skip concern files themselves
-        const modelName = file.replace('.rb', '');
-        const modelSubdir = join(modelsDir, modelName);
-        if (!existsSync(modelSubdir)) continue;
-
-        // Find concern JS files in the model's subdirectory
-        const jsFile = join(outDir, 'app/models', modelName + '.js');
-        if (!existsSync(jsFile)) continue;
-
-        const concerns = [];
-        try {
-          for (const entry of readdirSync(join(outDir, 'app/models', modelName), { withFileTypes: true })) {
-            if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
-            const concernFile = join(outDir, 'app/models', modelName, entry.name);
-            const concernContent = readFileSync(concernFile, 'utf-8');
-            // Extract concern name from export: `export const Eventable = ...`
-            const exportMatch = concernContent.match(/export\s+(?:const|let|var)\s+(\w+)/);
-            if (exportMatch) {
-              concerns.push({
-                name: exportMatch[1],
-                path: `./${modelName}/${entry.name}`
-              });
-            }
-          }
-        } catch (err) { /* skip */ }
-
-        if (concerns.length > 0) {
-          let content = readFileSync(jsFile, 'utf-8');
-          // Only mix concerns into classes (which have .prototype),
-          // not modules (IIFEs returning plain objects)
-          const className = modelName.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('');
-          if (!content.includes(`class ${className}`)) continue;
-
-          // Add concern imports at the top of the file
-          const importLines = concerns.map(c =>
-            `import { ${c.name} } from '${c.path}';`
-          ).join('\n');
-          // Defer concern mixing to avoid circular dependency issues with Node ESM.
-          // Concerns import their parent model and vice versa. Running the mixing
-          // at module scope causes TDZ errors. Instead, register a static _mixConcerns
-          // method that setup.mjs calls after all models are loaded.
-          const mixBody = concerns.map(c =>
-            `    for (const [key, desc] of Object.entries(Object.getOwnPropertyDescriptors(${c.name}))) Object.defineProperty(${className}.prototype, key, desc);`
-          ).join('\n');
-          const deferredMixin = `${className}._mixConcerns = () => {\n${mixBody}\n};`;
-          content = importLines + '\n' + content + '\n' + deferredMixin + '\n';
-          writeFileSync(jsFile, content);
         }
       }
 
