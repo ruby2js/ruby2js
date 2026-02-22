@@ -4277,7 +4277,7 @@ switch (command) {
       console.log('  method_missing     method_missing cannot be transpiled');
       console.log('  eval_call          eval() is not safely transpilable');
       console.log('  instance_eval      instance_eval is not transpilable');
-      console.log('  singleton_method   def obj.method has limited support');
+      console.log('  singleton_method   def obj.method on non-self receiver has limited support');
       console.log('  retry_statement    retry has no JS equivalent');
       console.log('  redo_statement     redo has no JS equivalent');
       console.log('  ruby_catch_throw   Ruby catch/throw differs from JS');

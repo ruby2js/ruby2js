@@ -88,9 +88,13 @@ function walkNode(node, diagnostics, filePath) {
     }
 
     case 'defs': {
-      // Singleton methods (def obj.method) - limited JS support
-      pushDiag(diagnostics, node, filePath, 'warning', 'singleton_method',
-        "singleton method definition (def obj.method) has limited JavaScript support");
+      // Singleton methods: def self.method inside a class transpiles cleanly
+      // to static methods. Only warn for non-self receivers (def obj.method).
+      const defReceiver = children[0];
+      if (!defReceiver || defReceiver.type !== 'self') {
+        pushDiag(diagnostics, node, filePath, 'warning', 'singleton_method',
+          "singleton method definition (def obj.method) has limited JavaScript support");
+      }
       break;
     }
 
