@@ -1541,7 +1541,7 @@ dist/
 
   // Run npm install
   console.log('\nInstalling dependencies...\n');
-  const result = spawnSync('npm', ['install'], {
+  const result = spawnSync('npm', ['install', '--prefer-online'], {
     cwd: destDir,
     stdio: 'inherit'
   });
