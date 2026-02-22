@@ -682,6 +682,25 @@ module Ruby2JS
         # These have no location info and would produce confusing output.
         return unless line
 
+        # Skip diagnostics when the root variable in the expression chain has a
+        # known type (from code inference or global hints). For example,
+        # routes['redirects'] << item — if 'routes' has a type hint, the user
+        # has already acknowledged this variable and the warning is not helpful.
+        receiver = node.children.first
+        if receiver && receiver.type == :send
+          root = receiver
+          while root&.type == :send && root.children.first
+            root = root.children.first
+          end
+          if root&.type == :lvar || root&.type == :ivar
+            root_name = root.children.first
+            return if @var_types[root_name] || @ivar_types[root_name] || @global_type_hints[root_name]
+          elsif root&.type == :send && root.children.first.nil?
+            root_name = root.children[1]
+            return if @global_type_hints[root_name]
+          end
+        end
+
         column = nil
         if node.respond_to?(:loc) && node.loc
           loc = node.loc
