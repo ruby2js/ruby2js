@@ -1879,8 +1879,8 @@ describe Ruby2JS::Filter::Pragma do
 
     it "should skip diagnostic for delete with literal key" do
       diags = lint('obj.delete(:key)')
-      d = diags.find { |d| d[:rule] == :ambiguous_method && d[:method] == 'delete' }
-      _(d).must_be_nil
+      delete_diags = diags.select { |d| d[:rule] == :ambiguous_method && d[:method] == 'delete' }
+      assert_equal 0, delete_diags.length
     end
 
     it "should include arg_types for delete with variable arg" do
