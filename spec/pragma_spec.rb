@@ -244,6 +244,31 @@ describe Ruby2JS::Filter::Pragma do
         must_equal 'let a = [1]; let x = [...a, ...[2, 3]]'
     end
 
+    it "should infer array + when right operand is array literal" do
+      to_js('x = unknown + [1, 2]').
+        must_equal 'let x = [...unknown, ...[1, 2]]'
+    end
+
+    it "should infer array + when left operand is array literal" do
+      to_js('x = [1, 2] + unknown').
+        must_equal 'let x = [...[1, 2], ...unknown]'
+    end
+
+    it "should infer array + from method returning array" do
+      to_js('x = items.reverse + [1]').
+        must_equal 'let x = [...items.reverse, ...[1]]'
+    end
+
+    it "should not infer array + when operand is string" do
+      to_js('x = a + "hello"').
+        must_equal 'let x = a + "hello"'
+    end
+
+    it "should not infer array + when operand is number" do
+      to_js('x = a + 1').
+        must_equal 'let x = a + 1'
+    end
+
     it "should convert - to filter for difference with pragma" do
       to_js('x = a - b # Pragma: array').
         must_equal 'let x = a.filter(x => !b.includes(x))'
@@ -252,6 +277,21 @@ describe Ruby2JS::Filter::Pragma do
     it "should convert - to filter for difference with inferred type" do
       to_js('a = [1, 2, 3]; x = a - [2]').
         must_equal 'let a = [1, 2, 3]; let x = a.filter(x => ![2].includes(x))'
+    end
+
+    it "should infer array - when right operand is array literal" do
+      to_js('x = unknown - [1, 2]').
+        must_equal 'let x = unknown.filter(x => (![1, 2].includes(x)))'
+    end
+
+    it "should infer array - when left operand is array literal" do
+      to_js('x = [1, 2, 3] - unknown').
+        must_equal 'let x = [1, 2, 3].filter(x => !unknown.includes(x))'
+    end
+
+    it "should not infer array - when operand is number" do
+      to_js('x = a - 1').
+        must_equal 'let x = a - 1'
     end
 
     it "should convert -= to filter assignment" do

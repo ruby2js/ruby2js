@@ -1232,6 +1232,16 @@ module Ruby2JS
                  else var_type(target)
                  end
 
+          # Infer array type from operand literals/expressions:
+          # [1,2] + x or x + [1,2] → array concatenation
+          if type.nil? && target && args.length == 1
+            target_type = node_type(target)
+            arg_type = node_type(args.first)
+            if target_type == :array || arg_type == :array
+              type = :array
+            end
+          end
+
           if type == :array && target && args.length == 1
             # [...a, ...b]
             return process s(:array, s(:splat, target), s(:splat, args.first))
@@ -1246,6 +1256,16 @@ module Ruby2JS
           type = if pragma?(node, :array) then :array
                  else var_type(target)
                  end
+
+          # Infer array type from operand literals/expressions:
+          # [1,2] - x or x - [1,2] → array difference
+          if type.nil? && target && args.length == 1
+            target_type = node_type(target)
+            arg_type = node_type(args.first)
+            if target_type == :array || arg_type == :array
+              type = :array
+            end
+          end
 
           if type == :array && target && args.length == 1
             # Generate: target.filter(x => !args.first.includes(x))
