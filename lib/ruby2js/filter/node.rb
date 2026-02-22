@@ -429,6 +429,21 @@ module Ruby2JS
           to_path = process(target.children[2])
           S(:send, s(:attr, nil, :path), :relative, from_path, to_path)
 
+        # ENV.fetch("KEY", default) → process.env.KEY ?? default
+        # ENV.fetch("KEY") → process.env.KEY
+        elsif target&.type == :const && const_is?(target, :ENV) && method == :fetch
+          if args.length >= 1 && args.first.type == :str
+            key = args.first.children.first
+            env_access = s(:attr, s(:attr, s(:attr, nil, :process), :env), key.to_sym)
+            if args.length >= 2
+              process s(:or, env_access, args[1])
+            else
+              env_access
+            end
+          else
+            super
+          end
+
         else
           super
         end
@@ -448,6 +463,13 @@ module Ruby2JS
             s(:kwbegin, s(:ensure,
               s(:begin, process(call), process(node.children.last)),
               s(:send, s(:attr, nil, :process), :chdir, s(:gvar, :$oldwd)))))
+        # ENV.fetch("KEY") { default_expr } → process.env.KEY ?? default_expr
+        elsif target&.type == :const && const_is?(target, :ENV) &&
+              method == :fetch && args.length == 1 && args.first.type == :str
+          key = args.first.children.first
+          env_access = s(:attr, s(:attr, s(:attr, nil, :process), :env), key.to_sym)
+          process s(:or, env_access, node.children.last)
+
         else
           super
         end

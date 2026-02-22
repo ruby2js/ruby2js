@@ -334,6 +334,18 @@ describe Ruby2JS::Filter::Node do
       to_js( 'ENV' ).must_equal 'process.env'
     end
 
+    it 'should handle ENV.fetch with default' do
+      to_js( 'ENV.fetch("KEY", "default")' ).must_equal 'process.env.KEY ?? "default"'
+    end
+
+    it 'should handle ENV.fetch without default' do
+      to_js( 'ENV.fetch("KEY")' ).must_equal 'process.env.KEY'
+    end
+
+    it 'should handle ENV.fetch with block default' do
+      to_js( 'ENV.fetch("KEY") { "default" }' ).must_equal 'process.env.KEY ?? "default"'
+    end
+
     it 'should handle STDIN' do
       to_js( 'STDIN' ).must_equal 'process.stdin'
       to_js( '$stdin' ).must_equal 'process.stdin'
