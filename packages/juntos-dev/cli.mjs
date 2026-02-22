@@ -61,7 +61,8 @@ import {
   globToRegex,
   matchesAny,
   shouldIncludeFile,
-  lintRuby
+  lintRuby,
+  ErbCompiler
 } from './transform.mjs';
 
 import { singularize, camelize, pluralize, underscore } from 'juntos/adapters/inflector.mjs';
@@ -3187,17 +3188,19 @@ Note: Browser databases (dexie) auto-migrate at runtime.
 // ============================================
 
 /**
- * Recursively find all Ruby files (*.rb) in a directory.
+ * Recursively find all lintable files (*.rb, *.html.erb, *.turbo_stream.erb) in a directory.
  */
-function findAllRubyFiles(dir) {
+function findAllLintableFiles(dir) {
   const files = [];
   if (!existsSync(dir)) return files;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.name.startsWith('.') || entry.name.startsWith('._')) continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      files.push(...findAllRubyFiles(full));
+      files.push(...findAllLintableFiles(full));
     } else if (entry.name.endsWith('.rb')) {
+      files.push(full);
+    } else if (entry.name.endsWith('.html.erb') || entry.name.endsWith('.turbo_stream.erb')) {
       files.push(full);
     }
   }
@@ -3211,10 +3214,61 @@ function inferSection(filePath, appRoot) {
   const rel = relative(appRoot, filePath);
   if (rel.startsWith('app/models/')) return 'models';
   if (rel.startsWith('app/controllers/') || rel.startsWith('app/javascript/controllers/')) return 'controllers';
-  if (rel.startsWith('app/views/')) return null; // views use ERB transform
+  if (rel.startsWith('app/views/') && filePath.endsWith('.erb')) return 'erb';
+  if (rel.startsWith('app/views/')) return null; // non-ERB views (e.g. .jsx.rb)
   if (rel.startsWith('config/routes')) return 'routes';
   if (rel.startsWith('test/') || rel.startsWith('spec/')) return 'models'; // test files use model section defaults
   return null;
+}
+
+/**
+ * Build an array of byte offsets for each line start in a string.
+ */
+function buildLineOffsets(src) {
+  const offsets = [0];
+  for (let i = 0; i < src.length; i++) {
+    if (src[i] === '\n') offsets.push(i + 1);
+  }
+  return offsets;
+}
+
+/**
+ * Convert a byte offset to a 1-based line and 0-based column.
+ */
+function byteToLineCol(lineOffsets, byte) {
+  let line = 1;
+  for (let i = 1; i < lineOffsets.length; i++) {
+    if (lineOffsets[i] > byte) break;
+    line = i + 1;
+  }
+  return [line, byte - lineOffsets[line - 1]];
+}
+
+/**
+ * Remap diagnostic line/column from generated Ruby coordinates back to ERB coordinates
+ * using the ErbCompiler's position_map.
+ */
+function remapDiagnosticLines(diagnostics, rubySrc, erbSrc, positionMap) {
+  const rubyLines = buildLineOffsets(rubySrc);
+  const erbLines = buildLineOffsets(erbSrc);
+
+  for (const d of diagnostics) {
+    if (!d.line) continue;
+    // Convert ruby line/col to byte offset
+    const lineIdx = d.line - 1;
+    if (lineIdx < 0 || lineIdx >= rubyLines.length) continue;
+    const rubyByte = rubyLines[lineIdx] + (d.column || 0);
+    // Look up in position_map: [ruby_start, ruby_end, erb_start, erb_end]
+    for (const [rStart, rEnd, eStart, eEnd] of positionMap) {
+      if (rubyByte >= rStart && rubyByte < rEnd) {
+        const erbByte = eStart + (rubyByte - rStart);
+        const [line, col] = byteToLineCol(erbLines, erbByte);
+        d.line = line;
+        d.column = col;
+        break;
+      }
+    }
+  }
 }
 
 async function runLint(files, options) {
@@ -3262,10 +3316,10 @@ async function runLint(files, options) {
   } else {
     // Scan default directories
     filePaths = [
-      ...findAllRubyFiles(join(APP_ROOT, 'app/models')),
-      ...findAllRubyFiles(join(APP_ROOT, 'app/controllers')),
-      ...findAllRubyFiles(join(APP_ROOT, 'app/javascript/controllers')),
-      ...findAllRubyFiles(join(APP_ROOT, 'app/views'))
+      ...findAllLintableFiles(join(APP_ROOT, 'app/models')),
+      ...findAllLintableFiles(join(APP_ROOT, 'app/controllers')),
+      ...findAllLintableFiles(join(APP_ROOT, 'app/javascript/controllers')),
+      ...findAllLintableFiles(join(APP_ROOT, 'app/views'))
     ];
 
     // Add individual files if they exist
@@ -3284,7 +3338,7 @@ async function runLint(files, options) {
   }
 
   if (filePaths.length === 0) {
-    console.log('No Ruby files found to lint.');
+    console.log('No files found to lint.');
     return;
   }
 
@@ -3295,9 +3349,19 @@ async function runLint(files, options) {
   const allDiagnostics = [];
 
   for (const filePath of filePaths) {
-    const source = readFileSync(filePath, 'utf8');
+    let source = readFileSync(filePath, 'utf8');
     const section = inferSection(filePath, APP_ROOT);
     const relPath = relative(APP_ROOT, filePath);
+
+    // Compile ERB to Ruby before linting
+    let erbPositionMap = null;
+    let erbSource = null;
+    if (filePath.endsWith('.erb')) {
+      erbSource = source;
+      const compiler = new ErbCompiler(source);
+      source = compiler.src;
+      erbPositionMap = compiler.position_map;
+    }
 
     let diagnostics;
     try {
@@ -3310,6 +3374,11 @@ async function runLint(files, options) {
         severity: 'error', rule: 'lint_error',
         message: err.message, file: relPath, line: null, column: null
       }];
+    }
+
+    // Remap line numbers from generated Ruby back to ERB source
+    if (erbPositionMap && erbPositionMap.length > 0) {
+      remapDiagnosticLines(diagnostics, source, erbSource, erbPositionMap);
     }
 
     // Filter out disabled rules

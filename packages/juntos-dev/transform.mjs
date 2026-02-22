@@ -175,6 +175,7 @@ export function getBuildOptions(section, target, sectionConfig = null) {
     stimulus: ['Pragma', 'Stimulus', 'Functions', 'ESM', 'Return'],
     controllers: ['Pragma', 'Rails_Controller', ...nodeFilter, 'Functions', 'ESM', 'Return'],
     jsx: ['Pragma', 'Rails_Helpers', 'React', 'Functions', 'ESM', 'Return'],
+    erb: ['Pragma', 'Rails_Helpers', 'Erb', ...nodeFilter, 'Functions', 'Return'],
     default: ['Pragma', 'Rails_Concern', 'Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', ...nodeFilter, 'ActiveSupport', 'Functions', 'ESM', 'Return']
   };
 
@@ -205,6 +206,13 @@ export function getBuildOptions(section, target, sectionConfig = null) {
       return {
         ...baseOptions,
         autoexports: sectionConfig?.autoexports ?? 'default',
+        filters,
+        target
+      };
+
+    case 'erb':
+      return {
+        ...baseOptions,
         filters,
         target
       };
