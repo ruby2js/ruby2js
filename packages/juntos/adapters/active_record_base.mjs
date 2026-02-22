@@ -220,6 +220,7 @@ export class ActiveRecordBase {
       const result = await this._update();
 
       if (result) {
+        await this._processNestedAttributes();
         // Run after_update instance method and callbacks
         if (typeof this.after_update === 'function') await this.after_update();
         await this._runCallbacks('after_update');
@@ -245,6 +246,7 @@ export class ActiveRecordBase {
       const result = await this._insert();
 
       if (result) {
+        await this._processNestedAttributes();
         // Run after_create callbacks
         await this._runCallbacks('after_create');
         await this._runCallbacks('after_save');
@@ -474,6 +476,11 @@ export class ActiveRecordBase {
     this._custom_validations.push(method);
   }
 
+  static accepts_nested_attributes_for(association, options = {}) {
+    if (!this._nested_attributes) this._nested_attributes = {};
+    this._nested_attributes[association] = options;
+  }
+
   // --- Association helpers ---
 
   async hasMany(modelClass, foreignKey) {
@@ -584,6 +591,66 @@ export class ActiveRecordBase {
     const target = options.target || this.domId();
     const stream = `<turbo-stream action="remove" target="${target}"></turbo-stream>`;
     Broadcaster.broadcast(channel, stream);
+  }
+
+  async _processNestedAttributes() {
+    const config = this.constructor._nested_attributes;
+    if (!config || !this._pending_nested_attributes) return;
+
+    for (const [assocName, options] of Object.entries(config)) {
+      const data = this._pending_nested_attributes[assocName];
+      if (!data) continue;
+
+      // Normalize to array of attribute hashes
+      const entries = Array.isArray(data)
+        ? data
+        : Object.values(data);
+
+      for (const attrs of entries) {
+        // Apply reject_if filter
+        if (options.reject_if && options.reject_if(attrs)) continue;
+
+        // Handle _destroy
+        if (attrs._destroy && options.allow_destroy) {
+          if (attrs.id) {
+            // Find the association's model class via the associations metadata
+            const assocMeta = this.constructor.associations?.[assocName];
+            if (assocMeta) {
+              const modelClass = (await import('ruby2js-rails/model-registry')).default[assocMeta.model];
+              if (modelClass) {
+                const record = await modelClass.find(attrs.id);
+                if (record) await record.destroy();
+              }
+            }
+          }
+          continue;
+        }
+
+        // Get association metadata to determine model class and foreign key
+        const assocMeta = this.constructor.associations?.[assocName];
+        if (!assocMeta) continue;
+
+        const modelClass = (await import('ruby2js-rails/model-registry')).default[assocMeta.model];
+        if (!modelClass) continue;
+
+        const fk = assocMeta.foreignKey || `${this.constructor.name.toLowerCase()}_id`;
+
+        if (attrs.id) {
+          // Update existing record
+          const record = await modelClass.find(attrs.id);
+          if (record) {
+            const updateAttrs = { ...attrs };
+            delete updateAttrs.id;
+            await record.update(updateAttrs);
+          }
+        } else {
+          // Create new record with parent FK
+          await modelClass.create({ ...attrs, [fk]: this.id });
+        }
+      }
+    }
+
+    this._pending_nested_attributes = {};
   }
 
   attribute_present(name) {

@@ -77,6 +77,36 @@ export class Article extends ApplicationRecord {
 - `belongs_to` — `:class_name`, `:foreign_key`, `:optional`
 - `has_one` — `:class_name`, `:foreign_key`
 
+### Nested Attributes
+
+```ruby
+class Billable < ApplicationRecord
+  has_many :questions, dependent: :destroy
+  accepts_nested_attributes_for :questions, allow_destroy: true,
+    reject_if: proc { |attrs| attrs['question_text'].blank? }
+end
+```
+
+```javascript
+export class Billable extends ApplicationRecord {
+  // ... association getter/setter ...
+
+  set questions_attributes(value) {
+    if (!this._pending_nested_attributes) this._pending_nested_attributes = {};
+    this._pending_nested_attributes.questions = value
+  }
+};
+
+Billable.accepts_nested_attributes_for("questions", {
+  allow_destroy: true,
+  reject_if(attrs) { return !attrs.question_text }
+});
+```
+
+The setter stores incoming nested attribute data for processing during `save()`. After the parent record is persisted, the adapter's `_processNestedAttributes()` method iterates through the pending data, creating, updating, or destroying nested records as appropriate.
+
+**Supported options:** `allow_destroy`, `reject_if`
+
 ### Validations
 
 ```ruby

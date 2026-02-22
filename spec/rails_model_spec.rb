@@ -660,6 +660,77 @@ describe Ruby2JS::Filter::Rails::Model do
     end
   end
 
+  describe "accepts_nested_attributes_for" do
+    it "generates setter and static registration for simple case" do
+      result = to_js(<<~RUBY)
+        class Person < ApplicationRecord
+          has_many :answers
+          accepts_nested_attributes_for :answers
+        end
+      RUBY
+      assert_includes result, 'set answers_attributes(value)'
+      assert_includes result, 'Person.accepts_nested_attributes_for("answers")'
+    end
+
+    it "generates setter that stores to _pending_nested_attributes" do
+      result = to_js(<<~RUBY)
+        class Person < ApplicationRecord
+          has_many :answers
+          accepts_nested_attributes_for :answers
+        end
+      RUBY
+      assert_includes result, '_pending_nested_attributes'
+      assert_includes result, '_pending_nested_attributes.answers = value'
+    end
+
+    it "initializes _pending_nested_attributes if not set" do
+      result = to_js(<<~RUBY)
+        class Person < ApplicationRecord
+          has_many :answers
+          accepts_nested_attributes_for :answers
+        end
+      RUBY
+      assert_includes result, 'if (!this._pending_nested_attributes) this._pending_nested_attributes = {}'
+    end
+
+    it "passes through options like allow_destroy" do
+      result = to_js(<<~RUBY)
+        class Billable < ApplicationRecord
+          has_many :questions
+          accepts_nested_attributes_for :questions, allow_destroy: true
+        end
+      RUBY
+      assert_includes result, 'Billable.accepts_nested_attributes_for('
+      assert_includes result, '"questions"'
+      assert_includes result, 'allow_destroy: true'
+    end
+
+    it "passes through reject_if proc" do
+      result = to_js(<<~RUBY)
+        class Billable < ApplicationRecord
+          has_many :questions
+          accepts_nested_attributes_for :questions, reject_if: proc { |a| a["question_text"].blank? }
+        end
+      RUBY
+      assert_includes result, 'reject_if'
+      assert_includes result, 'question_text'
+    end
+
+    it "does not pass through raw DSL call" do
+      result = to_js(<<~RUBY)
+        class Person < ApplicationRecord
+          has_many :answers
+          accepts_nested_attributes_for :answers
+        end
+      RUBY
+      # The raw call should not appear as a bare method call in the class body
+      # It should only appear as the static registration: Person.accepts_nested_attributes_for(...)
+      refute_includes result, 'accepts_nested_attributes_for("answers")'
+        .gsub(/^/, '  ') # not indented as class body
+      assert_includes result, 'Person.accepts_nested_attributes_for("answers")'
+    end
+  end
+
   describe "find_by!" do
     it "converts find_by! to findByBang" do
       result = to_js('Article.find_by!(slug: "hello")')

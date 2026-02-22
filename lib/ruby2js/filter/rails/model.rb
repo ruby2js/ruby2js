@@ -76,6 +76,7 @@ module Ruby2JS
           @rails_enums = []
           @rails_broadcasts_to = []  # broadcasts_to declarations
           @rails_attachments = []    # Active Storage attachments
+          @rails_nested_attributes = []  # accepts_nested_attributes_for declarations
           @rails_url_helpers = false  # include Rails.application.routes.url_helpers
           @rails_model_private_methods = {}
           @rails_model_refs = Set.new
@@ -258,6 +259,7 @@ module Ruby2JS
           @rails_enums = []
           @rails_broadcasts_to = []
           @rails_attachments = []
+          @rails_nested_attributes = []
           @rails_url_helpers = false
           @rails_model_private_methods = {}
           @rails_model_refs = Set.new
@@ -820,6 +822,8 @@ module Ruby2JS
               collect_broadcasts_to(args)
             when :enum
               collect_enum(args)
+            when :accepts_nested_attributes_for
+              collect_nested_attributes(args)
             when :include
               if args.length == 1 && is_url_helpers_include?(args[0])
                 @rails_url_helpers = true
@@ -918,6 +922,24 @@ module Ruby2JS
         # Collect enum declarations
         # Supports: enum :field, %w[...].index_by(&:itself)  (string values)
         #           enum :field, %i[...].index_by(&:itself)  (string values)
+        def collect_nested_attributes(args)
+          return if args.empty?
+          name = args.first.children[0] if args.first.type == :sym
+          return unless name
+
+          options = {}
+          args[1..-1].each do |arg|
+            next unless arg.type == :hash
+            arg.children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              options[key.children[0]] = value if key.type == :sym
+            end
+          end
+
+          @rails_nested_attributes.push({ name: name, options: options })
+        end
+
         #           enum :field, %i[...]                      (integer values)
         #           enum :field, %w[...]                      (integer values)
         # Options:  prefix: :name / prefix: true, scopes: false, default: :value
@@ -1204,7 +1226,7 @@ module Ruby2JS
             # Skip DSL declarations (already collected)
             if child.type == :send && child.children[0].nil?
               method = child.children[1]
-              next if %i[has_many has_one belongs_to validates scope broadcasts_to has_one_attached has_many_attached has_rich_text store enum include].include?(method)
+              next if %i[has_many has_one belongs_to validates scope broadcasts_to has_one_attached has_many_attached has_rich_text store enum include accepts_nested_attributes_for].include?(method)
               next if CALLBACKS.include?(method)
             end
 
@@ -1315,6 +1337,13 @@ module Ruby2JS
           # Generate callbacks from broadcasts_to declarations
           @rails_broadcasts_to.each do |broadcast|
             transformed << generate_broadcasts_to_callbacks(broadcast)
+          end
+
+          # Generate nested attributes setters and registration
+          @rails_nested_attributes.each do |nested|
+            generate_nested_attributes(nested).each do |node|
+              transformed.push(node)
+            end
           end
 
           # Keep private methods that aren't inlined elsewhere
@@ -2089,6 +2118,56 @@ module Ruby2JS
             :after_destroy_commit, :remove, transformed_stream, nil, nil))
 
           s(:begin, *callbacks)
+        end
+
+        # Generate nested attributes setter and static registration call
+        # Produces:
+        #   set <name>_attributes(value) {
+        #     if (!this._pending_nested_attributes) this._pending_nested_attributes = {};
+        #     this._pending_nested_attributes.<name> = value;
+        #   }
+        #   Model.accepts_nested_attributes_for("<name>", { allow_destroy: true, ... })
+        def generate_nested_attributes(nested)
+          name = nested[:name]
+          options = nested[:options]
+          nodes = []
+
+          # Generate setter using def with = suffix (class2 converter handles as setter)
+          setter_name = :"#{name}_attributes="
+          setter_body = s(:begin,
+            # if (!this._pending_nested_attributes) this._pending_nested_attributes = {};
+            s(:if,
+              s(:send,
+                s(:attr, s(:self), :_pending_nested_attributes),
+                :!),
+              s(:send, s(:self), :_pending_nested_attributes=,
+                s(:hash)),
+              nil),
+            # this._pending_nested_attributes.<name> = value;
+            s(:send,
+              s(:attr, s(:self), :_pending_nested_attributes),
+              :"#{name}=",
+              s(:lvar, :value)))
+
+          nodes.push(s(:def, setter_name,
+            s(:args, s(:arg, :value)),
+            setter_body))
+
+          # Generate static registration call:
+          # Model.accepts_nested_attributes_for("name", { ... })
+          opt_pairs = []
+          options.keys.each do |key|
+            val = options[key]
+            opt_pairs.push(s(:pair, s(:sym, key), val))
+          end
+
+          call_args = [s(:str, name.to_s)]
+          call_args.push(s(:hash, *opt_pairs)) unless opt_pairs.empty?
+
+          model_const = s(:const, nil, @rails_model_name.to_sym)
+          nodes.push(s(:send, model_const, :accepts_nested_attributes_for, *call_args))
+
+          nodes
         end
 
         # Transform the stream expression from broadcasts_to lambda
