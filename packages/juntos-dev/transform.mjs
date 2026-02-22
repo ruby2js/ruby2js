@@ -2438,6 +2438,7 @@ export async function ensureRuby2jsReady() {
     await import('ruby2js/filters/rails/migration.js');
     await import('ruby2js/filters/rails/helpers.js');
     await import('ruby2js/filters/rails/test.js');
+    await import('ruby2js/filters/rails/logger.js');
 
     // Template filters
     await import('ruby2js/filters/erb.js');
