@@ -78,6 +78,7 @@ module Ruby2JS
           @rails_attachments = []    # Active Storage attachments
           @rails_nested_attributes = []  # accepts_nested_attributes_for declarations
           @rails_url_helpers = false  # include Rails.application.routes.url_helpers
+          @rails_primary_abstract_class = false  # primary_abstract_class declaration
           @rails_model_private_methods = {}
           @rails_model_refs = Set.new
           @in_callback_block = false  # Track when processing callback body
@@ -137,34 +138,54 @@ module Ruby2JS
           # Second pass: transform body
           transformed_body = transform_model_body(body)
 
+          # Detect if extending ActiveRecord::Base directly (e.g., ApplicationRecord)
+          extends_ar_base = superclass.children.last == :Base &&
+            superclass.children.first&.type == :const &&
+            superclass.children.first.children.last == :ActiveRecord
+
           # Build the exported class
           # For namespaced classes like Identity::AccessToken, use just the leaf name
           # for export. JS doesn't support `export X.Y = class`, only `export class Y`.
           export_class_name = class_name.children.first ?
             s(:const, nil, class_name.children.last) : class_name
+          # When extending ActiveRecord::Base, change extends to just ActiveRecord
+          js_superclass = extends_ar_base ? s(:const, nil, :ActiveRecord) : superclass
           exported_class = s(:send, nil, :export,
-            node.updated(nil, [export_class_name, superclass, transformed_body]))
+            node.updated(nil, [export_class_name, js_superclass, transformed_body]))
 
-          # Generate import for superclass (ApplicationRecord or ActiveRecord::Base)
-          superclass_name = superclass.children.last.to_s
-          superclass_file = superclass_name.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '')
+          # Generate import for superclass
+          if extends_ar_base
+            # ActiveRecord::Base → import ActiveRecord from adapter path
+            import_list = [s(:const, nil, :ActiveRecord)]
+            import_list.push(s(:const, nil, :CollectionProxy))
+            import_list.push(s(:const, nil, :modelRegistry))
+            import_list.push(s(:const, nil, :Reference))
+            import_list.push(s(:const, nil, :HasOneReference))
 
-          # Check if model has has_many associations (need CollectionProxy)
-          has_has_many = @rails_associations.any? { |a| a[:type] == :has_many }
-          has_belongs_to = @rails_associations.any? { |a| a[:type] == :belongs_to }
-          has_has_one = @rails_associations.any? { |a| a[:type] == :has_one }
-          has_associations = @rails_associations.any?
+            import_node = s(:send, nil, :import,
+              s(:array, *import_list),
+              s(:str, "../lib/active_record.mjs"))
+          else
+            superclass_name = superclass.children.last.to_s
+            superclass_file = superclass_name.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '')
 
-          # Build import list: always include superclass, add CollectionProxy/modelRegistry if needed
-          import_list = [s(:const, nil, superclass_name.to_sym)]
-          import_list.push(s(:const, nil, :CollectionProxy)) if has_has_many
-          import_list.push(s(:const, nil, :modelRegistry)) if has_associations
-          import_list.push(s(:const, nil, :Reference)) if has_belongs_to
-          import_list.push(s(:const, nil, :HasOneReference)) if has_has_one
+            # Check if model has has_many associations (need CollectionProxy)
+            has_has_many = @rails_associations.any? { |a| a[:type] == :has_many }
+            has_belongs_to = @rails_associations.any? { |a| a[:type] == :belongs_to }
+            has_has_one = @rails_associations.any? { |a| a[:type] == :has_one }
+            has_associations = @rails_associations.any?
 
-          import_node = s(:send, nil, :import,
-            s(:array, *import_list),
-            s(:str, "./#{superclass_file}.js"))
+            # Build import list: always include superclass, add CollectionProxy/modelRegistry if needed
+            import_list = [s(:const, nil, superclass_name.to_sym)]
+            import_list.push(s(:const, nil, :CollectionProxy)) if has_has_many
+            import_list.push(s(:const, nil, :modelRegistry)) if has_associations
+            import_list.push(s(:const, nil, :Reference)) if has_belongs_to
+            import_list.push(s(:const, nil, :HasOneReference)) if has_has_one
+
+            import_node = s(:send, nil, :import,
+              s(:array, *import_list),
+              s(:str, "./#{superclass_file}.js"))
+          end
 
           # No cross-model imports needed — association methods use modelRegistry
           # for lazy resolution, avoiding circular dependencies
@@ -237,11 +258,23 @@ module Ruby2JS
               s(:lvar, :render))
           end
 
-          begin_node = if render_partial_assignment
-            s(:begin, import_node, *model_import_nodes, exported_class, render_partial_assignment)
-          else
-            s(:begin, import_node, *model_import_nodes, exported_class)
+          # Build list of trailing nodes (re-exports, partial assignment)
+          trailing_nodes = []
+
+          # When extending ActiveRecord::Base, re-export utility classes so
+          # other models can import them from ./application_record.js
+          if extends_ar_base
+            trailing_nodes.push(s(:send, nil, :export,
+              s(:array,
+                s(:const, nil, :CollectionProxy),
+                s(:const, nil, :modelRegistry),
+                s(:const, nil, :Reference),
+                s(:const, nil, :HasOneReference))))
           end
+
+          trailing_nodes.push(render_partial_assignment) if render_partial_assignment
+
+          begin_node = s(:begin, import_node, *model_import_nodes, exported_class, *trailing_nodes)
           result = process(begin_node)
           # Set empty comments on processed begin node to prevent first-location lookup
           # from incorrectly inheriting comments from child nodes
@@ -261,6 +294,7 @@ module Ruby2JS
           @rails_attachments = []
           @rails_nested_attributes = []
           @rails_url_helpers = false
+          @rails_primary_abstract_class = false
           @rails_model_private_methods = {}
           @rails_model_refs = Set.new
 
@@ -824,6 +858,8 @@ module Ruby2JS
               collect_enum(args)
             when :accepts_nested_attributes_for
               collect_nested_attributes(args)
+            when :primary_abstract_class
+              @rails_primary_abstract_class = true
             when :include
               if args.length == 1 && is_url_helpers_include?(args[0])
                 @rails_url_helpers = true
@@ -1198,20 +1234,26 @@ module Ruby2JS
           children = body ? (body.type == :begin ? body.children : [body]) : []
           transformed = []
 
-          # Add table_name as a static getter (not a method) so it can be accessed as this.table_name
-          # Use underscore for proper CamelCase handling (NotNow -> not_now -> not_nows)
-          leaf_name = Ruby2JS::Inflector.underscore(@rails_model_name)
-          # For namespaced models (Card::NotNow), Rails prefixes with parent table name
-          # when parent is an AR model: card_not_nows
-          parent_const = @rails_model_class_name.children.first
-          if parent_const && parent_const.type == :const
-            parent_name = Ruby2JS::Inflector.underscore(parent_const.children.last.to_s)
-            table_name = Ruby2JS::Inflector.pluralize("#{parent_name}_#{leaf_name}")
+          if @rails_primary_abstract_class
+            # Abstract class: add static primaryAbstractClass = true, skip table_name
+            transformed << s(:send, s(:self), :primaryAbstractClass=,
+              s(:true))
           else
-            table_name = Ruby2JS::Inflector.pluralize(leaf_name)
+            # Add table_name as a static getter (not a method) so it can be accessed as this.table_name
+            # Use underscore for proper CamelCase handling (NotNow -> not_now -> not_nows)
+            leaf_name = Ruby2JS::Inflector.underscore(@rails_model_name)
+            # For namespaced models (Card::NotNow), Rails prefixes with parent table name
+            # when parent is an AR model: card_not_nows
+            parent_const = @rails_model_class_name.children.first
+            if parent_const && parent_const.type == :const
+              parent_name = Ruby2JS::Inflector.underscore(parent_const.children.last.to_s)
+              table_name = Ruby2JS::Inflector.pluralize("#{parent_name}_#{leaf_name}")
+            else
+              table_name = Ruby2JS::Inflector.pluralize(leaf_name)
+            end
+            transformed << s(:send, s(:self), :table_name=,
+              s(:str, table_name))
           end
-          transformed << s(:send, s(:self), :table_name=,
-            s(:str, table_name))
 
           in_private = false
           children.each do |child|
@@ -1226,7 +1268,7 @@ module Ruby2JS
             # Skip DSL declarations (already collected)
             if child.type == :send && child.children[0].nil?
               method = child.children[1]
-              next if %i[has_many has_one belongs_to validates scope broadcasts_to has_one_attached has_many_attached has_rich_text store enum include accepts_nested_attributes_for].include?(method)
+              next if %i[has_many has_one belongs_to validates scope broadcasts_to has_one_attached has_many_attached has_rich_text store enum include accepts_nested_attributes_for primary_abstract_class].include?(method)
               next if CALLBACKS.include?(method)
             end
 

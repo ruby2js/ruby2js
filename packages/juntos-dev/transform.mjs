@@ -295,7 +295,7 @@ export function findModels(appRoot) {
       if (entry.isDirectory()) {
         if (entry.name === 'concerns') continue;
         results.push(...walk(path.join(dir, entry.name), prefix ? `${prefix}/${entry.name}` : entry.name));
-      } else if (entry.name.endsWith('.rb') && entry.name !== 'application_record.rb' && !entry.name.startsWith('._')) {
+      } else if (entry.name.endsWith('.rb') && !entry.name.startsWith('._')) {
         const name = entry.name.replace('.rb', '');
         results.push(prefix ? `${prefix}/${name}` : name);
       }
@@ -679,14 +679,8 @@ export function fixImports(js, fromFile) {
   js = js.replace(/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, "from 'juntos:active-record'");
   js = js.replace(/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, "from 'juntos:active-record'");
 
-  // ApplicationRecord → virtual module
-  js = js.replace(/from ['"]\.\/application_record\.js['"]/g, "from 'juntos:application-record'");
-
   // Model imports: .js → .rb (same directory, including nested paths like identity/access_token)
-  js = js.replace(/from ['"]\.\/([\w/]+)\.js['"]/g, (match, name) => {
-    if (name === 'application_record') return "from 'juntos:application-record'";
-    return `from './${name}.rb'`;
-  });
+  js = js.replace(/from ['"]\.\/([\w/]+)\.js['"]/g, "from './$1.rb'");
 
   // Model imports from controllers: ../models/*.js → ../models/*.rb (including nested paths)
   js = js.replace(/from ['"]\.\.\/models\/([\w/]+)\.js['"]/g, "from '../models/$1.rb'");
@@ -776,8 +770,9 @@ export function fixImportsForEject(js, fromFile, config = {}) {
   js = js.replace(/from ['"]\.\.\/\.\.\/\.\.\/lib\/rails\.js['"]/g, `from '${railsModule}'`);
   js = js.replace(/from ['"]lib\/rails\.js['"]/g, `from '${railsModule}'`);
   js = js.replace(/from ['"](ruby2js-rails|juntos)\/rails_base\.js['"]/g, `from '${railsModule}'`);
-  js = js.replace(/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, "from 'juntos/adapters/active_record.mjs'");
-  js = js.replace(/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, "from 'juntos/adapters/active_record.mjs'");
+  const adapterFile = getActiveRecordAdapterFile(config.database);
+  js = js.replace(/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, `from 'juntos/adapters/${adapterFile}'`);
+  js = js.replace(/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, `from 'juntos/adapters/${adapterFile}'`);
 
   // ActiveStorage virtual module → adapter
   js = js.replace(/from ['"]juntos:active-storage['"]/g, "from 'juntos/adapters/active_storage_base.mjs'");
@@ -1072,7 +1067,7 @@ export function fixImportsForEject(js, fromFile, config = {}) {
  * Generate content for juntos:models virtual module.
  */
 export function generateModelsModule(appRoot) {
-  const models = findModels(appRoot);
+  const models = findModels(appRoot).filter(m => m !== 'application_record');
   const collisions = findLeafCollisions(models);
   const imports = models.map(m => {
     const leafClass = m.split('/').pop().split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
@@ -1098,7 +1093,7 @@ export { ${classNames.join(', ')} };
  * Uses juntos package for runtime, local paths for app code.
  */
 export function generateModelsModuleForEject(appRoot, config = {}) {
-  let models = findModels(appRoot);
+  let models = findModels(appRoot).filter(m => m !== 'application_record');
   // Exclude models that failed to transpile (e.g., unsupported syntax like class << self)
   if (config.excludeModels) {
     models = models.filter(m => !config.excludeModels.has(m));
@@ -1182,23 +1177,6 @@ for (const migration of migrations) {
 }
 ${nestingCode}
 export { ${classNames.join(', ')} };
-`;
-}
-
-/**
- * Generate application_record.js for ejected output.
- * This provides the base class for all models.
- */
-export function generateApplicationRecordForEject(config = {}) {
-  const adapterFile = getActiveRecordAdapterFile(config.database);
-  return `import { ActiveRecord as Base, CollectionProxy, modelRegistry } from 'juntos/adapters/${adapterFile}';
-import { Reference, HasOneReference } from 'juntos/adapters/reference.mjs';
-
-export class ApplicationRecord extends Base {
-  static primaryAbstractClass = true;
-}
-
-export { CollectionProxy, modelRegistry, Reference, HasOneReference };
 `;
 }
 

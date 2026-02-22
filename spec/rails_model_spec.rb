@@ -29,6 +29,49 @@ describe Ruby2JS::Filter::Rails::Model do
     end
   end
 
+  describe "ActiveRecord::Base subclass" do
+    it "imports ActiveRecord from adapter path" do
+      result = to_js('class ApplicationRecord < ActiveRecord::Base; end')
+      assert_includes result, 'from "../lib/active_record.mjs"'
+      assert_includes result, 'import { ActiveRecord'
+    end
+
+    it "extends ActiveRecord (not ActiveRecord.Base)" do
+      result = to_js('class ApplicationRecord < ActiveRecord::Base; end')
+      assert_includes result, 'class ApplicationRecord extends ActiveRecord'
+      refute_includes result, 'ActiveRecord.Base'
+    end
+
+    it "re-exports utility classes" do
+      result = to_js('class ApplicationRecord < ActiveRecord::Base; end')
+      assert_includes result, 'export { CollectionProxy, modelRegistry, Reference, HasOneReference }'
+    end
+
+    it "strips primary_abstract_class" do
+      result = to_js(<<~RUBY)
+        class ApplicationRecord < ActiveRecord::Base
+          primary_abstract_class
+        end
+      RUBY
+      refute_includes result, 'primary_abstract_class'
+      assert_includes result, 'primaryAbstractClass = true'
+    end
+
+    it "skips table_name for abstract classes" do
+      result = to_js(<<~RUBY)
+        class ApplicationRecord < ActiveRecord::Base
+          primary_abstract_class
+        end
+      RUBY
+      refute_includes result, 'table_name'
+    end
+
+    it "generates table_name without primary_abstract_class" do
+      result = to_js('class ApplicationRecord < ActiveRecord::Base; end')
+      assert_includes result, 'table_name = "application_records"'
+    end
+  end
+
   describe "has_many" do
     it "generates association getter with CollectionProxy" do
       result = to_js(<<~RUBY)

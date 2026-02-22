@@ -39,7 +39,6 @@ import {
   generateMigrationsModuleForEject,
   generateViewsModuleForEject,
   generateTurboStreamModuleForEject,
-  generateApplicationRecordForEject,
   generatePackageJsonForEject,
   generateViteConfigForEject,
   generateTestSetupForEject,
@@ -2510,10 +2509,8 @@ async function runEject(options) {
     }
   }
 
-  // Generate application_record.js
+  // Generate project files
   console.log('  Generating project files...');
-  writeFileSync(join(outDir, 'app/models/application_record.js'), generateApplicationRecordForEject(config));
-  fileCount++;
 
   // Generate package.json with database config
   const appName = basename(APP_ROOT) + '-ejected';

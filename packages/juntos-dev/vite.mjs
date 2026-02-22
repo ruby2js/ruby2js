@@ -692,7 +692,6 @@ function createRubyTransformPlugin(config, appRoot) {
     // Resolve virtual modules and source file imports
     resolveId(source, importer) {
       // Virtual modules
-      if (source === 'juntos:application-record') return '\0juntos:application-record';
       if (source === 'juntos:models') return '\0juntos:models';
       if (source === 'juntos:migrations') return '\0juntos:migrations';
       if (source.startsWith('juntos:views/')) return '\0' + source;
@@ -719,21 +718,11 @@ function createRubyTransformPlugin(config, appRoot) {
 
     // Load virtual modules and transform Ruby files
     async load(id) {
-      // Virtual module: juntos:application-record
-      // Re-exports everything from active-record plus ApplicationRecord class
-      if (id === '\0juntos:application-record') {
-        return `
-import { ActiveRecord } from 'juntos:active-record';
-export * from 'juntos:active-record';
-export class ApplicationRecord extends ActiveRecord {}
-`;
-      }
-
       // Virtual module: juntos:models (registry of all models)
       // Registers models with both Application and the adapter's modelRegistry
       // Also registers for RPC when dual bundle mode is enabled (hydration needs RPC)
       if (id === '\0juntos:models') {
-        const allModels = findModels(appRoot);
+        const allModels = findModels(appRoot).filter(m => m !== 'application_record');
         const models = (config.include?.length || config.exclude?.length)
           ? allModels.filter(m => shouldIncludeFile(`app/models/${m}.rb`, config.include, config.exclude))
           : allModels;
@@ -880,7 +869,7 @@ export { application };
 
       // Skip base classes that don't need transformation
       const basename = path.basename(id);
-      if (basename === 'application_record.rb' || basename === 'application_controller.rb') {
+      if (basename === 'application_controller.rb') {
         return null;
       }
 
