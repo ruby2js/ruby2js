@@ -64,31 +64,46 @@ export class AstroComponentTransformer {
     // Add ESM filter for import/export handling
     
     if (!convertOptions.filters.includes(Ruby2JS.Filter.ESM)) {
-      convertOptions.filters = convertOptions.filters.concat([Ruby2JS.Filter.ESM])
+      convertOptions.filters = [
+        ...convertOptions.filters,
+        ...[Ruby2JS.Filter.ESM]
+      ]
     };
 
     // Add functions filter for method parentheses (.pop → .pop())
     
     if (!convertOptions.filters.includes(Ruby2JS.Filter.Functions)) {
-      convertOptions.filters = convertOptions.filters.concat([Ruby2JS.Filter.Functions])
+      convertOptions.filters = [
+        ...convertOptions.filters,
+        ...[Ruby2JS.Filter.Functions]
+      ]
     };
 
     // Add return filter for implicit returns in blocks
     
     if (!convertOptions.filters.includes(Ruby2JS.Filter.Return)) {
-      convertOptions.filters = convertOptions.filters.concat([Ruby2JS.Filter.Return])
+      convertOptions.filters = [
+        ...convertOptions.filters,
+        ...[Ruby2JS.Filter.Return]
+      ]
     };
 
     // Add SFC filter for @var → const var transformation
     
     if (!convertOptions.filters.includes(Ruby2JS.Filter.SFC)) {
-      convertOptions.filters = convertOptions.filters.concat([Ruby2JS.Filter.SFC])
+      convertOptions.filters = [
+        ...convertOptions.filters,
+        ...[Ruby2JS.Filter.SFC]
+      ]
     };
 
     // Add camelCase filter for method/variable name conversion
     
     if (!convertOptions.filters.includes(Ruby2JS.Filter.CamelCase)) {
-      convertOptions.filters = convertOptions.filters.concat([Ruby2JS.Filter.CamelCase])
+      convertOptions.filters = [
+        ...convertOptions.filters,
+        ...[Ruby2JS.Filter.CamelCase]
+      ]
     };
 
     // Extract template from __END__

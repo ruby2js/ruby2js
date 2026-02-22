@@ -14,6 +14,7 @@ export class SvelteTemplateCompiler {
     return {template, errors, warnings}
   };
 
+  // Default options for Ruby2JS conversion
   static DEFAULT_OPTIONS = Object.freeze({eslevel: 2_022, filters: []});
 
   get template() {
@@ -45,6 +46,7 @@ export class SvelteTemplateCompiler {
     this.#warnings = []
   };
 
+  // Compile the template, returning a Result
   get compile() {
     let result = [];
     let pos = 0;
@@ -61,9 +63,12 @@ export class SvelteTemplateCompiler {
 
       // Add text before brace
       if (braceStart > pos) result.push(this.#template.slice(pos, braceStart));
+
+      // Find matching closing brace
       let braceEnd = this.#findMatchingBrace(this.#template, braceStart);
 
       if (braceEnd == null) {
+        // Unmatched brace - treat as literal
         this.#errors.push({type: "unmatchedBrace", position: braceStart});
         result.push(this.#template.slice(braceStart));
         break
@@ -71,6 +76,8 @@ export class SvelteTemplateCompiler {
 
       // Extract content between braces
       let content = this.#template.slice(braceStart + 1, braceEnd);
+
+      // Process based on content type
       result.push("{", this.#processBraceContent(content), "}");
       pos = braceEnd + 1
     };
@@ -87,6 +94,7 @@ export class SvelteTemplateCompiler {
     return new this(template, options).compile
   };
 
+  // Find the next unescaped opening brace
   #findNextBrace(str, startPos) {
     let pos = startPos;
 
@@ -94,6 +102,7 @@ export class SvelteTemplateCompiler {
       let idx = str.indexOf("{", pos);
       if (idx === -1) return null;
 
+      // Check if escaped (preceded by backslash)
       if (idx > 0 && str[idx - 1] == "\\") {
         pos = idx + 1;
         continue
@@ -105,6 +114,7 @@ export class SvelteTemplateCompiler {
     return null
   };
 
+  // Find the matching closing brace, handling nesting and strings
   #findMatchingBrace(str, openPos) {
     let depth = 1;
     let pos = openPos + 1;
@@ -127,6 +137,7 @@ export class SvelteTemplateCompiler {
       };
 
       if (inString) {
+        // Check for end of string
         if (char == inString) inString = null
       } else {
         switch (char) {
@@ -154,6 +165,7 @@ export class SvelteTemplateCompiler {
     return depth == 0 ? pos - 1 : null
   };
 
+  // Process content inside braces
   #processBraceContent(content) {
     content = content.trim();
 
@@ -183,6 +195,7 @@ export class SvelteTemplateCompiler {
       return `@const ${RegExp.$1} = ${this.#convertExpression(RegExp.$2)}`
     } else {
       {
+        // Plain expression - use begin/rescue with explicit returns for JS compatibility
         try {
           return this.#convertExpression(content)
         } catch (e) {
@@ -244,6 +257,7 @@ export class SvelteTemplateCompiler {
 
   // Convert a Ruby expression to JavaScript using Ruby2JS
   #convertExpression(rubyExpr) {
+    // Build options for Ruby2JS
     let convertOptions = {
       eslevel: this.#options.eslevel,
       filters: this.#buildFilters
@@ -252,17 +266,24 @@ export class SvelteTemplateCompiler {
     // Wrap expression in array - [expr] becomes [jsExpr] in JS
     // This prevents bare identifiers from being treated as declarations
     let wrapped = `[${rubyExpr}]`;
+
+    // Convert the wrapped expression
     let result = convert(wrapped, convertOptions);
     let js = result.toString().trim();
 
     // Remove trailing semicolon
     js = js.chomp(";").trim();
+
+    // Extract the expression from the array: [expr] -> expr
     if (js.startsWith("[") && js.endsWith("]")) js = js.slice(1, -1).trim();
     return js
   };
 
+  // Build the filter list for Ruby2JS conversion
   get #buildFilters() {
     let filters = [...this.#options.filters];
+
+    // Add camelCase filter if enabled (default)
     let camelCaseEnabled = this.#options.camelCase ?? true;
 
     if (camelCaseEnabled) {

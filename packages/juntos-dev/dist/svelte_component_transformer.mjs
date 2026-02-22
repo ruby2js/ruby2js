@@ -78,13 +78,19 @@ export class SvelteComponentTransformer {
     // Add SFC filter for @var → let var transformation
     
     if (!convertOptions.filters.includes(Ruby2JS.Filter.SFC)) {
-      convertOptions.filters = convertOptions.filters.concat([Ruby2JS.Filter.SFC])
+      convertOptions.filters = [
+        ...convertOptions.filters,
+        ...[Ruby2JS.Filter.SFC]
+      ]
     };
 
     // Add camelCase filter for method/variable name conversion
     
     if (!convertOptions.filters.includes(Ruby2JS.Filter.CamelCase)) {
-      convertOptions.filters = convertOptions.filters.concat([Ruby2JS.Filter.CamelCase])
+      convertOptions.filters = [
+        ...convertOptions.filters,
+        ...[Ruby2JS.Filter.CamelCase]
+      ]
     };
 
     // Extract template from __END__
@@ -165,6 +171,8 @@ export class SvelteComponentTransformer {
       break;
 
     case "ivar":
+
+      // Instance variable reference
       varName = node.children[0].toString().slice(1);
       if (!this.#vars.includes(varName)) this.#vars.push(varName);
       break;
@@ -183,6 +191,8 @@ export class SvelteComponentTransformer {
       break;
 
     case "send":
+
+      // Check for navigation/routing usage
       [target, method, ...args] = node.children;
 
       if (target == null) {
@@ -233,6 +243,7 @@ export class SvelteComponentTransformer {
   #transformScript(js) {
     let lines = [];
 
+    // Build imports
     // Note: Use Array() instead of .to_a for JS compatibility (Sets)
     let svelteImports = Array.from(this.#imports.svelte).sort();
 

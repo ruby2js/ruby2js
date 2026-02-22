@@ -78,13 +78,19 @@ export class VueComponentTransformer {
     // Add SFC filter for @var → const var = ref(value) transformation
     
     if (!convertOptions.filters.includes(Ruby2JS.Filter.SFC)) {
-      convertOptions.filters = convertOptions.filters.concat([Ruby2JS.Filter.SFC])
+      convertOptions.filters = [
+        ...convertOptions.filters,
+        ...[Ruby2JS.Filter.SFC]
+      ]
     };
 
     // Add camelCase filter for method/variable name conversion
     
     if (!convertOptions.filters.includes(Ruby2JS.Filter.CamelCase)) {
-      convertOptions.filters = convertOptions.filters.concat([Ruby2JS.Filter.CamelCase])
+      convertOptions.filters = [
+        ...convertOptions.filters,
+        ...[Ruby2JS.Filter.CamelCase]
+      ]
     };
 
     // Extract template from __END__
@@ -163,6 +169,8 @@ export class VueComponentTransformer {
       break;
 
     case "ivar":
+
+      // Instance variable reference
       varName = node.children[0].toString().slice(1);
       if (!this.#refs.includes(varName)) this.#refs.push(varName);
       this.#imports.vue.add("ref");
@@ -181,6 +189,8 @@ export class VueComponentTransformer {
       break;
 
     case "send":
+
+      // Check for router/route usage
       [target, method, ...args] = node.children;
 
       if (target == null) {
@@ -221,6 +231,7 @@ export class VueComponentTransformer {
   #transformScript(js) {
     let lines = [];
 
+    // Build imports
     // Note: Use Array() instead of .to_a for JS compatibility (Sets)
     let vueImports = Array.from(this.#imports.vue).sort();
 

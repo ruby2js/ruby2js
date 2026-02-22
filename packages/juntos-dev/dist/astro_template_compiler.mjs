@@ -46,6 +46,7 @@ export class AstroTemplateCompiler {
     this.#warnings = []
   };
 
+  // Compile the template, returning a Result
   get compile() {
     // First pass: convert snake_case attribute names to camelCase
     let processed = this.#convertAttributeNames(this.#template);
@@ -66,6 +67,8 @@ export class AstroTemplateCompiler {
 
       // Add text before brace
       if (braceStart > pos) result.push(processed.slice(pos, braceStart));
+
+      // Find matching closing brace
       let braceEnd = this.#findMatchingBrace(processed, braceStart);
 
       if (braceEnd == null) {
@@ -95,6 +98,7 @@ export class AstroTemplateCompiler {
     return new this(template, options).compile
   };
 
+  // Convert snake_case attribute names to camelCase in JSX
   // e.g., show_count={true} → showCount={true}
   #convertAttributeNames(template) {
     let camelCaseEnabled = this.#options.camelCase ?? true;
@@ -126,6 +130,7 @@ export class AstroTemplateCompiler {
       let idx = str.indexOf("{", pos);
       if (idx === -1) return null;
 
+      // Check if escaped (preceded by backslash)
       if (idx > 0 && str[idx - 1] == "\\") {
         pos = idx + 1;
         continue
@@ -137,6 +142,7 @@ export class AstroTemplateCompiler {
     return null
   };
 
+  // Find the matching closing brace, handling nesting and strings
   #findMatchingBrace(str, openPos) {
     let depth = 1;
     let pos = openPos + 1;
@@ -159,6 +165,7 @@ export class AstroTemplateCompiler {
       };
 
       if (inString) {
+        // Check for end of string
         if (char == inString) inString = null
       } else {
         switch (char) {
@@ -186,6 +193,7 @@ export class AstroTemplateCompiler {
     return depth == 0 ? pos - 1 : null
   };
 
+  // Process an expression inside braces
   #processExpression(content) {
     let collection, blockVars, blockBody;
     content = content.trim();
@@ -203,6 +211,7 @@ export class AstroTemplateCompiler {
       blockVars = RegExp.$2.trim();
       blockBody = RegExp.$3.trim();
 
+      // Check if block body looks like JSX (starts with <)
       if (blockBody.startsWith("<")) {
         return this.#processMapBlock(collection, blockVars, blockBody)
       }
@@ -243,6 +252,7 @@ export class AstroTemplateCompiler {
 
   // Process a .map block with JSX body
   #processMapBlock(collection, blockVars, jsxBody) {
+    // Convert collection expression
     let jsCollection = this.#convertExpression(collection);
 
     // Process the JSX body recursively (convert {expr} inside it)
@@ -299,10 +309,13 @@ export class AstroTemplateCompiler {
 
     // Remove trailing semicolon
     js = js.chomp(";").trim();
+
+    // Extract the expression from the array: [expr] -> expr
     if (js.startsWith("[") && js.endsWith("]")) js = js.slice(1, -1).trim();
     return js
   };
 
+  // Build the filter list for Ruby2JS conversion
   get #buildFilters() {
     let filters = [...this.#options.filters];
 

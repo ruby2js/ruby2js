@@ -26,6 +26,7 @@ module Ruby2JS
       if \
         receiver and
         receiver.type == :begin and
+        receiver.children.first and
         [:irange, :erange].include? receiver.children.first.type
       then
         if method == :to_a

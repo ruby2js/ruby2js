@@ -46,14 +46,23 @@ export class VueTemplateCompiler {
     this.#warnings = []
   };
 
+  // Compile the template, returning a Result
   get compile() {
     let result = this.#template.toString() // Use to_s instead of dup for JS compatibility;
 
     // Process Vue interpolations: {{ expression }}
     result = this.#processInterpolations(result);
+
+    // Process v-for directives
     result = this.#processVFor(result);
+
+    // Process v-if/v-else-if/v-show directives
     result = this.#processConditionals(result);
+
+    // Process v-bind shorthand and full syntax
     result = this.#processBindings(result);
+
+    // Process v-model
     result = this.#processVModel(result);
 
     return VueTemplateCompiler.Result({
@@ -68,9 +77,12 @@ export class VueTemplateCompiler {
     return new this(template, options).compile
   };
 
+  // Process {{ expression }} interpolations
   #processInterpolations(template) {
     return template.replaceAll(/\{\{\s*(.+?)\s*\}\}/gs, (match, $1) => {
       let rubyExpr = $1;
+
+      // Store result in variable to ensure proper return in transpiled JS
       let result = null;
 
       try {
@@ -96,6 +108,8 @@ export class VueTemplateCompiler {
       /v-for="(.+?)\s+in\s+(.+?)"/g, (match, $1, $2) => {
         let vars = $1;
         let rubyCollection = $2.trim();
+
+        // Store result in variable to ensure proper return in transpiled JS
         let result = null;
 
         try {
@@ -118,6 +132,7 @@ export class VueTemplateCompiler {
 
   // Process v-if, v-else-if, v-show conditionals
   #processConditionals(template) {
+    // Process v-if="condition"
     let result = template.replaceAll(/v-if="(.+?)"/g, (match, $1) => {
       let rubyExpr = $1;
       return this.#processDirectiveExpression("v-if", rubyExpr, match)
@@ -138,11 +153,15 @@ export class VueTemplateCompiler {
     return result
   };
 
+  // Process :prop="value" and v-bind:prop="value" bindings
   #processBindings(template) {
+    // Process shorthand :prop="value" (but not ::prop or @click)
     let result = template.replaceAll(
       /(?<!:):(\w[\w-]*)="(.+?)"/g, (match, $1, $2) => {
         let prop = $1;
         let rubyValue = $2;
+
+        // Store result in variable to ensure proper return in transpiled JS
         let replacement = null;
 
         try {
@@ -167,6 +186,8 @@ export class VueTemplateCompiler {
     result = result.replaceAll(/v-bind:(\w[\w-]*)="(.+?)"/g, (match, $1, $2) => {
       let prop = $1;
       let rubyValue = $2;
+
+      // Store result in variable to ensure proper return in transpiled JS
       let replacement = null;
 
       try {
@@ -189,9 +210,12 @@ export class VueTemplateCompiler {
     return result
   };
 
+  // Process v-model="ref"
   #processVModel(template) {
     return template.replaceAll(/v-model="(.+?)"/g, (match, $1) => {
-      let rubyRef = $1 // Store result in variable to ensure proper return in transpiled JS;
+      let rubyRef = $1;
+
+      // Store result in variable to ensure proper return in transpiled JS
       let result = null;
 
       try {
@@ -213,6 +237,7 @@ export class VueTemplateCompiler {
 
   // Helper to process a directive with an expression
   #processDirectiveExpression(directive, rubyExpr, original) {
+    // Store result in variable to ensure proper return in transpiled JS
     let result = null;
 
     try {
@@ -231,7 +256,9 @@ export class VueTemplateCompiler {
     return result
   };
 
+  // Convert a Ruby expression to JavaScript using Ruby2JS
   #convertExpression(rubyExpr) {
+    // For Vue templates, we're converting expressions that will be evaluated
     // in a context where variables already exist (reactive refs, props, etc.)
     //
     // Strategy: Wrap in an array literal and extract the first element.
@@ -244,18 +271,25 @@ export class VueTemplateCompiler {
 
     // Wrap expression in array - [expr] becomes [jsExpr] in JS
     let wrapped = `[${rubyExpr}]`;
+
+    // Convert the wrapped expression
     let result = convert(wrapped, convertOptions);
     let js = result.toString().trim();
 
     // Remove trailing semicolon
     js = js.chomp(";").trim();
+
+    // Extract the expression from the array: [expr] -> expr
     if (js.startsWith("[") && js.endsWith("]")) js = js.slice(1, -1).trim();
     return js
   };
 
+  // Build the filter list for Ruby2JS conversion
   get #buildFilters() {
     // Note: Use spread [...] instead of .dup for JS compatibility
     let filters = [...this.#options.filters];
+
+    // Add camelCase filter if enabled (default)
     let camelCaseEnabled = this.#options.camelCase ?? true;
 
     if (camelCaseEnabled) {

@@ -2975,6 +2975,7 @@ const Ruby2JS = (() => {
       }
     };
 
+    // return the output as a string
     get to_s() {
       if (this._str) return this._str;
       this.respace;
@@ -3006,6 +3007,7 @@ const Ruby2JS = (() => {
       return null
     };
 
+    // Get or create an ERB source buffer for source map generation
     get erb_source_buffer() {
       if (this._erb_source_buffer) return this._erb_source_buffer;
       if (!this._erb_source) return null;
@@ -3158,7 +3160,6 @@ const Ruby2JS = (() => {
   // Alias for selfhost transpilation (_compact avoids functions filter transformation)
   Serializer.prototype._compact = Serializer.prototype.compact;
 
-  // Source buffer for ERB templates - provides line/column lookup for source maps
   class ErbSourceBuffer {
     get source() {
       return this._source
@@ -3183,6 +3184,7 @@ const Ruby2JS = (() => {
       return other instanceof ErbSourceBuffer && this._source.object_id === other.source.object_id
     };
 
+    // Use find_index instead of bsearch_index for JS compatibility
     line_for_position(pos) {
       return this._line_offsets.findIndex(offset => offset > pos) ?? this._line_offsets.length
     };
@@ -5149,8 +5151,6 @@ const Ruby2JS = (() => {
         try {
           [class_name, this._class_name] = [this._class_name, name];
           [class_parent, this._class_parent] = [this._class_parent, inheritance];
-
-          // inhibit ivar substitution within a class definition.  See ivars.rb
           [ivars, this.ivars] = [this.ivars, null];
           saved_underscored_private = this._underscored_private;
 
@@ -12545,7 +12545,10 @@ const Ruby2JS = (() => {
         if (node !== this._ast) return this.parse(node)
       };
 
-      if (receiver && receiver.type === "begin" && ["irange", "erange"].includes(receiver.children.first.type)) {
+      if (receiver && receiver.type === "begin" && receiver.children.first && [
+        "irange",
+        "erange"
+      ].includes(receiver.children.first.type)) {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
@@ -13087,7 +13090,10 @@ const Ruby2JS = (() => {
         if (node !== this._ast) return this.parse(node)
       };
 
-      if (receiver && receiver.type === "begin" && ["irange", "erange"].includes(receiver.children.first.type)) {
+      if (receiver && receiver.type === "begin" && receiver.children.first && [
+        "irange",
+        "erange"
+      ].includes(receiver.children.first.type)) {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
@@ -13629,7 +13635,10 @@ const Ruby2JS = (() => {
         if (node !== this._ast) return this.parse(node)
       };
 
-      if (receiver && receiver.type === "begin" && ["irange", "erange"].includes(receiver.children.first.type)) {
+      if (receiver && receiver.type === "begin" && receiver.children.first && [
+        "irange",
+        "erange"
+      ].includes(receiver.children.first.type)) {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
@@ -14171,7 +14180,10 @@ const Ruby2JS = (() => {
         if (node !== this._ast) return this.parse(node)
       };
 
-      if (receiver && receiver.type === "begin" && ["irange", "erange"].includes(receiver.children.first.type)) {
+      if (receiver && receiver.type === "begin" && receiver.children.first && [
+        "irange",
+        "erange"
+      ].includes(receiver.children.first.type)) {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
@@ -14713,7 +14725,10 @@ const Ruby2JS = (() => {
         if (node !== this._ast) return this.parse(node)
       };
 
-      if (receiver && receiver.type === "begin" && ["irange", "erange"].includes(receiver.children.first.type)) {
+      if (receiver && receiver.type === "begin" && receiver.children.first && [
+        "irange",
+        "erange"
+      ].includes(receiver.children.first.type)) {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
@@ -15255,7 +15270,10 @@ const Ruby2JS = (() => {
         if (node !== this._ast) return this.parse(node)
       };
 
-      if (receiver && receiver.type === "begin" && ["irange", "erange"].includes(receiver.children.first.type)) {
+      if (receiver && receiver.type === "begin" && receiver.children.first && [
+        "irange",
+        "erange"
+      ].includes(receiver.children.first.type)) {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
@@ -15797,7 +15815,10 @@ const Ruby2JS = (() => {
         if (node !== this._ast) return this.parse(node)
       };
 
-      if (receiver && receiver.type === "begin" && ["irange", "erange"].includes(receiver.children.first.type)) {
+      if (receiver && receiver.type === "begin" && receiver.children.first && [
+        "irange",
+        "erange"
+      ].includes(receiver.children.first.type)) {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
@@ -16339,7 +16360,10 @@ const Ruby2JS = (() => {
         if (node !== this._ast) return this.parse(node)
       };
 
-      if (receiver && receiver.type === "begin" && ["irange", "erange"].includes(receiver.children.first.type)) {
+      if (receiver && receiver.type === "begin" && receiver.children.first && [
+        "irange",
+        "erange"
+      ].includes(receiver.children.first.type)) {
         if (method === "to_a") {
           return this.range_to_array(receiver.children.first)
         } else {
@@ -16874,7 +16898,6 @@ const Ruby2JS = (() => {
     };
 
     on_csend(receiver, method, ...args) {
-      // they need to be converted to instanceof/constructor checks
       if (["is_a?", "kind_of?", "instance_of?"].includes(method) && args.length === 1) {
         this.parse(receiver);
         this.put(" && ");
@@ -16911,7 +16934,6 @@ const Ruby2JS = (() => {
         this.parse_all(...args, {join: ", "});
         return this.put(")")
       } else {
-        // Fallback for pre-ES2020: receiver && receiver(args)
         this.parse(receiver);
         this.put(" && ");
         this.parse(receiver);
@@ -16931,6 +16953,7 @@ const Ruby2JS = (() => {
       if (!left) return node;
       let right = node.children[2];
 
+      // recursively evaluate left hand side
       if (left.type === "send" && left.children.length === 3 && left.children[1] === "+") {
         left = this.collapse_strings(left)
       };
@@ -16950,6 +16973,8 @@ const Ruby2JS = (() => {
         } else {
           if (left.type === "str") left = this.s("dstr", left);
           if (right.type === "str") right = this.s("dstr", right);
+
+          // Use splat for JS compatibility (array + array doesn't concat in JS)
           return left.updated(null, [...left.children, ...right.children])
         }
       };
@@ -16967,6 +16992,7 @@ const Ruby2JS = (() => {
 
       if (start.type === "int" && start.children.first === 0) {
         if (finish.type === "int") {
+          // output cleaner code if we know the value already
           length = finish.children.first + (node.type === "irange" ? 1 : 0);
           return this.put(`[...Array(${length ?? ""}).keys()]`)
         } else {
@@ -19275,7 +19301,6 @@ const Ruby2JS = (() => {
 
       if (prepend.length === 0) return;
 
-      // Use Parser::AST::Node in Ruby, Ruby2JS::Node in JS selfhost
       this._ast = typeof Parser !== 'undefined' && typeof Parser.AST.Node !== 'undefined' ? new Parser.AST.Node("begin", [
         ...prepend,
         this._ast

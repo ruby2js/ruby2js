@@ -191,7 +191,7 @@ export class ErbPnodeTransformer {
 
     for (let filter of filtersToAdd) {
       if (!convertOptions.filters.includes(filter)) {
-        convertOptions.filters = convertOptions.filters.concat([filter])
+        convertOptions.filters = [...convertOptions.filters, ...[filter]]
       }
     };
 
