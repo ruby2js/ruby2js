@@ -154,6 +154,11 @@ module Ruby2JS
       def infer_type(node)
         return nil unless node.respond_to?(:type)
 
+        # Unwrap begin nodes (parenthesized expressions)
+        if node.type == :begin && node.children.length == 1
+          return infer_type(node.children.first)
+        end
+
         # Direct literal types
         # Use explicit hash lookup to avoid prototype chain issues in JS.
         # Hash#key? transpiles to `in` which checks prototype chain, so we check

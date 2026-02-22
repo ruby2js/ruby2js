@@ -269,6 +269,14 @@ describe Ruby2JS::Filter::Pragma do
         must_equal 'let x = a + 1'
     end
 
+    it "should not warn for + when operand is parenthesized or-with-number" do
+      diags = []
+      result = Ruby2JS.convert('x = (a || 0) + (b || 0)', eslevel: 2021,
+        lint: true, diagnostics: diags,
+        filters: [Ruby2JS::Filter::Pragma])
+      _(diags.select { |d| d[:rule] == :ambiguous_method }).must_be_empty
+    end
+
     it "should convert - to filter for difference with pragma" do
       to_js('x = a - b # Pragma: array').
         must_equal 'let x = a.filter(x => !b.includes(x))'
