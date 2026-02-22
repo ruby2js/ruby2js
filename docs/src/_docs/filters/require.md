@@ -25,11 +25,15 @@ If you want `require` statements to be converted to ES module `import` statement
 You can prevent specific `require` or `require_relative` statements from being inlined by using the `skip` pragma:
 
 ```ruby
-require 'json' # Pragma: skip
+require 'parser/current' # Pragma: skip
 require_relative 'helper'
 ```
 
-In this example, `require 'json'` will be removed from the output (since `json` is a Ruby-only library), while `require_relative 'helper'` will be processed normally and its contents inlined.
+In this example, `require 'parser/current'` will be removed from the output (since it's a Ruby-only library), while `require_relative 'helper'` will be processed normally and its contents inlined.
+
+{% rendercontent "docs/note", title: "Auto-stripped Requires" %}
+The **functions** filter automatically strips `require 'json'` and `require 'ostruct'` (since JSON is built-in and JS objects are effectively OpenStructs), so these don't need the skip pragma.
+{% endrendercontent %}
 
 This allows the Require filter to be run before the Pragma filter in the filter chain while still respecting skip directives.
 

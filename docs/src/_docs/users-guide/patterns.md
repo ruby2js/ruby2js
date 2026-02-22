@@ -504,7 +504,7 @@ Use `# Pragma: skip` to exclude Ruby-only code from JS output:
 }'></div>
 
 ```ruby
-require 'json' # Pragma: skip
+require 'parser/current' # Pragma: skip
 
 def ruby_only_helper # Pragma: skip
   # This method won't appear in JS

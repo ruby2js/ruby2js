@@ -263,7 +263,6 @@ The skip pragma works on both individual statements and entire block structures:
 ```ruby
 # Skip individual statements
 require 'parser/current' # Pragma: skip
-require 'json' # Pragma: skip
 
 # Skip entire conditional blocks
 unless defined?(RUBY2JS_SELFHOST) # Pragma: skip

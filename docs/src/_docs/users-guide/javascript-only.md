@@ -370,7 +370,7 @@ The Require filter inlines these files, producing a single bundled JavaScript mo
 ### Skip External Dependencies
 
 ```ruby
-require 'json' # Pragma: skip
+require 'parser/current' # Pragma: skip
 require_relative 'helper'  # This gets inlined
 ```
 

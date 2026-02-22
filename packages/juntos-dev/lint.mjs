@@ -131,6 +131,15 @@ function walkNode(node, diagnostics, filePath) {
         pushDiag(diagnostics, node, filePath, 'warning', 'force_encoding',
           "force_encoding has no JavaScript equivalent (JS strings are always UTF-16)");
       }
+
+      // is_a?(OpenStruct) / kind_of?(OpenStruct)
+      if ((method === 'is_a?' || method === 'kind_of?') && children.length > 2) {
+        const arg = children[2];
+        if (arg && arg.type === 'const' && arg.children?.[1] === 'OpenStruct') {
+          pushDiag(diagnostics, node, filePath, 'warning', 'openstruct_type_check',
+            "is_a?(OpenStruct) has no JavaScript equivalent — OpenStruct maps to a plain object");
+        }
+      }
       break;
     }
 

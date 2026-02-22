@@ -187,9 +187,19 @@ module Ruby2JS
         return super if excluded?(method) and method != :call
 
         # require 'json' → remove (JSON is built-in in JavaScript)
+        # require 'ostruct' → remove (JS objects are effectively OpenStructs)
         if target.nil? && method == :require && args.length == 1 &&
-           args.first.type == :str && args.first.children.first == 'json'
+           args.first.type == :str && %w[json ostruct].include?(args.first.children.first)
           return s(:begin)
+        end
+
+        # OpenStruct.new(hash) → plain object
+        if method == :new && target == s(:const, nil, :OpenStruct)
+          if args.length == 1 && args[0].type == :hash
+            return process(args[0])
+          elsif args.empty?
+            return s(:hash)
+          end
         end
 
         # Force certain methods to always have () in JS output

@@ -1446,5 +1446,17 @@ describe Ruby2JS::Filter::Functions do
       result.must_include 'to_s'
       result.must_include 'this.value'
     end
+
+    it "should strip require 'ostruct'" do
+      to_js("require 'ostruct'").must_equal ''
+    end
+
+    it "should convert OpenStruct.new with hash to plain object" do
+      to_js('OpenStruct.new(name: "x", age: 30)').must_equal '{name: "x", age: 30}'
+    end
+
+    it "should convert OpenStruct.new without args to empty object" do
+      to_js('OpenStruct.new').must_equal '{}'
+    end
   end
 end

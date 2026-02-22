@@ -131,6 +131,8 @@ obj.is_a?(Float)   # => typeof obj === "number"
 obj.is_a?(Hash)    # => typeof obj === "object" && obj !== null && !Array.isArray(obj)
 ```
 
+**`OpenStruct`**: Since `OpenStruct.new(hash)` transpiles to a plain JS object, `is_a?(OpenStruct)` has no meaningful equivalent — any JS object would match. The linter flags this as a warning.
+
 ### `respond_to?`
 
 Method/property existence checks work:

@@ -109,6 +109,9 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `JSON.pretty_generate(x)` {{ caret }} `JSON.stringify(x, null, 2)`
 * `JSON.parse(x)` {{ caret }} `JSON.parse(x)`
 * `JSON::ParserError` {{ caret }} `SyntaxError` (JS equivalent for JSON parse errors)
+* `OpenStruct.new(name: "x")` {{ caret }} `{name: "x"}` (plain JS object)
+* `OpenStruct.new` {{ caret }} `{}` (empty object)
+* `require 'ostruct'` {{ caret }} (removed - JS objects are effectively OpenStructs)
 * `typeof(x)` {{ caret }} `typeof x` (JS type checking operator)
 * `.upcase` {{ caret }} `.toUpperCase`
 * `.yield_self {|n| n}` {{ caret }} `(n => n)(...)`
