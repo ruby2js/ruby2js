@@ -587,6 +587,56 @@ end
 | `after_update_commit` | After transaction commits (update) |
 | `after_destroy_commit` | After transaction commits (delete) |
 
+## Concerns
+
+Concerns let you extract shared model behavior into reusable modules:
+
+```ruby
+# app/models/concerns/trackable.rb
+module Trackable
+  extend ActiveSupport::Concern
+
+  included do
+    has_many :tracks
+    after_update :record_change
+  end
+
+  def record_change
+    tracks.create(changed_at: Time.current)
+  end
+end
+```
+
+Include concerns in your models:
+
+```ruby
+class Article < ApplicationRecord
+  include Trackable
+  has_many :comments
+end
+```
+
+Concerns transpile to **subclass factory functions** that compose via JavaScript class inheritance:
+
+```javascript
+// concerns/trackable.js
+const Trackable = (Base) => class extends Base {
+  static associations = { ...super.associations, tracks: { type: "has_many" } };
+  static callbacks = [...super.callbacks, ["after_update", "record_change"]];
+
+  record_change() {
+    return this.tracks.create({ changed_at: new Date() });
+  }
+};
+
+// article.js
+class Article extends Trackable(ApplicationRecord) {
+  static associations = { ...super.associations, comments: { type: "has_many" } };
+}
+```
+
+Multiple concerns compose naturally — `include A; include B` becomes `extends B(A(ApplicationRecord))`, matching Ruby's method resolution order. Concerns can also include other concerns.
+
 ## Limitations
 
 Juntos implements the most commonly used Active Record features. The following are **not yet supported**:

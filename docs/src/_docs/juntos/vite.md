@@ -206,9 +206,6 @@ include:
   - app/models/heat.rb
   - app/models/score.rb
   - app/views/scores/**
-exclude:
-  - app/models/concerns/**
-
 # Eject command configuration (see "juntos eject --help")
 eject:
   output: ejected

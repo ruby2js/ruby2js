@@ -1005,11 +1005,13 @@ module Ruby2JS
       def on_send(node)
         target, method, *args = node.children
 
-        # Skip pragma and target pragmas: remove require/require_relative/import statements
-        if target.nil? && [:require, :require_relative, :import].include?(method)
-          if pragma?(node, :skip)
-            return s(:hide)
-          end
+        # Skip pragma: remove any bare send (include, require, validates, etc.)
+        if target.nil? && pragma?(node, :skip)
+          return s(:hide)
+        end
+
+        # Target-specific pragmas: remove require/require_relative/import/include statements
+        if target.nil? && [:require, :require_relative, :import, :include].include?(method)
 
           # Target-specific pragma: skip if target doesn't match
           if skip_for_target?(node)

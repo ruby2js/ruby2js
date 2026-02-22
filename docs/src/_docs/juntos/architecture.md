@@ -19,6 +19,8 @@ Running `juntos build` creates a self-contained JavaScript application:
 dist/
 ├── app/
 │   ├── models/
+│   │   ├── concerns/
+│   │   │   └── trackable.js        # Concern → factory function
 │   │   ├── application_record.js   # Base class wrapping ActiveRecord
 │   │   ├── article.js              # Transpiled model
 │   │   ├── comment.js

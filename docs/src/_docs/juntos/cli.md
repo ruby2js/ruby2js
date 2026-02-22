@@ -206,7 +206,6 @@ include:
   - config/routes.rb
 exclude:
   - "**/*_test.rb"
-  - app/models/concerns/*
 
 eject:
   output: ejected
@@ -603,8 +602,6 @@ lint:
     - singleton_method
   include:
     - "app/models/**"
-  exclude:
-    - "app/models/concerns/**"
   type_hints:
     params: hash
     positions: array

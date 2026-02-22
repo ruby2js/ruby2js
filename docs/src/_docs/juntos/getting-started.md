@@ -185,7 +185,7 @@ class Article < ApplicationRecord
 end
 ```
 
-Associations, validations, and callbacks transpile directly.
+Associations, validations, callbacks, and [concerns](/docs/juntos/active-record#concerns) transpile directly.
 
 ### Controllers
 

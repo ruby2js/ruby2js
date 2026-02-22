@@ -50,6 +50,7 @@ end
 | ActiveRecord models | Same models, transpiled |
 | Validations | Same validations |
 | Associations | Same associations |
+| Concerns | Same concerns, transpiled to factory functions |
 | Scopes | Same scopes |
 | Controllers | Same MVC pattern |
 | `rails routes` | File-based routing |
