@@ -971,7 +971,9 @@ module Ruby2JS
             when :include
               if args.length == 1 && is_url_helpers_include?(args[0])
                 @rails_url_helpers = true
-              elsif args.length == 1 && args[0]&.type == :const
+              elsif args.length == 1 && args[0]&.type == :const && args[0].children[0].nil?
+                # Only simple consts (include Trackable), not nested framework
+                # modules (include ActionView::Helpers::TextHelper)
                 @rails_includes ||= []
                 @rails_includes.push(args[0])
               end
