@@ -601,6 +601,12 @@ export class ActiveRecordBase {
       const data = this._pending_nested_attributes[assocName];
       if (!data) continue;
 
+      // Use the has_many association proxy (CollectionProxy) to access the model class
+      const proxy = this[assocName];
+      if (!proxy || !proxy._model) continue;
+      const modelClass = proxy._model;
+      const fk = proxy._association?.foreignKey || `${this.constructor.name.toLowerCase()}_id`;
+
       // Normalize to array of attribute hashes
       const entries = Array.isArray(data)
         ? data
@@ -613,27 +619,11 @@ export class ActiveRecordBase {
         // Handle _destroy
         if (attrs._destroy && options.allow_destroy) {
           if (attrs.id) {
-            // Find the association's model class via the associations metadata
-            const assocMeta = this.constructor.associations?.[assocName];
-            if (assocMeta) {
-              const modelClass = (await import('ruby2js-rails/model-registry')).default[assocMeta.model];
-              if (modelClass) {
-                const record = await modelClass.find(attrs.id);
-                if (record) await record.destroy();
-              }
-            }
+            const record = await modelClass.find(attrs.id);
+            if (record) await record.destroy();
           }
           continue;
         }
-
-        // Get association metadata to determine model class and foreign key
-        const assocMeta = this.constructor.associations?.[assocName];
-        if (!assocMeta) continue;
-
-        const modelClass = (await import('ruby2js-rails/model-registry')).default[assocMeta.model];
-        if (!modelClass) continue;
-
-        const fk = assocMeta.foreignKey || `${this.constructor.name.toLowerCase()}_id`;
 
         if (attrs.id) {
           // Update existing record
