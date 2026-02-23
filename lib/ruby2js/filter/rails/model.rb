@@ -2064,7 +2064,7 @@ module Ruby2JS
             # Extract conditional (:if) — a lambda AST node whose body is the condition
             if_condition = nil
             if_node = v[:validations][:if]
-            if if_node.is_a?(Parser::AST::Node) && if_node.type == :block
+            if if_node.respond_to?(:type) && if_node.type == :block
               if_condition = if_node.children[2] # lambda body
               # Rewrite bare method calls (send nil :name) to self-prefixed (send self :name)
               # since the lambda body runs in instance context (this.type, not bare type)
