@@ -500,11 +500,9 @@ module Ruby2JS
           # Only handle remaining transforms when processing a model
           return super unless @rails_model
 
-          # Only handle unqualified (implicit self) calls
-          return super unless target.nil?
-
           # Inline-transform enum predicate and bang calls
-          if @rails_enums.any?
+          # Accept both bare sends (target.nil?) and self sends (rewrite_bare_sends_to_self may add self)
+          if @rails_enums.any? && (target.nil? || target == s(:self))
             method_str = method.to_s
             if method_str.end_with?('?') || method_str.end_with?('!')
               base = method_str[0..-2]
@@ -529,6 +527,9 @@ module Ruby2JS
               end
             end
           end
+
+          # Only handle unqualified (implicit self) calls
+          return super unless target.nil?
 
           # Inside class methods (def self.X), bare calls to AR class methods
           # and scopes need self. prefix: create(...) → self.create(...)
@@ -1391,6 +1392,13 @@ module Ruby2JS
             end
           end
 
+          # Pre-compute callback method names so we can detect them in the children loop
+          all_callback_methods = []
+          @rails_callbacks.keys.each do |cb_type|
+            methods = @rails_callbacks[cb_type]
+            methods.each { |m| all_callback_methods.push(m) }
+          end
+
           in_private = false
           children.each do |child|
             next unless child
@@ -1416,7 +1424,27 @@ module Ruby2JS
             if @is_factory_concern
               transformed << process(child)
             elsif child.type == :def && !in_private
-              transformed << process(child)
+              # Rewrite bare sends to self sends in all instance methods.
+              # Ruby allows bare `category` to call the attribute getter;
+              # JS requires explicit `this.category`.
+              args_node = child.children[1]
+              locals = []
+              if args_node
+                args_node.children.each do |arg|
+                  locals.push(arg.children[0]) if arg.respond_to?(:children) && arg.children[0]
+                end
+              end
+              rewritten = child.updated(nil, [
+                child.children[0],
+                child.children[1],
+                rewrite_bare_sends_to_self(child.children[2], locals)
+              ])
+              # Callback methods need :defm so they stay as methods (not getters)
+              if all_callback_methods.include?(child.children[0])
+                transformed << process(rewritten.updated(:defm, rewritten.children))
+              else
+                transformed << process(rewritten)
+              end
             elsif !in_private && child.type != :def
               # Pass through other class-level code
               transformed << process(child)
@@ -1538,13 +1566,6 @@ module Ruby2JS
           end
 
           # Keep private methods that aren't inlined elsewhere
-          # Note: collect all callback method names for lookup
-          all_callback_methods = []
-          @rails_callbacks.keys.each do |cb_type|
-            methods = @rails_callbacks[cb_type]
-            methods.each { |m| all_callback_methods.push(m) }
-          end
-
           @rails_model_private_methods.keys.each do |name|
             node = @rails_model_private_methods[name]
             # Check if used in callbacks

@@ -1135,6 +1135,7 @@ export class ActiveRecordSQL extends ActiveRecordBase {
   }
 
   // Snake case aliases
+  static find_by(conditions) { return this.findBy(conditions); }
   static find_or_create_by(attrs) { return this.findOrCreateBy(attrs); }
   static find_by_bang(conditions) { return this.findByBang(conditions); }
   static update_all(attrs, conditions) { return this.updateAll(attrs, conditions); }
