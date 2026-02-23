@@ -5,7 +5,7 @@ import { mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { SQLiteDialect, SQLITE_TYPE_MAP } from './dialects/sqlite.mjs';
-import { attr_accessor, initTimePolyfill } from 'juntos/adapters/active_record_base.mjs';
+import { attr_accessor, initTimePolyfill, quoteId } from 'juntos/adapters/active_record_base.mjs';
 import { modelRegistry, _uuidTables, CollectionProxy, Reference, HasOneReference } from 'juntos/adapters/active_record_sql.mjs';
 
 // Re-export shared utilities
@@ -68,7 +68,7 @@ export function createTable(tableName, columns, options = {}) {
   if (columns.some(c => c.primaryKey && c.type === 'uuid')) _uuidTables.add(tableName);
   const columnDefs = columns.map(col => {
     const sqlType = SQLITE_TYPE_MAP[col.type] || 'TEXT';
-    let def = `${col.name} ${sqlType}`;
+    let def = `${quoteId(col.name)} ${sqlType}`;
 
     if (col.primaryKey) {
       def += ' PRIMARY KEY';
@@ -86,7 +86,7 @@ export function createTable(tableName, columns, options = {}) {
   if (options.foreignKeys) {
     for (const fk of options.foreignKeys) {
       columnDefs.push(
-        `FOREIGN KEY (${fk.column}) REFERENCES ${fk.references}(${fk.primaryKey})`
+        `FOREIGN KEY (${quoteId(fk.column)}) REFERENCES ${fk.references}(${quoteId(fk.primaryKey)})`
       );
     }
   }
@@ -98,7 +98,7 @@ export function createTable(tableName, columns, options = {}) {
 export function addIndex(tableName, columns, options = {}) {
   const unique = options.unique ? 'UNIQUE ' : '';
   const indexName = options.name || `idx_${tableName}_${columns.join('_')}`;
-  const columnList = Array.isArray(columns) ? columns.join(', ') : columns;
+  const columnList = Array.isArray(columns) ? columns.map(c => quoteId(c)).join(', ') : quoteId(columns);
 
   const sql = `CREATE ${unique}INDEX IF NOT EXISTS ${indexName} ON ${tableName}(${columnList})`;
   return db.exec(sql);
@@ -106,7 +106,7 @@ export function addIndex(tableName, columns, options = {}) {
 
 export function addColumn(tableName, columnName, columnType) {
   const sqlType = SQLITE_TYPE_MAP[columnType] || 'TEXT';
-  const sql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${sqlType}`;
+  const sql = `ALTER TABLE ${tableName} ADD COLUMN ${quoteId(columnName)} ${sqlType}`;
   return db.exec(sql);
 }
 
@@ -122,7 +122,7 @@ export function removeColumn(tableName, columnName) {
   }
 
   // SQLite 3.35.0+ (2021-03-12) supports DROP COLUMN
-  const sql = `ALTER TABLE ${tableName} DROP COLUMN ${columnName}`;
+  const sql = `ALTER TABLE ${tableName} DROP COLUMN ${quoteId(columnName)}`;
   return db.exec(sql);
 }
 
@@ -165,7 +165,7 @@ export async function insert(tableName, data) {
   const keys = Object.keys(data);
   const values = Object.values(data);
   const placeholders = keys.map(() => '?');
-  const sql = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})`;
+  const sql = `INSERT INTO ${tableName} (${keys.map(k => quoteId(k)).join(', ')}) VALUES (${placeholders.join(', ')})`;
   const stmt = db.prepare(sql);
   stmt.run(...values);
 }

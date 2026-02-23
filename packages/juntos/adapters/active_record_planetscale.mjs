@@ -5,7 +5,7 @@
 import { connect } from '@planetscale/database';
 
 import { MySQLDialect, MYSQL_TYPE_MAP } from './dialects/mysql.mjs';
-import { attr_accessor, initTimePolyfill } from 'juntos/adapters/active_record_base.mjs';
+import { attr_accessor, initTimePolyfill, quoteId } from 'juntos/adapters/active_record_base.mjs';
 import { modelRegistry, CollectionProxy, Reference, HasOneReference } from 'juntos/adapters/active_record_sql.mjs';
 
 // Re-export shared utilities
@@ -59,7 +59,7 @@ export async function execSQL(sql) {
 export async function createTable(tableName, columns, options = {}) {
   const columnDefs = columns.map(col => {
     const sqlType = MySQLDialect.getSqlType(col);
-    let def = `${col.name} ${sqlType}`;
+    let def = `${quoteId(col.name)} ${sqlType}`;
 
     if (col.primaryKey) {
       def += ' PRIMARY KEY';
@@ -83,7 +83,7 @@ export async function createTable(tableName, columns, options = {}) {
 export async function addIndex(tableName, columns, options = {}) {
   const unique = options.unique ? 'UNIQUE ' : '';
   const indexName = options.name || `idx_${tableName}_${columns.join('_')}`;
-  const columnList = Array.isArray(columns) ? columns.join(', ') : columns;
+  const columnList = Array.isArray(columns) ? columns.map(c => quoteId(c)).join(', ') : quoteId(columns);
 
   const sql = `CREATE ${unique}INDEX ${indexName} ON ${tableName}(${columnList})`;
   try {
@@ -96,12 +96,12 @@ export async function addIndex(tableName, columns, options = {}) {
 
 export async function addColumn(tableName, columnName, columnType) {
   const sqlType = MYSQL_TYPE_MAP[columnType] || 'TEXT';
-  const sql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${sqlType}`;
+  const sql = `ALTER TABLE ${tableName} ADD COLUMN ${quoteId(columnName)} ${sqlType}`;
   return await connection.execute(sql);
 }
 
 export async function removeColumn(tableName, columnName) {
-  const sql = `ALTER TABLE ${tableName} DROP COLUMN ${columnName}`;
+  const sql = `ALTER TABLE ${tableName} DROP COLUMN ${quoteId(columnName)}`;
   return await connection.execute(sql);
 }
 
@@ -132,7 +132,7 @@ export async function insert(tableName, data) {
   const keys = Object.keys(data);
   const values = Object.values(data);
   const placeholders = keys.map(() => '?');
-  const sql = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})`;
+  const sql = `INSERT INTO ${tableName} (${keys.map(k => quoteId(k)).join(', ')}) VALUES (${placeholders.join(', ')})`;
   await connection.execute(sql, values);
 }
 

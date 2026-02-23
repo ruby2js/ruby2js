@@ -13,7 +13,7 @@
 // - static _getRows(result) - extract rows array from result
 // - static _getLastInsertId(result) - get auto-generated ID after insert
 
-import { ActiveRecordBase } from 'juntos/adapters/active_record_base.mjs';
+import { ActiveRecordBase, quoteId } from 'juntos/adapters/active_record_base.mjs';
 import { Relation } from 'juntos/adapters/relation.mjs';
 import { CollectionProxy } from 'juntos/adapters/collection_proxy.mjs';
 import { Reference, HasOneReference } from 'juntos/adapters/reference.mjs';
@@ -30,8 +30,8 @@ export const modelRegistry = {};
 // Tables with UUID primary keys (populated by createTable in each adapter)
 export const _uuidTables = new Set();
 
-// Re-export CollectionProxy for use by models
-export { CollectionProxy, Reference, HasOneReference };
+// Re-export CollectionProxy and quoteId for use by models and adapters
+export { CollectionProxy, Reference, HasOneReference, quoteId };
 
 export class ActiveRecordSQL extends ActiveRecordBase {
   // --- Dialect hooks (override in dialect subclass) ---
@@ -131,7 +131,7 @@ export class ActiveRecordSQL extends ActiveRecordBase {
   // --- Class Methods (terminal - execute immediately) ---
 
   static async find(id) {
-    const sql = `SELECT * FROM ${this.tableName} WHERE id = ${this._param(1)}`;
+    const sql = `SELECT * FROM ${this.tableName} WHERE ${quoteId('id')} = ${this._param(1)}`;
     const result = await this._execute(sql, [id]);
     const rows = this._getRows(result);
     if (rows.length === 0) {
@@ -327,7 +327,7 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     // Build SET clause
     const sets = [];
     for (const [key, value] of Object.entries(attrs)) {
-      sets.push(`${key} = ${this._param(paramIndex.value++)}`);
+      sets.push(`${quoteId(key)} = ${this._param(paramIndex.value++)}`);
       values.push(this._formatValue(value));
     }
 
@@ -790,10 +790,10 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     let sql;
     if (assoc.type === 'has_one' || assoc.type === 'has_many') {
       const fk = assoc.foreignKey || singularize(sourceModel.tableName) + '_id';
-      sql = `${joinType} ${assocTable} ON ${assocTable}.${fk} = ${sourceModel.tableName}.id`;
+      sql = `${joinType} ${assocTable} ON ${assocTable}.${quoteId(fk)} = ${sourceModel.tableName}.${quoteId('id')}`;
     } else if (assoc.type === 'belongs_to') {
       const fk = assoc.foreignKey || assocName + '_id';
-      sql = `${joinType} ${assocTable} ON ${sourceModel.tableName}.${fk} = ${assocTable}.id`;
+      sql = `${joinType} ${assocTable} ON ${sourceModel.tableName}.${quoteId(fk)} = ${assocTable}.${quoteId('id')}`;
     }
 
     return sql ? { sql, model: AssocModel } : null;
@@ -828,7 +828,7 @@ export class ActiveRecordSQL extends ActiveRecordBase {
           const hasTableLikeKey = !('_begin' in value) && !('begin' in value);
           if (hasTableLikeKey) {
             for (const [col, colVal] of Object.entries(value)) {
-              const qualifiedCol = `${key}.${col}`;
+              const qualifiedCol = `${key}.${quoteId(col)}`;
               if (Array.isArray(colVal)) {
                 const placeholders = colVal.map(() => this._param(paramIndex.value++)).join(', ');
                 parts.push(`${qualifiedCol} IN (${placeholders})`);
@@ -856,19 +856,19 @@ export class ActiveRecordSQL extends ActiveRecordBase {
         if (Array.isArray(value)) {
           // IN clause: where({id: [1, 2, 3]})
           const placeholders = value.map(() => this._param(paramIndex.value++)).join(', ');
-          parts.push(`${key} IN (${placeholders})`);
+          parts.push(`${quoteId(key)} IN (${placeholders})`);
           vals.push(...value.map(v => this._formatValue(v)));
         } else if (this._isRange(value)) {
           // Range: where({age: 18..65}) or where({age: 18...})
-          const { sql, values: rangeVals } = this._buildRangeSQL(key, value, paramIndex);
+          const { sql, values: rangeVals } = this._buildRangeSQL(quoteId(key), value, paramIndex);
           parts.push(sql);
           vals.push(...rangeVals);
         } else if (value === null || value === undefined) {
           // IS NULL
-          parts.push(`${key} IS NULL`);
+          parts.push(`${quoteId(key)} IS NULL`);
         } else {
           // Simple equality
-          parts.push(`${key} = ${this._param(paramIndex.value++)}`);
+          parts.push(`${quoteId(key)} = ${this._param(paramIndex.value++)}`);
           vals.push(this._formatValue(value));
         }
       }
@@ -940,11 +940,11 @@ export class ActiveRecordSQL extends ActiveRecordBase {
   // Parse order option into [column, direction]
   static _parseOrder(order) {
     if (typeof order === 'string') {
-      return [order, 'ASC'];
+      return [quoteId(order), 'ASC'];
     }
     const col = Object.keys(order)[0];
     const dir = (order[col] === 'desc' || order[col] === ':desc') ? 'DESC' : 'ASC';
-    return [col, dir];
+    return [quoteId(col), dir];
   }
 
   // --- Instance Methods ---
@@ -954,7 +954,7 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     if (typeof this.before_destroy === 'function') await this.before_destroy();
     await this._runCallbacks('before_destroy');
     await this.constructor._execute(
-      `DELETE FROM ${this.constructor.tableName} WHERE id = ${this.constructor._param(1)}`,
+      `DELETE FROM ${this.constructor.tableName} WHERE ${quoteId('id')} = ${this.constructor._param(1)}`,
       [this.id]
     );
     this._persisted = false;
@@ -1017,14 +1017,14 @@ export class ActiveRecordSQL extends ActiveRecordBase {
 
     // Include id if present (pre-set UUID or auto-generated)
     if (this._id) {
-      cols.push('id');
+      cols.push(quoteId('id'));
       placeholders.push(this.constructor._param(i++));
       values.push(this.constructor._formatValue(this._id));
     }
 
     for (const [key, value] of Object.entries(this.attributes)) {
       if (key === 'id') continue;
-      cols.push(key);
+      cols.push(quoteId(key));
       placeholders.push(this.constructor._param(i++));
       values.push(this.constructor._formatValue(value));
     }
@@ -1055,12 +1055,12 @@ export class ActiveRecordSQL extends ActiveRecordBase {
 
     for (const [key, value] of Object.entries(this.attributes)) {
       if (key === 'id') continue;
-      sets.push(`${key} = ${this.constructor._param(i++)}`);
+      sets.push(`${quoteId(key)} = ${this.constructor._param(i++)}`);
       values.push(this.constructor._formatValue(value));
     }
     values.push(this.id);
 
-    const sql = `UPDATE ${this.constructor.tableName} SET ${sets.join(', ')} WHERE id = ${this.constructor._param(i)}`;
+    const sql = `UPDATE ${this.constructor.tableName} SET ${sets.join(', ')} WHERE ${quoteId('id')} = ${this.constructor._param(i)}`;
     console.debug(`  ${this.constructor.name} Update  ${sql}`, values);
 
     const result = await this.constructor._execute(sql, values);
@@ -1105,9 +1105,9 @@ export class ActiveRecordSQL extends ActiveRecordBase {
         }
       }
       if (colValue === null || colValue === undefined) {
-        clauses.push(`${colName} IS NULL`);
+        clauses.push(`${quoteId(colName)} IS NULL`);
       } else {
-        clauses.push(`${colName} = ${this._param(i++)}`);
+        clauses.push(`${quoteId(colName)} = ${this._param(i++)}`);
         values.push(this._formatValue(colValue));
       }
     }

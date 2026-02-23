@@ -11,6 +11,11 @@
 // - static async all(), find(), findBy(), where(), first(), last(), count()
 // - async _insert(), _update(), destroy(), reload()
 
+// Quote a SQL identifier to handle reserved words (order, group, key, type, etc.)
+export function quoteId(name) {
+  return `"${name}"`;
+}
+
 // Base class for ActiveRecord models
 export class ActiveRecordBase {
   static table_name = null;  // Override in subclass (Ruby convention)
@@ -324,11 +329,11 @@ export class ActiveRecordBase {
     const values = [];
     let i = 1;
     for (const [k, v] of Object.entries(attrs)) {
-      sets.push(`${k} = ${this.constructor._param(i++)}`);
+      sets.push(`${quoteId(k)} = ${this.constructor._param(i++)}`);
       values.push(this.constructor._formatValue(v));
     }
     values.push(this.id);
-    const sql = `UPDATE ${this.constructor.tableName} SET ${sets.join(', ')} WHERE id = ${this.constructor._param(i)}`;
+    const sql = `UPDATE ${this.constructor.tableName} SET ${sets.join(', ')} WHERE ${quoteId('id')} = ${this.constructor._param(i)}`;
     await this.constructor._execute(sql, values);
     return true;
   }

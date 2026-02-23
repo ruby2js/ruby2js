@@ -4,7 +4,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-import { ActiveRecordBase, attr_accessor, initTimePolyfill } from 'juntos/adapters/active_record_base.mjs';
+import { ActiveRecordBase, attr_accessor, initTimePolyfill, quoteId } from 'juntos/adapters/active_record_base.mjs';
 import { Relation } from 'juntos/adapters/relation.mjs';
 import { CollectionProxy } from 'juntos/adapters/collection_proxy.mjs';
 import { Reference, HasOneReference } from 'juntos/adapters/reference.mjs';
@@ -90,10 +90,10 @@ export async function createTable(tableName, columns, options = {}) {
     let def;
 
     if (col.primaryKey && col.autoIncrement) {
-      def = `${col.name} SERIAL PRIMARY KEY`;
+      def = `${quoteId(col.name)} SERIAL PRIMARY KEY`;
     } else {
       const sqlType = getPgType(col);
-      def = `${col.name} ${sqlType}`;
+      def = `${quoteId(col.name)} ${sqlType}`;
 
       if (col.primaryKey) def += ' PRIMARY KEY';
       if (col.null === false) def += ' NOT NULL';
@@ -108,7 +108,7 @@ export async function createTable(tableName, columns, options = {}) {
   if (options.foreignKeys) {
     for (const fk of options.foreignKeys) {
       columnDefs.push(
-        `FOREIGN KEY (${fk.column}) REFERENCES ${fk.references}(${fk.primaryKey})`
+        `FOREIGN KEY (${quoteId(fk.column)}) REFERENCES ${fk.references}(${quoteId(fk.primaryKey)})`
       );
     }
   }
@@ -133,7 +133,7 @@ export async function createTable(tableName, columns, options = {}) {
 export async function addIndex(tableName, columns, options = {}) {
   const unique = options.unique ? 'UNIQUE ' : '';
   const indexName = options.name || `idx_${tableName}_${columns.join('_')}`;
-  const columnList = Array.isArray(columns) ? columns.join(', ') : columns;
+  const columnList = Array.isArray(columns) ? columns.map(c => quoteId(c)).join(', ') : quoteId(columns);
 
   const ddl = `CREATE ${unique}INDEX IF NOT EXISTS ${indexName} ON ${tableName}(${columnList})`;
   console.log(`-- Supabase Migration SQL:\n${ddl};`);
@@ -147,12 +147,12 @@ export async function addIndex(tableName, columns, options = {}) {
 
 export async function addColumn(tableName, columnName, columnType) {
   const sqlType = PG_TYPE_MAP[columnType] || 'TEXT';
-  const ddl = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${sqlType}`;
+  const ddl = `ALTER TABLE ${tableName} ADD COLUMN ${quoteId(columnName)} ${sqlType}`;
   console.log(`-- Supabase Migration SQL:\n${ddl};`);
 }
 
 export async function removeColumn(tableName, columnName) {
-  const ddl = `ALTER TABLE ${tableName} DROP COLUMN ${columnName}`;
+  const ddl = `ALTER TABLE ${tableName} DROP COLUMN ${quoteId(columnName)}`;
   console.log(`-- Supabase Migration SQL:\n${ddl};`);
 }
 
