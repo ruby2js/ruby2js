@@ -72,6 +72,7 @@ module Ruby2JS
           @rails_validations = []
           # Note: use plain hash for JS compatibility (Hash.new with block doesn't transpile)
           @rails_callbacks = {}
+
           @rails_scopes = []
           @rails_enums = []
           @rails_broadcasts_to = []  # broadcasts_to declarations
@@ -320,6 +321,7 @@ module Ruby2JS
           @rails_validations = []
           # Note: use plain hash for JS compatibility (Hash.new with block doesn't transpile)
           @rails_callbacks = {}
+
           @rails_scopes = []
           @rails_enums = []
           @rails_broadcasts_to = []
@@ -394,6 +396,7 @@ module Ruby2JS
           @rails_associations = []
           @rails_validations = []
           @rails_callbacks = {}
+
           @rails_scopes = []
           @rails_enums = []
           @rails_broadcasts_to = []

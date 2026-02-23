@@ -234,6 +234,7 @@ export class ActiveRecordBase {
         await this._runCallbacks('after_save');
         if (typeof this.after_save === 'function') await this.after_save();
         await this._runCallbacks('after_update_commit');
+        await this._runCallbacks('after_save_commit');
         this._changes = {};  // Clear dirty tracking after successful save
       }
       return result;
@@ -259,6 +260,7 @@ export class ActiveRecordBase {
         await this._runCallbacks('after_save');
         if (typeof this.after_save === 'function') await this.after_save();
         await this._runCallbacks('after_create_commit');
+        await this._runCallbacks('after_save_commit');
         this._changes = {};  // Clear dirty tracking after successful save
       }
       return result;
@@ -443,9 +445,39 @@ export class ActiveRecordBase {
     this._after_update_commit_callbacks.push(callback);
   }
 
+  static before_destroy(callback) {
+    if (!this._before_destroy_callbacks) this._before_destroy_callbacks = [];
+    this._before_destroy_callbacks.push(callback);
+  }
+
+  static after_destroy(callback) {
+    if (!this._after_destroy_callbacks) this._after_destroy_callbacks = [];
+    this._after_destroy_callbacks.push(callback);
+  }
+
   static after_destroy_commit(callback) {
     if (!this._after_destroy_commit_callbacks) this._after_destroy_commit_callbacks = [];
     this._after_destroy_commit_callbacks.push(callback);
+  }
+
+  static after_save_commit(callback) {
+    if (!this._after_save_commit_callbacks) this._after_save_commit_callbacks = [];
+    this._after_save_commit_callbacks.push(callback);
+  }
+
+  static before_validation(callback) {
+    if (!this._before_validation_callbacks) this._before_validation_callbacks = [];
+    this._before_validation_callbacks.push(callback);
+  }
+
+  static after_validation(callback) {
+    if (!this._after_validation_callbacks) this._after_validation_callbacks = [];
+    this._after_validation_callbacks.push(callback);
+  }
+
+  static after_touch(callback) {
+    if (!this._after_touch_callbacks) this._after_touch_callbacks = [];
+    this._after_touch_callbacks.push(callback);
   }
 
   // --- Declarative class methods ---

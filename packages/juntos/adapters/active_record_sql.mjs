@@ -951,12 +951,16 @@ export class ActiveRecordSQL extends ActiveRecordBase {
 
   async destroy() {
     if (!this._persisted) return false;
+    if (typeof this.before_destroy === 'function') await this.before_destroy();
+    await this._runCallbacks('before_destroy');
     await this.constructor._execute(
       `DELETE FROM ${this.constructor.tableName} WHERE id = ${this.constructor._param(1)}`,
       [this.id]
     );
     this._persisted = false;
     console.log(`  ${this.constructor.name} Destroy (id: ${this.id})`);
+    if (typeof this.after_destroy === 'function') await this.after_destroy();
+    await this._runCallbacks('after_destroy');
     await this._runCallbacks('after_destroy_commit');
     return true;
   }
