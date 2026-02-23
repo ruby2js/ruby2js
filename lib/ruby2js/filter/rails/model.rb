@@ -1003,7 +1003,11 @@ module Ruby2JS
           # Association names and types (for awaitable getter detection)
           assocs = []
           @rails_associations.each do |a|
-            assocs.push({ 'name' => a[:name].to_s, 'type' => a[:type].to_s })
+            entry = { 'name' => a[:name].to_s, 'type' => a[:type].to_s }
+            if a[:options][:class_name]
+              entry['class_name'] = a[:options][:class_name].split('::').last
+            end
+            assocs.push(entry)
           end
           model_meta['associations'] = assocs
 
@@ -2057,6 +2061,19 @@ module Ruby2JS
 
           @rails_validations.each do |v|
             attr = v[:attribute]
+            # Extract conditional (:if) — a lambda AST node whose body is the condition
+            if_condition = nil
+            if_node = v[:validations][:if]
+            if if_node.is_a?(Parser::AST::Node) && if_node.type == :block
+              if_condition = if_node.children[2] # lambda body
+              # Rewrite bare method calls (send nil :name) to self-prefixed (send self :name)
+              # since the lambda body runs in instance context (this.type, not bare type)
+              if_condition = rewrite_bare_sends_to_self(if_condition, [])
+            end
+
+            # Collect validation calls for this attribute
+            attr_calls = []
+
             # Note: use keys loop for JS compatibility (hash.each doesn't work with for...of)
             # Note: push directly to avoid case-as-expression which doesn't transpile to JS
             v[:validations].keys.each do |validation_type|
@@ -2064,7 +2081,7 @@ module Ruby2JS
               case validation_type
               when :presence
                 if options == true
-                  validation_calls.push(s(:send, s(:self), :validates_presence_of, s(:str, attr.to_s)))
+                  attr_calls.push(s(:send, s(:self), :validates_presence_of, s(:str, attr.to_s)))
                 end
               when :length
                 if options.is_a?(Hash)
@@ -2073,21 +2090,21 @@ module Ruby2JS
                     val = options[k]
                     s(:pair, s(:sym, k), s(:int, val))
                   end
-                  validation_calls.push(s(:send, s(:self), :validates_length_of, s(:str, attr.to_s), s(:hash, *opts)))
+                  attr_calls.push(s(:send, s(:self), :validates_length_of, s(:str, attr.to_s), s(:hash, *opts)))
                 end
               when :uniqueness
                 if options == true
-                  validation_calls.push(s(:send, s(:self), :validates_uniqueness_of, s(:str, attr.to_s)))
+                  attr_calls.push(s(:send, s(:self), :validates_uniqueness_of, s(:str, attr.to_s)))
                 end
               when :format
                 if options.is_a?(Hash) && options[:with]
                   # Handle regex format validation
-                  validation_calls.push(s(:send, s(:self), :validates_format_of, s(:str, attr.to_s), s(:hash,
+                  attr_calls.push(s(:send, s(:self), :validates_format_of, s(:str, attr.to_s), s(:hash,
                     s(:pair, s(:sym, :with), s(:regexp, s(:str, options[:with].to_s), s(:regopt))))))
                 end
               when :numericality
                 if options == true
-                  validation_calls.push(s(:send, s(:self), :validates_numericality_of, s(:str, attr.to_s)))
+                  attr_calls.push(s(:send, s(:self), :validates_numericality_of, s(:str, attr.to_s)))
                 elsif options.is_a?(Hash)
                   # Note: use keys loop for JS compatibility (hash.map doesn't work in JS)
                   opts = options.keys.map do |k|
@@ -2105,21 +2122,33 @@ module Ruby2JS
                     end
                     s(:pair, s(:sym, k), value_node)
                   end
-                  validation_calls.push(s(:send, s(:self), :validates_numericality_of, s(:str, attr.to_s), s(:hash, *opts)))
+                  attr_calls.push(s(:send, s(:self), :validates_numericality_of, s(:str, attr.to_s), s(:hash, *opts)))
                 end
               when :inclusion
                 if options.is_a?(Hash) && options[:in]
                   values = options[:in]
                   if values.is_a?(Array)
                     array_node = s(:array, *values.map { |v| s(:str, v.to_s) })
-                    validation_calls.push(s(:send, s(:self), :validates_inclusion_of, s(:str, attr.to_s), s(:hash,
+                    attr_calls.push(s(:send, s(:self), :validates_inclusion_of, s(:str, attr.to_s), s(:hash,
                       s(:pair, s(:sym, :in), array_node))))
                   end
                 end
               when :associated
                 if options == true
-                  validation_calls.push(s(:send, s(:self), :validates_associated_of, s(:str, attr.to_s)))
+                  attr_calls.push(s(:send, s(:self), :validates_associated_of, s(:str, attr.to_s)))
                 end
+              when :if, :unless, :scope
+                # Meta-options handled separately, not validation types
+              end
+            end
+
+            # Wrap in conditional if :if option was provided
+            if if_condition && attr_calls.any?
+              body = attr_calls.length == 1 ? attr_calls.first : s(:begin, *attr_calls)
+              validation_calls.push(s(:if, if_condition, body, nil))
+            else
+              attr_calls.each do |call|
+                validation_calls.push(call)
               end
             end
           end

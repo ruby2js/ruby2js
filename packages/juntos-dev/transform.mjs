@@ -485,8 +485,14 @@ export function deriveAssociationMap(metadata) {
 
     for (const assoc of modelMeta.associations) {
       if (!assoc.name) continue;
-      // Derive target table from association name using Rails conventions
-      const targetTable = pluralize(assoc.name);
+      // Derive target table: use class_name if provided (e.g., belongs_to :lead, class_name: 'Person' → people)
+      // Otherwise fall back to Rails convention (pluralize the association name)
+      let targetTable;
+      if (assoc.class_name) {
+        targetTable = underscore(pluralize(assoc.class_name));
+      } else {
+        targetTable = pluralize(assoc.name);
+      }
       tableAssocs[assoc.name] = {
         table: targetTable,
         type: assoc.type || 'belongs_to'

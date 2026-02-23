@@ -317,12 +317,10 @@ module Ruby2JS
           column_name = "#{ref_name}_id"
           column = {
             name: column_name,
-            type: 'integer',
-            null: false
+            type: 'integer'
           }
           foreign_key = nil
           polymorphic = false
-          nullable = false
 
           args[1..-1].each do |arg|
             next unless arg.type == :hash
@@ -334,8 +332,7 @@ module Ruby2JS
 
               case key.children[0]
               when :null
-                nullable = true if value.type == :true
-                column[:null] = true if value.type == :true
+                column[:null] = false if value.type == :false
               when :type
                 col_type = extract_string_value(value)
                 column[:type] = col_type if col_type
@@ -356,13 +353,13 @@ module Ruby2JS
 
           result = { column: column, foreign_key: foreign_key }
 
-          # Polymorphic adds a _type string column
+          # Polymorphic adds a _type string column (matches null constraint of FK column)
           if polymorphic
             type_column = {
               name: "#{ref_name}_type",
-              type: 'string',
-              null: nullable
+              type: 'string'
             }
+            type_column[:null] = false if column[:null] == false
             result[:columns] = [type_column]
           end
 

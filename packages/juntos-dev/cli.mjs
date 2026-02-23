@@ -962,47 +962,6 @@ function generateFixturesModule(fixtures, associationMap, currentAttributes, mod
 // Dev-mode test transpilation (for juntos test)
 // ============================================
 
-/**
- * Build association map from Ruby source model files.
- * Parses belongs_to declarations to determine foreign key relationships.
- * Used for fixture inlining when transpiled model files aren't available.
- */
-function buildAssociationMapFromRuby(modelsDir) {
-  const assocMap = {};
-  if (!existsSync(modelsDir)) return assocMap;
-
-  const modelFiles = readdirSync(modelsDir)
-    .filter(f => f.endsWith('.rb') && f !== 'application_record.rb');
-
-  for (const file of modelFiles) {
-    try {
-      let content = readFileSync(join(modelsDir, file), 'utf-8');
-
-      // Extract class name
-      const classMatch = content.match(/class\s+(\w+)\s*</);
-      if (!classMatch) continue;
-      const className = classMatch[1];
-      const tableName = underscore(pluralize(className));
-
-      // Find belongs_to associations
-      const belongsToRegex = /belongs_to\s+:(\w+)/g;
-      let match;
-      const tableAssocs = {};
-      while ((match = belongsToRegex.exec(content)) !== null) {
-        const assocName = match[1];
-        const targetTable = pluralize(assocName);
-        tableAssocs[assocName] = targetTable;
-      }
-
-      if (Object.keys(tableAssocs).length > 0) {
-        assocMap[tableName] = tableAssocs;
-      }
-    } catch (err) {
-      // Skip files that can't be read
-    }
-  }
-  return assocMap;
-}
 
 /**
  * Add model imports using virtual modules (for dev-mode tests).

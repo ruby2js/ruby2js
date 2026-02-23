@@ -131,7 +131,11 @@ export class ActiveRecordBase {
   }
 
   validates_presence_of(field) {
-    const value = this.attributes[field];
+    // For belongs_to associations, check the FK (field_id) if field itself isn't in attributes
+    let value = this.attributes[field];
+    if (value === undefined && (field + '_id') in this.attributes) {
+      value = this.attributes[field + '_id'];
+    }
     if (value == null || String(value).trim().length === 0) {
       this.addError(field, "can't be blank");
     }
