@@ -1039,7 +1039,7 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     const result = await this.constructor._execute(sql, values);
 
     // Only set id from DB if we didn't provide one
-    if (!this._id) {
+    if (this._id == null) {
       this.id = this.constructor._getLastInsertId(result);
       this.attributes.id = this.id;
     }

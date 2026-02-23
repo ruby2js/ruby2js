@@ -248,23 +248,19 @@ export class ActiveRecordBase {
     this.attributes.updated_at = now;
     this.updated_at = now;
 
-    // Run before_save instance method and registered callbacks
-    if (typeof this.before_save === 'function') await this.before_save();
+    // Run callbacks via the registration system (_runCallbacks handles both
+    // string method names and function callbacks)
     await this._runCallbacks('before_save');
 
     if (this._persisted) {
-      // Run before_update callbacks
       await this._runCallbacks('before_update');
 
       const result = await this._update();
 
       if (result) {
         await this._processNestedAttributes();
-        // Run after_update instance method and callbacks
-        if (typeof this.after_update === 'function') await this.after_update();
         await this._runCallbacks('after_update');
         await this._runCallbacks('after_save');
-        if (typeof this.after_save === 'function') await this.after_save();
         await this._runCallbacks('after_update_commit');
         await this._runCallbacks('after_save_commit');
         this._changes = {};  // Clear dirty tracking after successful save
@@ -279,18 +275,14 @@ export class ActiveRecordBase {
         await this._resolveDefaults();
       }
 
-      // Run before_create instance method and registered callbacks
-      if (typeof this.before_create === 'function') await this.before_create();
       await this._runCallbacks('before_create');
 
       const result = await this._insert();
 
       if (result) {
         await this._processNestedAttributes();
-        // Run after_create callbacks
         await this._runCallbacks('after_create');
         await this._runCallbacks('after_save');
-        if (typeof this.after_save === 'function') await this.after_save();
         await this._runCallbacks('after_create_commit');
         await this._runCallbacks('after_save_commit');
         this._changes = {};  // Clear dirty tracking after successful save
@@ -304,8 +296,15 @@ export class ActiveRecordBase {
     const callbacks = this.constructor[`_${type}_callbacks`];
     if (!callbacks) return;
     for (const callback of callbacks) {
-      // Pass instance as first argument (arrow functions don't bind 'this')
-      await callback(this);
+      if (typeof callback === 'string') {
+        // String callback: call the named method on this instance
+        if (typeof this[callback] === 'function') {
+          await this[callback]();
+        }
+      } else {
+        // Function callback: pass instance as first argument (arrow functions don't bind 'this')
+        await callback(this);
+      }
     }
   }
 

@@ -295,7 +295,7 @@ describe Ruby2JS::Filter::Rails::Model do
   end
 
   describe "callbacks" do
-    it "generates before_save callback method" do
+    it "registers before_save callback on class" do
       result = to_js(<<~RUBY)
         class Article < ApplicationRecord
           before_save :normalize_title
@@ -307,7 +307,7 @@ describe Ruby2JS::Filter::Rails::Model do
           end
         end
       RUBY
-      assert_includes result, 'before_save()'
+      assert_includes result, 'Article.before_save("normalize_title")'
       assert_includes result, 'normalize_title()'
     end
 
@@ -317,9 +317,8 @@ describe Ruby2JS::Filter::Rails::Model do
           before_save :method_a, :method_b
         end
       RUBY
-      assert_includes result, 'before_save()'
-      assert_includes result, 'method_a()'
-      assert_includes result, 'method_b()'
+      assert_includes result, 'Article.before_save("method_a")'
+      assert_includes result, 'Article.before_save("method_b")'
     end
 
     it "supports after_create callback" do
@@ -328,8 +327,25 @@ describe Ruby2JS::Filter::Rails::Model do
           after_create :notify_subscribers
         end
       RUBY
-      assert_includes result, 'after_create()'
-      assert_includes result, 'notify_subscribers()'
+      assert_includes result, 'Article.after_create("notify_subscribers")'
+    end
+
+    it "skips callbacks with if: conditions" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          after_save :upload_blobs, if: -> { counter_art.attached? }
+        end
+      RUBY
+      refute_includes result, 'after_save'
+    end
+
+    it "skips callbacks with unless: conditions" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          before_save :check_status, unless: -> { draft? }
+        end
+      RUBY
+      refute_includes result, 'before_save'
     end
 
     it "generates async callback when accessing associations" do
@@ -397,14 +413,14 @@ describe Ruby2JS::Filter::Rails::Model do
       refute_includes result, 'get validate'
     end
 
-    it "generates callback invokers as methods" do
+    it "registers callbacks as post-class statements" do
       result = to_js(<<~RUBY)
         class Article < ApplicationRecord
           before_save :normalize_title
         end
       RUBY
-      # before_save() is called by the framework, should be a method
-      assert_includes result, 'before_save()'
+      # Callbacks are registered on the class, not as instance methods
+      assert_includes result, 'Article.before_save("normalize_title")'
       refute_includes result, 'get before_save'
     end
 
@@ -420,20 +436,20 @@ describe Ruby2JS::Filter::Rails::Model do
           end
         end
       RUBY
-      # normalize_title is called by before_save, should be a method
+      # normalize_title is called by _runCallbacks, should be a method
       assert_includes result, 'normalize_title()'
       refute_includes result, 'get normalize_title'
     end
 
-    it "calls callback methods with parentheses" do
+    it "registers multiple callbacks individually" do
       result = to_js(<<~RUBY)
         class Article < ApplicationRecord
           before_save :step_a, :step_b
         end
       RUBY
-      # Callback method calls should have parentheses
-      assert_includes result, 'this.step_a()'
-      assert_includes result, 'this.step_b()'
+      # Each callback registered separately for individual invocation
+      assert_includes result, 'Article.before_save("step_a")'
+      assert_includes result, 'Article.before_save("step_b")'
     end
   end
 

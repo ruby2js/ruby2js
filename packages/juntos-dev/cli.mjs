@@ -1903,6 +1903,36 @@ async function runEject(options) {
         }
       }
     }
+
+    // Transform model concerns (app/models/concerns/*.rb)
+    const modelConcernsDir = join(modelsDir, 'concerns');
+    if (existsSync(modelConcernsDir)) {
+      const concernFiles = findRubyModelFiles(modelConcernsDir)
+        .filter(f => shouldInclude(`app/models/concerns/${f}`));
+
+      if (concernFiles.length > 0) {
+        console.log('  Transforming model concerns...');
+        for (const file of concernFiles) {
+          const relativePath = `app/models/concerns/${file}`;
+          try {
+            const source = readFileSync(join(modelConcernsDir, file), 'utf-8');
+            const result = await transformRuby(source, join(modelConcernsDir, file), null, config, APP_ROOT, metadata);
+            const relativeOutPath = `app/models/concerns/${file.replace('.rb', '.js')}`;
+            let code = fixImportsForEject(result.code, relativeOutPath, config);
+            const outFile = join(outDir, 'app/models/concerns', file.replace('.rb', '.js'));
+            const outParentDir = dirname(outFile);
+            if (!existsSync(outParentDir)) {
+              mkdirSync(outParentDir, { recursive: true });
+            }
+            writeFileSync(outFile, code);
+            fileCount++;
+          } catch (err) {
+            errors.push({ file: relativePath, error: err.message, stack: err.stack });
+            console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+          }
+        }
+      }
+    }
   }
 
   // Transform migrations

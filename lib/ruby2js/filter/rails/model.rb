@@ -307,6 +307,20 @@ module Ruby2JS
 
           trailing_nodes.push(render_partial_assignment) if render_partial_assignment
 
+          # Generate callback registrations as post-class statements
+          # e.g., Event.after_save("upload_blobs")
+          @rails_callbacks.keys.each do |callback_type|
+            methods = @rails_callbacks[callback_type]
+            next if methods.empty?
+            methods.each do |method_name|
+              trailing_nodes.push(
+                s(:send,
+                  s(:const, nil, @rails_model_name.to_sym),
+                  callback_type,
+                  s(:str, method_name.to_s)))
+            end
+          end
+
           begin_node = s(:begin, import_node, *model_import_nodes, exported_class, *trailing_nodes)
           result = process(begin_node)
           # Set empty comments on processed begin node to prevent first-location lookup
@@ -1325,6 +1339,18 @@ module Ruby2JS
         def collect_callback(type, args)
           # Initialize key if needed (JS compatibility - no Hash.new with default)
           @rails_callbacks[type] ||= []
+
+          # Skip callbacks with if:/unless: conditions — they can't be
+          # transpiled correctly, and running them unconditionally is wrong
+          has_condition = args.any? do |arg|
+            arg.type == :hash && arg.children.any? do |pair|
+              pair.type == :pair &&
+                pair.children[0].type == :sym &&
+                [:if, :unless].include?(pair.children[0].children[0])
+            end
+          end
+          return if has_condition
+
           args.each do |arg|
             if arg.type == :sym
               @rails_callbacks[type].push(arg.children[0])
@@ -1525,14 +1551,9 @@ module Ruby2JS
           validate_method = generate_validate_method
           transformed << validate_method if validate_method
 
-          # Generate callback methods
-          # Note: use keys loop for JS compatibility (hash.each doesn't work with for...of)
-          @rails_callbacks.keys.each do |callback_type|
-            methods = @rails_callbacks[callback_type]
-            next if methods.empty?
-            callback_method = generate_callback_method(callback_type, methods)
-            transformed << callback_method if callback_method
-          end
+          # Callback methods are registered as post-class statements
+          # (e.g., Event.after_save("upload_blobs")) rather than bundled
+          # instance methods, so the adapter's _runCallbacks system handles them
 
           # Generate scope methods
           @rails_scopes.each do |scope|
