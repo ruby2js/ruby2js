@@ -106,9 +106,9 @@ export class ActiveRecordBase {
     });
   }
 
-  get isValid() {
+  async isValid() {
     this._errors = { _all: [] };
-    this.validate();
+    await this.validate();
     if (this._errors._all.length > 0) {
       console.warn('  Validation failed:', this._errors._all);
     }
@@ -116,18 +116,18 @@ export class ActiveRecordBase {
   }
 
   valid() {
-    return this.isValid;
+    return this.isValid();
   }
 
   // Override in subclass to add validations
-  validate() {}
+  async validate() {}
 
   // Add an error for a field
   addError(field, message) {
     const fullMessage = `${field} ${message}`;
     this._errors._all.push({ attribute: field, message, full_message: fullMessage });
     if (!this._errors[field]) this._errors[field] = [];
-    this._errors[field].push({ attribute: field, message, full_message: fullMessage });
+    this._errors[field].push(message);
   }
 
   validates_presence_of(field) {
@@ -154,6 +154,9 @@ export class ActiveRecordBase {
   validates_format_of(field, options) {
     const value = String(this.attributes[field] || '');
     if (options.with && !options.with.test(value)) {
+      this.addError(field, options.message || 'is invalid');
+    }
+    if (options.without && options.without.test(value)) {
       this.addError(field, options.message || 'is invalid');
     }
   }
@@ -198,10 +201,24 @@ export class ActiveRecordBase {
     }
   }
 
-  validates_uniqueness_of(field, options = {}) {
-    // Uniqueness is enforced at the database level via UNIQUE indexes/constraints.
-    // A proper async DB check would require making validate() async.
-    // For now, this is a no-op; duplicate inserts will fail with a DB constraint error.
+  async validates_uniqueness_of(field, options = {}) {
+    const value = this.attributes[field];
+    if (value == null) return; // null values are not checked for uniqueness
+
+    const conditions = { [field]: value };
+
+    // Support scope option (single field or array of fields)
+    if (options.scope) {
+      const scopes = Array.isArray(options.scope) ? options.scope : [options.scope];
+      for (const scopeField of scopes) {
+        conditions[scopeField] = this.attributes[scopeField];
+      }
+    }
+
+    const existing = await this.constructor.findBy(conditions);
+    if (existing && existing.id !== this._id) {
+      this.addError(field, options.message || 'has already been taken');
+    }
   }
 
   validates_associated_of(field) {
@@ -224,7 +241,7 @@ export class ActiveRecordBase {
   // --- Instance Methods ---
 
   async save() {
-    if (!this.isValid) return false;
+    if (!await this.isValid()) return false;
 
     // Set timestamps centrally - adapters don't need to handle this
     const now = new Date().toISOString();

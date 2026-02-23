@@ -1340,6 +1340,8 @@ module Ruby2JS
           when :true then true
           when :false then false
           when :nil then nil
+          when :array then node.children.map { |c| extract_value(c) }
+          when :regexp then node  # keep regex as AST node for format validations
           else node
           end
         end
@@ -2115,13 +2117,49 @@ module Ruby2JS
                 end
               when :uniqueness
                 if options == true
-                  attr_calls.push(s(:send, s(:self), :validates_uniqueness_of, s(:str, attr.to_s)))
+                  attr_calls.push(s(:send, nil, :await,
+                    s(:send, s(:self), :validates_uniqueness_of, s(:str, attr.to_s))))
+                elsif options.is_a?(Hash)
+                  opts = []
+                  if options[:scope]
+                    scope_val = options[:scope]
+                    if scope_val.is_a?(Array)
+                      scope_nodes = scope_val.map { |sv| s(:str, sv.to_s) }
+                      opts.push(s(:pair, s(:sym, :scope), s(:array, *scope_nodes)))
+                    else
+                      opts.push(s(:pair, s(:sym, :scope), s(:str, scope_val.to_s)))
+                    end
+                  end
+                  if options[:message]
+                    opts.push(s(:pair, s(:sym, :message), s(:str, options[:message].to_s)))
+                  end
+                  if opts.any?
+                    attr_calls.push(s(:send, nil, :await,
+                      s(:send, s(:self), :validates_uniqueness_of, s(:str, attr.to_s), s(:hash, *opts))))
+                  else
+                    attr_calls.push(s(:send, nil, :await,
+                      s(:send, s(:self), :validates_uniqueness_of, s(:str, attr.to_s))))
+                  end
                 end
               when :format
-                if options.is_a?(Hash) && options[:with]
-                  # Handle regex format validation
-                  attr_calls.push(s(:send, s(:self), :validates_format_of, s(:str, attr.to_s), s(:hash,
-                    s(:pair, s(:sym, :with), s(:regexp, s(:str, options[:with].to_s), s(:regopt))))))
+                if options.is_a?(Hash)
+                  fmt_opts = []
+                  if options[:with]
+                    regex_node = options[:with].respond_to?(:type) && options[:with].type == :regexp ?
+                      options[:with] : s(:regexp, s(:str, options[:with].to_s), s(:regopt))
+                    fmt_opts.push(s(:pair, s(:sym, :with), regex_node))
+                  end
+                  if options[:without]
+                    regex_node = options[:without].respond_to?(:type) && options[:without].type == :regexp ?
+                      options[:without] : s(:regexp, s(:str, options[:without].to_s), s(:regopt))
+                    fmt_opts.push(s(:pair, s(:sym, :without), regex_node))
+                  end
+                  if options[:message]
+                    fmt_opts.push(s(:pair, s(:sym, :message), s(:str, options[:message].to_s)))
+                  end
+                  if fmt_opts.any?
+                    attr_calls.push(s(:send, s(:self), :validates_format_of, s(:str, attr.to_s), s(:hash, *fmt_opts)))
+                  end
                 end
               when :numericality
                 if options == true

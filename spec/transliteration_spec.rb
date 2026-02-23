@@ -1135,12 +1135,13 @@ describe Ruby2JS do
 
     it "should escape JS reserved words in function names" do
       # Reserved words like 'new' must be prefixed with $ to be valid JS identifiers
+      # Object literal uses original name as key: {new: $new}
       to_js( 'module M; def self.new; 1; end; end' ).
-        must_equal('const M = (() => {function $new() {1}; return {$new}})()')
+        must_equal('const M = (() => {function $new() {1}; return {new: $new}})()')
       to_js( 'module M; def self.delete(x); x; end; end' ).
-        must_equal('const M = (() => {function $delete(x) {x}; return {$delete}})()')
+        must_equal('const M = (() => {function $delete(x) {x}; return {delete: $delete}})()')
       to_js( 'module M; def self.for(x); x; end; end' ).
-        must_equal('const M = (() => {function $for(x) {x}; return {$for}})()')
+        must_equal('const M = (() => {function $for(x) {x}; return {for: $for}})()')
     end
 
     it "should escape JS reserved words in method calls without receivers" do

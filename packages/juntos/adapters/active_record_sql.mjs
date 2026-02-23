@@ -1009,14 +1009,14 @@ export class ActiveRecordSQL extends ActiveRecordBase {
 
     // Auto-generate UUID if no id set and table uses UUID primary keys
     // (like Rails' before_create callback for UUID PKs — discovered at migration time)
-    if (!this._id && _uuidTables.has(this.constructor.tableName) &&
+    if (this._id == null && _uuidTables.has(this.constructor.tableName) &&
         typeof crypto !== 'undefined' && crypto.randomUUID) {
       this._id = crypto.randomUUID();
       this.attributes.id = this._id;
     }
 
-    // Include id if present (pre-set UUID or auto-generated)
-    if (this._id) {
+    // Include id if present (pre-set UUID or auto-generated, including id=0)
+    if (this._id != null) {
       cols.push(quoteId('id'));
       placeholders.push(this.constructor._param(i++));
       values.push(this.constructor._formatValue(this._id));

@@ -448,7 +448,7 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(list).toContain(item)'
+      assert_includes result, 'expect(await list).toContain(item)'
     end
 
     it "converts assert_raises to expect().toThrow()" do

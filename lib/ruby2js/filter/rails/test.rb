@@ -862,14 +862,15 @@ module Ruby2JS
             s(:send!, s(:attr, s(:send, nil, :expect, process(args.first)), :not), :toBeNull)
 
           when :assert_includes
-            # assert_includes collection, item -> expect(collection).toContain(item)
+            # assert_includes collection, item -> expect(await collection).toContain(item)
+            # Wrap with await since collections may be async (has_many returns CollectionProxy)
             collection, item = args[0], args[1]
-            s(:send, s(:send, nil, :expect, process(collection)), :toContain, process(item))
+            s(:send, s(:send, nil, :expect, s(:send, nil, :await, process(collection))), :toContain, process(item))
 
           when :assert_not_includes, :refute_includes
-            # assert_not_includes collection, item -> expect(collection).not.toContain(item)
+            # assert_not_includes collection, item -> expect(await collection).not.toContain(item)
             collection, item = args[0], args[1]
-            s(:send, s(:attr, s(:send, nil, :expect, process(collection)), :not), :toContain, process(item))
+            s(:send, s(:attr, s(:send, nil, :expect, s(:send, nil, :await, process(collection))), :not), :toContain, process(item))
 
           when :assert_respond_to
             # assert_respond_to obj, method -> expect(typeof obj.method).toBe('function')
