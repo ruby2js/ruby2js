@@ -644,7 +644,11 @@ function buildFixturePlan(rubySource, fixtures, associationMap) {
     replacements[`${table}:${fixture}`] = key;
   }
 
-  const setupCode = `beforeEach(async () => {\n${createLines.join('\n')}\n});`;
+  // Wrap fixture inserts with deferred FK checks (like Rails' disable_referential_integrity)
+  const firstModel = camelize(singularize(sortedTables[0]));
+  const deferLine = `  if (${firstModel}._deferForeignKeys) ${firstModel}._deferForeignKeys(true);`;
+  const undeferLine = `  if (${firstModel}._deferForeignKeys) ${firstModel}._deferForeignKeys(false);`;
+  const setupCode = `beforeEach(async () => {\n${deferLine}\n${createLines.join('\n')}\n${undeferLine}\n});`;
 
   // Collect unique model names referenced in fixture creates (for import generation)
   const fixtureModels = [...new Set([...allFixtures.values()].map(f => camelize(singularize(f.table))))];

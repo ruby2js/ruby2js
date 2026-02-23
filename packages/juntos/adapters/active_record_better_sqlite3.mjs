@@ -176,4 +176,9 @@ export class ActiveRecord extends SQLiteDialect {
   static _getLastInsertId(result) {
     return result.info?.lastInsertRowid;
   }
+
+  // Disable/enable foreign key checks (used during fixture loading, like Rails' disable_referential_integrity)
+  static _deferForeignKeys(enabled) {
+    db.pragma(`foreign_keys = ${enabled ? 'OFF' : 'ON'}`);
+  }
 }
