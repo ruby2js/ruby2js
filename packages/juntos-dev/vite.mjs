@@ -615,6 +615,76 @@ function createRubyTransformPlugin(config, appRoot) {
   let metadata = null;
   let manifestPromise = null;
 
+  // Lazily-built map of ClassName → model path (e.g., "Person" → "person")
+  let _modelClassMap = null;
+  function getModelClassMap() {
+    if (_modelClassMap) return _modelClassMap;
+    _modelClassMap = {};
+    const models = findModels(appRoot).filter(m => m !== 'application_record');
+    const collisions = findLeafCollisions(models);
+    for (const m of models) {
+      const className = modelClassName(m, collisions);
+      _modelClassMap[className] = m;
+    }
+    return _modelClassMap;
+  }
+
+  // Add imports for cross-model references in method bodies.
+  // Scans for bare ClassName.method or new ClassName( patterns and adds
+  // import statements for models that aren't already imported.
+  function addCrossModelImports(js, filePath) {
+    // Only process model files
+    const relPath = path.relative(appRoot, filePath);
+    if (!relPath.startsWith('app/models/') && !relPath.startsWith('app' + path.sep + 'models' + path.sep)) return js;
+
+    const modelMap = getModelClassMap();
+    const modelRelPath = relPath.replace(/^app\/models\/|^app\\models\\/g, '').replace(/\.rb$|\.js$/, '');
+
+    for (const [className, modelPath] of Object.entries(modelMap)) {
+      // Skip self
+      if (modelPath === modelRelPath) continue;
+
+      // Skip if already imported
+      const importPattern = new RegExp(`import\\s+\\{[^}]*\\b${className}\\b[^}]*\\}\\s+from`);
+      if (importPattern.test(js)) continue;
+
+      // Skip if this file defines the class
+      const definesClass = new RegExp(`(export\\s+)?(class|const|let|var|function)\\s+${className}\\b`);
+      if (definesClass.test(js)) continue;
+
+      // Check if referenced (ClassName.something or new ClassName)
+      const refPattern = new RegExp(`\\b${className}\\b\\.\\w|\\bnew\\s+${className}\\b`);
+      if (!refPattern.test(js)) continue;
+
+      // Compute relative path from current model to target model
+      const currentParts = modelRelPath.split('/');
+      const targetParts = modelPath.split('/');
+      const currentDir = currentParts.slice(0, -1);
+      const targetDir = targetParts.slice(0, -1);
+      const targetFile = targetParts[targetParts.length - 1];
+
+      let common = 0;
+      while (common < currentDir.length && common < targetDir.length &&
+             currentDir[common] === targetDir[common]) {
+        common++;
+      }
+      const up = currentDir.length - common;
+      const down = targetDir.slice(common);
+      let importPath;
+      if (up === 0 && down.length === 0) {
+        importPath = `./${targetFile}.rb`;
+      } else if (up === 0) {
+        importPath = `./${[...down, targetFile + '.rb'].join('/')}`;
+      } else {
+        importPath = [...Array(up).fill('..'), ...down, targetFile + '.rb'].join('/');
+      }
+
+      js = `import { ${className} } from '${importPath}';\n${js}`;
+    }
+
+    return js;
+  }
+
   async function ensureManifest() {
     if (!metadata) {
       if (!manifestPromise) {
@@ -626,7 +696,8 @@ function createRubyTransformPlugin(config, appRoot) {
       for (const [filePath, result] of manifest.modelCache) {
         try {
           const stat = fs.statSync(filePath);
-          const js = fixImports(result.code, filePath);
+          let js = fixImports(result.code, filePath);
+          js = addCrossModelImports(js, filePath);
           const map = result.map;
           if (map) {
             map.file = path.basename(filePath).replace('.rb', '.js');
@@ -917,6 +988,7 @@ export { application };
 
         let js = result.toString();
         js = fixImports(js, id);
+        js = addCrossModelImports(js, id);
 
         // For routes.rb, re-export database functions from the bundled adapter
         // This allows migrate.mjs and server.mjs to use the same adapter instance

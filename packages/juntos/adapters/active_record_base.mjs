@@ -194,6 +194,12 @@ export class ActiveRecordBase {
     }
   }
 
+  validates_uniqueness_of(field, options = {}) {
+    // Uniqueness is enforced at the database level via UNIQUE indexes/constraints.
+    // A proper async DB check would require making validate() async.
+    // For now, this is a no-op; duplicate inserts will fail with a DB constraint error.
+  }
+
   validates_associated_of(field) {
     const record = this[`_${field}`] || this.attributes[field];
     if (record && typeof record.valid === 'function' && !record.valid()) {
