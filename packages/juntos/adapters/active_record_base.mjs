@@ -189,6 +189,13 @@ export class ActiveRecordBase {
     }
   }
 
+  validates_associated_of(field) {
+    const record = this[`_${field}`] || this.attributes[field];
+    if (record && typeof record.valid === 'function' && !record.valid()) {
+      this.addError(field, 'is invalid');
+    }
+  }
+
   // --- Instance Properties ---
 
   get persisted() {

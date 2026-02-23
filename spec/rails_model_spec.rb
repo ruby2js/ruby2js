@@ -248,6 +248,16 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'validates_presence_of("title")'
       assert_includes result, 'validates_length_of("title"'
     end
+
+    it "handles validates_associated" do
+      result = to_js(<<~RUBY)
+        class Heat < ApplicationRecord
+          belongs_to :entry
+          validates_associated :entry
+        end
+      RUBY
+      assert_includes result, 'validates_associated_of("entry")'
+    end
   end
 
   describe "scope" do

@@ -958,6 +958,8 @@ module Ruby2JS
               collect_attachment(:has_many_attached, args)
             when :validates
               collect_validation(args)
+            when :validates_associated
+              collect_validates_associated(args)
             when :scope
               collect_scope(args)
             when :broadcasts_to
@@ -1243,6 +1245,17 @@ module Ruby2JS
           end
         end
 
+        def collect_validates_associated(args)
+          args.each do |arg|
+            if arg.type == :sym
+              @rails_validations.push({
+                attribute: arg.children[0],
+                validations: { associated: true }
+              })
+            end
+          end
+        end
+
         def collect_scope(args)
           return if args.size < 2
 
@@ -1387,7 +1400,7 @@ module Ruby2JS
             # Skip DSL declarations (already collected)
             if child.type == :send && child.children[0].nil?
               method = child.children[1]
-              next if %i[has_many has_one belongs_to validates scope broadcasts_to has_one_attached has_many_attached has_rich_text store enum include accepts_nested_attributes_for primary_abstract_class].include?(method)
+              next if %i[has_many has_one belongs_to validates validates_associated scope broadcasts_to has_one_attached has_many_attached has_rich_text store enum include accepts_nested_attributes_for primary_abstract_class].include?(method)
               next if CALLBACKS.include?(method)
             end
 
@@ -2099,6 +2112,10 @@ module Ruby2JS
                     validation_calls.push(s(:send, s(:self), :validates_inclusion_of, s(:str, attr.to_s), s(:hash,
                       s(:pair, s(:sym, :in), array_node))))
                   end
+                end
+              when :associated
+                if options == true
+                  validation_calls.push(s(:send, s(:self), :validates_associated_of, s(:str, attr.to_s)))
                 end
               end
             end

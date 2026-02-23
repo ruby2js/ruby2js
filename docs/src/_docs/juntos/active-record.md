@@ -531,6 +531,7 @@ class Article < ApplicationRecord
   validates :slug, uniqueness: true
   validates :status, inclusion: { in: %w[draft published archived] }
   validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }
+  validates_associated :comments
 end
 ```
 
