@@ -129,18 +129,15 @@ module Ruby2JS
                 parse right, :method
               elsif \
                 left.type == :sym and right.type == :lvar and
-                left.children.last == right.children.last and
-                jsvar(right.children.last) == right.children.last.to_s
+                left.children.last == right.children.last
               then
                 # Shorthand: {x} when x is a local variable
-                # Skip when jsvar renames it (e.g. package → $package)
                 parse right
               elsif \
                 left.type == :sym and
                 right.type == :send and right.children.first == nil and
                 right.children.length == 2 and  # no args (just receiver, method)
                 left.children.last == right.children.last and
-                jsvar(right.children.last) == right.children.last.to_s and
                 # Only use shorthand if: not in a class, OR the identifier is a known local/param
                 # Inside a class, method calls become `this.x` which can't use shorthand
                 # Check @vars for local variables/parameters

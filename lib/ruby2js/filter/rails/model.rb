@@ -1444,6 +1444,11 @@ module Ruby2JS
               # Callback methods need :defm so they stay as methods (not getters)
               if all_callback_methods.include?(child.children[0])
                 transformed << process(rewritten.updated(:defm, rewritten.children))
+              elsif child.children[0].to_s.end_with?('?') && child.children[1].children.empty?
+                # Zero-arg predicate methods become getters in model classes
+                # Strip ? and use :defget so class2 generates `get active() { ... }`
+                getter_name = child.children[0].to_s.sub('?', '').to_sym
+                transformed << process(rewritten.updated(:defget, [getter_name, rewritten.children[1], rewritten.children[2]]))
               else
                 transformed << process(rewritten)
               end

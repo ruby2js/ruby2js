@@ -191,12 +191,12 @@ describe "Rails enum transpilation" do
           end
         end
       RUBY
-      # Should still generate drafted predicate
-      assert_includes result, 'drafted() {'
+      # Should still generate drafted predicate (as getter in model context)
+      assert_includes result, 'get drafted() {'
       assert_includes result, 'return this.status === "drafted"'
       # Should NOT generate published predicate (user defined it)
-      occurrences = result.scan(/^\s*published\(\)/).length
-      assert_equal 1, occurrences, "published() should appear exactly once (user-defined)"
+      occurrences = result.scan(/^\s*get published\(\)/).length
+      assert_equal 1, occurrences, "get published() should appear exactly once (user-defined)"
     end
   end
 
