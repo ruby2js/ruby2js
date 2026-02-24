@@ -289,6 +289,24 @@ export class Category extends ApplicationRecord {
 }
 ```
 
+### Normalizations
+
+Rails `normalizes` declarations generate setter methods that apply the normalization lambda:
+
+```ruby
+class Studio < ApplicationRecord
+  normalizes :name, with: -> name { name.strip }
+end
+```
+
+```javascript
+export class Studio extends ApplicationRecord {
+  set name(value) {
+    this.attributes.name = (name => name.trim())(value)
+  }
+}
+```
+
 ### Enums
 
 Rails `enum` declarations are transpiled to instance predicate methods, static scope methods, and a frozen values constant.

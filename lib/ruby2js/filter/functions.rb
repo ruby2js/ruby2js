@@ -455,6 +455,14 @@ module Ruby2JS
             process S(:undef, S(:send, target, :[], args.first))
           end
 
+        elsif method == :dig and args.length >= 1 and target
+          # hash.dig(:a, :b) => hash?.[a]?.[b] (optional chaining)
+          result = target
+          args.each do |arg|
+            result = s(:csend, result, :[], arg)
+          end
+          process result
+
         elsif method == :to_s
           if @options[:nullish_to_s] && es2020 && args.empty?
             # (x ?? '').toString() - nil-safe conversion matching Ruby's nil.to_s => ""

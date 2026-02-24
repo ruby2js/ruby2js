@@ -273,6 +273,20 @@ describe Ruby2JS::Filter::Rails::Model do
     end
   end
 
+  describe "normalizes" do
+    it "generates getter and setter with lambda applied" do
+      result = to_js(<<~RUBY)
+        class Studio < ApplicationRecord
+          normalizes :name, with: -> name { name.strip }
+        end
+      RUBY
+      assert_includes result, 'get name()'
+      assert_includes result, 'set name(value)'
+      assert_includes result, 'this.attributes.name'
+      assert_includes result, '(name => name.strip)(value)'
+    end
+  end
+
   describe "scope" do
     it "generates class method for scope" do
       result = to_js(<<~RUBY)
@@ -411,6 +425,24 @@ describe Ruby2JS::Filter::Rails::Model do
       RUBY
       # Simple property accessors should be getters
       assert_includes result, 'get full_title()'
+    end
+
+    it "adds return to last expression in async methods" do
+      result = to_js(<<~RUBY)
+        class Studio < ApplicationRecord
+          has_many :studio1_pairs
+          has_many :studio2_pairs
+          def pairs
+            ids = studio1_pairs.pluck(:studio2_id) + studio2_pairs.pluck(:studio1_id)
+            Studio.where(id: ids)
+          end
+        end
+      RUBY
+      # Method should be async (contains AR operations)
+      assert_includes result, 'async pairs()'
+      # Last expression should have return (autoreturn)
+      assert_includes result, 'return'
+      assert_match(/return.*Studio\.where/, result)
     end
   end
 

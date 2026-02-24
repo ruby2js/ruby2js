@@ -27,6 +27,8 @@ module Ruby2JS
           first last take
           count sum average minimum maximum
           create create!
+          find_or_create_by find_or_create_by!
+          find_or_initialize_by
           order
           distinct pluck ids exists?
           find_each find_in_batches
@@ -53,6 +55,26 @@ module Ruby2JS
           destroy_all delete_all
         ].freeze
 
+        # Strip inner :await! nodes from a chain that will be wrapped with an outer await.
+        # When the controller filter processes bottom-up, inner AR calls (e.g., where())
+        # get wrapped with await! before chain detection fires for the terminal method.
+        # Since Relation is thenable, awaiting an intermediate Relation resolves it to
+        # an Array, breaking chainable methods like .or(). This method unwraps those
+        # inner awaits so only the outermost call is awaited.
+        def self.strip_inner_awaits(node)
+          return node unless node.respond_to?(:type)
+
+          if node.type == :await!
+            # Unwrap: change type back to :send, recurse on children
+            return self.strip_inner_awaits(node.updated(:send))
+          end
+
+          new_children = node.children.map do |c|
+            c.respond_to?(:type) ? self.strip_inner_awaits(c) : c
+          end
+          node.updated(nil, new_children)
+        end
+
         # Wrap ActiveRecord operations with await for async database support
         # Takes the node to potentially wrap and an array of known model names
         def self.wrap_with_await_if_needed(node, model_refs)
@@ -73,18 +95,27 @@ module Ruby2JS
 
           # Check for chained method calls ending with an AR class method
           # e.g., Article.includes(:comments).all, Article.where(...).first
-          if target&.type == :send && AR_CLASS_METHODS.include?(method)
+          # Also handle chains where inner nodes are already await-wrapped
+          if (target&.type == :send || target&.type == :await!) && AR_CLASS_METHODS.include?(method)
             # Walk up the chain to find the root target
             chain_start = target
-            while chain_start&.type == :send
-              chain_start = chain_start.children[0]
+            while chain_start&.type == :send || chain_start&.type == :await!
+              # :await! wraps a single child node
+              if chain_start.type == :await!
+                chain_start = chain_start.children[0]
+              else
+                chain_start = chain_start.children[0]
+              end
             end
             # If chain starts with a model constant, await the whole thing
+            # Strip inner awaits first — intermediate Relation calls (where, order, etc.)
+            # must not be individually awaited or they resolve to Arrays.
             if chain_start&.type == :const && chain_start.children[0].nil?
               const_name = chain_start.children[1].to_s
               model_refs_array = model_refs ? [*model_refs] : []
               if model_refs_array.include?(const_name)
-                return node.updated(:await!)
+                stripped = self.strip_inner_awaits(node)
+                return stripped.updated(:await!)
               end
             end
           end
@@ -106,7 +137,7 @@ module Ruby2JS
             # If the chain starts from a local variable or instance variable,
             # and the intermediate method is a named accessor (not [] subscript,
             # which is hash/array access, not an association proxy)
-            if (assoc_target&.type == :lvar || assoc_target&.type == :ivar) &&
+            if (assoc_target&.type == :lvar || assoc_target&.type == :ivar || assoc_target&.type == :self || assoc_target&.type == :attr) &&
                assoc_method != :[]
               return node.updated(:await!)
             end
@@ -117,7 +148,9 @@ module Ruby2JS
 
         # Recursively wrap AR operations in an AST node
         # Used by seeds and test filters for transforming method bodies
-        def self.wrap_ar_operations(node, model_refs)
+        # model_metadata: optional hash of { ModelName => { 'instance_methods' => [...] } }
+        #   for detecting custom instance methods that need await+parens in chains
+        def self.wrap_ar_operations(node, model_refs, model_metadata=nil)
           return node unless node.respond_to?(:type)
 
           case node.type
@@ -131,7 +164,7 @@ module Ruby2JS
               if model_refs_array.include?(const_name)
                 if AR_CLASS_METHODS.include?(method)
                   # Known AR class method: wrap with await!
-                  new_args = args.map { |a| self.wrap_ar_operations(a, model_refs) }
+                  new_args = args.map { |a| self.wrap_ar_operations(a, model_refs, model_metadata) }
                   new_node = node.updated(nil, [target, method, *new_args])
                   return new_node.updated(:await!)
                 elsif args.empty?
@@ -146,7 +179,7 @@ module Ruby2JS
             # Check for instance method calls (e.g., article.save, @article.update)
             # Also handles :attr targets for fixture refs (_fixtures.card)
             if (target&.type == :lvar || target&.type == :ivar || target&.type == :attr) && AR_INSTANCE_METHODS.include?(method)
-              new_args = args.map { |a| self.wrap_ar_operations(a, model_refs) }
+              new_args = args.map { |a| self.wrap_ar_operations(a, model_refs, model_metadata) }
               new_node = node.updated(nil, [target, method, *new_args])
               return new_node.updated(:await!)
             end
@@ -160,7 +193,7 @@ module Ruby2JS
               if (chain_receiver&.type == :lvar || chain_receiver&.type == :ivar || chain_receiver&.type == :attr) &&
                  AR_INSTANCE_METHODS.include?(chain_method)
                 wrapped_target = target.updated(:await!)
-                new_args = args.map { |a| self.wrap_ar_operations(a, model_refs) }
+                new_args = args.map { |a| self.wrap_ar_operations(a, model_refs, model_metadata) }
                 return node.updated(nil, [wrapped_target, method, *new_args])
               end
             end
@@ -175,9 +208,29 @@ module Ruby2JS
               assoc_method = target.children[1]
               # Only wrap if chain starts from lvar/ivar/attr and accessor isn't [] (hash/array access)
               if (assoc_target&.type == :lvar || assoc_target&.type == :ivar || assoc_target&.type == :attr) && assoc_method != :[]
+                # Check if the intermediate method is a custom instance method (not an association getter).
+                # Custom methods are async and need await+parens; association getters are sync.
+                is_custom_method = false
+                if model_metadata
+                  model_metadata.each do |_name, meta| # Pragma: entries
+                    methods = meta['instance_methods']
+                    if methods && methods.include?(assoc_method.to_s)
+                      is_custom_method = true
+                    end
+                  end
+                end
+
+                if is_custom_method
+                  # Custom async method: await the intermediate call, then await the outer
+                  wrapped_target = target.updated(:await!)
+                  new_args = args.map { |a| self.wrap_ar_operations(a, model_refs, model_metadata) }
+                  new_node = node.updated(nil, [wrapped_target, method, *new_args])
+                  return new_node.updated(:await!)
+                end
+
                 # Wrap with await, process target and args
-                new_target = self.wrap_ar_operations(target, model_refs)
-                new_args = args.map { |a| self.wrap_ar_operations(a, model_refs) }
+                new_target = self.wrap_ar_operations(target, model_refs, model_metadata)
+                new_args = args.map { |a| self.wrap_ar_operations(a, model_refs, model_metadata) }
                 new_node = node.updated(nil, [new_target, method, *new_args])
                 return new_node.updated(:await!)
               end
@@ -185,7 +238,7 @@ module Ruby2JS
 
             # Process children recursively
             new_children = node.children.map do |c|
-              c.respond_to?(:type) ? self.wrap_ar_operations(c, model_refs) : c
+              c.respond_to?(:type) ? self.wrap_ar_operations(c, model_refs, model_metadata) : c
             end
             # Note: explicit return for JS switch/case compatibility
             return node.updated(nil, new_children)
@@ -194,7 +247,7 @@ module Ruby2JS
             # Variable assignment - wrap the value if it's an AR operation
             var_name, value = node.children
             if value.respond_to?(:type)
-              new_value = self.wrap_ar_operations(value, model_refs)
+              new_value = self.wrap_ar_operations(value, model_refs, model_metadata)
               return node.updated(nil, [var_name, new_value])
             end
             return node
@@ -208,8 +261,8 @@ module Ruby2JS
             # or lambdas. Don't convert blocks for assertion macros (assert_raises, etc.)
             # which are handled by the test filter's on_block.
             call_node, args_node, body_node = node.children
-            new_call = call_node.respond_to?(:type) ? self.wrap_ar_operations(call_node, model_refs) : call_node
-            new_body = body_node.respond_to?(:type) ? self.wrap_ar_operations(body_node, model_refs) : body_node
+            new_call = call_node.respond_to?(:type) ? self.wrap_ar_operations(call_node, model_refs, model_metadata) : call_node
+            new_body = body_node.respond_to?(:type) ? self.wrap_ar_operations(body_node, model_refs, model_metadata) : body_node
 
             # Exclude blocks handled by test filter's on_block (they add async themselves)
             test_macros = [:describe, :context, :it, :test, :specify, :setup, :teardown,
@@ -230,7 +283,7 @@ module Ruby2JS
             if node.children.any?
               # Note: use different variable name to avoid JS TDZ error in switch/case
               mapped_children = node.children.map do |c|
-                c.respond_to?(:type) ? self.wrap_ar_operations(c, model_refs) : c
+                c.respond_to?(:type) ? self.wrap_ar_operations(c, model_refs, model_metadata) : c
               end
               # Note: explicit return for JS switch/case compatibility
               return node.updated(nil, mapped_children)

@@ -79,9 +79,11 @@ module Ruby2JS
           @rails_attachments = []    # Active Storage attachments
           @rails_nested_attributes = []  # accepts_nested_attributes_for declarations
           @rails_alias_attributes = []   # alias_attribute declarations
+          @rails_normalizations = []   # normalizes declarations
           @rails_url_helpers = false  # include Rails.application.routes.url_helpers
           @rails_primary_abstract_class = false  # primary_abstract_class declaration
           @rails_model_private_methods = {}
+          @rails_model_instance_methods = []
           @rails_model_refs = Set.new
           @in_callback_block = false  # Track when processing callback body
           @uses_broadcast = false  # Track if model uses broadcast methods
@@ -343,9 +345,11 @@ module Ruby2JS
           @rails_attachments = []
           @rails_nested_attributes = []
           @rails_alias_attributes = []
+          @rails_normalizations = []
           @rails_url_helpers = false
           @rails_primary_abstract_class = false
           @rails_model_private_methods = {}
+          @rails_model_instance_methods = []
           @rails_model_refs = Set.new
           @rails_includes = []
           @has_concern_includes = false
@@ -419,9 +423,11 @@ module Ruby2JS
           @rails_attachments = []
           @rails_nested_attributes = []
           @rails_alias_attributes = []
+          @rails_normalizations = []
           @rails_url_helpers = false
           @rails_primary_abstract_class = false
           @rails_model_private_methods = {}
+          @rails_model_instance_methods = []
           @rails_model_refs = Set.new
           @rails_includes = []
           @has_concern_includes = false
@@ -962,6 +968,11 @@ module Ruby2JS
               next
             end
 
+            # Collect public instance method names (for test filter await detection)
+            if !in_private && child.type == :def
+              @rails_model_instance_methods.push(child.children[0].to_s)
+            end
+
             next unless child.type == :send && child.children[0].nil?
 
             method_name = child.children[1]
@@ -996,6 +1007,8 @@ module Ruby2JS
                   original: args[1].children[0]
                 })
               end
+            when :normalizes
+              collect_normalization(args)
             when :primary_abstract_class
               @rails_primary_abstract_class = true
             when :include
@@ -1060,6 +1073,9 @@ module Ruby2JS
             end
           end
           model_meta['enum_bangs'] = bangs
+
+          # Custom instance method names (for test filter to distinguish from associations)
+          model_meta['instance_methods'] = @rails_model_instance_methods if @rails_model_instance_methods.any?
 
           # File path for import generation in test filter
           model_meta['file'] = @options[:file] if @options[:file]
@@ -1303,6 +1319,40 @@ module Ruby2JS
           })
         end
 
+        # Collect normalizes declarations
+        # normalizes :name, with: -> name { name.strip }
+        def collect_normalization(args)
+          return if args.empty?
+
+          # First arg(s) are field names (symbols), last arg is options hash with :with key
+          fields = []
+          lambda_node = nil
+
+          args.each do |arg|
+            if arg.type == :sym
+              fields.push(arg.children[0])
+            elsif arg.type == :hash
+              arg.children.each do |pair|
+                if pair.type == :pair && pair.children[0].type == :sym && pair.children[0].children[0] == :with
+                  # Lambda is parsed as (block (send nil :lambda) (args ...) body)
+                  lambda_node = pair.children[1]
+                end
+              end
+            end
+          end
+
+          return unless lambda_node
+          return unless lambda_node.type == :block
+
+          fields.each do |field|
+            @rails_normalizations.push({
+              field: field,
+              lambda_args: lambda_node.children[1],
+              lambda_body: lambda_node.children[2]
+            })
+          end
+        end
+
         # Collect broadcasts_to declarations
         # broadcasts_to ->(record) { "stream_name" }
         # broadcasts_to ->(record) { "stream_name" }, inserts_by: :prepend
@@ -1453,7 +1503,7 @@ module Ruby2JS
             # Skip DSL declarations (already collected)
             if child.type == :send && child.children[0].nil?
               method = child.children[1]
-              next if %i[has_many has_one belongs_to validates validates_associated scope broadcasts_to has_one_attached has_many_attached has_rich_text store enum include accepts_nested_attributes_for alias_attribute primary_abstract_class].include?(method)
+              next if %i[has_many has_one belongs_to validates validates_associated scope broadcasts_to has_one_attached has_many_attached has_rich_text store enum include accepts_nested_attributes_for alias_attribute normalizes primary_abstract_class].include?(method)
               next if CALLBACKS.include?(method)
             end
 
@@ -1472,11 +1522,20 @@ module Ruby2JS
                   locals.push(arg.children[0]) if arg.respond_to?(:children) && arg.children[0]
                 end
               end
+              rewritten_body = rewrite_bare_sends_to_self(child.children[2], locals)
+
+              # Wrap AR operations with await (pluck, where, save, etc.)
+              metadata = @options ? @options[:metadata] : nil
+              models = metadata ? metadata[:models] : nil
+              model_refs = models ? models.keys : []
+              wrapped_body = wrap_model_ar_operations(rewritten_body, model_refs)
+
               rewritten = child.updated(nil, [
                 child.children[0],
                 child.children[1],
-                rewrite_bare_sends_to_self(child.children[2], locals)
+                wrapped_body
               ])
+
               # Callback methods need :defm so they stay as methods (not getters)
               if all_callback_methods.include?(child.children[0])
                 transformed << process(rewritten.updated(:defm, rewritten.children))
@@ -1485,6 +1544,15 @@ module Ruby2JS
                 # Strip ? and use :defget so class2 generates `get active() { ... }`
                 getter_name = child.children[0].to_s.sub('?', '').to_sym
                 transformed << process(rewritten.updated(:defget, [getter_name, rewritten.children[1], rewritten.children[2]]))
+              elsif model_body_needs_async?(wrapped_body)
+                # Method contains AR operations — make it async.
+                # Wrap body with autoreturn since the Return filter's on_def
+                # won't fire for :async type nodes (only handles :def/:defm/:deff).
+                async_body = s(:autoreturn, wrapped_body)
+                async_rewritten = rewritten.updated(nil, [
+                  rewritten.children[0], rewritten.children[1], async_body
+                ])
+                transformed << process(async_rewritten.updated(:async, async_rewritten.children))
               else
                 transformed << process(rewritten)
               end
@@ -1566,6 +1634,33 @@ module Ruby2JS
             setter = s(:def, "#{new_name}=".to_sym,
               s(:args, s(:arg, :value)),
               s(:send, s(:attr, s(:self), :attributes), :[]=, s(:str, original.to_s), s(:lvar, :value)))
+            transformed << s(:begin, getter, setter)
+          end
+
+          # Generate normalizes getter/setter pairs
+          # normalizes :name, with: -> name { name.strip }
+          # => get name() { return this.attributes.name }
+          #    set name(value) { this.attributes.name = ((name) => name.strip())(value) }
+          @rails_normalizations.each do |norm|
+            field = norm[:field]
+            lambda_args = norm[:lambda_args]
+            lambda_body = norm[:lambda_body]
+            param_name = lambda_args&.children&.first&.children&.first || :value
+
+            # get name() { return this.attributes.name }
+            getter = s(:defget, field,
+              s(:args),
+              s(:autoreturn, s(:send, s(:attr, s(:self), :attributes), :[], s(:str, field.to_s))))
+
+            # set name(value) { this.attributes.name = ((param) => body)(value) }
+            setter = s(:def, "#{field}=".to_sym,
+              s(:args, s(:arg, :value)),
+              s(:send, s(:attr, s(:self), :attributes), :[]=, s(:str, field.to_s),
+                s(:send,
+                  s(:block, s(:send, nil, :lambda),
+                    s(:args, s(:arg, param_name)),
+                    process(lambda_body)),
+                  :call, s(:lvar, :value))))
             transformed << s(:begin, getter, setter)
           end
 
@@ -2021,6 +2116,96 @@ module Ruby2JS
           node.updated(nil, new_children)
         end
 
+        # AR association methods that need await when called on association proxies.
+        # Subset of ActiveRecordHelpers::AR_ASSOCIATION_METHODS needed for model methods.
+        AR_ASSOC_ASYNC_METHODS = %i[
+          pluck ids count size length
+          first last take
+          where order limit
+          exists? empty? any? none?
+          find create create! build
+          destroy_all delete_all
+        ].freeze
+
+        # Recursively wrap AR association method calls with await in model method bodies.
+        # Handles self.association.method patterns (e.g., self.studio1_pairs.pluck(:id)).
+        def wrap_model_ar_operations(node, model_refs)
+          return node unless node.respond_to?(:type)
+
+          if node.type == :send
+            target, method, *args = node.children
+
+            # Check for self.association.ar_method (e.g., self.comments.pluck("id"))
+            if target.respond_to?(:type) && target.type == :send && AR_ASSOC_ASYNC_METHODS.include?(method)
+              assoc_target = target.children[0]
+              if assoc_target.respond_to?(:type) &&
+                 (assoc_target.type == :self || assoc_target.type == :lvar || assoc_target.type == :ivar)
+                new_args = args.map { |a| a.respond_to?(:type) ? wrap_model_ar_operations(a, model_refs) : a }
+                new_target = wrap_model_ar_operations(target, model_refs)
+                new_node = node.updated(nil, [new_target, method, *new_args])
+                return new_node.updated(:await!)
+              end
+            end
+
+            # Check for Model.class_method (e.g., Studio.where(...))
+            if target.respond_to?(:type) && target.type == :const && target.children[0].nil?
+              const_name = target.children[1].to_s
+              ar_class_methods = %i[all find find_by find_by! where first last count create create! order distinct pluck ids exists? destroy_all delete_all update_all find_or_create_by]
+              if model_refs.include?(const_name) && ar_class_methods.include?(method)
+                new_args = args.map { |a| a.respond_to?(:type) ? wrap_model_ar_operations(a, model_refs) : a }
+                new_node = node.updated(nil, [target, method, *new_args])
+                return new_node.updated(:await!)
+              end
+            end
+
+            # Check for chained class methods (e.g., Studio.where(...).first)
+            if target.respond_to?(:type) && target.type == :send
+              ar_class_methods = %i[all find find_by where first last count order distinct pluck ids destroy_all delete_all update_all]
+              if ar_class_methods.include?(method)
+                chain_start = target
+                while chain_start.respond_to?(:type) && chain_start.type == :send
+                  chain_start = chain_start.children[0]
+                end
+                if chain_start.respond_to?(:type) && chain_start.type == :const && chain_start.children[0].nil?
+                  const_name = chain_start.children[1].to_s
+                  if model_refs.include?(const_name)
+                    new_target = wrap_model_ar_operations(target, model_refs)
+                    new_args = args.map { |a| a.respond_to?(:type) ? wrap_model_ar_operations(a, model_refs) : a }
+                    new_node = node.updated(nil, [new_target, method, *new_args])
+                    return new_node.updated(:await!)
+                  end
+                end
+              end
+            end
+
+            # Check for instance method calls (e.g., record.save, record.destroy)
+            ar_instance_methods = %i[save save! update update! destroy destroy! reload touch valid? invalid?]
+            if target.respond_to?(:type) &&
+               (target.type == :lvar || target.type == :ivar || target.type == :self) &&
+               ar_instance_methods.include?(method)
+              new_args = args.map { |a| a.respond_to?(:type) ? wrap_model_ar_operations(a, model_refs) : a }
+              new_node = node.updated(nil, [target, method, *new_args])
+              return new_node.updated(:await!)
+            end
+          end
+
+          # Recurse into children
+          return node unless node.respond_to?(:children)
+          new_children = node.children.map do |c|
+            c.respond_to?(:type) ? wrap_model_ar_operations(c, model_refs) : c
+          end
+          node.updated(nil, new_children)
+        end
+
+        # Check if an AST node contains :await or :await! nodes (needs async method).
+        def model_body_needs_async?(node)
+          return false unless node.respond_to?(:type)
+          return true if node.type == :await || node.type == :await!
+          return false if node.type == :async
+          return false unless node.respond_to?(:children)
+          node.children.any? { |c| c.respond_to?(:type) && model_body_needs_async?(c) }
+        end
+
         # Transform a belongs_to default lambda body for JS output.
         # Bare method calls (no receiver) become property access on self.
         # Association accesses are wrapped with await since getters return
@@ -2109,15 +2294,25 @@ module Ruby2JS
 
           return nil if dependent_destroy.empty?
 
-          # Generate: async destroy() { for (let record of await this.comments) { await record.destroy() }; return super.destroy(); }
-          # Must await the association (thenable proxy) to get the collection
-          # Use for...of with await inside to properly handle async destroy calls
+          # Generate destroy calls based on association type:
+          # has_many: for (let record of await this.comments) { await record.destroy() }
+          # has_one:  { let record = await this.costs; if (record) await record.destroy() }
           destroy_calls = dependent_destroy.map do |assoc|
-            # for (let record of await this.comments) { await record.destroy() }
-            s(:for_of,
-              s(:lvasgn, :record),
-              s(:send, nil, :await, s(:attr, s(:self), assoc[:name])),
-              s(:send, nil, :await, s(:send, s(:lvar, :record), :destroy)))
+            if assoc[:type] == :has_one
+              # let record = await this.costs; if (record) await record.destroy()
+              s(:begin,
+                s(:lvasgn, :record,
+                  s(:send, nil, :await, s(:attr, s(:self), assoc[:name]))),
+                s(:if, s(:lvar, :record),
+                  s(:send, nil, :await, s(:send, s(:lvar, :record), :destroy)),
+                  nil))
+            else
+              # for (let record of await this.comments) { await record.destroy() }
+              s(:for_of,
+                s(:lvasgn, :record),
+                s(:send, nil, :await, s(:attr, s(:self), assoc[:name])),
+                s(:send, nil, :await, s(:send, s(:lvar, :record), :destroy)))
+            end
           end
 
           # Add super.destroy() call

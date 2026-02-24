@@ -343,3 +343,22 @@ export class Relation {
     return { [col]: dir === 'desc' ? 'asc' : 'desc' };
   }
 }
+
+// Array.pluck — extract column values from an array of model records.
+// When an async model method returns a Relation, await resolves it to an Array
+// (because Relation is thenable). This lets .pluck() work on the resolved array,
+// matching Rails behavior where .pluck() works on both Relations and Arrays.
+if (!Array.prototype.pluck) {
+  Object.defineProperty(Array.prototype, 'pluck', {
+    value(...columns) {
+      if (columns.length === 1) {
+        const col = columns[0];
+        return this.map(r => r.attributes?.[col] ?? r[col]);
+      }
+      return this.map(r => columns.map(col => r.attributes?.[col] ?? r[col]));
+    },
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+}

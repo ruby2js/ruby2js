@@ -28,6 +28,7 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `debugger` {{ caret }} `debugger` (JS debugger statement)
 * `.define_method` {{ caret }} `klass.prototype.meth = function ...`
 * `.delete` {{ caret }} `delete target[arg]`
+* `.dig(:a, :b)` {{ caret }} `?.["a"]?.["b"]` (optional chaining)
 * `.downcase` {{ caret }} `.toLowerCase`
 * `.each` {{ caret }} `.forEach`
 * `.each_key` {{ caret }} `for (i in ...) {}`

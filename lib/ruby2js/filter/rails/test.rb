@@ -728,7 +728,10 @@ module Ruby2JS
         # Pre-resolves fixture refs so that AR wrapping sees :attr nodes.
         def wrap_test_ar_operations(node)
           resolved = resolve_fixture_refs_in_tree(node)
-          ActiveRecordHelpers.wrap_ar_operations(resolved, @rails_test_models)
+          # Pass model metadata so wrap_ar_operations can detect custom instance methods
+          metadata = @options ? @options[:metadata] : nil
+          model_meta = metadata ? metadata['models'] : nil
+          ActiveRecordHelpers.wrap_ar_operations(resolved, @rails_test_models, model_meta)
         end
 
         # Convert sends with receivers in statement position to await!

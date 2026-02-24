@@ -833,6 +833,18 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'HTTP.delete("x").then {}' ).
         must_equal 'HTTP.delete("x").then(() => {})'
     end
+
+    it "should handle dig with one key" do
+      to_js( 'a.dig(:b)' ).must_equal 'a?.["b"]'
+    end
+
+    it "should handle dig with multiple keys" do
+      to_js( 'a.dig(:b, :c)' ).must_equal 'a?.["b"]?.["c"]'
+    end
+
+    it "should handle dig with string keys" do
+      to_js( 'a.dig("x", "y")' ).must_equal 'a?.["x"]?.["y"]'
+    end
   end
 
   describe 'instance tests' do

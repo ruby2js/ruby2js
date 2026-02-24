@@ -89,9 +89,9 @@ module Ruby2JS
           @rails_controller = true
           @rails_controller_const = class_name.children.last
 
-          # First pass: collect before_actions, private methods, and model references
-          collect_controller_metadata(body)
+          # First pass: collect model references, before_actions, private methods
           collect_model_references(body)
+          collect_controller_metadata(body)
           record_controller_metadata
 
           # Second pass: transform methods
@@ -233,6 +233,51 @@ module Ruby2JS
             next unless method.to_s.end_with?('=')
             base = method.to_s.chomp('=').to_sym
             @rails_class_accessors.add(base) if @rails_class_methods.include?(base)
+          end
+
+          # Pre-compute injected params for private methods called from actions.
+          # Private methods that reference ivars or params need those passed as args.
+          # Pre-compute which private methods will be async (contain AR operations).
+          # Used by mark_private_method_calls to wrap calls with await.
+          # Note: use Array for JS compatibility (Set.include? doesn't transpile correctly)
+          @rails_async_private_methods = []
+          @rails_private_method_calls.each do |method_name|
+            method_node = @rails_private_methods[method_name]
+            next unless method_node
+            body = method_node.children[2]
+            if body && contains_ar_operations?(body)
+              @rails_async_private_methods.push(method_name)
+            end
+          end
+
+          @rails_private_method_params = {}
+          @rails_private_method_calls.each do |method_name|
+            method_node = @rails_private_methods[method_name]
+            next unless method_node
+            body = method_node.children[2]
+            next unless body
+
+            # Get existing method argument names to avoid duplicates
+            args_node = method_node.children[1]
+            existing_args = []
+            if args_node
+              args_node.children.each do |arg|
+                existing_args.push(arg.children[0]) if arg.respond_to?(:children)
+              end
+            end
+
+            injected = []
+            # Check for ivar references (will become locals after transformation)
+            ivars = collect_instance_variables(body)
+            ivars.each do |ivar_name|
+              local_name = ivar_name.to_s.sub('@', '').to_sym
+              injected.push(local_name) unless existing_args.include?(local_name)
+            end
+            # Check for params references (skip if already a method argument)
+            if references_params?(body) && !existing_args.include?(:params)
+              injected.push(:params)
+            end
+            @rails_private_method_params[method_name] = injected if injected.any?
           end
         end
 
@@ -555,25 +600,37 @@ module Ruby2JS
           # 2. Standard RESTful params (id for show/edit/destroy, params for create/update)
           param_args = [s(:arg, :context)]
 
-          # Add extra params keys found in method body (like article_id for nested resources)
-          # Exclude :id because it's handled by standard RESTful routing
-          # Note: use filter instead of - for JS array compatibility
-          extra_params = params_keys.select { |k| k != :id }
-          # Note: use push instead of << for JS compatibility
-          extra_params.sort.each do |key|
-            param_args.push(s(:arg, key))
-          end
+          # Standard RESTful actions have well-defined parameter patterns
+          standard_actions = [:index, :show, :new, :edit, :create, :update, :destroy]
 
-          # Add standard params based on action type
-          # Note: use push instead of << for JS compatibility
-          case method_name
-          when :show, :edit, :destroy
-            param_args.push(s(:arg, :id))
-          when :update
-            param_args.push(s(:arg, :id))
-            param_args.push(s(:arg, :params))
-          when :create
-            param_args.push(s(:arg, :params))
+          if standard_actions.include?(method_name)
+            # For standard actions, extract extra params as individual parameters
+            extra_params = params_keys.select { |k| !(k == :id && [:show, :edit, :destroy, :update].include?(method_name)) }
+            extra_params.sort.each do |key|
+              param_args.push(s(:arg, key))
+            end
+
+            # Add standard params based on action type
+            case method_name
+            when :show, :edit, :destroy
+              param_args.push(s(:arg, :id))
+            when :update
+              param_args.push(s(:arg, :id))
+              param_args.push(s(:arg, :params))
+            when :create
+              param_args.push(s(:arg, :params))
+            end
+          else
+            # Custom actions: extract :id if present, pass remaining params as object
+            has_id = params_keys.include?(:id)
+            has_other_params = params_keys.any? { |k| k != :id }
+
+            if has_id
+              param_args.push(s(:arg, :id))
+            end
+            if has_other_params
+              param_args.push(s(:arg, :params))
+            end
           end
 
           output_args = s(:args, *param_args)
@@ -664,9 +721,17 @@ module Ruby2JS
                   target.children[0].nil? &&
                   target.children[1] == :params &&
                   method == :[]
-              # params[:id] -> id (method parameter)
+              # params[:key] -> key (method parameter) for standard actions
+              # For custom actions, only extract :id; leave other keys as params["key"]
+              standard_actions = [:index, :show, :new, :edit, :create, :update, :destroy]
               if args.first&.type == :sym
-                return s(:lvar, args.first.children[0])
+                key = args.first.children[0]
+                if standard_actions.include?(@rails_current_action) || key == :id
+                  return s(:lvar, key)
+                else
+                  # Custom action: params["key"] (keep as params access)
+                  return s(:send, s(:lvar, :params), :[], s(:str, key.to_s))
+                end
               else
                 return node
               end
@@ -806,14 +871,17 @@ module Ruby2JS
             json_block = nil
             turbo_stream_block = nil
             turbo_stream_template = false  # format.turbo_stream without block
+            other_statements = []  # Non-format statements (e.g., add_pair)
 
             node.children.each do |child|
+              is_format = false
               if child.type == :block
                 block_send = child.children[0]
                 if block_send&.type == :send
                   receiver = block_send.children[0]
                   method = block_send.children[1]
                   if receiver&.type == :lvar
+                    is_format = true
                     if method == :html
                       html_block = child.children[2]
                     elsif method == :json
@@ -828,6 +896,7 @@ module Ruby2JS
                 receiver = child.children[0]
                 method = child.children[1]
                 if receiver&.type == :lvar
+                  is_format = true
                   if method == :turbo_stream
                     turbo_stream_template = true
                   elsif method == :html
@@ -835,29 +904,35 @@ module Ruby2JS
                   end
                 end
               end
+              other_statements.push(transform_ivars_to_locals(child)) unless is_format
             end
+
+            # Build the format result
+            format_result = nil
 
             # If turbo_stream template render is needed (no block), generate template call
             if turbo_stream_template && html_block
-              return generate_format_conditional_with_template(html_block)
+              format_result = generate_format_conditional_with_template(html_block)
             elsif turbo_stream_template
-              return generate_turbo_stream_template_render
+              format_result = generate_turbo_stream_template_render
+            elsif html_block && turbo_stream_block
+              format_result = generate_format_conditional(html_block, turbo_stream_block)
+            elsif json_block && (html_block || html_template)
+              format_result = generate_json_format_conditional(html_block, json_block)
+            elsif json_block
+              format_result = generate_json_format_conditional(nil, json_block)
+            elsif html_block
+              format_result = transform_ivars_to_locals(html_block)
+            elsif turbo_stream_block
+              format_result = transform_ivars_to_locals(turbo_stream_block)
             end
 
-            # If both formats present, generate Accept header conditional
-            if html_block && turbo_stream_block
-              return generate_format_conditional(html_block, turbo_stream_block)
-            elsif json_block && (html_block || html_template)
-              # JSON + HTML: check Accept header for application/json
-              return generate_json_format_conditional(html_block, json_block)
-            elsif json_block
-              # Only JSON - still need Accept header check and {json:} wrapper
-              return generate_json_format_conditional(nil, json_block)
-            elsif html_block
-              return transform_ivars_to_locals(html_block)
-            elsif turbo_stream_block
-              # Only turbo_stream - return it directly
-              return transform_ivars_to_locals(turbo_stream_block)
+            if format_result
+              # Prepend non-format statements before the format conditional
+              if other_statements.any?
+                return s(:begin, *other_statements, format_result)
+              end
+              return format_result
             end
 
             # No format blocks found - transform all children
@@ -1410,13 +1485,31 @@ module Ruby2JS
         # Recursively mark bare private method calls as send! (force parens).
         # Without this, `setup_data unless cond` becomes `if (!cond) let setup_data`
         # because the converter treats no-arg no-paren sends as variable declarations.
+        # Also injects free-variable arguments (params, ivars) for private methods
+        # that need them from the calling scope.
         def mark_private_method_calls(node)
           return node unless node.respond_to?(:type)
 
           if node.type == :send && node.children[0].nil? &&
-              node.children.length == 2 &&
               @rails_private_methods.key?(node.children[1])
-            return node.updated(:send!, node.children)
+            method_name = node.children[1]
+            is_async = @rails_async_private_methods.include?(method_name)
+            # Check if this private method needs injected arguments
+            injected = nil
+            if defined?(@rails_private_method_params)
+              injected = @rails_private_method_params[method_name]
+            end
+            result = node
+            if injected && injected.any?
+              # Add injected variables as arguments to the call
+              extra_args = injected.map { |name| s(:lvar, name) }
+              new_children = [*node.children, *extra_args]
+              result = node.updated(:send!, new_children)
+            elsif node.children.length == 2
+              result = node.updated(:send!, node.children)
+            end
+            # Wrap with await if the private method is async
+            return is_async ? result.updated(:await!) : result
           elsif [:if, :begin, :kwbegin, :while, :until, :for].include?(node.type)
             new_children = node.children.map { |c| mark_private_method_calls(c) }
             return node.updated(nil, new_children)
@@ -1464,6 +1557,8 @@ module Ruby2JS
 
         # Transform a non-strong-params private method into a module function.
         # Applies the same ivar→local and params transformations as action methods.
+        # Uses pre-computed @rails_private_method_params to add injected parameters
+        # for ivars and params that are free variables in the private method's scope.
         def transform_private_method(node)
           method_name = node.children[0]
           args = node.children[1]
@@ -1480,6 +1575,14 @@ module Ruby2JS
           # Build function args from the Ruby method args
           param_args = args.children.map { |arg| s(:arg, arg.children[0]) }
 
+          # Add injected params (pre-computed in collect_controller_metadata)
+          injected = @rails_private_method_params[method_name]
+          if injected
+            injected.each do |name|
+              param_args.push(s(:arg, name))
+            end
+          end
+
           # Use async if the transformed body contains await nodes (e.g., AR queries).
           # The converter's own await detection skips :block boundaries, so it misses
           # await nodes inside the send child of blocks like .map { ... }.
@@ -1490,6 +1593,50 @@ module Ruby2JS
           final_body = transformed_body ? s(:autoreturn, transformed_body) : nil
 
           process(s(node_type, method_name, s(:args, *param_args), final_body))
+        end
+
+        # Check if an AST node references params (params[:key], params.require, params.expect, etc.)
+        def references_params?(node)
+          return false unless node.respond_to?(:type)
+          if node.type == :send
+            target = node.children[0]
+            if target.respond_to?(:type) && target.type == :send &&
+               target.children[0].nil? && target.children[1] == :params
+              return true
+            end
+            if target.nil? && node.children[1] == :params
+              return true
+            end
+          end
+          if node.type == :lvar && node.children[0] == :params
+            return true
+          end
+          return false unless node.respond_to?(:children)
+          node.children.any? { |c| c.respond_to?(:type) && references_params?(c) }
+        end
+
+        # Check if an AST subtree contains ActiveRecord operations
+        # (model class method calls like Studio.find_by, StudioPair.find_or_create_by).
+        # Used to pre-compute which private methods will be async.
+        def contains_ar_operations?(node)
+          return false unless node.respond_to?(:type)
+          if node.type == :send
+            target = node.children[0]
+            method = node.children[1]
+            if target&.type == :const && target.children[0].nil?
+              const_name = target.children[1].to_s
+              if @rails_model_refs.include?(const_name) &&
+                  ActiveRecordHelpers::AR_CLASS_METHODS.include?(method)
+                return true
+              end
+            end
+            # Instance methods like save, destroy, update on any target
+            if target && ActiveRecordHelpers::AR_INSTANCE_METHODS.include?(method)
+              return true
+            end
+          end
+          return false if [:def, :defs].include?(node.type)
+          node.children.any? { |child| contains_ar_operations?(child) }
         end
 
         # Check if an AST node contains any :await or :await! nodes.
@@ -1507,21 +1654,43 @@ module Ruby2JS
         #   function clip_params(params) { return params.clip || {} }
         #
         # We return the full nested params object rather than enumerating
-        # individual permitted keys, because some keys may be virtual
-        # attributes (e.g., Active Storage attachments) rather than database
-        # columns. The Active Record adapter handles filtering to known columns.
+        # Generate a strong params function that filters to permitted keys.
+        # params.expect(studio: [:name, :email]) -> returns only {name, email} from params.studio
         def generate_strong_params_function(method_node)
           method_name = method_node.children[0]
           body = method_node.children[2]
 
-          model_name, _permitted_keys = extract_strong_params_info(body)
+          model_name, permitted_keys = extract_strong_params_info(body)
 
-          # Build: return params.model || {}
-          return_expr = s(:return,
-            s(:or, s(:attr, s(:lvar, :params), model_name), s(:hash)))
+          if permitted_keys && !permitted_keys.empty?
+            # Build: let raw = params.model || {};
+            #        let result = {};
+            #        for (let key of ["name", "email"]) { if (key in raw) result[key] = raw[key] }
+            #        return result;
+            key_strings = permitted_keys.map { |k| s(:str, k.to_s) }
 
-          process(s(:def, method_name, s(:args, s(:arg, :params)),
-            return_expr))
+            raw_var = s(:lvasgn, :raw,
+              s(:or, s(:attr, s(:lvar, :params), model_name), s(:hash)))
+            result_var = s(:lvasgn, :result, s(:hash))
+            loop_body = s(:for_of,
+              s(:lvasgn, :key),
+              s(:array, *key_strings),
+              s(:if,
+                s(:jsliteral, "key in raw"),
+                s(:send, s(:lvar, :result), :[]=, s(:lvar, :key), s(:send, s(:lvar, :raw), :[], s(:lvar, :key))),
+                nil))
+            return_expr = s(:return, s(:lvar, :result))
+
+            process(s(:def, method_name, s(:args, s(:arg, :params)),
+              s(:begin, raw_var, result_var, loop_body, return_expr)))
+          else
+            # Fallback: return params.model || {}
+            return_expr = s(:return,
+              s(:or, s(:attr, s(:lvar, :params), model_name), s(:hash)))
+
+            process(s(:def, method_name, s(:args, s(:arg, :params)),
+              return_expr))
+          end
         end
 
         # Transform article_params call: preserve as function call with params arg

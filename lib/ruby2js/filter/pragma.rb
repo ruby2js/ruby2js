@@ -176,6 +176,13 @@ module Ruby2JS
           end
         end
 
+        # Unwrap await nodes — :await! and :await have the same children as :send
+        # (receiver, method, *args) but a different type. Look through them for
+        # type inference so that e.g. (await x.pluck(:id)) is still inferred as :array.
+        if [:await, :await!, :await_attr].include?(node.type)
+          return infer_type(node.updated(:send))
+        end
+
         # Constructor calls: Set.new, Map.new, Array.new, Hash.new, String.new
         if node.type == :send
           receiver, method, *args = node.children

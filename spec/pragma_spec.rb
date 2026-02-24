@@ -1705,6 +1705,10 @@ describe Ruby2JS::Filter::Pragma do
       to_js('x = items.to_a; x + other').must_include '[...x, ...other]'
     end
 
+    it "should infer array type from pluck + pluck" do
+      to_js('x = a.pluck(:id) + b.pluck(:id)').must_include '[...'
+    end
+
     it "should deduplicate warnings for the same location" do
       d = lint("x = a + b\ny = a + b")
       plus_warnings = d.select { |w| w[:method] == '+' }

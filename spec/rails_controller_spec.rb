@@ -615,7 +615,9 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'setup_heatlist_data()'
+      # Private method receives ivar-derived locals as arguments
+      _(result).must_include 'setup_heatlist_data(heats)'
+      _(result).must_include 'function setup_heatlist_data(heats)'
       _(result).wont_include 'let setup_heatlist_data'
     end
   end
@@ -861,7 +863,8 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'async function setup_form()'
+      # Private method receives ivar-derived locals as arguments
+      _(result).must_include 'async function setup_form(options)'
     end
   end
 
@@ -905,6 +908,30 @@ describe Ruby2JS::Filter::Rails::Controller do
 
       result = to_js(source)
       _(result).must_include 'await'
+    end
+  end
+
+  describe 'AR chain with .or() strips inner awaits' do
+    it "does not individually await intermediate where() calls in a chain" do
+      source = <<~RUBY
+        class StudiosController < ApplicationController
+          def unpair
+            StudioPair.where(studio1: @studio, studio2: pair_studio)
+              .or(StudioPair.where(studio1: pair_studio, studio2: @studio))
+              .destroy_all
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # The whole chain should have ONE outer await on destroy_all
+      _(result).must_include 'await'
+      _(result).must_include '.destroy_all()'
+      # Inner where() calls should NOT be individually awaited
+      # (awaiting a Relation resolves it to Array, breaking .or())
+      _(result).wont_include 'await StudioPair.where'
+      _(result).wont_include 'await (await'
+      _(result).must_include '.or(StudioPair.where('
     end
   end
 
@@ -1048,9 +1075,11 @@ describe Ruby2JS::Filter::Rails::Controller do
 
       result = to_js(source)
       # Both action and private method should have parens on the call
-      _(result).must_include 'generate_agenda()'
-      # In generate_scores, the bare call should also have parens
-      _(result).must_include 'if (!agenda) generate_agenda()'
+      # generate_agenda receives ivar-derived locals as arguments
+      _(result).must_include 'generate_agenda(agenda)'
+      _(result).must_include 'function generate_agenda(agenda)'
+      # In generate_scores, the bare call should also have parens with args
+      _(result).must_include 'if (!agenda) generate_agenda(agenda)'
     end
   end
 
