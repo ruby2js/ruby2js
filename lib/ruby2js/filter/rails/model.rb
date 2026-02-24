@@ -145,11 +145,12 @@ module Ruby2JS
           # First pass: collect DSL declarations
           collect_model_metadata(body)
 
-          # Record metadata for cross-file filter context (test filter reads this)
-          record_model_metadata
-
           # Second pass: transform body
           transformed_body = transform_model_body(body)
+
+          # Record metadata for cross-file filter context (test filter reads this)
+          # Must happen after transform_model_body which populates instance_methods
+          record_model_metadata
 
           # Detect if extending ActiveRecord::Base directly (e.g., ApplicationRecord)
           extends_ar_base = superclass.children.last == :Base &&
@@ -371,11 +372,11 @@ module Ruby2JS
           # Collect DSL declarations from body (reuses all model collection logic)
           collect_model_metadata(body)
 
-          # Record metadata
-          record_model_metadata
-
           # Transform body (generates static properties, association methods, etc.)
           transformed_body = transform_model_body(body)
+
+          # Record metadata (after transform_model_body which populates instance_methods)
+          record_model_metadata
 
           # Build factory class
           export_class_name = class_name.children.first ?
