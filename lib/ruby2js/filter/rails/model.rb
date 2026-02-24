@@ -78,6 +78,7 @@ module Ruby2JS
           @rails_broadcasts_to = []  # broadcasts_to declarations
           @rails_attachments = []    # Active Storage attachments
           @rails_nested_attributes = []  # accepts_nested_attributes_for declarations
+          @rails_alias_attributes = []   # alias_attribute declarations
           @rails_url_helpers = false  # include Rails.application.routes.url_helpers
           @rails_primary_abstract_class = false  # primary_abstract_class declaration
           @rails_model_private_methods = {}
@@ -341,6 +342,7 @@ module Ruby2JS
           @rails_broadcasts_to = []
           @rails_attachments = []
           @rails_nested_attributes = []
+          @rails_alias_attributes = []
           @rails_url_helpers = false
           @rails_primary_abstract_class = false
           @rails_model_private_methods = {}
@@ -416,6 +418,7 @@ module Ruby2JS
           @rails_broadcasts_to = []
           @rails_attachments = []
           @rails_nested_attributes = []
+          @rails_alias_attributes = []
           @rails_url_helpers = false
           @rails_primary_abstract_class = false
           @rails_model_private_methods = {}
@@ -986,6 +989,13 @@ module Ruby2JS
               collect_enum(args)
             when :accepts_nested_attributes_for
               collect_nested_attributes(args)
+            when :alias_attribute
+              if args.length >= 2 && args[0].type == :sym && args[1].type == :sym
+                @rails_alias_attributes.push({
+                  new_name: args[0].children[0],
+                  original: args[1].children[0]
+                })
+              end
             when :primary_abstract_class
               @rails_primary_abstract_class = true
             when :include
@@ -1443,7 +1453,7 @@ module Ruby2JS
             # Skip DSL declarations (already collected)
             if child.type == :send && child.children[0].nil?
               method = child.children[1]
-              next if %i[has_many has_one belongs_to validates validates_associated scope broadcasts_to has_one_attached has_many_attached has_rich_text store enum include accepts_nested_attributes_for primary_abstract_class].include?(method)
+              next if %i[has_many has_one belongs_to validates validates_associated scope broadcasts_to has_one_attached has_many_attached has_rich_text store enum include accepts_nested_attributes_for alias_attribute primary_abstract_class].include?(method)
               next if CALLBACKS.include?(method)
             end
 
@@ -1541,6 +1551,22 @@ module Ruby2JS
           # Generate Active Storage attachment methods
           @rails_attachments.each do |attachment|
             transformed << generate_attachment_method(attachment)
+          end
+
+          # Generate alias_attribute getter/setter pairs
+          # Access via this.attributes[name] to avoid name collisions (e.g. sort)
+          @rails_alias_attributes.each do |alias_attr|
+            new_name = alias_attr[:new_name]
+            original = alias_attr[:original]
+            # get sort_order() { return this.attributes.sort; }
+            getter = s(:defget, new_name,
+              s(:args),
+              s(:autoreturn, s(:send, s(:attr, s(:self), :attributes), :[], s(:str, original.to_s))))
+            # set sort_order(value) { this.attributes.sort = value; }
+            setter = s(:def, "#{new_name}=".to_sym,
+              s(:args, s(:arg, :value)),
+              s(:send, s(:attr, s(:self), :attributes), :[]=, s(:str, original.to_s), s(:lvar, :value)))
+            transformed << s(:begin, getter, setter)
           end
 
           # Generate destroy method if any dependent: :destroy associations

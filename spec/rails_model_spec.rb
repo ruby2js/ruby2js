@@ -260,6 +260,19 @@ describe Ruby2JS::Filter::Rails::Model do
     end
   end
 
+  describe "alias_attribute" do
+    it "generates getter and setter for aliased attribute" do
+      result = to_js(<<~RUBY)
+        class Judge < ApplicationRecord
+          alias_attribute :sort_order, :sort
+        end
+      RUBY
+      assert_includes result, 'get sort_order()'
+      assert_includes result, 'this.attributes.sort'
+      assert_includes result, 'set sort_order(value)'
+    end
+  end
+
   describe "scope" do
     it "generates class method for scope" do
       result = to_js(<<~RUBY)
