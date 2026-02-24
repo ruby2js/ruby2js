@@ -144,6 +144,14 @@ export function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+/**
+ * Convert an underscored string to PascalCase (like Rails classify without singularization).
+ * "age_cost" -> "AgeCost", "cat_extensions" -> "CatExtensions"
+ */
+export function classify(str) {
+  return str.split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+}
+
 // Re-export inflector functions for convenience
 export { singularize, pluralize, underscore };
 
@@ -315,14 +323,14 @@ export function findModels(appRoot) {
 export function modelClassName(modelPath, leafCollisions) {
   const parts = modelPath.split('/');
   const leaf = parts[parts.length - 1];
-  const leafClass = leaf.split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+  const leafClass = classify(leaf);
 
   if (parts.length === 1 || !leafCollisions || !leafCollisions.has(leafClass)) {
     return leafClass;
   }
 
   // Collision: prefix with namespace segments
-  return parts.map(p => p.split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('')).join('');
+  return parts.map(p => classify(p)).join('');
 }
 
 /**
@@ -334,7 +342,7 @@ export function findLeafCollisions(models) {
   for (const m of models) {
     const parts = m.split('/');
     const leaf = parts[parts.length - 1];
-    const leafClass = leaf.split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+    const leafClass = classify(leaf);
     counts[leafClass] = (counts[leafClass] || 0) + 1;
   }
   return new Set(Object.keys(counts).filter(k => counts[k] > 1));
@@ -889,7 +897,7 @@ export function generateModelsModule(appRoot) {
   const models = findModels(appRoot).filter(m => m !== 'application_record');
   const collisions = findLeafCollisions(models);
   const imports = models.map(m => {
-    const leafClass = m.split('/').pop().split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+    const leafClass = classify(m.split('/').pop());
     const alias = modelClassName(m, collisions);
     if (alias !== leafClass) {
       return `import { ${leafClass} as ${alias} } from 'app/models/${m}.rb';`;
@@ -949,7 +957,7 @@ export function generateModelsModuleForEject(appRoot, config = {}) {
   const imports = models.map(m => {
     const actualName = getActualExportName(m);
     const alias = modelClassName(m, collisions);
-    const importName = actualName || m.split('/').pop().split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+    const importName = actualName || classify(m.split('/').pop());
     if (alias !== importName) {
       return `import { ${importName} as ${alias} } from './${m}.js';`;
     }
@@ -2090,7 +2098,7 @@ export function generateViewsModule(appRoot, resource) {
 
   // Create namespace object: ArticleViews = { index, show, new_, edit, ... }
   // Use singularized form to match controller filter (ArticleViews, not ArticlesViews)
-  const className = capitalize(singularize(resource)) + 'Views';
+  const className = classify(singularize(resource)) + 'Views';
   const members = views.map(v => v.exportName);
 
   return `${imports.join('\n')}
@@ -2141,7 +2149,7 @@ export function generateViewsModuleForEject(appRoot, resource) {
     }
   });
 
-  const className = capitalize(singularize(resource)) + 'Views';
+  const className = classify(singularize(resource)) + 'Views';
   const members = views.map(v => v.exportName);
 
   return `${imports.join('\n')}
@@ -2175,7 +2183,7 @@ export function generateTurboStreamModuleForEject(appRoot, resource) {
     `import { render as ${v.exportName}_render } from './${resource}/${v.outputFile}';`
   );
 
-  const className = capitalize(singularize(resource)) + 'TurboStreams';
+  const className = classify(singularize(resource)) + 'TurboStreams';
   const members = turboViews.map(v => `${v.exportName}: ${v.exportName}_render`);
 
   return `${imports.join('\n')}

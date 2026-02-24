@@ -45,6 +45,7 @@ import {
   DEFAULT_TARGETS,
   RESERVED,
   capitalize,
+  classify,
   singularize,
   getBuildOptions,
   findModels,
@@ -799,7 +800,7 @@ function createRubyTransformPlugin(config, appRoot) {
           : allModels;
         const collisions = findLeafCollisions(models);
         const imports = models.map(m => {
-          const leafClass = m.split('/').pop().split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+          const leafClass = classify(m.split('/').pop());
           const alias = modelClassName(m, collisions);
           if (alias !== leafClass) {
             return `import { ${leafClass} as ${alias} } from 'app/models/${m}.rb';`;

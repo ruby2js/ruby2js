@@ -84,8 +84,8 @@ module Ruby2JS
           end
 
           # Extract controller name (e.g., ArticlesController -> Article, PeopleController -> Person)
-          @rails_controller_plural = class_name.children.last.to_s.sub(/Controller$/, '').downcase
-          @rails_controller_name = Ruby2JS::Inflector.singularize(@rails_controller_plural).capitalize
+          @rails_controller_plural = Ruby2JS::Inflector.underscore(class_name.children.last.to_s.sub(/Controller$/, ''))
+          @rails_controller_name = Ruby2JS::Inflector.classify(Ruby2JS::Inflector.singularize(@rails_controller_plural))
           @rails_controller = true
           @rails_controller_const = class_name.children.last
 

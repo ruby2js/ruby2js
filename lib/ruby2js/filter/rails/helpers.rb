@@ -2378,7 +2378,7 @@ module Ruby2JS
           # Build form tag with action and method - Turbo intercepts form submissions automatically
           if model_name
             # Form with action and method using path helpers
-            plural_name = model_name + 's'  # Simple pluralization
+            plural_name = Ruby2JS::Inflector.pluralize(model_name)
             singular_path = :"#{model_name}_path"   # :article_path
             plural_path = :"#{plural_name}_path"    # :articles_path
             model_var = s(:lvar, model_name.to_sym)
