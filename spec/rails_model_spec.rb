@@ -442,7 +442,7 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'async pairs()'
       # Last expression should have return (autoreturn)
       assert_includes result, 'return'
-      assert_match(/return.*Studio\.where/, result)
+      assert result.match?(/return.*Studio\.where/)
     end
   end
 
