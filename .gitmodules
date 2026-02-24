@@ -1,0 +1,3 @@
+[submodule "test/ballroom"]
+	path = test/ballroom
+	url = https://github.com/rubys/ballroom.git
