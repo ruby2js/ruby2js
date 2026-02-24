@@ -398,6 +398,13 @@ export function assert_raises(fnOrClass, maybeFn) {
   }
 }
 
+export function assert(value, message) {
+  if (!value) {
+    throw new Error(message || `Expected truthy value, got ${JSON.stringify(value)}`);
+  }
+}
+
+globalThis.assert = assert;
 globalThis.assert_equal = assert_equal;
 globalThis.assert_includes = assert_includes;
 globalThis.refute_includes = refute_includes;
