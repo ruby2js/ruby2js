@@ -968,11 +968,6 @@ module Ruby2JS
               next
             end
 
-            # Collect public instance method names (for test filter await detection)
-            if !in_private && child.type == :def
-              @rails_model_instance_methods.push(child.children[0].to_s)
-            end
-
             next unless child.type == :send && child.children[0].nil?
 
             method_name = child.children[1]
@@ -1548,6 +1543,8 @@ module Ruby2JS
                 # Method contains AR operations — make it async.
                 # Wrap body with autoreturn since the Return filter's on_def
                 # won't fire for :async type nodes (only handles :def/:defm/:deff).
+                # Track as instance method so test filter adds await+parens
+                @rails_model_instance_methods.push(child.children[0].to_s)
                 async_body = s(:autoreturn, wrapped_body)
                 async_rewritten = rewritten.updated(nil, [
                   rewritten.children[0], rewritten.children[1], async_body
