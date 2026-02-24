@@ -403,6 +403,18 @@ class User < ApplicationRecord
 end
 ```
 
+### alias_attribute
+
+Creates a getter/setter alias for a column, useful when a column name collides with a JavaScript built-in (e.g., `sort` vs `Array.prototype.sort`):
+
+```ruby
+class Judge < ApplicationRecord
+  alias_attribute :sort_order, :sort
+end
+```
+
+The database column remains unchanged — `sort_order` reads and writes the underlying `sort` column.
+
 ## CollectionProxy
 
 Accessing a has_many association returns a `CollectionProxy` with query methods:
@@ -655,8 +667,6 @@ Juntos implements the most commonly used Active Record features. The following a
 - Subqueries
 - CTEs (Common Table Expressions)
 - Window functions
-- Scopes (named query shortcuts)
-
 ### Associations
 
 - `has_many :through` — Join models
