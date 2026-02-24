@@ -184,6 +184,21 @@ module Ruby2JS
               return new_node.updated(:await!)
             end
 
+            # Check for custom async instance methods (e.g., studio.pairs)
+            # These are model-defined methods that contain AR operations
+            if (target&.type == :lvar || target&.type == :ivar || target&.type == :attr) && model_metadata
+              # Use keys.each pattern for JS object compatibility (for...of fails on plain objects)
+              model_metadata.keys.each do |_name|
+                meta = model_metadata[_name]
+                methods = meta['instance_methods']
+                if methods && methods.include?(method.to_s)
+                  new_args = args.map { |a| self.wrap_ar_operations(a, model_refs, model_metadata) }
+                  new_node = node.updated(nil, [target, method, *new_args])
+                  return new_node.updated(:await!)
+                end
+              end
+            end
+
             # Check for chained AR instance methods (e.g., card.reload.status)
             # When an AR instance method like .reload appears as the receiver of
             # another send, wrap it with await: (await card.reload()).status
@@ -212,7 +227,9 @@ module Ruby2JS
                 # Custom methods are async and need await+parens; association getters are sync.
                 is_custom_method = false
                 if model_metadata
-                  model_metadata.each do |_name, meta| # Pragma: entries
+                  # Use keys.each pattern for JS object compatibility
+                  model_metadata.keys.each do |_name|
+                    meta = model_metadata[_name]
                     methods = meta['instance_methods']
                     if methods && methods.include?(assoc_method.to_s)
                       is_custom_method = true

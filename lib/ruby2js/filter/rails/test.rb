@@ -1225,11 +1225,20 @@ module Ruby2JS
           end
 
           # Build: response = await ControllerName.action(context(), ...)
+          # Then extract notice/alert from response into _flash
           controller_const = s(:const, nil, url_info[:controller].to_sym)
           action_call = s(:send, controller_const, action, *action_args)
           await_call = s(:send, nil, :await, action_call)
 
-          s(:lvasgn, :response, await_call)
+          assign = s(:lvasgn, :response, await_call)
+
+          # if (response?.notice) _flash.notice = response.notice
+          extract_notice = s(:if,
+            s(:jsliteral, "response?.notice"),
+            s(:send, s(:lvar, :_flash), :notice=, s(:attr, s(:lvar, :response), :notice)),
+            nil)
+
+          s(:begin, assign, extract_notice)
         end
 
         # Helper to construct a passthrough send node (won't be re-processed by on_send)

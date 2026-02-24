@@ -415,8 +415,8 @@ describe Ruby2JS::Filter::Rails::Controller do
       result = to_js(source)
       _(result).wont_include 'return return'
       # Both branches should have return
-      _(result).must_match(/return\s*\{[\s\S]*redirect:\s*heats_url/)
-      _(result).must_match(/return\s*\{[\s\S]*redirect:\s*categories_url/)
+      _(result).must_match(/return\s*\{[\s\S]*redirect:\s*heats_path\(\)/)
+      _(result).must_match(/return\s*\{[\s\S]*redirect:\s*categories_path\(\)/)
     end
 
     it "wraps standalone redirect_to with return statement" do
@@ -436,6 +436,24 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).must_match(/return\s*\{[\s\S]*redirect:/)
       # Ensure we don't have bare hash statement (semicolon followed by hash)
       _(result).wont_match(/;\s*\n\s*\{redirect:/)
+    end
+
+    it "normalizes _url helpers to _path" do
+      source = <<~RUBY
+        class StudiosController < ApplicationController
+          def unpair
+            redirect_to edit_studio_url(@studio), notice: "unpaired"
+          end
+          def destroy
+            redirect_to studios_url, status: 303
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include 'edit_studio_path'
+      _(result).must_include 'studios_path()'
+      _(result).wont_include '_url'
     end
   end
 

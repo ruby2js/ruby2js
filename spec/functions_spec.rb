@@ -847,6 +847,13 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
+  describe 'except' do
+    it "should handle except with symbol keys" do
+      to_js( 'hash.except(:a, :b)' ).
+        must_equal 'Object.fromEntries(Object.entries(hash).filter(([k]) => (!["a", "b"].includes(k))))'
+    end
+  end
+
   describe 'instance tests' do
     it "should map is_a? Boolean" do
       to_js( 'true.is_a? Boolean' ).

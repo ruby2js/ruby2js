@@ -440,6 +440,27 @@ module Ruby2JS
         elsif method == :merge!
           process S(:assign, target, *args)
 
+        elsif method == :except and args.length >= 1 and target
+          # hash.except(:a, :b) =>
+          #   Object.fromEntries(Object.entries(hash).filter(([k]) => !["a","b"].includes(k)))
+          key_strings = args.map do |arg|
+            if arg.type == :sym || arg.type == :str
+              s(:str, arg.children[0].to_s)
+            else
+              arg
+            end
+          end
+
+          process s(:send, s(:const, nil, :Object), :fromEntries,
+            s(:send,
+              s(:send, s(:const, nil, :Object), :entries, target),
+              :filter,
+              s(:block, s(:send, nil, :proc),
+                s(:args, s(:mlhs, s(:arg, :k))),
+                s(:send,
+                  s(:send, s(:array, *key_strings), :includes, s(:lvar, :k)),
+                  :!))))
+
         elsif method == :delete and args.length == 1
           if not target
             process S(:undef, args.first)

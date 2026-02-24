@@ -1160,9 +1160,13 @@ module Ruby2JS
             path = s(:send, nil, path_helper, s(:lvar, singular_name.to_sym))
           elsif target.type == :send
             # redirect_to articles_path -> articles_path()
+            # redirect_to articles_url -> articles_path() (treat _url same as _path)
+            # redirect_to edit_article_url(@article) -> edit_article_path(article)
             # Pass through to path helper (already handles base path)
-            if target.children[0].nil? && target.children[1].to_s.end_with?('_path')
-              path_helper = target.children[1]
+            helper_name = target.children[0].nil? ? target.children[1].to_s : ''
+            if helper_name.end_with?('_path') || helper_name.end_with?('_url')
+              # Normalize _url to _path
+              path_helper = helper_name.sub(/_url$/, '_path').to_sym
               @rails_path_helpers.add(path_helper)
               # Use :send! to force method call with parentheses
               # Ruby source may have no parens but JS needs them
