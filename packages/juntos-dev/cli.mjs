@@ -1431,7 +1431,18 @@ export default mergeConfig(viteConfig, defineConfig({
     writeFileSync(setupPath, `// Test setup for Vitest
 // Initializes the database before each test
 
-import { beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, afterAll } from 'vitest';
+
+// Suppress ActiveRecord CRUD logging during tests
+const _info = console.info;
+const _debug = console.debug;
+console.info = () => {};
+console.debug = () => {};
+
+afterAll(() => {
+  console.info = _info;
+  console.debug = _debug;
+});
 
 beforeAll(async () => {
   // Import models (registers them with Application and modelRegistry)

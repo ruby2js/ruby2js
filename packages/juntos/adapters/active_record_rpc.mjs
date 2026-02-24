@@ -168,7 +168,7 @@ export class ActiveRecord extends ActiveRecordBase {
     await instance._runCallbacks('after_save');
     await instance._runCallbacks('after_create_commit');
 
-    console.log(`  ${this.name} Create (id: ${instance.id})`);
+    console.info(`  ${this.name} Create (id: ${instance.id})`);
     return instance;
   }
 
@@ -401,7 +401,7 @@ export class ActiveRecord extends ActiveRecordBase {
     await rpc(`${this.constructor.name}.destroy`, [this.id]);
     this._persisted = false;
 
-    console.log(`  ${this.constructor.name} Destroy (id: ${this.id})`);
+    console.info(`  ${this.constructor.name} Destroy (id: ${this.id})`);
     await this._runCallbacks('after_destroy_commit');
     return true;
   }
@@ -432,7 +432,7 @@ export class ActiveRecord extends ActiveRecordBase {
     Object.assign(this.attributes, data);
     this._persisted = true;
 
-    console.log(`  ${this.constructor.name} Create (id: ${this.id})`);
+    console.info(`  ${this.constructor.name} Create (id: ${this.id})`);
     return true;
   }
 
@@ -444,7 +444,7 @@ export class ActiveRecord extends ActiveRecordBase {
     const data = await rpc(`${this.constructor.name}.save`, [this.id, attrs]);
     Object.assign(this.attributes, data);
 
-    console.log(`  ${this.constructor.name} Update (id: ${this.id})`);
+    console.info(`  ${this.constructor.name} Update (id: ${this.id})`);
     return true;
   }
 

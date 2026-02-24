@@ -958,7 +958,7 @@ export class ActiveRecordSQL extends ActiveRecordBase {
       [this.id]
     );
     this._persisted = false;
-    console.log(`  ${this.constructor.name} Destroy (id: ${this.id})`);
+    console.info(`  ${this.constructor.name} Destroy (id: ${this.id})`);
     if (typeof this.after_destroy === 'function') await this.after_destroy();
     await this._runCallbacks('after_destroy');
     await this._runCallbacks('after_destroy_commit');
@@ -1044,7 +1044,7 @@ export class ActiveRecordSQL extends ActiveRecordBase {
       this.attributes.id = this.id;
     }
     this._persisted = true;
-    console.log(`  ${this.constructor.name} Create (id: ${this.id})`);
+    console.info(`  ${this.constructor.name} Create (id: ${this.id})`);
     return true;
   }
 
@@ -1076,7 +1076,7 @@ export class ActiveRecordSQL extends ActiveRecordBase {
       return await this._insert();
     }
 
-    console.log(`  ${this.constructor.name} Update (id: ${this.id})`);
+    console.info(`  ${this.constructor.name} Update (id: ${this.id})`);
     return true;
   }
 
