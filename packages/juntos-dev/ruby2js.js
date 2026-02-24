@@ -12412,6 +12412,9 @@ const Ruby2JS = (() => {
       "csend",
       "call",
       "typeof",
+      "await",
+      "await!",
+      "await_attr",
       "jsraw"
     ];
 

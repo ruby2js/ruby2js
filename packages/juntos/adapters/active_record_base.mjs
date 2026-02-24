@@ -750,6 +750,12 @@ export class ActiveRecordBase {
 // Helper to define attribute accessors on a class
 export function attr_accessor(klass, ...attrs) {
   for (const attr of attrs) {
+    // Skip if the class defines a custom getter+setter pair (e.g. normalizes).
+    // Only skip when BOTH getter and setter exist and aren't from attr_accessor.
+    // belongs_to FK getters (getter-only) should still get attr_accessor treatment.
+    const existing = Object.getOwnPropertyDescriptor(klass.prototype, attr);
+    if (existing && existing.set && !existing.get?._isAttrAccessor) continue;
+
     const getter = function() { return this.attributes[attr]; };
     getter._isAttrAccessor = true;
     Object.defineProperty(klass.prototype, attr, {

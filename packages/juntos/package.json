@@ -62,7 +62,7 @@
     "url": "https://github.com/ruby2js/ruby2js"
   },
   "peerDependencies": {
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.1"
   },
   "peerDependenciesMeta": {
     "js-yaml": {
