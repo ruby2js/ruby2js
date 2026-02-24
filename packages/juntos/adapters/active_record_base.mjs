@@ -50,12 +50,14 @@ export class ActiveRecordBase {
         // Column attribute with attr_accessor - use setter (writes to this.attributes)
         this[key] = value;
       } else if (descriptor?.set) {
-        // Association setter - only call with model instances
-        // Don't copy to attributes - the setter will handle storing the FK
         if (value && typeof value === 'object' && 'id' in value && typeof value.id !== 'undefined') {
+          // Association setter - call with model instances to store FK
+          this[key] = value;
+        } else if (value == null || typeof value !== 'object') {
+          // Scalar value with setter (e.g. alias_attribute) - invoke setter
           this[key] = value;
         }
-        // If value is a plain object with _id (from DB), skip - the FK should already be set
+        // Plain objects without id (from DB reconstruction) - skip, FK should already be set
       } else {
         // Regular attribute - copy to attributes and set as property
         this.attributes[key] = value;
