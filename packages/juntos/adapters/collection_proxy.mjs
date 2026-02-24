@@ -257,3 +257,51 @@ export class CollectionProxy {
     return 'CollectionProxy';
   }
 }
+
+class _ThroughProxy {
+  constructor(owner, throughName, sourceKey, TargetModel) {
+    this._owner = owner;
+    this._throughName = throughName;  // e.g., "studio1_pairs"
+    this._sourceKey = sourceKey;      // e.g., "studio1_id"
+    this._model = TargetModel;        // e.g., Studio class
+    this._loaded = false;
+    this._records = null;
+  }
+
+  async _load() {
+    if (this._loaded) return this._records;
+    const intermediates = await this._owner[this._throughName];
+    const ids = [...new Set(
+      intermediates.map(r => r.attributes?.[this._sourceKey] ?? r[this._sourceKey])
+    )];
+    this._records = ids.length > 0 ? await this._model.where({id: ids}) : [];
+    this._loaded = true;
+    return this._records;
+  }
+
+  then(resolve, reject) {
+    return this._load().then(resolve, reject);
+  }
+
+  pluck(...cols) {
+    return this._load().then(records => {
+      if (cols.length === 1) return records.map(r => r[cols[0]]);
+      return records.map(r => cols.map(c => r[c]));
+    });
+  }
+
+  async count() { return (await this._load()).length; }
+  async first() { return (await this._load())[0] || null; }
+  async last() { const r = await this._load(); return r.length > 0 ? r[r.length - 1] : null; }
+
+  [Symbol.iterator]() { return (this._records || [])[Symbol.iterator](); }
+  map(fn) { return (this._records || []).map(fn); }
+  filter(fn) { return (this._records || []).filter(fn); }
+  get length() { return this._records?.length ?? 0; }
+  get loaded() { return this._loaded; }
+  get records() { return this._records || []; }
+}
+
+CollectionProxy.through = function(owner, throughName, sourceKey, TargetModel) {
+  return new _ThroughProxy(owner, throughName, sourceKey, TargetModel);
+};

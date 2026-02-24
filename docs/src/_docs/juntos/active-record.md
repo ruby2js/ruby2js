@@ -403,6 +403,19 @@ class User < ApplicationRecord
 end
 ```
 
+### has_many :through
+
+Declares a many-to-many relationship through a join model:
+
+```ruby
+class Studio < ApplicationRecord
+  has_many :studio1_pairs, class_name: "StudioPair", foreign_key: "studio2_id"
+  has_many :studio1s, through: :studio1_pairs, source: :studio1, class_name: "Studio"
+end
+```
+
+The `:through` option names the intermediate has_many association, `:source` identifies the foreign key on the join model (appends `_id`), and `:class_name` specifies the target model. Without `:source`, the association name is singularized (e.g., `tags` → `tag_id`).
+
 ### alias_attribute
 
 Creates a getter/setter alias for a column, useful when a column name collides with a JavaScript built-in (e.g., `sort` vs `Array.prototype.sort`):
@@ -669,7 +682,6 @@ Juntos implements the most commonly used Active Record features. The following a
 - Window functions
 ### Associations
 
-- `has_many :through` — Join models
 - `has_and_belongs_to_many` — Many-to-many without join model
 - Polymorphic associations
 

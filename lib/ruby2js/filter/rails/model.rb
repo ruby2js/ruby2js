@@ -1574,7 +1574,7 @@ module Ruby2JS
           # Generate static associations metadata for eager loading
           # Also generate when factory concern or model includes concerns (for spread composition)
           if @rails_associations.any? || @is_factory_concern || @has_concern_includes
-            assoc_pairs = @rails_associations.map do |assoc|
+            assoc_pairs = @rails_associations.reject { |a| a[:options][:through] }.map do |assoc|
               # Derive class name from association name or options[:class_name]
               # For has_many, singularize and capitalize: comments -> Comment
               # For belongs_to, just capitalize: article -> Article
@@ -1747,7 +1747,11 @@ module Ruby2JS
         def generate_association_method(assoc)
           case assoc[:type]
           when :has_many
-            generate_has_many_method(assoc)
+            if assoc[:options][:through]
+              generate_has_many_through_method(assoc)
+            else
+              generate_has_many_method(assoc)
+            end
           when :has_one
             generate_has_one_method(assoc)
           when :belongs_to
@@ -1779,6 +1783,54 @@ module Ruby2JS
                   s(:self),
                   s(:str, name.to_s))))
           end
+        end
+
+        def generate_has_many_through_method(assoc)
+          # has_many :studio1s, through: :studio1_pairs, source: :studio1
+          # -> get studio1s() { return CollectionProxy.through(this, "studio1_pairs", "studio1_id", modelRegistry["Studio"]); }
+          association_name = assoc[:name]
+          cache_name = "_#{association_name}".to_sym
+
+          through_name = assoc[:options][:through].to_s
+          # source_key: derive from :source option + "_id", or singularize assoc name + "_id"
+          source = assoc[:options][:source]
+          source_key = source ? "#{source}_id" : "#{Ruby2JS::Inflector.singularize(association_name.to_s)}_id"
+
+          # class_name: from option, or classify the source/association name
+          class_name = (assoc[:options][:class_name] || '').split('::').last || ''
+          if class_name.empty?
+            base = source ? source.to_s : Ruby2JS::Inflector.singularize(association_name.to_s)
+            class_name = Ruby2JS::Inflector.classify(base)
+          end
+
+          model_ref = s(:send, s(:lvar, :modelRegistry), :[], s(:str, class_name))
+
+          # CollectionProxy.through(this, "studio1_pairs", "studio1_id", modelRegistry["Studio"])
+          through_call = s(:send,
+            s(:const, nil, :CollectionProxy),
+            :through,
+            s(:self),
+            s(:str, through_name),
+            s(:str, source_key),
+            model_ref)
+
+          # Getter: cache and return
+          getter = s(:defget, association_name,
+            s(:args),
+            s(:begin,
+              s(:if,
+                s(:attr, s(:self), cache_name),
+                s(:return, s(:attr, s(:self), cache_name)),
+                nil),
+              s(:return, s(:send, s(:self), "#{cache_name}=".to_sym, through_call))))
+
+          # Setter: allows preloading
+          setter_name = "#{association_name}=".to_sym
+          setter = s(:def, setter_name,
+            s(:args, s(:arg, :value)),
+            s(:send, s(:self), "#{cache_name}=".to_sym, s(:lvar, :value)))
+
+          s(:begin, getter, setter)
         end
 
         def generate_has_many_method(assoc)

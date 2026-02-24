@@ -73,7 +73,7 @@ export class Article extends ApplicationRecord {
 ```
 
 **Supported association options:**
-- `has_many` — `:class_name`, `:foreign_key`, `:dependent`
+- `has_many` — `:class_name`, `:foreign_key`, `:dependent`, `:through`, `:source`
 - `belongs_to` — `:class_name`, `:foreign_key`, `:optional`
 - `has_one` — `:class_name`, `:foreign_key`
 

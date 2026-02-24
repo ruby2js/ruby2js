@@ -170,6 +170,45 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'set comments(value)'
       assert_includes result, 'this._comments = value'
     end
+
+    it "handles has_many through" do
+      result = to_js(<<~RUBY)
+        class Studio < ApplicationRecord
+          has_many :studio1_pairs, class_name: "StudioPair", foreign_key: "studio2_id"
+          has_many :studio1s, through: :studio1_pairs, source: :studio1, class_name: "Studio"
+        end
+      RUBY
+      assert_includes result, 'get studio1s()'
+      assert_includes result, 'CollectionProxy.through('
+      assert_includes result, '"studio1_pairs"'
+      assert_includes result, '"studio1_id"'
+      assert_includes result, 'modelRegistry.Studio'
+    end
+
+    it "handles has_many through without source" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          has_many :taggings
+          has_many :tags, through: :taggings
+        end
+      RUBY
+      assert_includes result, 'get tags()'
+      assert_includes result, 'CollectionProxy.through('
+      assert_includes result, '"taggings"'
+      assert_includes result, '"tag_id"'
+      assert_includes result, 'modelRegistry.Tag'
+    end
+
+    it "excludes through associations from static associations metadata" do
+      result = to_js(<<~RUBY)
+        class Studio < ApplicationRecord
+          has_many :studio1_pairs, class_name: "StudioPair", foreign_key: "studio2_id"
+          has_many :studio1s, through: :studio1_pairs, source: :studio1, class_name: "Studio"
+        end
+      RUBY
+      assert_includes result, 'studio1_pairs:'
+      refute_includes result, 'studio1s:'
+    end
   end
 
   describe "belongs_to" do
