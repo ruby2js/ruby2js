@@ -426,7 +426,7 @@ export class Application extends ApplicationServer {
         continue;
       }
 
-      console.log(`Running migration ${migration.version}...`);
+      console.debug(`Running migration ${migration.version}...`);
       try {
         await migration.up(adapter);
         await adapter.execute('INSERT INTO schema_migrations (version) VALUES (?)', [migration.version]);
@@ -438,7 +438,7 @@ export class Application extends ApplicationServer {
     }
 
     if (ran > 0) {
-      console.log(`Ran ${ran} migration(s)`);
+      console.debug(`Ran ${ran} migration(s)`);
     }
 
     return { ran, wasFresh };

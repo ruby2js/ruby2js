@@ -215,7 +215,7 @@ export class ApplicationBase {
         continue;
       }
 
-      console.log(`Running migration ${migration.version}...`);
+      console.debug(`Running migration ${migration.version}...`);
       try {
         await migration.up(adapter);
         // Record that this migration ran
@@ -228,7 +228,7 @@ export class ApplicationBase {
     }
 
     if (ran > 0) {
-      console.log(`Ran ${ran} migration(s)`);
+      console.debug(`Ran ${ran} migration(s)`);
     }
 
     return { ran, wasFresh };
