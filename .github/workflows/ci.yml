@@ -353,6 +353,40 @@ jobs:
       - name: Run selfhost CI tests
         run: bundle exec rake -f demo/selfhost/Rakefile ci
 
+  ballroom-test:
+    needs: [build-tarballs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          name: tarballs
+          path: artifacts/tarballs
+
+      - name: Install dependencies and initialize
+        run: |
+          cd test/ballroom
+          npm install \
+            ../../artifacts/tarballs/ruby2js-beta.tgz \
+            ../../artifacts/tarballs/juntos-beta.tgz \
+            ../../artifacts/tarballs/juntos-dev-beta.tgz \
+            ../../artifacts/tarballs/vite-plugin-ruby2js-beta.tgz
+          npx juntos init --no-install
+
+      - name: Run Juntos tests
+        run: |
+          cd test/ballroom
+          npx juntos test
+
   smoke-test-blog:
     needs: [build-tarballs, create-blog]
     runs-on: ubuntu-latest
