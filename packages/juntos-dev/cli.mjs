@@ -1028,6 +1028,12 @@ async function transpileTestFiles(appRoot, config) {
         const result = await transformRuby(source, join(modelTestDir, file), 'test', config, appRoot, metadata);
         let code = result.code;
 
+        // Skip empty test suites (no test() calls)
+        if (!/\btest\s*\(/.test(code)) {
+          if (existsSync(outPath)) unlinkSync(outPath);
+          continue;
+        }
+
         writeFileSync(outPath, code);
         count++;
       } catch (err) {
@@ -1058,6 +1064,12 @@ async function transpileTestFiles(appRoot, config) {
         }
         const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, appRoot, metadata);
         let code = result.code;
+
+        // Skip empty test suites (no test() calls)
+        if (!/\btest\s*\(/.test(code)) {
+          if (existsSync(outPath)) unlinkSync(outPath);
+          continue;
+        }
 
         writeFileSync(outPath, code);
         count++;
