@@ -50,6 +50,7 @@
 #   end
 
 require 'ruby2js'
+require 'ruby2js/inflector'
 require_relative 'active_record'
 
 module Ruby2JS
@@ -68,6 +69,7 @@ module Ruby2JS
           @rails_test_checked = false
           @rails_test_describe_depth = 0
           @rails_test_integration = false
+          @rails_test_class_controller = nil
           @rails_test_response_var = false
           @rails_test_current_handled = false
         end
@@ -92,6 +94,7 @@ module Ruby2JS
           begin
             @rails_test_describe_depth += 1
             @rails_test_integration = is_integration
+            @rails_test_class_controller = describe_name if is_integration && describe_name.end_with?('Controller')
             @rails_test_current_handled = false
 
             # Collect model references from the body and shared metadata
@@ -1010,21 +1013,30 @@ module Ruby2JS
           end
 
           # Fall back to heuristic parsing when no metadata available
-          # Determine if the resource name is plural or singular
-          if name.end_with?('s') && name.length > 1
+          # Use inflector for proper pluralization
+          pluralized = Ruby2JS::Inflector.pluralize(name)
+          singularized = Ruby2JS::Inflector.singularize(name)
+          if name == pluralized || name != singularized
             is_plural = true
             controller_base = name
           else
             is_plural = false
-            controller_base = name + 's'
+            controller_base = pluralized
           end
+
+          # Check if the full compound name matches the class-derived controller.
+          # If so, the entire name is the resource (e.g., age_costs -> AgeCostsController),
+          # not a nested/prefixed route (e.g., action "age" on CostsController).
+          full_controller = Ruby2JS::Inflector.classify(controller_base) + 'Controller'
+          use_full_name = @rails_test_class_controller == full_controller
 
           # Detect prefix_resource pattern (custom action or nested resource)
           # e.g., redo_heats, book_heats, person_payments, person_payment
           # Also handles new_person_payment, edit_person_payment (prefix already stripped)
           # Parse both interpretations; disambiguate later using arg count.
+          # Skip splitting when the full name matches the test class controller.
           action_or_parent = nil
-          if name.include?('_')
+          if name.include?('_') && !use_full_name
             parts = name.split('_')
             # Try splitting from the right: find the longest resource suffix
             (parts.length - 1).downto(1) do |i|
@@ -1035,19 +1047,21 @@ module Ruby2JS
               # Resource must be a plausible name (at least 2 chars)
               if resource_candidate.length > 1
                 action_or_parent = prefix_candidate
-                if resource_candidate.end_with?('s')
+                rc_plural = Ruby2JS::Inflector.pluralize(resource_candidate)
+                rc_singular = Ruby2JS::Inflector.singularize(resource_candidate)
+                if resource_candidate == rc_plural || resource_candidate != rc_singular
                   is_plural = true
                   controller_base = resource_candidate
                 else
                   is_plural = false
-                  controller_base = resource_candidate + 's'
+                  controller_base = rc_plural
                 end
                 break
               end
             end
           end
 
-          controller_name = controller_base.split('_').map(&:capitalize).join
+          controller_name = Ruby2JS::Inflector.classify(controller_base)
 
           { controller: "#{controller_name}Controller",
             base: controller_base,
