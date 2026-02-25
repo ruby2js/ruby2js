@@ -204,91 +204,79 @@ class ChatController < Stimulus::Controller
 end
 CONTROLLER
 
-# Create integration test for messages (demo-specific)
-cat > test/messages.test.mjs << 'TEST'
-import { describe, it, expect } from 'vitest';
+# Update fixtures with valid data
+cat > test/fixtures/messages.yml << 'FIXTURES'
+one:
+  username: Alice
+  body: Hey everyone! Welcome to the chat room.
 
-describe('Message Model', () => {
-  it('creates a message with valid attributes', async () => {
-    const { Message } = await import('juntos:models');
+two:
+  username: Bob
+  body: Hi Alice! This is pretty cool.
+FIXTURES
 
-    const message = await Message.create({
-      username: 'TestUser',
-      body: 'Hello, world!'
-    });
+# Model tests
+cat > test/models/message_test.rb << 'TEST'
+require "test_helper"
 
-    expect(message.id).toBeDefined();
-    expect(message.username).toBe('TestUser');
-    expect(message.body).toBe('Hello, world!');
-  });
+class MessageTest < ActiveSupport::TestCase
+  test "creates a message with valid attributes" do
+    message = messages(:one)
+    assert_not_nil message.id
+    assert_equal "Alice", message.username
+  end
 
-  it('validates username presence', async () => {
-    const { Message } = await import('juntos:models');
+  test "validates username presence" do
+    message = Message.new(username: "", body: "Valid body")
+    assert_not message.save
+  end
 
-    const message = new Message({ username: '', body: 'Valid body' });
-    const saved = await message.save();
+  test "validates body presence" do
+    message = Message.new(username: "TestUser", body: "")
+    assert_not message.save
+  end
+end
+TEST
 
-    expect(saved).toBe(false);
-    expect(message.errors.username).toBeDefined();
-  });
+# Controller tests
+cat > test/controllers/messages_controller_test.rb << 'TEST'
+require "test_helper"
 
-  it('validates body presence', async () => {
-    const { Message } = await import('juntos:models');
+class MessagesControllerTest < ActionDispatch::IntegrationTest
+  setup do
+    @message = messages(:one)
+  end
 
-    const message = new Message({ username: 'TestUser', body: '' });
-    const saved = await message.save();
+  test "should get index" do
+    get messages_url
+    assert_response :success
+    assert_select "h1", "Chat Room"
+    assert_select "#messages" do
+      assert_select "div", minimum: 1
+    end
+  end
 
-    expect(saved).toBe(false);
-    expect(message.errors.body).toBeDefined();
-  });
-});
+  test "should create message" do
+    assert_difference("Message.count") do
+      post messages_url, params: { message: { username: "Carol", body: "Hello!" } }
+    end
+    assert_redirected_to messages_path
+  end
 
-describe('MessagesController', () => {
-  it('index action returns list', async () => {
-    const { Message } = await import('juntos:models');
-    const { MessagesController } = await import('../app/controllers/messages_controller.rb');
+  test "should not create message with invalid params" do
+    assert_no_difference("Message.count") do
+      post messages_url, params: { message: { username: "", body: "" } }
+    end
+    assert_redirected_to messages_path
+  end
 
-    await Message.create({ username: 'Alice', body: 'Hello everyone!' });
-
-    const context = {
-      params: {},
-      flash: { get: () => '', consumeNotice: () => ({ present: false }), consumeAlert: () => '' },
-      contentFor: {}
-    };
-
-    const html = await MessagesController.index(context);
-    expect(html).toContain('Alice');
-    expect(html).toContain('Hello everyone!');
-  });
-
-  it('create action adds a new message', async () => {
-    const { Message } = await import('juntos:models');
-    const { MessagesController } = await import('../app/controllers/messages_controller.rb');
-
-    const context = {
-      params: {},
-      flash: { set: () => {} },
-      contentFor: {},
-      request: { headers: { get: () => 'text/html' } }
-    };
-
-    const params = {
-      message: {
-        username: 'Bob',
-        body: 'New message from controller'
-      }
-    };
-
-    const result = await MessagesController.create(context, params);
-
-    // Should return redirect after successful create
-    expect(result.redirect).toBeDefined();
-
-    const messages = await Message.all();
-    expect(messages.length).toBe(1);
-    expect(messages[0].username).toBe('Bob');
-  });
-});
+  test "should destroy message" do
+    assert_difference("Message.count", -1) do
+      delete message_url(@message)
+    end
+    assert_redirected_to messages_path
+  end
+end
 TEST
 
 echo ""

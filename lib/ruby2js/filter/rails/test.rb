@@ -1353,6 +1353,12 @@ module Ruby2JS
 
           url_node = process(args.first)
 
+          # Force parens on zero-arg path helpers so String(messages_path())
+          # doesn't become String(messages_path) (function reference)
+          if url_node.type == :send && url_node.children[0].nil? && url_node.children.length == 2
+            url_node = s(:send!, *url_node.children)
+          end
+
           # expect(String(response.redirect)).toBe(String(url))
           s(:send,
             s(:send, nil, :expect, s(:send!, nil, :String, s(:attr, s(:lvar, :response), :redirect))),

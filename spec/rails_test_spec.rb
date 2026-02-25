@@ -727,6 +727,18 @@ describe Ruby2JS::Filter::Rails::Test do
       RUBY
       assert_includes result, 'expect(String(response.redirect)).toBe(String(articles_path()))'
     end
+
+    it "converts assert_redirected_to with direct _path helper (zero args)" do
+      result = to_controller_js(<<~RUBY)
+        class MessagesControllerTest < ActionDispatch::IntegrationTest
+          test "redirect" do
+            post messages_url, params: { message: { username: "Bob", body: "Hi" } }
+            assert_redirected_to messages_path
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(String(response.redirect)).toBe(String(messages_path()))'
+    end
   end
 
   describe "URL to path helper conversion" do
