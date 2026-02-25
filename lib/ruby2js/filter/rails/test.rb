@@ -74,6 +74,8 @@ module Ruby2JS
           @rails_test_current_handled = false
           @rails_test_assert_select_scope = nil
           @rails_test_has_assert_select = false
+          @rails_test_stimulus_controllers = []
+          @rails_test_has_stimulus = false
         end
 
         # Handle class-based test definitions
@@ -127,6 +129,14 @@ module Ruby2JS
 
             extra_nodes = fixture_nodes
             extra_nodes.push(current_standalone) if current_standalone
+
+            if @rails_test_has_stimulus
+              extra_nodes.push(s(:lvasgn, :_stimulusApp))
+              extra_nodes.push(s(:jsraw,
+                'afterEach(() => { if (_stimulusApp) {' \
+                ' _stimulusApp.stop(); _stimulusApp = undefined }' \
+                ' document.body.innerHTML = "" })'))
+            end
 
             if extra_nodes.length > 0
               if transformed_body && transformed_body.type == :begin
@@ -203,6 +213,11 @@ module Ruby2JS
                 return transform_assert_select(args)
               end
 
+              # connect_stimulus "identifier", ControllerClass
+              if target.nil? && method == :connect_stimulus && args.length == 2
+                return transform_connect_stimulus(args)
+              end
+
               # URL helper -> path helper (standalone, e.g. in assert_redirected_to context)
               if target.nil? && method.to_s.end_with?('_url') && ![:get, :post, :patch, :put, :delete].include?(method)
                 return transform_url_to_path(method, args)
@@ -218,6 +233,19 @@ module Ruby2JS
 
               # Instance variables -> local variables
               # (handled via on_ivar/on_ivasgn below)
+            end
+
+            # skip -> return (for skip unless defined? Document)
+            if target.nil? && method == :skip
+              return s(:return)
+            end
+
+            # await_mutations -> await setTimeout promise
+            if target.nil? && method == :await_mutations && args.empty?
+              return s(:send, nil, :await,
+                s(:send, s(:const, nil, :Promise), :new,
+                  s(:block, s(:send, nil, :lambda), s(:args, s(:arg, :resolve)),
+                    s(:send, nil, :setTimeout, s(:lvar, :resolve), s(:int, 0)))))
             end
 
             result = transform_assertion(target, method, args)
@@ -541,6 +569,7 @@ module Ruby2JS
             # Controller imports: import { CardsController } from '../../../app/controllers/cards_controller.js'
             if meta['controller_files']
               @rails_test_controllers.each do |name|
+                next if @rails_test_stimulus_controllers.include?(name)
                 ctrl_file = nil
                 meta['controller_files'].each do |cname, cfile| # Pragma: entries
                   ctrl_file = cfile if cname == name
@@ -550,6 +579,13 @@ module Ruby2JS
                     [s(:const, nil, name.to_sym)]))
                 end
               end
+            end
+
+            # Stimulus controller imports: import ChatController from '../../../app/javascript/controllers/chat_controller.js'
+            @rails_test_stimulus_controllers.each do |name|
+              stim_file = name.gsub(/([A-Z])/) { |m| '_' + m.downcase }.sub(/^_/, '') + '.js'
+              imports.push(s(:import, [prefix + 'app/javascript/controllers/' + stim_file],
+                s(:const, nil, name.to_sym)))
             end
 
             # Path helper imports: import { cards_path, ... } from '../../../config/paths.js'
@@ -579,6 +615,7 @@ module Ruby2JS
             end
 
             @rails_test_controllers.each do |name|
+              next if @rails_test_stimulus_controllers.include?(name)
               # Controllers import from .rb paths (Vite transforms them).
               # Prefer metadata when available; fall back to regex derivation.
               ctrl_file = nil
@@ -594,6 +631,13 @@ module Ruby2JS
               end
               imports.push(s(:import, ['../../app/controllers/' + ctrl_rb],
                 [s(:const, nil, name.to_sym)]))
+            end
+
+            # Stimulus controller imports: import ChatController from '../../app/javascript/controllers/chat_controller.rb'
+            @rails_test_stimulus_controllers.each do |name|
+              stim_file = name.gsub(/([A-Z])/) { |m| '_' + m.downcase }.sub(/^_/, '') + '.rb'
+              imports.push(s(:import, ['../../app/javascript/controllers/' + stim_file],
+                s(:const, nil, name.to_sym)))
             end
 
             if @rails_test_path_helpers.length > 0
@@ -1363,6 +1407,58 @@ module Ruby2JS
           s(:send,
             s(:send, nil, :expect, s(:send!, nil, :String, s(:attr, s(:lvar, :response), :redirect))),
             :toBe, s(:send!, nil, :String, url_node))
+        end
+
+        # Transform connect_stimulus "identifier", ControllerClass
+        # Emits: document.body.innerHTML = response
+        #        _stimulusApp = Application.start()
+        #        _stimulusApp.register("identifier", ControllerClass)
+        #        await new Promise(resolve => setTimeout(resolve, 0))
+        def transform_connect_stimulus(args)
+          identifier = args[0].children.first  # string value
+          controller_const = args[1]            # :const node
+          controller_name = controller_const.children.last.to_s
+
+          # Track this as a stimulus controller (not a Rails controller)
+          unless @rails_test_stimulus_controllers.include?(controller_name)
+            @rails_test_stimulus_controllers << controller_name
+          end
+
+          # Emit @vitest-environment jsdom directive once per file
+          unless @rails_test_has_assert_select
+            @rails_test_has_assert_select = true
+            self.prepend_list << s(:jsraw, '// @vitest-environment jsdom')
+          end
+
+          # Emit import { Application } from "@hotwired/stimulus" once
+          unless @rails_test_has_stimulus
+            self.prepend_list << s(:import, ['@hotwired/stimulus'],
+              [s(:const, nil, :Application)])
+          end
+
+          @rails_test_has_stimulus = true
+
+          # Build four statements:
+          # 1. document.body.innerHTML = response
+          innerHTML_assign = s(:send,
+            s(:attr, s(:lvar, :document), :body),
+            :innerHTML=, s(:lvar, :response))
+
+          # 2. _stimulusApp = Application.start()
+          app_start = s(:lvasgn, :_stimulusApp,
+            s(:send, s(:const, nil, :Application), :start))
+
+          # 3. _stimulusApp.register("identifier", ControllerClass)
+          app_register = s(:send, s(:lvar, :_stimulusApp), :register,
+            s(:str, identifier), s(:const, nil, controller_name.to_sym))
+
+          # 4. await new Promise(resolve => setTimeout(resolve, 0))
+          await_mutation = s(:send, nil, :await,
+            s(:send, s(:const, nil, :Promise), :new,
+              s(:block, s(:send, nil, :lambda), s(:args, s(:arg, :resolve)),
+                s(:send, nil, :setTimeout, s(:lvar, :resolve), s(:int, 0)))))
+
+          s(:begin, innerHTML_assign, app_start, app_register, await_mutation)
         end
 
         # Transform assert_select (non-block forms)

@@ -1399,4 +1399,170 @@ describe Ruby2JS::Filter::Rails::Test do
       assert_includes result, 'Heat.count()'
     end
   end
+
+  describe "stimulus controller testing" do
+    def to_stimulus_js(string, metadata = {})
+      Ruby2JS.convert(string, {
+        filters: [Ruby2JS::Filter::Rails::Test],
+        eslevel: 2020,
+        file: 'test/controllers/messages_controller_test.rb',
+        metadata: { 'import_mode' => 'virtual' }.merge(metadata)
+      }).to_s
+    end
+
+    it "converts bare skip to return" do
+      result = to_controller_js(<<~RUBY)
+        class MessagesControllerTest < ActionDispatch::IntegrationTest
+          test "skippable" do
+            skip
+            get messages_url
+          end
+        end
+      RUBY
+      assert_includes result, 'return'
+    end
+
+    it "converts skip unless defined? Document to conditional return" do
+      result = to_controller_js(<<~RUBY)
+        class MessagesControllerTest < ActionDispatch::IntegrationTest
+          test "browser only" do
+            skip unless defined? Document
+            get messages_url
+          end
+        end
+      RUBY
+      assert_includes result, 'typeof Document'
+      assert_includes result, 'return'
+    end
+
+    it "converts connect_stimulus to innerHTML, Application.start, register, await" do
+      result = to_stimulus_js(<<~RUBY)
+        class MessagesControllerTest < ActionDispatch::IntegrationTest
+          test "stimulus" do
+            get messages_url
+            connect_stimulus "chat", ChatController
+          end
+        end
+      RUBY
+      assert_includes result, 'document.body.innerHTML = response'
+      assert_includes result, 'Application.start()'
+      assert_includes result, '_stimulusApp = Application.start()'
+      assert_includes result, '_stimulusApp.register("chat", ChatController)'
+      assert_includes result, 'await new Promise'
+      assert_includes result, 'setTimeout(resolve, 0)'
+    end
+
+    it "emits jsdom directive before describe" do
+      result = to_stimulus_js(<<~RUBY)
+        class MessagesControllerTest < ActionDispatch::IntegrationTest
+          test "stimulus" do
+            get messages_url
+            connect_stimulus "chat", ChatController
+          end
+        end
+      RUBY
+      assert_includes result, '// @vitest-environment jsdom'
+      # jsdom directive should appear before the describe
+      jsdom_pos = result.index('// @vitest-environment jsdom')
+      describe_pos = result.index('describe(')
+      assert jsdom_pos < describe_pos, "jsdom directive should precede describe"
+    end
+
+    it "imports Application from @hotwired/stimulus" do
+      result = to_stimulus_js(<<~RUBY)
+        class MessagesControllerTest < ActionDispatch::IntegrationTest
+          test "stimulus" do
+            get messages_url
+            connect_stimulus "chat", ChatController
+          end
+        end
+      RUBY
+      assert_includes result, 'import { Application } from "@hotwired/stimulus"'
+    end
+
+    it "imports stimulus controller as default import" do
+      result = to_stimulus_js(<<~RUBY)
+        class MessagesControllerTest < ActionDispatch::IntegrationTest
+          test "stimulus" do
+            get messages_url
+            connect_stimulus "chat", ChatController
+          end
+        end
+      RUBY
+      # Default import (no braces)
+      assert_includes result, 'import ChatController from'
+      assert_includes result, 'controllers/chat_controller.rb'
+      # Should NOT be a named import
+      refute_includes result, '{ChatController}'
+    end
+
+    it "does not include stimulus controller in Rails controller imports" do
+      result = to_stimulus_js(<<~RUBY)
+        class MessagesControllerTest < ActionDispatch::IntegrationTest
+          test "stimulus" do
+            get messages_url
+            connect_stimulus "chat", ChatController
+          end
+        end
+      RUBY
+      # Should not import ChatController from app/controllers/
+      refute_includes result, 'app/controllers/chat_controller'
+    end
+
+    it "emits afterEach cleanup with _stimulusApp.stop()" do
+      result = to_stimulus_js(<<~RUBY)
+        class MessagesControllerTest < ActionDispatch::IntegrationTest
+          test "stimulus" do
+            get messages_url
+            connect_stimulus "chat", ChatController
+          end
+        end
+      RUBY
+      assert_includes result, 'let _stimulusApp'
+      assert_includes result, 'afterEach('
+      assert_includes result, '_stimulusApp.stop()'
+      assert_includes result, 'document.body.innerHTML = ""'
+    end
+
+    it "converts await_mutations to setTimeout promise" do
+      result = to_controller_js(<<~RUBY)
+        class MessagesControllerTest < ActionDispatch::IntegrationTest
+          test "mutations" do
+            await_mutations
+          end
+        end
+      RUBY
+      assert_includes result, 'await new Promise'
+      assert_includes result, 'setTimeout(resolve, 0)'
+    end
+
+    it "transpiles a full stimulus test with DOM interaction" do
+      result = to_stimulus_js(<<~RUBY)
+        class MessagesControllerTest < ActionDispatch::IntegrationTest
+          test "clears input after form submission" do
+            skip unless defined? Document
+            get messages_url
+            connect_stimulus "chat", ChatController
+
+            body_input = document.querySelector("[data-chat-target='body']")
+            body_input.value = "Hello!"
+            form = document.querySelector("form")
+            form.dispatchEvent(Event.new("turbo:submit-end", bubbles: true))
+
+            assert_equal "", body_input.value
+          end
+        end
+      RUBY
+      # Should have conditional skip
+      assert_includes result, 'typeof Document'
+      # Should have DOM interaction
+      assert_includes result, 'document.querySelector'
+      assert_includes result, 'body_input.value = "Hello!"'
+      assert_includes result, 'new Event("turbo:submit-end"'
+      # Should have assertion
+      assert_includes result, 'expect(body_input.value).toBe("")'
+      # Should have stimulus setup
+      assert_includes result, '_stimulusApp = Application.start()'
+    end
+  end
 end
