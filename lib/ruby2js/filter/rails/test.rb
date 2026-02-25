@@ -1495,14 +1495,15 @@ module Ruby2JS
         # Build selector node, handling ? substitution
         def build_selector_node(selector_node, sub_arg)
           if sub_arg
-            # Replace ? with interpolated value: `a[href="${expr}"]`
+            # Replace ? with interpolated value wrapped in CSS quotes: `a[href="${expr}"]`
+            # Quotes are needed because substituted values may contain special CSS
+            # characters like [] (e.g. input[name="article[title]"])
             selector_str = selector_node.children.first
             parts = selector_str.split('?', 2)
-            # Build dstr: "before" + expr + "after"
             children = []
-            children << s(:str, parts[0]) unless parts[0].empty?
+            children << s(:str, parts[0] + '"')
             children << s(:begin, process(sub_arg))
-            children << s(:str, parts[1]) unless parts[1].empty?
+            children << s(:str, '"' + parts[1])
             s(:dstr, *children)
           else
             process(selector_node)

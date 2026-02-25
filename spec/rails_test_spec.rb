@@ -990,7 +990,7 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'querySelectorAll(`a[href=${foo_path(foo)}]`'
+      assert_includes result, 'querySelectorAll(`a[href="${foo_path(foo)}"]`'
     end
 
     it "converts block form with scoping" do
