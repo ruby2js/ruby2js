@@ -867,6 +867,21 @@ describe Ruby2JS::Filter::Rails::Test do
       assert_includes result, 'expect(document.body.querySelector("h1").textContent).toMatch(/Welcome/)'
     end
 
+    it "converts text match with dynamic expression" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          setup do
+            @article = articles(:one)
+          end
+          test "show" do
+            get foo_url(@article)
+            assert_select "h1", @article.title
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.body.querySelector("h1").textContent).toContain(article.title)'
+    end
+
     it "converts non-existence check with false" do
       result = to_controller_js(<<~RUBY)
         class FooControllerTest < ActionDispatch::IntegrationTest

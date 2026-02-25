@@ -1420,6 +1420,11 @@ module Ruby2JS
             # assert_select "h1", count: 3, text: "Hi"
             checks = build_hash_checks(base, sel_node, second)
             return innerHTML_node ? s(:begin, innerHTML_node, *checks) : (checks.length == 1 ? checks.first : s(:begin, *checks))
+
+          else
+            # assert_select "h1", @article.title -> dynamic text content check
+            checks = [build_text_check(base, sel_node, :toContain, process(second))]
+            return innerHTML_node ? s(:begin, innerHTML_node, *checks) : checks.first
           end
 
           nil
