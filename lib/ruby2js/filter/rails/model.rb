@@ -493,6 +493,7 @@ module Ruby2JS
           return super unless @rails_model
 
           @inside_class_method = true
+
           result = super
           @inside_class_method = false
           result
@@ -1554,6 +1555,22 @@ module Ruby2JS
               else
                 transformed << process(rewritten)
               end
+            elsif child.type == :defs && !in_private
+              # Class method (def self.xxx) — check for AR operations
+              _self_node, method_name, defs_args, defs_body = child.children
+              if defs_body && defs_body.respond_to?(:type)
+                defs_metadata = @options ? @options[:metadata] : nil
+                defs_models = defs_metadata ? defs_metadata[:models] : nil
+                defs_model_refs = defs_models ? defs_models.keys : [@rails_model_name.to_s]
+                wrapped_defs_body = wrap_model_ar_operations(defs_body, defs_model_refs)
+                if model_body_needs_async?(wrapped_defs_body)
+                  async_body = s(:autoreturn, wrapped_defs_body)
+                  async_node = child.updated(:asyncs, [s(:self), method_name, defs_args, async_body])
+                  transformed << process(async_node)
+                  next
+                end
+              end
+              transformed << process(child)
             elsif !in_private && child.type != :def
               # Pass through other class-level code
               transformed << process(child)
@@ -2200,7 +2217,7 @@ module Ruby2JS
             # Check for Model.class_method (e.g., Studio.where(...))
             if target.respond_to?(:type) && target.type == :const && target.children[0].nil?
               const_name = target.children[1].to_s
-              ar_class_methods = %i[all find find_by find_by! where first last count create create! order distinct pluck ids exists? destroy_all delete_all update_all find_or_create_by]
+              ar_class_methods = %i[all find find_by find_by! where first last sole count create create! order distinct pluck ids exists? destroy_all delete_all update_all find_or_create_by]
               if model_refs.include?(const_name) && ar_class_methods.include?(method)
                 new_args = args.map { |a| a.respond_to?(:type) ? wrap_model_ar_operations(a, model_refs) : a }
                 new_node = node.updated(nil, [target, method, *new_args])
@@ -2210,7 +2227,7 @@ module Ruby2JS
 
             # Check for chained class methods (e.g., Studio.where(...).first)
             if target.respond_to?(:type) && target.type == :send
-              ar_class_methods = %i[all find find_by where first last count order distinct pluck ids destroy_all delete_all update_all]
+              ar_class_methods = %i[all find find_by where first last sole count order distinct pluck ids destroy_all delete_all update_all]
               if ar_class_methods.include?(method)
                 chain_start = target
                 while chain_start.respond_to?(:type) && chain_start.type == :send

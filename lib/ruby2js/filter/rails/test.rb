@@ -999,13 +999,25 @@ module Ruby2JS
             name = name.sub(/^edit_/, '')
           end
 
+          # Handle root_url/root_path: use the test class controller
+          if name == 'root' && @rails_test_class_controller
+            return {
+              controller: @rails_test_class_controller,
+              base: @rails_test_class_controller.sub(/Controller$/, '').downcase,
+              singular: false,
+              prefix: nil,
+              action_or_parent: nil,
+              action: 'root'
+            }
+          end
+
           # Check routes metadata for exact mapping
           metadata = @options[:metadata]
           routes_mapping = (metadata ? metadata[:routes_mapping] : nil) || {}
           lookup_key = prefix ? "#{prefix}_#{name}_path" : "#{name}_path"
           if routes_mapping[lookup_key]
             info = routes_mapping[lookup_key]
-            return {
+            result = {
               controller: info[:controller],
               base: info[:base],
               singular: info[:singular],
@@ -1013,6 +1025,8 @@ module Ruby2JS
               action_or_parent: info[:action_or_parent],
               from_metadata: true
             }
+            result[:action] = info[:action] if info[:action]
+            return result
           end
 
           # Fall back to heuristic parsing when no metadata available
@@ -1076,6 +1090,12 @@ module Ruby2JS
         # Determine controller action from HTTP method + URL helper info
         # is_nested: whether this was determined to be a nested resource
         def determine_action(http_method, url_info, is_nested)
+          # Explicit action from metadata (e.g., root route)
+          if url_info[:action]
+            action = url_info[:action].to_s
+            return action == 'new' ? :$new : action.to_sym
+          end
+
           # Custom action (non-nested prefix like redo_heats)
           if url_info[:action_or_parent] && !is_nested
             action_name = url_info[:action_or_parent]

@@ -42,7 +42,7 @@ module Ruby2JS
         # Wrap ActiveRecord operations with await for async database support
         # Delegates to shared helper in ActiveRecordHelpers
         def wrap_with_await_if_needed(node)
-          ActiveRecordHelpers.wrap_with_await_if_needed(node, @rails_model_refs)
+          ActiveRecordHelpers.wrap_with_await_if_needed(node, @rails_model_refs, @options[:metadata])
         end
 
         # Scan top-level AST for require/require_relative (runs once)

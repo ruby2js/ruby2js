@@ -176,6 +176,18 @@ module Ruby2JS
             path: "#{base_path}/",
             params: []
           }
+
+          # Store route mapping so test filter can resolve root_url/root_path
+          if @options[:metadata]
+            mapping = (@options[:metadata][:routes_mapping] ||= {})
+            mapping['root_path'] = {
+              controller: controller_name,
+              base: controller,
+              singular: false,
+              action_or_parent: nil,
+              action: action
+            }
+          end
         end
 
         def process_custom_route(http_method, args)
@@ -226,12 +238,26 @@ module Ruby2JS
           end
 
           # For on: :collection, temporarily remove parent's param
+          # Also infer controller/action/as_name from parent resource
           saved_parent = nil
           if on_collection && @rails_route_nesting.any?
             parent = @rails_route_nesting.last
             saved_parent = { param: parent[:param], type: parent[:type] }
             parent[:param] = nil
             parent[:type] = :namespace
+
+            # Rails convention: infer controller from parent resource
+            if controller.nil? && parent[:controller]
+              controller = parent[:controller]
+            end
+
+            # Rails convention: action = path name
+            action ||= raw_path if raw_path
+
+            # Rails convention: as_name = "{action}_{resource}"
+            if as_name.nil? && raw_path && parent[:name]
+              as_name = "#{raw_path}_#{parent[:name]}"
+            end
           end
 
           # Build full path with nesting prefix
@@ -361,7 +387,9 @@ module Ruby2JS
             @rails_route_nesting.push({
               path: url_segment,
               param: param_name,
-              type: :resource
+              type: :resource,
+              name: resource_name.to_s,
+              controller: controller_name
             })
             process_routes_body(body)
             @rails_route_nesting.pop

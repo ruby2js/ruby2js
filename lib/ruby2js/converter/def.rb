@@ -186,7 +186,10 @@ module Ruby2JS
       end
 
       # Add async if explicitly marked or if body contains await
-      put 'async ' if @ast.type == :async || contains_await
+      # Skip if @prop already includes 'async' (e.g., static async methods via class2)
+      if @ast.type == :async || contains_await
+        put 'async ' unless @prop && @prop.to_s.include?('async')
+      end
 
       # fat arrow support
       if \

@@ -7869,7 +7869,11 @@ const Ruby2JS = (() => {
         }
       };
 
-      if (this._ast.type === "async" || contains_await) this.put("async ");
+      if (this._ast.type === "async" || contains_await) {
+        if (!this._prop || !(this._prop ?? "").toString().includes("async")) {
+          this.put("async ")
+        }
+      };
 
       if (!name && this._state !== "method" && this._ast.type !== "defm" && this._ast.type !== "deff" && !this._prop) {
         let expr = body;
@@ -8209,7 +8213,11 @@ const Ruby2JS = (() => {
         }
       };
 
-      if (this._ast.type === "async" || contains_await) this.put("async ");
+      if (this._ast.type === "async" || contains_await) {
+        if (!this._prop || !(this._prop ?? "").toString().includes("async")) {
+          this.put("async ")
+        }
+      };
 
       if (!name && this._state !== "method" && this._ast.type !== "defm" && this._ast.type !== "deff" && !this._prop) {
         let expr = body;
@@ -8549,7 +8557,11 @@ const Ruby2JS = (() => {
         }
       };
 
-      if (this._ast.type === "async" || contains_await) this.put("async ");
+      if (this._ast.type === "async" || contains_await) {
+        if (!this._prop || !(this._prop ?? "").toString().includes("async")) {
+          this.put("async ")
+        }
+      };
 
       if (!name && this._state !== "method" && this._ast.type !== "defm" && this._ast.type !== "deff" && !this._prop) {
         let expr = body;
@@ -8889,7 +8901,11 @@ const Ruby2JS = (() => {
         }
       };
 
-      if (this._ast.type === "async" || contains_await) this.put("async ");
+      if (this._ast.type === "async" || contains_await) {
+        if (!this._prop || !(this._prop ?? "").toString().includes("async")) {
+          this.put("async ")
+        }
+      };
 
       if (!name && this._state !== "method" && this._ast.type !== "defm" && this._ast.type !== "deff" && !this._prop) {
         let expr = body;
@@ -9229,7 +9245,11 @@ const Ruby2JS = (() => {
         }
       };
 
-      if (this._ast.type === "async" || contains_await) this.put("async ");
+      if (this._ast.type === "async" || contains_await) {
+        if (!this._prop || !(this._prop ?? "").toString().includes("async")) {
+          this.put("async ")
+        }
+      };
 
       if (!name && this._state !== "method" && this._ast.type !== "defm" && this._ast.type !== "deff" && !this._prop) {
         let expr = body;
@@ -18017,7 +18037,6 @@ const Ruby2JS = (() => {
         if (!first) this.put(", ");
         first = false;
 
-        // Output key (quote if needed)
         if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/m.test(key)) {
           this.put(key)
         } else {

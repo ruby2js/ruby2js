@@ -24,6 +24,39 @@ export class Relation {
     this._joins = [];      // INNER JOIN associations
     this._missing = [];    // LEFT JOIN ... WHERE id IS NULL (where().missing())
     this._group = null;    // GROUP BY column(s)
+
+    // Delegate model scopes (e.g., Person.where({type: "DJ"}).by_name)
+    return new Proxy(this, {
+      get(target, prop, receiver) {
+        if (prop in target) {
+          return Reflect.get(target, prop, receiver);
+        }
+        if (typeof prop === 'symbol') {
+          return Reflect.get(target, prop, receiver);
+        }
+        // Check model for static scope (getter or method)
+        const desc = Object.getOwnPropertyDescriptor(target.model, prop);
+        if (desc) {
+          if (desc.get) {
+            const scopeResult = desc.get.call(target.model);
+            if (scopeResult instanceof Relation) {
+              return target._mergeScope(scopeResult);
+            }
+            return scopeResult;
+          }
+          if (typeof desc.value === 'function') {
+            return (...args) => {
+              const result = desc.value.call(target.model, ...args);
+              if (result instanceof Relation) {
+                return target._mergeScope(result);
+              }
+              return result;
+            };
+          }
+        }
+        return undefined;
+      }
+    });
   }
 
   // --- Chainable methods (return new Relation) ---
@@ -146,11 +179,16 @@ export class Relation {
     return results[0] || null;
   }
 
-  async count() {
-    if (this._group) {
-      return this.model._executeGroupCount(this);
+  async count(column) {
+    let rel = this;
+    if (column) {
+      rel = this._clone();
+      rel._select = [column];
     }
-    return this.model._executeCount(this);
+    if (rel._group) {
+      return rel.model._executeGroupCount(rel);
+    }
+    return rel.model._executeCount(rel);
   }
 
   // Aggregate: sum of a column. When grouped, returns {key: sum}.
@@ -316,6 +354,25 @@ export class Relation {
   }
 
   // --- Internal ---
+
+  // Merge a scope's query state into a clone of this relation
+  _mergeScope(scopeRelation) {
+    const merged = this._clone();
+    for (const c of scopeRelation._conditions) merged._conditions.push(c);
+    for (const c of scopeRelation._rawConditions) merged._rawConditions.push(c);
+    for (const c of scopeRelation._notConditions) merged._notConditions.push(c);
+    for (const c of scopeRelation._orConditions) merged._orConditions.push(c);
+    if (scopeRelation._order) merged._order = scopeRelation._order;
+    if (scopeRelation._limit) merged._limit = scopeRelation._limit;
+    if (scopeRelation._offset) merged._offset = scopeRelation._offset;
+    if (scopeRelation._select) merged._select = scopeRelation._select;
+    if (scopeRelation._distinct) merged._distinct = true;
+    for (const inc of scopeRelation._includes) merged._includes.push(inc);
+    for (const j of scopeRelation._joins) merged._joins.push(j);
+    for (const m of scopeRelation._missing) merged._missing.push(m);
+    if (scopeRelation._group) merged._group = scopeRelation._group;
+    return merged;
+  }
 
   _clone() {
     const rel = new Relation(this.model);

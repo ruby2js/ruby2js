@@ -24,7 +24,7 @@ module Ruby2JS
         # chain detection - only the final method in a chain gets awaited.
         AR_CLASS_METHODS = %i[
           all find find_by find_by! where
-          first last take
+          first last take sole
           count sum average minimum maximum
           create create!
           find_or_create_by find_or_create_by!
@@ -65,8 +65,10 @@ module Ruby2JS
           return node unless node.respond_to?(:type)
 
           if node.type == :await!
-            # Unwrap: change type back to :send, recurse on children
-            return self.strip_inner_awaits(node.updated(:send))
+            # Unwrap: change type to :send! (forces parens) instead of :send.
+            # AR methods like where() need parens even when zero-arg; plain :send
+            # would produce property access (e.g., Heat.where instead of Heat.where()).
+            return self.strip_inner_awaits(node.updated(:send!))
           end
 
           new_children = node.children.map do |c|
@@ -77,7 +79,8 @@ module Ruby2JS
 
         # Wrap ActiveRecord operations with await for async database support
         # Takes the node to potentially wrap and an array of known model names
-        def self.wrap_with_await_if_needed(node, model_refs)
+        # Optional metadata hash contains model info (scopes, associations, etc.)
+        def self.wrap_with_await_if_needed(node, model_refs, metadata=nil)
           return node unless node.respond_to?(:type) && node.type == :send
 
           target, method, *_args = node.children
@@ -87,19 +90,40 @@ module Ruby2JS
             const_name = target.children[1].to_s
             # Convert Set to Array for JS compatibility (Set.include? doesn't exist in JS)
             model_refs_array = model_refs ? [*model_refs] : []
-            if model_refs_array.include?(const_name) && AR_CLASS_METHODS.include?(method)
-              # Use updated(:await!) to force parens (method call, not property access)
-              return node.updated(:await!)
+            if model_refs_array.include?(const_name)
+              if AR_CLASS_METHODS.include?(method)
+                # Use updated(:await!) to force parens (method call, not property access)
+                return node.updated(:await!)
+              end
+
+              # Zero-arg calls on model constants: custom class methods or scopes
+              # (await on a non-Promise returns the value, so this is safe)
+              if _args.empty?
+                # Check if it's a known scope (getter, no parens)
+                if metadata && metadata['models']
+                  model_meta = metadata['models'][const_name]
+                  if model_meta
+                    scopes = model_meta['scopes'] || []
+                    if scopes.include?(method.to_s)
+                      return node.updated(:await_attr)
+                    end
+                  end
+                end
+
+                # Not a known scope: treat as custom class method (await with parens)
+                return node.updated(:await!)
+              end
             end
           end
 
           # Check for chained method calls ending with an AR class method
           # e.g., Article.includes(:comments).all, Article.where(...).first
           # Also handle chains where inner nodes are already await-wrapped
-          if (target&.type == :send || target&.type == :await!) && AR_CLASS_METHODS.include?(method)
+          if (target&.type == :send || target&.type == :send! || target&.type == :await!) && AR_CLASS_METHODS.include?(method)
             # Walk up the chain to find the root target
+            # Include :send! because strip_inner_awaits converts :await! → :send!
             chain_start = target
-            while chain_start&.type == :send || chain_start&.type == :await!
+            while chain_start&.type == :send || chain_start&.type == :send! || chain_start&.type == :await!
               # :await! wraps a single child node
               if chain_start.type == :await!
                 chain_start = chain_start.children[0]
@@ -116,6 +140,34 @@ module Ruby2JS
               if model_refs_array.include?(const_name)
                 stripped = self.strip_inner_awaits(node)
                 return stripped.updated(:await!)
+              end
+            end
+          end
+
+          # Check for scope chained after an awaited AR call
+          # e.g., (await Person.where({type: "DJ"})).by_name → await Person.where({type: "DJ"}).by_name
+          # Scopes are part of the query chain and must not be applied after await resolves to Array.
+          # Use :await_attr (not :await!) because zero-arg scopes are static getters (property access).
+          if target&.type == :await! && metadata
+            models = metadata['models']
+            if models
+              chain_start = target
+              while chain_start&.type == :send || chain_start&.type == :send! || chain_start&.type == :await!
+                chain_start = chain_start.type == :await! ? chain_start.children[0] : chain_start.children[0]
+              end
+              if chain_start&.type == :const && chain_start.children[0].nil?
+                const_name = chain_start.children[1].to_s
+                model_refs_array = model_refs ? [*model_refs] : []
+                if model_refs_array.include?(const_name)
+                  model_meta = models[const_name]
+                  if model_meta
+                    scopes = model_meta['scopes'] || []
+                    if scopes.include?(method.to_s)
+                      stripped = self.strip_inner_awaits(node)
+                      return stripped.updated(:await_attr)
+                    end
+                  end
+                end
               end
             end
           end
