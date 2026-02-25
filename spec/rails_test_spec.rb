@@ -829,6 +829,170 @@ describe Ruby2JS::Filter::Rails::Test do
     end
   end
 
+  describe "assert_select" do
+    it "converts existence check" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "index" do
+            get foos_url
+            assert_select "h1"
+          end
+        end
+      RUBY
+      assert_includes result, 'document.body.innerHTML = response'
+      assert_includes result, 'expect(document.body.querySelectorAll("h1").length).toBeGreaterThanOrEqual(1)'
+    end
+
+    it "converts text match with string" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "index" do
+            get foos_url
+            assert_select "h1", "Welcome"
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.body.querySelector("h1").textContent).toContain("Welcome")'
+    end
+
+    it "converts text match with regex" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "index" do
+            get foos_url
+            assert_select "h1", /Welcome/
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.body.querySelector("h1").textContent).toMatch(/Welcome/)'
+    end
+
+    it "converts non-existence check with false" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "index" do
+            get foos_url
+            assert_select "h1", false
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.body.querySelectorAll("h1")).toHaveLength(0)'
+    end
+
+    it "converts numeric count shorthand" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "index" do
+            get foos_url
+            assert_select "li", 3
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.body.querySelectorAll("li")).toHaveLength(3)'
+    end
+
+    it "converts hash count option" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "index" do
+            get foos_url
+            assert_select "li", count: 3
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.body.querySelectorAll("li")).toHaveLength(3)'
+    end
+
+    it "converts hash minimum option" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "index" do
+            get foos_url
+            assert_select "li", minimum: 1
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.body.querySelectorAll("li").length).toBeGreaterThanOrEqual(1)'
+    end
+
+    it "converts hash maximum option" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "index" do
+            get foos_url
+            assert_select "li", maximum: 5
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.body.querySelectorAll("li").length).toBeLessThanOrEqual(5)'
+    end
+
+    it "converts hash text option" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "index" do
+            get foos_url
+            assert_select "h1", text: "Hello"
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.body.querySelector("h1").textContent).toContain("Hello")'
+    end
+
+    it "converts combined count and text options" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "index" do
+            get foos_url
+            assert_select "li", count: 2, text: "Item"
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.body.querySelectorAll("li")).toHaveLength(2)'
+      assert_includes result, 'expect(document.body.querySelector("li").textContent).toContain("Item")'
+    end
+
+    it "converts ? substitution in selector" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "show" do
+            get foo_url(@foo)
+            assert_select "a[href=?]", foo_path(@foo)
+          end
+        end
+      RUBY
+      assert_includes result, 'querySelectorAll(`a[href=${foo_path(foo)}]`'
+    end
+
+    it "converts block form with scoping" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "index" do
+            get foos_url
+            assert_select "ul" do
+              assert_select "li"
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'document.body.innerHTML = response'
+      assert_includes result, '_scope = document.body.querySelectorAll("ul")'
+      assert_includes result, '_scope[0].querySelectorAll("li")'
+    end
+
+    it "is not transformed outside integration tests" do
+      result = to_js(<<~RUBY)
+        class FooTest < ActiveSupport::TestCase
+          test "works" do
+            assert_select "h1"
+          end
+        end
+      RUBY
+      refute_includes result, 'querySelector'
+      assert_includes result, 'assert_select("h1")'
+    end
+  end
+
   describe "full integration test transpilation" do
     it "transpiles a complete controller test" do
       result = to_controller_js(<<~RUBY)

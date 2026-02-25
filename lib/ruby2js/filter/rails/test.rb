@@ -72,6 +72,7 @@ module Ruby2JS
           @rails_test_class_controller = nil
           @rails_test_response_var = false
           @rails_test_current_handled = false
+          @rails_test_assert_select_scope = nil
         end
 
         # Handle class-based test definitions
@@ -194,6 +195,11 @@ module Ruby2JS
               # assert_redirected_to
               if target.nil? && method == :assert_redirected_to
                 return transform_assert_redirected_to(args)
+              end
+
+              # assert_select
+              if target.nil? && method == :assert_select
+                return transform_assert_select(args)
               end
 
               # URL helper -> path helper (standalone, e.g. in assert_redirected_to context)
@@ -348,6 +354,11 @@ module Ruby2JS
           when :assert_difference, :assert_no_difference
             return super unless @rails_test_describe_depth > 0
             transform_assert_difference(call, node.children.last, method == :assert_no_difference)
+
+          when :assert_select
+            return super unless @rails_test_describe_depth > 0
+            return super unless @rails_test_integration
+            transform_assert_select_block(call, node.children.last)
 
           when :it, :specify, :test
             return super unless @rails_test_describe_depth > 0
@@ -1345,6 +1356,213 @@ module Ruby2JS
           s(:send,
             s(:send, nil, :expect, s(:send!, nil, :String, s(:attr, s(:lvar, :response), :redirect))),
             :toBe, s(:send!, nil, :String, url_node))
+        end
+
+        # Transform assert_select (non-block forms)
+        # assert_select "h1" -> existence check
+        # assert_select "h1", "text" -> text content check
+        # assert_select "h1", /pat/ -> text match check
+        # assert_select "h1", count: 3 -> count check
+        # assert_select "h1", false -> non-existence check
+        # assert_select "h1", 3 -> count shorthand
+        def transform_assert_select(args)
+          return nil if args.empty?
+
+          selector_node = args[0]
+          return nil unless selector_node.type == :str || selector_node.type == :dstr
+
+          # Check for ? substitution: next non-hash arg replaces ? in selector
+          selector_str = selector_node.type == :str ? selector_node.children.first : nil
+          sub_arg = nil
+          remaining_args = args[1..-1]
+
+          if selector_str && selector_str.include?('?') && remaining_args.length > 0 &&
+             remaining_args.first.type != :hash
+            sub_arg = remaining_args.shift
+          end
+
+          base = assert_select_query_base
+          innerHTML_node = assert_select_innerHTML
+
+          # Build the selector node (possibly with ? substitution)
+          sel_node = build_selector_node(selector_node, sub_arg)
+
+          if remaining_args.empty?
+            # assert_select "h1" -> existence check
+            checks = [build_existence_check(base, sel_node)]
+            return innerHTML_node ? s(:begin, innerHTML_node, *checks) : checks.first
+          end
+
+          second = remaining_args.first
+
+          case second.type
+          when :str
+            # assert_select "h1", "Welcome" -> text content check
+            checks = [build_text_check(base, sel_node, :toContain, process(second))]
+            return innerHTML_node ? s(:begin, innerHTML_node, *checks) : checks.first
+
+          when :regexp
+            # assert_select "h1", /Welcome/ -> regex match check
+            checks = [build_text_check(base, sel_node, :toMatch, process(second))]
+            return innerHTML_node ? s(:begin, innerHTML_node, *checks) : checks.first
+
+          when :false
+            # assert_select "h1", false -> non-existence
+            checks = [build_count_check(base, sel_node, s(:int, 0))]
+            return innerHTML_node ? s(:begin, innerHTML_node, *checks) : checks.first
+
+          when :int
+            # assert_select "h1", 3 -> count shorthand
+            checks = [build_count_check(base, sel_node, process(second))]
+            return innerHTML_node ? s(:begin, innerHTML_node, *checks) : checks.first
+
+          when :hash
+            # assert_select "h1", count: 3, text: "Hi"
+            checks = build_hash_checks(base, sel_node, second)
+            return innerHTML_node ? s(:begin, innerHTML_node, *checks) : (checks.length == 1 ? checks.first : s(:begin, *checks))
+          end
+
+          nil
+        end
+
+        # Transform assert_select block form
+        # assert_select "ul" do ... end -> scoped queries
+        def transform_assert_select_block(call, body)
+          args = call.children[2..-1]
+          return nil if args.empty?
+
+          selector_node = args[0]
+          return nil unless selector_node.type == :str || selector_node.type == :dstr
+
+          base = assert_select_query_base
+          innerHTML_node = assert_select_innerHTML
+          sel_node = build_selector_node(selector_node, nil)
+
+          # _scope = base.querySelectorAll(selector)
+          scope_assign = s(:lvasgn, :_scope,
+            s(:send, base, :querySelectorAll, sel_node))
+
+          # Process body with scope set
+          old_scope = @rails_test_assert_select_scope
+          @rails_test_assert_select_scope = :_scope
+          processed_body = process(body)
+          @rails_test_assert_select_scope = old_scope
+
+          parts = []
+          parts << innerHTML_node if innerHTML_node
+          parts << scope_assign
+          parts << processed_body
+
+          s(:begin, *parts)
+        end
+
+        # Returns the base element for querySelector calls
+        def assert_select_query_base
+          if @rails_test_assert_select_scope
+            # Inside a block: use _scope[0]
+            s(:send, s(:lvar, @rails_test_assert_select_scope), :[], s(:int, 0))
+          else
+            s(:attr, s(:lvar, :document), :body)
+          end
+        end
+
+        # Returns innerHTML assignment node, or nil if inside a scoped block
+        def assert_select_innerHTML
+          return nil if @rails_test_assert_select_scope
+          s(:send,
+            s(:attr, s(:lvar, :document), :body),
+            :innerHTML=, s(:lvar, :response))
+        end
+
+        # Build selector node, handling ? substitution
+        def build_selector_node(selector_node, sub_arg)
+          if sub_arg
+            # Replace ? with interpolated value: `a[href="${expr}"]`
+            selector_str = selector_node.children.first
+            parts = selector_str.split('?', 2)
+            # Build dstr: "before" + expr + "after"
+            children = []
+            children << s(:str, parts[0]) unless parts[0].empty?
+            children << s(:begin, process(sub_arg))
+            children << s(:str, parts[1]) unless parts[1].empty?
+            s(:dstr, *children)
+          else
+            process(selector_node)
+          end
+        end
+
+        # Build: expect(base.querySelectorAll(sel).length).toBeGreaterThanOrEqual(1)
+        def build_existence_check(base, sel_node)
+          query = s(:attr,
+            s(:send, base, :querySelectorAll, sel_node),
+            :length)
+          s(:send,
+            s(:send, nil, :expect, query),
+            :toBeGreaterThanOrEqual, s(:int, 1))
+        end
+
+        # Build: expect(base.querySelectorAll(sel)).toHaveLength(n)
+        def build_count_check(base, sel_node, count_node)
+          query = s(:send, base, :querySelectorAll, sel_node)
+          s(:send,
+            s(:send, nil, :expect, query),
+            :toHaveLength, count_node)
+        end
+
+        # Build: expect(base.querySelector(sel).textContent).toContain/toMatch(value)
+        def build_text_check(base, sel_node, matcher, value_node)
+          text = s(:attr,
+            s(:send, base, :querySelector, sel_node),
+            :textContent)
+          s(:send,
+            s(:send, nil, :expect, text),
+            matcher, value_node)
+        end
+
+        # Build checks from hash options (count:, minimum:, maximum:, text:)
+        def build_hash_checks(base, sel_node, hash_node)
+          checks = []
+          opts = {}
+
+          hash_node.children.each do |pair|
+            key = pair.children[0]
+            val = pair.children[1]
+            key_name = key.type == :sym ? key.children.first : nil
+            opts[key_name] = val if key_name
+          end
+
+          if opts[:count]
+            checks << build_count_check(base, sel_node, process(opts[:count]))
+          end
+
+          if opts[:minimum]
+            query = s(:attr,
+              s(:send, base, :querySelectorAll, sel_node),
+              :length)
+            checks << s(:send,
+              s(:send, nil, :expect, query),
+              :toBeGreaterThanOrEqual, process(opts[:minimum]))
+          end
+
+          if opts[:maximum]
+            query = s(:attr,
+              s(:send, base, :querySelectorAll, sel_node),
+              :length)
+            checks << s(:send,
+              s(:send, nil, :expect, query),
+              :toBeLessThanOrEqual, process(opts[:maximum]))
+          end
+
+          if opts[:text]
+            text_val = opts[:text]
+            matcher = text_val.type == :regexp ? :toMatch : :toContain
+            checks << build_text_check(base, sel_node, matcher, process(text_val))
+          end
+
+          # If no recognized keys, fall back to existence check
+          checks << build_existence_check(base, sel_node) if checks.empty?
+
+          checks
         end
 
         # Transform URL helper to path helper
