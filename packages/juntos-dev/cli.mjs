@@ -3717,6 +3717,32 @@ async function runTest(options, testArgs) {
     }
   }
 
+  // Ensure jsdom is installed if any test file uses @vitest-environment jsdom
+  if (!isPackageInstalled('jsdom')) {
+    const testDir = join(APP_ROOT, 'test');
+    let needsJsdom = false;
+    if (existsSync(testDir)) {
+      const walk = (dir) => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          if (entry.isDirectory()) { walk(join(dir, entry.name)); continue; }
+          if (!entry.name.endsWith('.test.mjs')) continue;
+          const content = readFileSync(join(dir, entry.name), 'utf8');
+          if (content.includes('@vitest-environment jsdom')) { needsJsdom = true; return; }
+        }
+      };
+      walk(testDir);
+    }
+    if (needsJsdom) {
+      console.log('Installing jsdom (required by assert_select tests)...');
+      try {
+        execSync('npm install jsdom', { cwd: APP_ROOT, stdio: 'inherit' });
+      } catch (e) {
+        console.error('Failed to install jsdom.');
+        process.exit(1);
+      }
+    }
+  }
+
   // Build vitest command
   const args = ['vitest', 'run'];
 

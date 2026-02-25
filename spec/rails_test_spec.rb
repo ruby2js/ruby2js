@@ -830,6 +830,20 @@ describe Ruby2JS::Filter::Rails::Test do
   end
 
   describe "assert_select" do
+    it "emits vitest jsdom environment directive" do
+      result = to_controller_js(<<~RUBY)
+        class FooControllerTest < ActionDispatch::IntegrationTest
+          test "index" do
+            get foos_url
+            assert_select "h1"
+          end
+        end
+      RUBY
+      assert_includes result, '// @vitest-environment jsdom'
+      # Directive should be at the top, before describe
+      assert result.index('// @vitest-environment jsdom') < result.index('describe(')
+    end
+
     it "converts existence check" do
       result = to_controller_js(<<~RUBY)
         class FooControllerTest < ActionDispatch::IntegrationTest

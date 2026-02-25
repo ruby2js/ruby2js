@@ -73,6 +73,7 @@ module Ruby2JS
           @rails_test_response_var = false
           @rails_test_current_handled = false
           @rails_test_assert_select_scope = nil
+          @rails_test_has_assert_select = false
         end
 
         # Handle class-based test definitions
@@ -1368,6 +1369,12 @@ module Ruby2JS
         def transform_assert_select(args)
           return nil if args.empty?
 
+          # Emit @vitest-environment jsdom directive once per file
+          unless @rails_test_has_assert_select
+            @rails_test_has_assert_select = true
+            self.prepend_list << s(:jsraw, '// @vitest-environment jsdom')
+          end
+
           selector_node = args[0]
           return nil unless selector_node.type == :str || selector_node.type == :dstr
 
@@ -1435,6 +1442,12 @@ module Ruby2JS
         def transform_assert_select_block(call, body)
           args = call.children[2..-1]
           return nil if args.empty?
+
+          # Emit @vitest-environment jsdom directive once per file
+          unless @rails_test_has_assert_select
+            @rails_test_has_assert_select = true
+            self.prepend_list << s(:jsraw, '// @vitest-environment jsdom')
+          end
 
           selector_node = args[0]
           return nil unless selector_node.type == :str || selector_node.type == :dstr
