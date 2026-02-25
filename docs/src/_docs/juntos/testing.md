@@ -7,7 +7,7 @@ category: juntos
 
 # Testing Juntos Applications
 
-Write tests in JavaScript for your transpiled Juntos applications using Vitest and in-memory databases.
+Write tests in Ruby or JavaScript for your transpiled Juntos applications using Vitest and in-memory databases.
 
 {% toc %}
 
@@ -17,12 +17,134 @@ Juntos transpiles your Rails code to JavaScript. The `dist/` directory contains 
 
 | Approach | Pros | Cons |
 |----------|------|------|
-| Ruby tests (Minitest/RSpec) | Familiar Rails patterns | Tests Ruby, not the JS that runs |
-| JavaScript tests (Vitest) | Tests actual runtime code | Different syntax |
+| Ruby tests via `juntos test` | Familiar Rails patterns, tests the JS that runs | Requires Juntos CLI |
+| JavaScript tests (Vitest) | Direct control, no transpilation layer | Different syntax from Rails |
 
-JavaScript testing also catches transpilation issues—if Ruby2JS produces incorrect JavaScript, your tests will fail.
+JavaScript testing catches transpilation issues—if Ruby2JS produces incorrect JavaScript, your tests will fail. With `juntos test`, you get both: write familiar Rails tests that are transpiled and run against the actual JavaScript output.
 
-## Setup
+## Writing Tests in Ruby
+
+The recommended approach is to write standard Rails tests that run under both `rails test` and `juntos test`. The Rails test filter transpiles Minitest assertions, controller actions, and test structure to Vitest equivalents automatically.
+
+### Running Tests
+
+```bash
+# Run transpiled tests with Vitest
+npx juntos test -d sqlite
+
+# Same tests work with Rails
+bundle exec rails test
+```
+
+### Model Tests
+
+Standard Rails model tests transpile directly:
+
+```ruby
+class MessageTest < ActiveSupport::TestCase
+  test "creates a message with valid attributes" do
+    message = messages(:one)
+    assert_not_nil message.id
+    assert_equal "Alice", message.username
+  end
+
+  test "validates username presence" do
+    message = Message.new(username: "", body: "Valid body")
+    assert_not message.save
+  end
+end
+```
+
+### Controller Tests
+
+Integration tests with HTTP methods, assertions, and DOM checks:
+
+```ruby
+class MessagesControllerTest < ActionDispatch::IntegrationTest
+  test "should get index" do
+    get messages_url
+    assert_response :success
+    assert_select "h1", "Chat Room"
+    assert_select "#messages" do
+      assert_select "div", minimum: 1
+    end
+  end
+
+  test "should create message" do
+    assert_difference("Message.count") do
+      post messages_url, params: { message: { username: "Carol", body: "Hello!" } }
+    end
+    assert_redirected_to messages_path
+  end
+end
+```
+
+The filter transforms `get`, `post`, etc. into controller action calls, `assert_response` and `assert_redirected_to` into `expect()` calls, and `assert_select` into DOM queries using jsdom.
+
+### Testing Stimulus Controllers
+
+Use `connect_stimulus` to test Stimulus controller behaviors in jsdom without a browser. Tests that use DOM APIs should skip under Rails with `skip unless defined? Document`:
+
+```ruby
+class MessagesControllerTest < ActionDispatch::IntegrationTest
+  test "clears input after form submission" do
+    skip unless defined? Document
+    get messages_url
+    connect_stimulus "chat", ChatController
+
+    body_input = document.querySelector("[data-chat-target='body']")
+    body_input.value = "Hello!"
+    form = document.querySelector("form")
+    form.dispatchEvent(Event.new("turbo:submit-end", bubbles: true))
+
+    assert_equal "", body_input.value
+  end
+
+  test "auto-scrolls on new message" do
+    skip unless defined? Document
+    Element.prototype.scrollIntoView = -> {}
+    get messages_url
+    connect_stimulus "chat", ChatController
+
+    messages_div = document.querySelector("#messages")
+    new_msg = document.createElement("div")
+    new_msg.setAttribute("data-chat-target", "message")
+    new_msg.scrollIntoView = vi.fn()
+    messages_div.appendChild(new_msg)
+
+    await_mutations
+
+    assert new_msg.scrollIntoView.mock.calls.length > 0
+  end
+end
+```
+
+**How it works:**
+
+- `skip unless defined? Document` — skips under Rails (no DOM), runs under Juntos (jsdom)
+- `connect_stimulus "chat", ChatController` — renders the response HTML into `document.body`, starts a Stimulus `Application`, and registers the controller. The `@vitest-environment jsdom` directive is emitted automatically.
+- `await_mutations` — yields to the event loop so Stimulus `MutationObserver` callbacks fire
+- Standard DOM APIs (`querySelector`, `dispatchEvent`, `appendChild`) work in jsdom
+- `vi.fn()` creates a Vitest mock function for verifying calls
+- Stimulus cleanup (`Application.stop()`, clearing `document.body`) runs automatically after each test
+
+### What Gets Transpiled
+
+| Ruby | JavaScript |
+|------|-----------|
+| `skip` | `return` |
+| `defined? Document` | `typeof Document !== "undefined"` |
+| `connect_stimulus "chat", ChatController` | innerHTML + Application.start + register + await |
+| `await_mutations` | `await new Promise(resolve => setTimeout(resolve, 0))` |
+| `Event.new("turbo:submit-end", bubbles: true)` | `new Event("turbo:submit-end", {bubbles: true})` |
+| `assert_equal "", input.value` | `expect(input.value).toBe("")` |
+| `assert_select "h1", "text"` | DOM querySelector + expect |
+
+## Writing Tests in JavaScript
+
+If you prefer writing tests directly in JavaScript, or need more control over the test setup, you can write Vitest tests manually.
+
+### Setup
 
 Create a test directory with Vitest and better-sqlite3:
 
@@ -63,7 +185,7 @@ Add test scripts to `package.json`:
 }
 ```
 
-## Project Structure
+### Project Structure
 
 ```
 test/integration/
@@ -82,9 +204,9 @@ cd myapp
 bin/juntos build -d sqlite -t node
 ```
 
-## Testing Models
+### Testing Models
 
-### Basic CRUD
+#### Basic CRUD
 
 ```javascript
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
@@ -163,7 +285,7 @@ describe('Article Model', () => {
 });
 ```
 
-### Testing Validations
+#### Testing Validations
 
 ```javascript
 it('validates title presence', async () => {
@@ -183,7 +305,7 @@ it('validates body length', async () => {
 });
 ```
 
-### Testing Associations
+#### Testing Associations
 
 ```javascript
 describe('Associations', () => {
@@ -224,7 +346,7 @@ describe('Associations', () => {
 });
 ```
 
-### Testing Query Interface
+#### Testing Query Interface
 
 ```javascript
 describe('Query Interface', () => {
@@ -279,7 +401,7 @@ describe('Query Interface', () => {
 });
 ```
 
-## Testing Controllers
+### Testing Controllers
 
 Controllers need a mock context object simulating the request environment:
 
@@ -351,7 +473,7 @@ describe('ArticlesController', () => {
 });
 ```
 
-### Testing Turbo Stream Responses
+#### Testing Turbo Stream Responses
 
 For controllers that return Turbo Streams:
 
@@ -376,7 +498,7 @@ it('create returns turbo stream for turbo requests', async () => {
 });
 ```
 
-## Testing Path Helpers
+### Testing Path Helpers
 
 ```javascript
 describe('Path Helpers', () => {
@@ -411,7 +533,7 @@ describe('Path Helpers', () => {
 });
 ```
 
-## In-Memory Database Pattern
+### In-Memory Database Pattern
 
 The key pattern for fast, isolated tests:
 
@@ -430,7 +552,7 @@ beforeEach(async () => {
 
 Each test gets a clean slate. No cleanup needed. Tests can run in parallel without interference.
 
-## Testing React Components
+### Testing React Components
 
 Applications using RBX files with React (like the workflow demo) need jsdom for DOM simulation:
 
@@ -463,7 +585,7 @@ export default defineConfig({
 
 The `/lib/` and `/app/` aliases resolve absolute imports like `import JsonStreamProvider from '/lib/JsonStreamProvider.js'` that React components use.
 
-### Testing Controllers with React Views
+#### Testing Controllers with React Views
 
 Controllers that return React component output work the same way:
 
@@ -486,7 +608,7 @@ describe('WorkflowsController', () => {
 });
 ```
 
-## Running Tests
+### Running Tests
 
 ```bash
 # Run all tests
@@ -502,7 +624,7 @@ npm run test:watch
 npm test -- --reporter=verbose
 ```
 
-## Debugging Tests
+### Debugging Tests
 
 When a test fails, check:
 
