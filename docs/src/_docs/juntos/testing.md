@@ -102,7 +102,7 @@ class MessagesControllerTest < ActionDispatch::IntegrationTest
 
   test "auto-scrolls on new message" do
     skip unless defined? Document
-    Element.prototype.scrollIntoView = -> {}
+    window.Element.prototype.scrollIntoView = -> {}
     get messages_url
     connect_stimulus "chat", ChatController
 
