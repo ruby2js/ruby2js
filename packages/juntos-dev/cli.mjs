@@ -3854,6 +3854,132 @@ async function runTest(options, testArgs) {
 }
 
 // ============================================
+// Command: e2e
+// ============================================
+
+async function transpileE2EFiles(appRoot, config) {
+  const systemTestDir = join(appRoot, 'test', 'system');
+  if (!existsSync(systemTestDir)) return 0;
+  const files = findRubyTestFiles(systemTestDir);
+  if (files.length === 0) return 0;
+
+  const { metadata } = await buildAppManifest(appRoot, config, { mode: 'virtual' });
+  metadata.playwright = true;
+
+  let count = 0;
+  for (const file of files) {
+    const outName = file.replace(/_test\.rb$/, '.spec.mjs');
+    const outPath = join(systemTestDir, outName);
+
+    // Skip if .spec.mjs is newer than _test.rb
+    if (existsSync(outPath)) {
+      const rbStat = statSync(join(systemTestDir, file));
+      const mjsStat = statSync(outPath);
+      if (mjsStat.mtimeMs > rbStat.mtimeMs) continue;
+    }
+
+    try {
+      const source = readFileSync(join(systemTestDir, file), 'utf-8');
+      metadata.fixture_plan = null;
+      const result = await transformRuby(source, join(systemTestDir, file), 'test', config, appRoot, metadata);
+      let code = result.code;
+
+      // Skip empty test suites (no test() calls)
+      if (!/\btest\s*\(/.test(code)) {
+        if (existsSync(outPath)) unlinkSync(outPath);
+        continue;
+      }
+
+      writeFileSync(outPath, code);
+      count++;
+    } catch (err) {
+      console.warn(`  Warning: Failed to transpile ${file}: ${err.message}`);
+    }
+  }
+
+  if (count > 0) {
+    console.log(`Transpiled ${count} e2e test file${count > 1 ? 's' : ''}.`);
+  }
+  return count;
+}
+
+function generatePlaywrightConfig(appRoot) {
+  const configPath = join(appRoot, 'playwright.config.js');
+  if (existsSync(configPath)) return;
+
+  const config = `import { defineConfig } from "@playwright/test";
+
+export default defineConfig({
+  testDir: "./test/system",
+  testMatch: "**/*.spec.mjs",
+  use: {
+    baseURL: "http://localhost:5173"
+  },
+  webServer: {
+    command: "npx juntos dev",
+    url: "http://localhost:5173",
+    reuseExistingServer: !process.env.CI
+  }
+});
+`;
+  writeFileSync(configPath, config);
+  console.log('Generated playwright.config.js');
+}
+
+async function runE2E(options, e2eArgs) {
+  validateRailsApp();
+  loadDatabaseConfig(options);
+  validateDatabaseTarget(options);
+  ensurePackagesInstalled(options);
+  applyEnvOptions(options);
+
+  const { loadConfig } = await import('./vite.mjs');
+  const config = loadConfig(APP_ROOT, {
+    database: options.database,
+    target: options.target
+  });
+  await transpileE2EFiles(APP_ROOT, config);
+
+  // Auto-install @playwright/test if needed
+  if (!isPackageInstalled('@playwright/test')) {
+    console.log('Installing @playwright/test...');
+    try {
+      execSync('npm install @playwright/test', {
+        cwd: APP_ROOT,
+        stdio: 'inherit'
+      });
+    } catch (e) {
+      console.error('Failed to install @playwright/test.');
+      process.exit(1);
+    }
+
+    console.log('Installing Playwright browsers...');
+    try {
+      execSync('npx playwright install --with-deps chromium', {
+        cwd: APP_ROOT,
+        stdio: 'inherit'
+      });
+    } catch (e) {
+      console.error('Failed to install Playwright browsers.');
+      process.exit(1);
+    }
+  }
+
+  // Generate playwright.config.js if missing
+  generatePlaywrightConfig(APP_ROOT);
+
+  // Run: npx playwright test [args]
+  console.log('Running e2e tests...');
+  const result = spawnSync('npx', ['playwright', 'test', ...e2eArgs], {
+    cwd: APP_ROOT,
+    stdio: 'inherit',
+    env: process.env
+  });
+
+  process.exit(result.status || 0);
+}
+
+// ============================================
 // Command: deploy
 // ============================================
 
@@ -4241,6 +4367,7 @@ Commands:
   build     Build for deployment
   eject     Write transpiled JavaScript files to disk (for debugging/migration)
   test      Run tests with Vitest
+  e2e       Run end-to-end tests with Playwright
   server    Start production server (requires prior build)
   deploy    Build and deploy to serverless platform
   up        Build and run locally (node, bun, browser)
@@ -4457,6 +4584,23 @@ switch (command) {
     }
     runTest(options, commandArgs).catch(err => {
       console.error(`Test failed: ${err.message}`);
+      process.exit(1);
+    });
+    break;
+
+  case 'e2e':
+    if (options.help) {
+      console.log('Usage: juntos e2e [options] [files...]\n\nRun end-to-end tests with Playwright.\n');
+      console.log('Options:');
+      console.log('  -d, --database ADAPTER   Database adapter for tests');
+      console.log('\nExamples:');
+      console.log('  juntos e2e                     # Run all e2e tests');
+      console.log('  juntos e2e --headed            # Run with visible browser');
+      console.log('  juntos e2e --ui                # Open Playwright UI mode');
+      process.exit(0);
+    }
+    runE2E(options, commandArgs).catch(err => {
+      console.error(`E2E tests failed: ${err.message}`);
       process.exit(1);
     });
     break;

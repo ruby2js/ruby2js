@@ -112,6 +112,50 @@ npx juntos test test/models/           # Run tests in directory
 
 This mirrors `bin/rails test` — tests can be run with Rails (`bin/rails test`), with Juntos (`npx juntos test`), or directly with Vitest (`npx vitest`).
 
+## juntos e2e
+
+Run end-to-end tests with Playwright. Transpiles `test/system/*.rb` files to Playwright tests and runs them against a real browser.
+
+```bash
+npx juntos e2e [options] [args...]
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-d, --database ADAPTER` | Database adapter for tests |
+| `-h, --help` | Show help |
+
+Additional arguments are passed through to `npx playwright test` (e.g., `--headed`, `--ui`, `--workers=1`).
+
+**Examples:**
+
+```bash
+npx juntos e2e                         # Run all e2e tests
+npx juntos e2e --headed                # Run with visible browser
+npx juntos e2e --ui                    # Open Playwright UI mode
+npx juntos e2e -d sqlite              # Run with SQLite database
+```
+
+**What it does:**
+
+1. Transpiles `test/system/*.rb` files to `.spec.mjs` (Playwright format)
+2. Installs `@playwright/test` and Chromium if not present
+3. Generates `playwright.config.js` if missing (configures `test/system/` as test dir, starts `juntos dev` as web server)
+4. Runs `npx playwright test` with any additional arguments
+
+**Two-tier testing model:**
+
+The same `test/system/*.rb` source files produce two outputs:
+
+| Command | Output | Extension | Runner |
+|---------|--------|-----------|--------|
+| `juntos test` | Vitest + jsdom | `.test.mjs` | Fast, every commit |
+| `juntos e2e` | Playwright | `.spec.mjs` | Thorough, periodic |
+
+See [Testing](/docs/juntos/testing#end-to-end-testing-with-playwright) for the full transform mapping and `playwright?` constant.
+
 ## juntos build
 
 Build the app for deployment.
