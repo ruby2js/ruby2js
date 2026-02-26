@@ -235,26 +235,32 @@ test.describe("ChatSystem", () => {
 });
 ```
 
-### The `playwright?` Constant
+### The `defined? Playwright` Guard
 
-Use `playwright?` as a compile-time constant to write code that differs between tiers:
+Use `defined? Playwright` to write code that differs between tiers. It works naturally across all three runtimes:
+
+| Runtime | `defined? Playwright` | Why |
+|---|---|---|
+| `rails test:system` | `nil` (falsy) | No `Playwright` constant in Ruby |
+| `juntos test` | `false` | Transpiles to `typeof Playwright !== "undefined"` — no such global |
+| `juntos e2e` | `true` | Playwright filter intercepts and returns `true` |
 
 ```ruby
 class ChatSystemTest < ApplicationSystemTestCase
   test "visual regression" do
     visit messages_url
     # Only in Playwright (real browser)
-    expect(page).to_have_screenshot if playwright?
+    expect(page).to_have_screenshot if defined? Playwright
   end
 
   test "skip in e2e" do
-    skip if playwright?
+    skip if defined? Playwright
     # jsdom-only test logic
   end
 end
 ```
 
-Under `juntos test`, `playwright?` transpiles to `false`. Under `juntos e2e`, it transpiles to `true`. The JavaScript engine eliminates the dead branch.
+This follows the same pattern as `skip unless defined? Document` used in Stimulus controller tests (skips under Rails where there's no DOM, runs under Juntos with jsdom).
 
 ### Generated Files
 

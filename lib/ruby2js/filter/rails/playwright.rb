@@ -19,7 +19,7 @@
 #   assert_text "T"                   → await expect(page.locator("body")).toContainText("T")
 #   assert_no_selector "css"          → await expect(page.locator("css")).not.toBeVisible()
 #   assert_no_text "T"                → await expect(page.locator("body")).not.toContainText("T")
-#   playwright?                       → true
+#   defined? Playwright               → true
 #
 # Usage:
 #   Ruby2JS.convert(source, filters: [...], metadata: { 'playwright' => true })
@@ -151,11 +151,6 @@ module Ruby2JS
             return s(:hide)
           end
 
-          # playwright? → true
-          if target.nil? && method == :playwright?
-            return s(:true)
-          end
-
           # Only transform inside describe blocks
           if @playwright_describe_depth > 0 && target.nil?
             result = transform_capybara_to_playwright(method, args)
@@ -167,6 +162,16 @@ module Ruby2JS
             end
           end
 
+          super
+        end
+
+        # defined? Playwright → true (compile-time constant)
+        def on_defined?(node)
+          return super unless is_playwright_file
+          child = node.children.first
+          if child.type == :const && child.children[1] == :Playwright
+            return s(:true)
+          end
           super
         end
 

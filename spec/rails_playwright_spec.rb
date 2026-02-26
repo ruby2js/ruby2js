@@ -288,16 +288,28 @@ describe Ruby2JS::Filter::Rails::Playwright do
     end
   end
 
-  describe "playwright? constant" do
-    it "converts playwright? to true" do
+  describe "defined? Playwright constant" do
+    it "converts defined? Playwright to true" do
       result = to_js(<<~RUBY)
         class ChatSystemTest < ApplicationSystemTestCase
           test "playwright only" do
-            x = playwright?
+            x = defined? Playwright
           end
         end
       RUBY
       assert_includes result, 'true'
+      refute_includes result, 'typeof'
+    end
+
+    it "leaves other defined? checks unchanged" do
+      result = to_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "checks document" do
+            skip unless defined? Document
+          end
+        end
+      RUBY
+      assert_includes result, 'typeof Document'
     end
   end
 

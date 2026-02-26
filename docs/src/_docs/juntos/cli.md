@@ -154,7 +154,7 @@ The same `test/system/*.rb` source files produce two outputs:
 | `juntos test` | Vitest + jsdom | `.test.mjs` | Fast, every commit |
 | `juntos e2e` | Playwright | `.spec.mjs` | Thorough, periodic |
 
-See [Testing](/docs/juntos/testing#end-to-end-testing-with-playwright) for the full transform mapping and `playwright?` constant.
+See [Testing](/docs/juntos/testing#end-to-end-testing-with-playwright) for the full transform mapping and `defined? Playwright` guard.
 
 ## juntos build
 
