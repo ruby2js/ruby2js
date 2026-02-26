@@ -1470,8 +1470,10 @@ export default mergeConfig(viteConfig, defineConfig({
 
     // Discover Stimulus controllers for system test registration
     let stimSection = '';
+    const systemTestDir = join(destDir, 'test/system');
+    const hasSystemTests = existsSync(systemTestDir) && readdirSync(systemTestDir).some(f => f.endsWith('.rb'));
     const stimDir = join(destDir, 'app/javascript/controllers');
-    if (existsSync(stimDir)) {
+    if (hasSystemTests && existsSync(stimDir)) {
       const stimEntries = [];
       for (const f of readdirSync(stimDir)) {
         if (f.endsWith('_controller.rb') || f.endsWith('_controller.js')) {
@@ -2550,10 +2552,12 @@ async function runEject(options) {
   writeFileSync(join(outDir, 'vitest.config.js'), generateVitestConfigForEject(config));
   fileCount++;
 
-  // Discover Stimulus controllers for system test registration
+  // Discover Stimulus controllers for system test registration (only needed for system tests)
   const stimulusControllers = [];
+  const ejectSystemTestDir = join(APP_ROOT, 'test/system');
+  const ejectHasSystemTests = existsSync(ejectSystemTestDir) && readdirSync(ejectSystemTestDir).some(f => f.endsWith('.rb'));
   const stimControllersDir = join(APP_ROOT, 'app/javascript/controllers');
-  if (existsSync(stimControllersDir)) {
+  if (ejectHasSystemTests && existsSync(stimControllersDir)) {
     for (const file of readdirSync(stimControllersDir)) {
       if (file.endsWith('_controller.rb') || file.endsWith('_controller.js')) {
         const ext = file.endsWith('.rb') ? '.rb' : '.js';
