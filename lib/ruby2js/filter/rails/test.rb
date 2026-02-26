@@ -69,6 +69,7 @@ module Ruby2JS
           @rails_test_checked = false
           @rails_test_describe_depth = 0
           @rails_test_integration = false
+          @rails_test_system = false
           @rails_test_class_controller = nil
           @rails_test_response_var = false
           @rails_test_current_handled = false
@@ -76,6 +77,7 @@ module Ruby2JS
           @rails_test_has_assert_select = false
           @rails_test_stimulus_controllers = []
           @rails_test_has_stimulus = false
+          @rails_test_has_system_test = false
         end
 
         # Handle class-based test definitions
@@ -91,13 +93,15 @@ module Ruby2JS
           name = class_name.children.last.to_s
           describe_name = name.end_with?('Test') ? name[0..-5] : name
 
-          # Detect integration test class
+          # Detect integration and system test classes
           is_integration = integration_test_class?(superclass)
+          is_system = system_test_class?(superclass)
 
           result = nil
           begin
             @rails_test_describe_depth += 1
-            @rails_test_integration = is_integration
+            @rails_test_integration = is_system ? true : is_integration
+            @rails_test_system = is_system
             @rails_test_class_controller = describe_name if is_integration && describe_name.end_with?('Controller')
             @rails_test_current_handled = false
 
@@ -108,8 +112,8 @@ module Ruby2JS
             # Transform class body
             transformed_body = transform_class_body(body)
 
-            # For integration tests, prepend context helper
-            if is_integration && transformed_body
+            # For integration tests (not system tests), prepend context helper
+            if is_integration && !is_system && transformed_body
               context_helper = build_context_helper
               if transformed_body.type == :begin
                 transformed_body = s(:begin, context_helper, *transformed_body.children)
@@ -138,6 +142,10 @@ module Ruby2JS
                 ' document.body.innerHTML = "" })'))
             end
 
+            if is_system
+              extra_nodes.push(s(:jsraw, 'afterEach(() => cleanup())'))
+            end
+
             if extra_nodes.length > 0
               if transformed_body && transformed_body.type == :begin
                 transformed_body = s(:begin, *extra_nodes, *transformed_body.children)
@@ -164,6 +172,7 @@ module Ruby2JS
           ensure
             @rails_test_describe_depth -= 1
             @rails_test_integration = false
+            @rails_test_system = false
           end
           result
         end
@@ -193,29 +202,35 @@ module Ruby2JS
           if @rails_test_describe_depth > 0
             # Integration test specific transforms
             if @rails_test_integration
-              # HTTP method calls -> controller action calls
-              if target.nil? && [:get, :post, :patch, :put, :delete].include?(method)
-                return transform_http_to_action(method, args)
-              end
+              # System test (Capybara) transforms
+              if @rails_test_system
+                result = transform_system_test_method(target, method, args)
+                return result if result
+              else
+                # HTTP method calls -> controller action calls
+                if target.nil? && [:get, :post, :patch, :put, :delete].include?(method)
+                  return transform_http_to_action(method, args)
+                end
 
-              # assert_response
-              if target.nil? && method == :assert_response
-                return transform_assert_response(args)
-              end
+                # assert_response
+                if target.nil? && method == :assert_response
+                  return transform_assert_response(args)
+                end
 
-              # assert_redirected_to
-              if target.nil? && method == :assert_redirected_to
-                return transform_assert_redirected_to(args)
-              end
+                # assert_redirected_to
+                if target.nil? && method == :assert_redirected_to
+                  return transform_assert_redirected_to(args)
+                end
 
-              # assert_select
-              if target.nil? && method == :assert_select
-                return transform_assert_select(args)
-              end
+                # assert_select
+                if target.nil? && method == :assert_select
+                  return transform_assert_select(args)
+                end
 
-              # connect_stimulus "identifier", ControllerClass
-              if target.nil? && method == :connect_stimulus && args.length == 2
-                return transform_connect_stimulus(args)
+                # connect_stimulus "identifier", ControllerClass
+                if target.nil? && method == :connect_stimulus && args.length == 2
+                  return transform_connect_stimulus(args)
+                end
               end
 
               # URL helper -> path helper (standalone, e.g. in assert_redirected_to context)
@@ -544,6 +559,14 @@ module Ruby2JS
         # Uses metadata to determine file paths and import mode (eject vs. virtual).
         def build_test_imports
           imports = []
+
+          # System test imports don't depend on metadata
+          if @rails_test_has_system_test
+            system_helpers = [:visit, :fillIn, :clickButton, :findField, :findButton, :cleanup]
+            system_consts = system_helpers.map { |name| s(:const, nil, name) }
+            imports.push(s(:import, ['juntos/system_test.mjs'], system_consts))
+          end
+
           meta = @options[:metadata]
           return imports unless meta
 
@@ -852,6 +875,8 @@ module Ruby2JS
           [
             'ActiveSupport::TestCase',
             'ActionDispatch::IntegrationTest',
+            'ActionDispatch::SystemTestCase',
+            'ApplicationSystemTestCase',
             'ActionController::TestCase',
             'ActionMailer::TestCase',
             'ActionView::TestCase',
@@ -864,6 +889,13 @@ module Ruby2JS
           return false unless superclass&.type == :const
           superclass_name = const_name(superclass)
           superclass_name.include?('IntegrationTest')
+        end
+
+        # Check if this is a system test class (Capybara-style)
+        def system_test_class?(superclass)
+          return false unless superclass&.type == :const
+          superclass_name = const_name(superclass)
+          superclass_name.include?('SystemTestCase')
         end
 
         # Get fully qualified constant name from AST node
@@ -1407,6 +1439,129 @@ module Ruby2JS
           s(:send,
             s(:send, nil, :expect, s(:send!, nil, :String, s(:attr, s(:lvar, :response), :redirect))),
             :toBe, s(:send!, nil, :String, url_node))
+        end
+
+        # Transform Capybara-style system test methods
+        # visit, fill_in, click_button, assert_field, assert_selector, assert_text
+        def transform_system_test_method(target, method, args)
+          return nil unless target.nil?
+
+          # Emit @vitest-environment jsdom directive once per file
+          unless @rails_test_has_system_test
+            @rails_test_has_system_test = true
+            self.prepend_list << s(:jsraw, '// @vitest-environment jsdom')
+          end
+
+          case method
+          when :visit
+            # visit messages_url -> await visit(messages_path())
+            return nil if args.empty?
+            url_node = process(args.first)
+            s(:send, nil, :await, s(:send!, nil, :visit, url_node))
+
+          when :fill_in
+            # fill_in "locator", with: "value" -> await fillIn("locator", "value")
+            return nil if args.length < 2
+            locator = process(args[0])
+            value_hash = args[1]
+            return nil unless value_hash.type == :hash
+            value_node = nil
+            value_hash.children.each do |pair|
+              if pair.children[0].type == :sym && pair.children[0].children[0] == :with
+                value_node = process(pair.children[1])
+              end
+            end
+            return nil unless value_node
+            s(:send, nil, :await, s(:send!, nil, :fillIn, locator, value_node))
+
+          when :click_button, :click_on
+            # click_button "Send" -> await clickButton("Send")
+            return nil if args.empty?
+            text = process(args.first)
+            s(:send, nil, :await, s(:send!, nil, :clickButton, text))
+
+          when :assert_field
+            # assert_field "locator", with: "value" -> expect(findField("locator").value).toBe("value")
+            return nil if args.empty?
+            locator = process(args[0])
+            if args.length >= 2 && args[1].type == :hash
+              value_node = nil
+              args[1].children.each do |pair|
+                if pair.children[0].type == :sym && pair.children[0].children[0] == :with
+                  value_node = process(pair.children[1])
+                end
+              end
+              if value_node
+                return s(:send,
+                  s(:send, nil, :expect,
+                    s(:attr, s(:send!, nil, :findField, locator), :value)),
+                  :toBe, value_node)
+              end
+            end
+            # assert_field "locator" (existence check)
+            s(:send,
+              s(:send, nil, :expect, s(:send!, nil, :findField, locator)),
+              :toBeTruthy)
+
+          when :assert_selector
+            # assert_selector "css", text: "content"
+            return nil if args.empty?
+            selector = process(args[0])
+            if args.length >= 2 && args[1].type == :hash
+              text_node = nil
+              args[1].children.each do |pair|
+                if pair.children[0].type == :sym && pair.children[0].children[0] == :text
+                  text_node = process(pair.children[1])
+                end
+              end
+              if text_node
+                # expect(document.querySelector("css").textContent).toContain("text")
+                return s(:send,
+                  s(:send, nil, :expect,
+                    s(:attr,
+                      s(:send, s(:lvar, :document), :querySelector, selector),
+                      :textContent)),
+                  :toContain, text_node)
+              end
+            end
+            # assert_selector "css" (existence check)
+            s(:send,
+              s(:send, nil, :expect,
+                s(:send, s(:lvar, :document), :querySelector, selector)),
+              :toBeTruthy)
+
+          when :assert_text
+            # assert_text "content" -> expect(document.body.textContent).toContain("content")
+            return nil if args.empty?
+            text = process(args.first)
+            s(:send,
+              s(:send, nil, :expect,
+                s(:attr, s(:attr, s(:lvar, :document), :body), :textContent)),
+              :toContain, text)
+
+          when :assert_no_selector
+            # assert_no_selector "css" -> expect(document.querySelector("css")).toBeNull()
+            return nil if args.empty?
+            selector = process(args[0])
+            s(:send!,
+              s(:send, nil, :expect,
+                s(:send, s(:lvar, :document), :querySelector, selector)),
+              :toBeNull)
+
+          when :assert_no_text
+            # assert_no_text "content" -> expect(document.body.textContent).not.toContain("content")
+            return nil if args.empty?
+            text = process(args.first)
+            s(:send,
+              s(:attr,
+                s(:send, nil, :expect,
+                  s(:attr, s(:attr, s(:lvar, :document), :body), :textContent)),
+                :not),
+              :toContain, text)
+
+          else
+            nil
+          end
         end
 
         # Transform connect_stimulus "identifier", ControllerClass

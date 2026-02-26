@@ -81,9 +81,57 @@ end
 
 The filter transforms `get`, `post`, etc. into controller action calls, `assert_response` and `assert_redirected_to` into `expect()` calls, and `assert_select` into DOM queries using jsdom.
 
+### System Tests
+
+Write Capybara-style system tests that run in jsdom without a browser. Use `visit`, `fill_in`, `click_button`, and assertion helpers — same API as Rails system tests:
+
+```ruby
+class ChatSystemTest < ApplicationSystemTestCase
+  test "clears input after sending message" do
+    visit messages_url
+    fill_in "Your name", with: "Alice"
+    fill_in "Type a message...", with: "Hello!"
+    click_button "Send"
+    assert_field "Type a message...", with: ""
+  end
+
+  test "creates message and displays it" do
+    visit messages_url
+    fill_in "Your name", with: "Alice"
+    fill_in "Type a message...", with: "Hello!"
+    click_button "Send"
+    visit messages_url
+    assert_selector "#messages", text: "Hello!"
+  end
+end
+```
+
+Place system tests in `test/system/`. They work under both `rails test:system` (Selenium) and `juntos test` (jsdom + fetch interceptor).
+
+**How it works:**
+
+- `visit messages_url` — fetches the page via the fetch interceptor (routes to your controller action), renders the HTML into `document.body`, auto-discovers `data-controller` attributes, and starts Stimulus controllers
+- `fill_in "placeholder", with: "value"` — finds an input by placeholder text, label, or name, then sets its value
+- `click_button "Send"` — finds the button, builds `FormData` from its parent form, submits via `fetch`, and handles Turbo Stream responses or redirects
+- `assert_field`, `assert_selector`, `assert_text` — DOM assertions using `querySelector` and `textContent`
+- Stimulus controllers are auto-registered from `test/setup.mjs` — `juntos test` discovers controllers in `app/javascript/controllers/` and calls `registerController()` at setup time
+- DOM cleanup runs automatically after each test via `afterEach(() => cleanup())`
+
+**Capybara methods transpiled:**
+
+| Ruby | JavaScript |
+|------|-----------|
+| `visit messages_url` | `await visit(messages_path())` |
+| `fill_in "Name", with: "Alice"` | `await fillIn("Name", "Alice")` |
+| `click_button "Send"` | `await clickButton("Send")` |
+| `assert_field "Name", with: ""` | `expect(findField("Name").value).toBe("")` |
+| `assert_selector "#el", text: "Hi"` | `expect(document.querySelector("#el").textContent).toContain("Hi")` |
+| `assert_text "Welcome"` | `expect(document.body.textContent).toContain("Welcome")` |
+| `assert_no_selector ".error"` | `expect(document.querySelector(".error")).toBeNull()` |
+
 ### Testing Stimulus Controllers
 
-Use `connect_stimulus` to test Stimulus controller behaviors in jsdom without a browser. Tests that use DOM APIs should skip under Rails with `skip unless defined? Document`:
+For unit-testing individual Stimulus controller methods (rather than full user flows), use `connect_stimulus` inside an integration test:
 
 ```ruby
 class MessagesControllerTest < ActionDispatch::IntegrationTest
@@ -98,23 +146,6 @@ class MessagesControllerTest < ActionDispatch::IntegrationTest
     form.dispatchEvent(Event.new("turbo:submit-end", bubbles: true))
 
     assert_equal "", body_input.value
-  end
-
-  test "auto-scrolls on new message" do
-    skip unless defined? Document
-    window.Element.prototype.scrollIntoView = -> {}
-    get messages_url
-    connect_stimulus "chat", ChatController
-
-    messages_div = document.querySelector("#messages")
-    new_msg = document.createElement("div")
-    new_msg.setAttribute("data-chat-target", "message")
-    new_msg.scrollIntoView = vi.fn()
-    messages_div.appendChild(new_msg)
-
-    await_mutations
-
-    assert new_msg.scrollIntoView.mock.calls.length > 0
   end
 end
 ```

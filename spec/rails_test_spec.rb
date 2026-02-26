@@ -1565,4 +1565,227 @@ describe Ruby2JS::Filter::Rails::Test do
       assert_includes result, '_stimulusApp = Application.start()'
     end
   end
+
+  # ============================================
+  # System test (Capybara) transforms
+  # ============================================
+
+  def to_system_js(string)
+    Ruby2JS.convert(string, {
+      filters: [Ruby2JS::Filter::Rails::Test],
+      eslevel: 2020,
+      file: 'test/system/chat_system_test.rb'
+    }).to_s
+  end
+
+  describe "system test class detection" do
+    it "converts ApplicationSystemTestCase class to describe" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "works" do
+            true
+          end
+        end
+      RUBY
+      assert_includes result, 'describe("ChatSystem"'
+      refute_includes result, 'ChatSystemTest'
+    end
+
+    it "converts ActionDispatch::SystemTestCase class to describe" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ActionDispatch::SystemTestCase
+          test "works" do
+            true
+          end
+        end
+      RUBY
+      assert_includes result, 'describe("ChatSystem"'
+    end
+
+    it "does not emit context helper for system tests" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "works" do
+            true
+          end
+        end
+      RUBY
+      refute_includes result, 'function context'
+    end
+
+    it "emits cleanup afterEach for system tests" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "works" do
+            visit messages_url
+          end
+        end
+      RUBY
+      assert_includes result, 'afterEach(() => cleanup())'
+    end
+
+    it "emits jsdom vitest environment directive" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "works" do
+            visit messages_url
+          end
+        end
+      RUBY
+      assert_includes result, '// @vitest-environment jsdom'
+    end
+
+    it "imports system test helpers" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "works" do
+            visit messages_url
+          end
+        end
+      RUBY
+      assert_includes result, 'from "juntos/system_test.mjs"'
+      assert_includes result, 'visit'
+      assert_includes result, 'fillIn'
+      assert_includes result, 'clickButton'
+      assert_includes result, 'findField'
+      assert_includes result, 'cleanup'
+    end
+  end
+
+  describe "Capybara visit" do
+    it "converts visit url to await visit(path)" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "visits page" do
+            visit messages_url
+          end
+        end
+      RUBY
+      assert_includes result, 'await(visit(messages_path()))'
+    end
+  end
+
+  describe "Capybara fill_in" do
+    it "converts fill_in with: to await fillIn" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "fills in field" do
+            fill_in "Your name", with: "Alice"
+          end
+        end
+      RUBY
+      assert_includes result, 'await(fillIn("Your name", "Alice"))'
+    end
+  end
+
+  describe "Capybara click_button" do
+    it "converts click_button to await clickButton" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "clicks button" do
+            click_button "Send"
+          end
+        end
+      RUBY
+      assert_includes result, 'await(clickButton("Send"))'
+    end
+
+    it "converts click_on to await clickButton" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "clicks button" do
+            click_on "Send"
+          end
+        end
+      RUBY
+      assert_includes result, 'await(clickButton("Send"))'
+    end
+  end
+
+  describe "Capybara assert_field" do
+    it "converts assert_field with: to expect findField value" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "checks field" do
+            assert_field "Type a message...", with: ""
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(findField("Type a message...").value).toBe("")'
+    end
+
+    it "converts assert_field without with: to existence check" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "checks field exists" do
+            assert_field "Your name"
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(findField("Your name")).toBeTruthy()'
+    end
+  end
+
+  describe "Capybara assert_selector" do
+    it "converts assert_selector with text: to querySelector + textContent" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "checks content" do
+            assert_selector "#messages", text: "Hello!"
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.querySelector("#messages").textContent).toContain("Hello!")'
+    end
+
+    it "converts assert_selector without text: to existence check" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "checks element exists" do
+            assert_selector "#messages"
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.querySelector("#messages")).toBeTruthy()'
+    end
+  end
+
+  describe "Capybara assert_text" do
+    it "converts assert_text to body textContent check" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "checks text" do
+            assert_text "Welcome"
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.body.textContent).toContain("Welcome")'
+    end
+  end
+
+  describe "Capybara assert_no_selector" do
+    it "converts assert_no_selector to toBeNull check" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "checks no element" do
+            assert_no_selector ".error"
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.querySelector(".error")).toBeNull()'
+    end
+  end
+
+  describe "Capybara assert_no_text" do
+    it "converts assert_no_text to not.toContain check" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "checks no text" do
+            assert_no_text "Error"
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(document.body.textContent).not.toContain("Error")'
+    end
+  end
 end

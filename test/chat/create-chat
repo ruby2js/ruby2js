@@ -276,36 +276,30 @@ class MessagesControllerTest < ActionDispatch::IntegrationTest
     end
     assert_redirected_to messages_path
   end
+end
+TEST
 
-  test "clears input after form submission" do
-    skip unless defined? Document
-    get messages_url
-    connect_stimulus "chat", ChatController
+# System tests (Capybara-style, runs in jsdom via Juntos)
+mkdir -p test/system
+cat > test/system/chat_system_test.rb << 'TEST'
+require "test_helper"
 
-    body_input = document.querySelector("[data-chat-target='body']")
-    body_input.value = "Hello!"
-
-    form = document.querySelector("form")
-    form.dispatchEvent(Event.new("turbo:submit-end", bubbles: true))
-
-    assert_equal "", body_input.value
+class ChatSystemTest < ApplicationSystemTestCase
+  test "clears input after sending message" do
+    visit messages_url
+    fill_in "Your name", with: "Alice"
+    fill_in "Type a message...", with: "Hello!"
+    click_button "Send"
+    assert_field "Type a message...", with: ""
   end
 
-  test "auto-scrolls on new message" do
-    skip unless defined? Document
-    window.Element.prototype.scrollIntoView = -> {}
-    get messages_url
-    connect_stimulus "chat", ChatController
-
-    messages_div = document.querySelector("#messages")
-    new_msg = document.createElement("div")
-    new_msg.setAttribute("data-chat-target", "message")
-    new_msg.scrollIntoView = vi.fn()
-    messages_div.appendChild(new_msg)
-
-    await_mutations
-
-    assert new_msg.scrollIntoView.mock.calls.length > 0
+  test "creates message and displays it" do
+    visit messages_url
+    fill_in "Your name", with: "Alice"
+    fill_in "Type a message...", with: "Hello!"
+    click_button "Send"
+    visit messages_url
+    assert_selector "#messages", text: "Hello!"
   end
 end
 TEST

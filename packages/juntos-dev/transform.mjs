@@ -1090,9 +1090,21 @@ export function generateTestSetupForEject(config = {}) {
     ? `\n${helperImports}\n\n// Make test helpers globally available (like Rails includes)\n${helperGlobals}\n`
     : '';
 
+  // Generate Stimulus controller registration for system tests
+  const stimulusControllers = config.stimulusControllers || [];
+  const stimulusImports = stimulusControllers.map(c =>
+    `import ${c.className} from '../app/javascript/controllers/${c.file}';`
+  ).join('\n');
+  const stimulusRegistrations = stimulusControllers.map(c =>
+    `registerController('${c.name}', ${c.className});`
+  ).join('\n');
+  const stimulusSection = stimulusControllers.length > 0
+    ? `\nimport { registerController } from 'juntos/system_test.mjs';\n${stimulusImports}\n${stimulusRegistrations}\n`
+    : '';
+
   return `// Test setup for Vitest - ejected version
 import { beforeAll, beforeEach, afterEach, expect } from 'vitest';
-import { installFetchInterceptor } from 'juntos/test_fetch.mjs';${fixtureImport}${helperSection}
+import { installFetchInterceptor } from 'juntos/test_fetch.mjs';${fixtureImport}${stimulusSection}${helperSection}
 
 // Compare ActiveRecord model instances by class and id (like Rails)
 expect.addEqualityTesters([

@@ -988,9 +988,11 @@ async function transpileTestFiles(appRoot, config) {
   // Check if there are any Ruby test files
   const modelTestDir = join(testDir, 'models');
   const controllerTestDir = join(testDir, 'controllers');
+  const systemTestDir = join(testDir, 'system');
   const hasModelTests = existsSync(modelTestDir) && findRubyTestFiles(modelTestDir).length > 0;
   const hasControllerTests = existsSync(controllerTestDir) && findRubyTestFiles(controllerTestDir).length > 0;
-  if (!hasModelTests && !hasControllerTests) return;
+  const hasSystemTests = existsSync(systemTestDir) && findRubyTestFiles(systemTestDir).length > 0;
+  if (!hasModelTests && !hasControllerTests && !hasSystemTests) return;
 
   // Pre-analyze all models to populate metadata with associations, scopes, etc.
   // This replaces the regex-based buildAssociationMapFromRuby with actual
@@ -1063,6 +1065,43 @@ async function transpileTestFiles(appRoot, config) {
           metadata.fixture_plan = null;
         }
         const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, appRoot, metadata);
+        let code = result.code;
+
+        // Skip empty test suites (no test() calls)
+        if (!/\btest\s*\(/.test(code)) {
+          if (existsSync(outPath)) unlinkSync(outPath);
+          continue;
+        }
+
+        writeFileSync(outPath, code);
+        count++;
+      } catch (err) {
+        console.warn(`  Warning: Failed to transpile ${file}: ${err.message}`);
+      }
+    }
+  }
+
+  // Transpile system tests
+  if (hasSystemTests) {
+    for (const file of findRubyTestFiles(systemTestDir)) {
+      const outName = file.replace(/_test\.rb$/, '.test.mjs');
+      const outPath = join(systemTestDir, outName);
+
+      // Skip if .test.mjs is newer than _test.rb
+      if (existsSync(outPath)) {
+        const rbStat = statSync(join(systemTestDir, file));
+        const mjsStat = statSync(outPath);
+        if (mjsStat.mtimeMs > rbStat.mtimeMs) continue;
+      }
+
+      try {
+        const source = readFileSync(join(systemTestDir, file), 'utf-8');
+        if (Object.keys(fixtures).length > 0) {
+          metadata.fixture_plan = buildFixturePlan(source, fixtures, associationMap);
+        } else {
+          metadata.fixture_plan = null;
+        }
+        const result = await transformRuby(source, join(systemTestDir, file), 'test', config, appRoot, metadata);
         let code = result.code;
 
         // Skip empty test suites (no test() calls)
@@ -1428,11 +1467,37 @@ export default mergeConfig(viteConfig, defineConfig({
     if (!existsSync(testDir)) {
       mkdirSync(testDir, { recursive: true });
     }
+
+    // Discover Stimulus controllers for system test registration
+    let stimSection = '';
+    const stimDir = join(destDir, 'app/javascript/controllers');
+    if (existsSync(stimDir)) {
+      const stimEntries = [];
+      for (const f of readdirSync(stimDir)) {
+        if (f.endsWith('_controller.rb') || f.endsWith('_controller.js')) {
+          const name = f.replace(/_controller\.(rb|js)$/, '').replace(/_/g, '-');
+          const className = f.replace(/_controller\.(rb|js)$/, '')
+            .split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('') + 'Controller';
+          const ext = f.endsWith('.rb') ? '.rb' : '.js';
+          stimEntries.push({ name, className, file: f.replace(/\.js$/, ext) });
+        }
+      }
+      if (stimEntries.length > 0) {
+        const imports = stimEntries.map(c =>
+          `import ${c.className} from '../app/javascript/controllers/${c.file}';`
+        ).join('\n');
+        const regs = stimEntries.map(c =>
+          `registerController('${c.name}', ${c.className});`
+        ).join('\n');
+        stimSection = `\nimport { registerController } from 'juntos/system_test.mjs';\n${imports}\n${regs}\n`;
+      }
+    }
+
     writeFileSync(setupPath, `// Test setup for Vitest
 // Initializes the database before each test
 
 import { beforeAll, beforeEach, afterAll } from 'vitest';
-import { installFetchInterceptor } from 'juntos/test_fetch.mjs';
+import { installFetchInterceptor } from 'juntos/test_fetch.mjs';${stimSection}
 
 // Suppress ActiveRecord CRUD logging during tests
 const _info = console.info;
@@ -2485,12 +2550,28 @@ async function runEject(options) {
   writeFileSync(join(outDir, 'vitest.config.js'), generateVitestConfigForEject(config));
   fileCount++;
 
+  // Discover Stimulus controllers for system test registration
+  const stimulusControllers = [];
+  const stimControllersDir = join(APP_ROOT, 'app/javascript/controllers');
+  if (existsSync(stimControllersDir)) {
+    for (const file of readdirSync(stimControllersDir)) {
+      if (file.endsWith('_controller.rb') || file.endsWith('_controller.js')) {
+        const ext = file.endsWith('.rb') ? '.rb' : '.js';
+        const jsFile = file.replace(/\.rb$/, '.js');
+        const name = file.replace(/_controller\.(rb|js)$/, '').replace(/_/g, '-');
+        const className = file.replace(/_controller\.(rb|js)$/, '')
+          .split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('') + 'Controller';
+        stimulusControllers.push({ name, className, file: jsFile });
+      }
+    }
+  }
+
   // Generate test/setup.mjs and test/globals.mjs
   const outTestDir = join(outDir, 'test');
   if (!existsSync(outTestDir)) {
     mkdirSync(outTestDir, { recursive: true });
   }
-  writeFileSync(join(outTestDir, 'setup.mjs'), generateTestSetupForEject({ ...config, hasFixtures, helpers: helperExports }));
+  writeFileSync(join(outTestDir, 'setup.mjs'), generateTestSetupForEject({ ...config, hasFixtures, helpers: helperExports, stimulusControllers }));
   fileCount++;
   writeFileSync(join(outTestDir, 'globals.mjs'), generateTestGlobalsForEject());
   fileCount++;
