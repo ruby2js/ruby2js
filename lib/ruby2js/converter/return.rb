@@ -17,7 +17,7 @@ module Ruby2JS
       :block, :const, :true, :false, :xnode, :taglit, :self,
       :op_asgn, :and_asgn, :or_asgn, :taglit, :gvar, :csend, :call, :typeof,
       :await, :await!, :await_attr,
-      :jsraw ]  # jsraw is used by RBX mode for JSX
+      :instanceof, :jsraw ]  # jsraw is used by RBX mode for JSX
 
     handle :autoreturn do |*statements|
       return if statements.length == 1 && statements.first.nil?

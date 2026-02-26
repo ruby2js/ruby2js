@@ -895,6 +895,11 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'x instanceof MyClass'
     end
 
+    it "should autoreturn instanceof inside a block" do
+      to_js( 'list.any? {|child| child.is_a?(Foo)}' ).
+        must_equal 'list.some(child => child instanceof Foo)'
+    end
+
     it "should map instance_of? to constructor check" do
       to_js( 'x.instance_of? MyClass' ).
         must_equal 'x.constructor === MyClass'
