@@ -150,6 +150,7 @@ task :integration, [:demo] do |t, args|
     case test_name
     when 'blog' then test_name = 'juntos-blog'
     when 'chat' then test_name = 'juntos-chat'
+    when 'notes' then test_name = 'juntos-notes'
     when 'photo-gallery' then test_name = 'juntos-photo-gallery'
     when 'dictaphone' then test_name = 'juntos-dictaphone'
     end

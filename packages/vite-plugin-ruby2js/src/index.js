@@ -190,10 +190,14 @@ export default function ruby2js(options = {}) {
         const js = result.toString();
         const map = result.sourcemap;
 
-        // Ensure source map has correct source reference
+        // Ensure source map has correct source references.
+        // JSX %x{} blocks create multiple (eval) source buffers in the
+        // sourcemap, but they all correspond to the original file. Map all
+        // sources to the file path and provide sourcesContent for each so
+        // Vite's combineSourcemaps can resolve every source index.
         if (map) {
-          map.sources = [id];
-          map.sourcesContent = [code];
+          map.sources = map.sources.map(() => id);
+          map.sourcesContent = map.sources.map(() => code);
         }
 
         return {
@@ -317,10 +321,10 @@ export default function ruby2js(options = {}) {
         const jsx = result.toString();
         const map = result.sourcemap;
 
-        // Ensure source map has correct source reference
+        // Ensure source map has correct source references (see comment above)
         if (map) {
-          map.sources = [id];
-          map.sourcesContent = [code];
+          map.sources = map.sources.map(() => id);
+          map.sourcesContent = map.sources.map(() => code);
         }
 
         return {

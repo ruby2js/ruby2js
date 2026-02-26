@@ -429,8 +429,8 @@ function createJsxRbPlugin(config, appRoot) {
         }
 
         if (map) {
-          map.sources = [id];
-          map.sourcesContent = [code];
+          map.sources = map.sources.map(() => id);
+          map.sourcesContent = map.sources.map(() => code);
         }
 
         return { code: js, map };
@@ -548,8 +548,8 @@ function createErbPlugin(config) {
     // Step 4: Generate source map pointing to original ERB
     const map = result.sourcemap;
     if (map) {
-      map.sources = [id];
-      map.sourcesContent = [code];
+      map.sources = map.sources.map(() => id);
+      map.sourcesContent = map.sources.map(() => code);
     }
 
     return { code: js, map };
@@ -701,10 +701,11 @@ function createRubyTransformPlugin(config, appRoot) {
           js = addCrossModelImports(js, filePath);
           const map = result.map;
           if (map) {
+            const fileContent = fs.readFileSync(filePath, 'utf-8');
             map.file = path.basename(filePath).replace('.rb', '.js');
-            map.sources = [filePath];
+            map.sources = map.sources.map(() => filePath);
             map.sourceRoot = '';
-            map.sourcesContent = [fs.readFileSync(filePath, 'utf-8')];
+            map.sourcesContent = map.sources.map(() => fileContent);
           }
           transformCache.set(filePath, { result: { code: js, map }, mtime: stat.mtimeMs });
         } catch {}
@@ -1001,17 +1002,16 @@ export { application };
         }
 
         // Normalize sourcemap for Vite bundling
-        // Use absolute path for sources - Vite will normalize to correct relative paths
-        // Using relative paths from appRoot causes duplication when Vite resolves them
-        // relative to the file's directory location
+        // Ruby2JS may produce multiple source entries (e.g., inline JSX %x{} blocks
+        // create (eval) source buffers). Map all sources to the original file path
+        // and provide sourcesContent for each, so Vite's combineSourcemaps can
+        // resolve every source index.
         const map = result.sourcemap;
         if (map) {
-          // Use absolute path - Vite normalizes this correctly during bundle
           map.file = path.basename(id).replace('.rb', '.js');
-          map.sources = [id];  // Absolute path
+          map.sources = map.sources.map(() => id);
           map.sourceRoot = '';
-          // Embed source content so browsers don't need to fetch it
-          map.sourcesContent = [source];
+          map.sourcesContent = map.sources.map(() => source);
         }
 
         // Cache and return
