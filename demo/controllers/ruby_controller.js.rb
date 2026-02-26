@@ -199,12 +199,12 @@ class RubyController < DemoController
     output << "#{indent}<span class=hidden>s(:</span>#{ast.type}"
     output << '<span class=hidden>,</span>' unless ast.children.empty?
 
-    if ast.children.any? {|child| child.is_a? Parser::AST::Node}
+    if ast.children.any? {|child| child.is_a?(Object) && child.respond_to?(:children)}
       ast.children.each_with_index do |child, index|
         ctail = index == ast.children.length - 1 ? ')' + tail : ''
         lastc = last && !ctail.empty?
 
-        if child.is_a? Parser::AST::Node
+        if child.is_a?(Object) && child.respond_to?(:children)
           output.push *walk(child, "  #{indent}", ctail, lastc)
         else
           output << "<div>#{indent}  "
