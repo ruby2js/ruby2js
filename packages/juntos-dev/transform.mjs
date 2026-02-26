@@ -1091,7 +1091,8 @@ export function generateTestSetupForEject(config = {}) {
     : '';
 
   return `// Test setup for Vitest - ejected version
-import { beforeAll, beforeEach, afterEach, expect } from 'vitest';${fixtureImport}${helperSection}
+import { beforeAll, beforeEach, afterEach, expect } from 'vitest';
+import { installFetchInterceptor } from 'juntos/test_fetch.mjs';${fixtureImport}${helperSection}
 
 // Compare ActiveRecord model instances by class and id (like Rails)
 expect.addEqualityTesters([
@@ -1137,6 +1138,12 @@ beforeAll(async () => {
   const activeRecord = await import('juntos/adapters/${adapterFile}');
   await activeRecord.initDatabase({ database: ':memory:' });
   await Application.runMigrations(activeRecord);
+
+  // Import routes (registers routes with Router via RouterBase.resources())
+  await import('../config/routes.js');
+
+  // Install fetch interceptor so Stimulus controllers can reach controller actions
+  installFetchInterceptor();
 });
 
 // Transactional tests: wrap each test in a transaction that rolls back,

@@ -24,6 +24,7 @@
     "./server.mjs": "./server.mjs",
     "./testing": "./testing.mjs",
     "./testing.mjs": "./testing.mjs",
+    "./test_fetch.mjs": "./test_fetch.mjs",
     "./url_helpers.mjs": "./url_helpers.mjs"
   },
   "files": [
@@ -41,6 +42,7 @@
     "path_helper.mjs",
     "path_helper_browser.mjs",
     "testing.mjs",
+    "test_fetch.mjs",
     "turbo_cable_simple.js",
     "url_helpers.mjs"
   ],

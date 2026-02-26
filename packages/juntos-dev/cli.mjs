@@ -1432,6 +1432,7 @@ export default mergeConfig(viteConfig, defineConfig({
 // Initializes the database before each test
 
 import { beforeAll, beforeEach, afterAll } from 'vitest';
+import { installFetchInterceptor } from 'juntos/test_fetch.mjs';
 
 // Suppress ActiveRecord CRUD logging during tests
 const _info = console.info;
@@ -1452,6 +1453,12 @@ beforeAll(async () => {
   const rails = await import('juntos:rails');
   const migrations = await import('juntos:migrations');
   rails.Application.configure({ migrations: migrations.migrations });
+
+  // Import routes (registers routes with Router via RouterBase.resources())
+  await import('../config/routes.rb');
+
+  // Install fetch interceptor so Stimulus controllers can reach controller actions
+  installFetchInterceptor();
 });
 
 beforeEach(async () => {
