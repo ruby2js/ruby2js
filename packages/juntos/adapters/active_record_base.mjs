@@ -111,9 +111,6 @@ export class ActiveRecordBase {
   async isValid() {
     this._errors = { _all: [] };
     await this.validate();
-    if (this._errors._all.length > 0) {
-      console.warn('  Validation failed:', this._errors._all);
-    }
     return this._errors._all.length === 0;
   }
 

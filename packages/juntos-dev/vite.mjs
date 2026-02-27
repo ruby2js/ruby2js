@@ -474,8 +474,6 @@ function createErbPlugin(config) {
   async function transformErb(code, id, isLayout = false) {
     await ensureReady();
 
-    console.debug('[juntos-erb] Transforming:', id);
-
     let template = code;
 
     // Step 1: Compile ERB to Ruby
@@ -569,9 +567,6 @@ function createErbPlugin(config) {
 
       // Detect layout files - they need special handling (yield -> content)
       const isLayout = id.includes('/layouts/');
-      if (isLayout) {
-        console.debug('[juntos-erb] Transforming layout:', id);
-      }
 
       try {
         // Read the file content
@@ -1018,7 +1013,6 @@ export { application };
         const output = { code: js, map };
         transformCache.set(id, { result: output, mtime: stat.mtimeMs });
 
-        console.debug(`[juntos] Transformed: ${path.relative(appRoot, id)}`);
         return output;
       } catch (error) {
         console.error(`[juntos] Transform error in ${id}:`, error);
