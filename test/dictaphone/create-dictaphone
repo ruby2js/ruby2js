@@ -655,10 +655,7 @@ describe('Clip Active Storage', () => {
     const downloaded = await clip.audio.download();
     expect(downloaded).toBeDefined();
 
-    const buffer = typeof downloaded.arrayBuffer === 'function'
-      ? await downloaded.arrayBuffer()
-      : await new Response(downloaded).arrayBuffer();
-    const downloadedArray = new Uint8Array(buffer);
+    const downloadedArray = new Uint8Array(await downloaded.arrayBuffer());
     expect(downloadedArray.length).toBe(5);
     expect(downloadedArray[0]).toBe(10);
   });

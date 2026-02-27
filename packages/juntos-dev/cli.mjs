@@ -1485,6 +1485,9 @@ function runInit(options) {
     if (!existing.devDependencies['vitest']) {
       existing.devDependencies['vitest'] = '^2.0.0';
     }
+    if (!existing.devDependencies['jsdom']) {
+      existing.devDependencies['jsdom'] = '^28.1.0';
+    }
 
     // Add scripts if missing
     existing.scripts.dev = existing.scripts.dev || 'vite';
@@ -1512,7 +1515,8 @@ function runInit(options) {
       },
       devDependencies: {
         vite: '^7.0.0',
-        vitest: '^2.0.0'
+        vitest: '^2.0.0',
+        jsdom: '^28.1.0'
       }
     };
     writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + '\n');
