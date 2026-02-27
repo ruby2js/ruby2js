@@ -1541,13 +1541,16 @@ function getNativeModules(database) {
     d1: []
   };
 
+  // WebSocket package (installed when app uses broadcasting, resolved at runtime)
+  const wsModules = ['ws'];
+
   // Client-side framework modules that should not be bundled in server builds
   const clientModules = ['@hotwired/stimulus', '@hotwired/turbo', '@hotwired/turbo-rails'];
 
   // React modules - externalize for SSR (resolved at runtime)
   const reactModules = ['react', 'react-dom', 'react-dom/server', 'react-dom/client'];
 
-  return [...baseModules, ...(dbModules[database] || []), ...clientModules, ...reactModules];
+  return [...baseModules, ...(dbModules[database] || []), ...wsModules, ...clientModules, ...reactModules];
 }
 
 /**

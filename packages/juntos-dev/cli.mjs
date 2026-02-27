@@ -1717,6 +1717,13 @@ function ensurePackagesInstalled(options) {
     }
   }
 
+  // Check if app uses broadcasting (needs ws package on node target)
+  if (['node', 'bun', 'fly'].includes(target) && checkUsesBroadcasting()) {
+    if (!isPackageInstalled('ws')) {
+      missing.push('ws');
+    }
+  }
+
   // Install missing packages
   if (missing.length > 0) {
     console.log(`Installing required packages: ${missing.join(', ')}...`);
