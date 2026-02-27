@@ -4,7 +4,7 @@
 
 Replace Opal with [ruby.wasm](https://github.com/ruby/ruby.wasm) for the online demo at ruby2js.com. This enables Ruby 4.0 syntax support (via Prism) while reducing bundle size.
 
-**Why now:** The whitequark `parser` gem only supports Ruby 3.3 and lower. Ruby 4.0 releases December 2024. Opal cannot use Prism (written in C).
+**Why now:** The whitequark `parser` gem only supports Ruby 3.3 and lower. Ruby 4.0 releases December 2025. Opal cannot use Prism (written in C).
 
 **Related:** See [PRISM_MIGRATION.md](./PRISM_MIGRATION.md) and [SELF_HOSTING.md](./SELF_HOSTING.md) for context.
 
