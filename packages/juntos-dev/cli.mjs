@@ -1193,7 +1193,7 @@ export async function loadFixtures() {}
 // Initializes the database once, loads fixtures, uses savepoints per test
 
 import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
-import { installFetchInterceptor } from 'juntos/test_fetch.mjs';
+import { installFetchInterceptor, resetCookies } from 'juntos/test_fetch.mjs';
 import { loadFixtures, _fixtures } from './__fixtures.mjs';${stimSection}
 
 // Suppress ActiveRecord CRUD logging during tests
@@ -1235,6 +1235,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  resetCookies();
   const activeRecord = await import('juntos:active-record');
   activeRecord.beginSavepoint();
 });
@@ -1628,7 +1629,7 @@ export default mergeConfig(viteConfig, defineConfig({
 // Initializes the database once, loads fixtures, uses savepoints per test
 
 import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
-import { installFetchInterceptor } from 'juntos/test_fetch.mjs';
+import { installFetchInterceptor, resetCookies } from 'juntos/test_fetch.mjs';
 import { loadFixtures, _fixtures } from './__fixtures.mjs';${stimSection}
 
 // Suppress ActiveRecord CRUD logging during tests
@@ -1670,6 +1671,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  resetCookies();
   const activeRecord = await import('juntos:active-record');
   activeRecord.beginSavepoint();
 });

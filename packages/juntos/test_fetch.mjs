@@ -15,6 +15,11 @@
 import { RouterBase, createFlash } from 'juntos/rails_base.js';
 
 let _originalFetch = null;
+const _cookieJar = new Map();
+
+export function resetCookies() {
+  _cookieJar.clear();
+}
 
 /**
  * Install the fetch interceptor.
@@ -49,9 +54,12 @@ export function installFetchInterceptor() {
     }
 
     const { route, match } = result;
+    const cookieHeader = [..._cookieJar.entries()]
+      .map(([k, v]) => `${k}=${v}`).join('; ');
+
     const context = {
       params: {},
-      flash: createFlash(),
+      flash: createFlash(cookieHeader),
       contentFor: {},
       request: { headers: { accept: init.headers?.accept || 'text/html' } }
     };
@@ -163,10 +171,30 @@ function extractParams(body) {
 function buildResponse(result, context) {
   const headers = new Headers();
 
+  // Move redirect notice/alert into flash before checking hasPending
+  if (result && typeof result === 'object') {
+    if (result.notice) context.flash.set('notice', result.notice);
+    if (result.alert) context.flash.set('alert', result.alert);
+  }
+
   // Set flash cookie if flash has pending messages
   if (context.flash?.hasPending?.()) {
     const cookie = context.flash.getResponseCookie();
     if (cookie) headers.set('Set-Cookie', cookie);
+  }
+
+  // Capture Set-Cookie into the in-memory cookie jar
+  const setCookie = headers.get('Set-Cookie');
+  if (setCookie) {
+    const cookieMatch = setCookie.match(/^([^=]+)=([^;]*)/);
+    if (cookieMatch) {
+      const [, name, value] = cookieMatch;
+      if (value === '' || setCookie.includes('Max-Age=0')) {
+        _cookieJar.delete(name);
+      } else {
+        _cookieJar.set(name, value);
+      }
+    }
   }
 
   if (typeof result === 'string') {
@@ -177,9 +205,7 @@ function buildResponse(result, context) {
   if (result && typeof result === 'object') {
     if (result.redirect) {
       headers.set('Location', String(result.redirect));
-      // Include notice in response for flash handling
-      const body = result.notice ? JSON.stringify({ notice: result.notice }) : '';
-      return new Response(body, { status: 302, headers });
+      return new Response('', { status: 302, headers });
     }
 
     if (result.render) {

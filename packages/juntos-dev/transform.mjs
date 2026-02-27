@@ -1104,7 +1104,7 @@ export function generateTestSetupForEject(config = {}) {
 
   return `// Test setup for Vitest - ejected version
 import { beforeAll, beforeEach, afterEach, expect } from 'vitest';
-import { installFetchInterceptor } from 'juntos/test_fetch.mjs';${fixtureImport}${stimulusSection}${helperSection}
+import { installFetchInterceptor, resetCookies } from 'juntos/test_fetch.mjs';${fixtureImport}${stimulusSection}${helperSection}
 
 // Compare ActiveRecord model instances by class and id (like Rails)
 expect.addEqualityTesters([
@@ -1161,6 +1161,7 @@ beforeAll(async () => {
 // Transactional tests: wrap each test in a transaction that rolls back,
 // so fixture data from beforeEach is cleaned up automatically (like Rails)
 beforeEach(async () => {
+  resetCookies();
   const activeRecord = await import('juntos/adapters/${adapterFile}');
   activeRecord.beginTransaction();${fixtureLoad}
 });

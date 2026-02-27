@@ -143,7 +143,7 @@ Place system tests in `test/system/`. They work under both `rails test:system` (
 | `assert_no_text "Error"` | `expect(document.body.textContent).not.toContain("Error")` |
 | `assert_no_selector ".error"` | `expect(document.querySelector(".error")).toBeNull()` |
 
-**Notes on flash messages:** Flash notices (e.g., "Studio was successfully created") are available under Rails (via session/cookies) but not yet in jsdom system tests (where redirects don't carry flash data). Write assertions against page content rather than flash text for cross-environment compatibility.
+**Flash messages:** Flash notices (e.g., "Studio was successfully created") work automatically in system tests. The fetch interceptor maintains an in-memory cookie jar that carries flash data across redirects, just like Rails does with session cookies. You can assert flash content after create/update/destroy actions.
 
 ### Testing Stimulus Controllers
 
