@@ -468,7 +468,7 @@ function topologicalSortTables(referencedTables, fixtures, associationMap) {
  * - setupCode: JavaScript string for the beforeEach block (let _fixtures = {}; beforeEach(...))
  * - replacements: { "table:fixture": "table_fixture", ... } for AST-level fixture ref replacement
  */
-function buildFixturePlan(rubySource, fixtures, associationMap) {
+function buildFixturePlan(rubySource, fixtures, associationMap, { loadAll = false } = {}) {
   // Find fixture references in Ruby source: cards(:logo), sessions(:david), accounts(:"37s"), accounts("37s")
   const fixtureCallRegex = /\b([a-z_]+)\s*(?:[\(:]\s*:["']?(\w+)["']?|\("(\w+)"\))/g;
   const referencedFixtures = new Map();
@@ -483,7 +483,20 @@ function buildFixturePlan(rubySource, fixtures, associationMap) {
     }
   }
 
-  if (referencedFixtures.size === 0) return null;
+  if (referencedFixtures.size === 0) {
+    if (!loadAll) return null;
+
+    // Load all fixtures (for system tests, matching Rails behavior)
+    for (const [tableName, tableFixtures] of Object.entries(fixtures)) {
+      for (const [fixtureName, fixtureData] of Object.entries(tableFixtures)) {
+        if (!fixtureData || typeof fixtureData !== 'object') continue;
+        const key = `${tableName}_${fixtureName}`;
+        referencedFixtures.set(key, { table: tableName, fixture: fixtureName });
+      }
+    }
+
+    if (referencedFixtures.size === 0) return null;
+  }
 
   // Resolve transitive dependencies (same logic as inlineFixtures)
   const allFixtures = new Map(referencedFixtures);
@@ -1097,7 +1110,7 @@ async function transpileTestFiles(appRoot, config) {
       try {
         const source = readFileSync(join(systemTestDir, file), 'utf-8');
         if (Object.keys(fixtures).length > 0) {
-          metadata.fixture_plan = buildFixturePlan(source, fixtures, associationMap);
+          metadata.fixture_plan = buildFixturePlan(source, fixtures, associationMap, { loadAll: true });
         } else {
           metadata.fixture_plan = null;
         }
