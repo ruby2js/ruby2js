@@ -396,6 +396,17 @@ module Ruby2JS
                 :toThrow)
             end
 
+          when :accept_confirm
+            return super unless @rails_test_describe_depth > 0
+            return super unless @rails_test_system
+            # accept_confirm do ... end -> await acceptConfirm(async () => { ... })
+            body = node.children.last
+            wrapped_body = wrap_test_ar_operations(body)
+            wrapped_body = ensure_statement_method_calls(wrapped_body)
+            processed_body = process(wrapped_body)
+            async_fn = s(:async, nil, s(:args), processed_body)
+            s(:send, nil, :await, s(:send!, nil, :acceptConfirm, async_fn))
+
           when :assert_difference, :assert_no_difference
             return super unless @rails_test_describe_depth > 0
             transform_assert_difference(call, node.children.last, method == :assert_no_difference)
@@ -563,7 +574,7 @@ module Ruby2JS
 
           # System test imports don't depend on metadata
           if @rails_test_has_system_test
-            system_helpers = [:visit, :fillIn, :clickButton, :findField, :findButton, :cleanup]
+            system_helpers = [:visit, :fillIn, :clickButton, :clickOn, :acceptConfirm, :findField, :findButton, :cleanup]
             system_consts = system_helpers.map { |name| s(:const, nil, name) }
             imports.push(s(:import, ['juntos/system_test.mjs'], system_consts))
           end
@@ -1475,11 +1486,17 @@ module Ruby2JS
             return nil unless value_node
             s(:send, nil, :await, s(:send!, nil, :fillIn, locator, value_node))
 
-          when :click_button, :click_on
+          when :click_button
             # click_button "Send" -> await clickButton("Send")
             return nil if args.empty?
             text = process(args.first)
             s(:send, nil, :await, s(:send!, nil, :clickButton, text))
+
+          when :click_on, :click_link
+            # click_on "Studios" -> await clickOn("Studios")
+            return nil if args.empty?
+            text = process(args.first)
+            s(:send, nil, :await, s(:send!, nil, :clickOn, text))
 
           when :assert_field
             # assert_field "locator", with: "value" -> expect(findField("locator").value).toBe("value")

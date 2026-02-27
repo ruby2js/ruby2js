@@ -1690,7 +1690,7 @@ describe Ruby2JS::Filter::Rails::Test do
       assert_includes result, 'await(clickButton("Send"))'
     end
 
-    it "converts click_on to await clickButton" do
+    it "converts click_on to await clickOn" do
       result = to_system_js(<<~RUBY)
         class ChatSystemTest < ApplicationSystemTestCase
           test "clicks button" do
@@ -1698,7 +1698,33 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'await(clickButton("Send"))'
+      assert_includes result, 'await(clickOn("Send"))'
+    end
+
+    it "converts click_link to await clickOn" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "clicks link" do
+            click_link "Studios"
+          end
+        end
+      RUBY
+      assert_includes result, 'await(clickOn("Studios"))'
+    end
+  end
+
+  describe "Capybara accept_confirm" do
+    it "converts accept_confirm block to await acceptConfirm" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "deletes with confirm" do
+            accept_confirm do
+              click_on "Destroy"
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'await(acceptConfirm(async () => await(clickOn("Destroy"))))'
     end
   end
 

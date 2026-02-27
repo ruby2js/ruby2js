@@ -2090,10 +2090,22 @@ module Ruby2JS
             extra_attrs = build_field_attrs(options)
             if label
               html = %(<input type="submit" value="#{label}"#{extra_attrs}>)
+              s(:str, html)
+            elsif @erb_model_name
+              # Generate dynamic label like Rails: "Create Model" / "Update Model"
+              humanized = @erb_model_name.gsub('_', ' ')
+              humanized = humanized[0].upcase + humanized[1..]
+              model_sym = @erb_model_name.to_sym
+              s(:dstr,
+                s(:str, %(<input type="submit" value=")),
+                s(:begin,
+                  s(:if, s(:attr, s(:lvar, model_sym), :id),
+                    s(:str, "Update"), s(:str, "Create"))),
+                s(:str, %( #{humanized}"#{extra_attrs}>)))
             else
               html = %(<input type="submit"#{extra_attrs}>)
+              s(:str, html)
             end
-            s(:str, html)
 
           when :button
             value = args.first

@@ -121,7 +121,7 @@ export async function clickButton(text) {
 
   const response = await fetch(action, {
     method,
-    body: new URLSearchParams(formData),
+    body: new URLSearchParams(formData).toString(),
     headers: { accept: 'text/vnd.turbo-stream.html, text/html' }
   });
 
@@ -198,6 +198,35 @@ export function findButton(text) {
   }
 
   return null;
+}
+
+/**
+ * Click a link or button by its text content — equivalent to Capybara's click_on.
+ * Tries links first, then buttons.
+ * @param {string} text - Link or button text
+ */
+export async function clickOn(text) {
+  // Try links first
+  const links = document.querySelectorAll('a');
+  for (const link of links) {
+    if (link.textContent.trim() === text) {
+      const href = link.getAttribute('href');
+      if (href) return visit(href);
+    }
+  }
+
+  // Fall back to button behavior
+  return clickButton(text);
+}
+
+/**
+ * Accept a confirmation dialog and execute the callback.
+ * In jsdom, Turbo confirm dialogs are bypassed (fetch submits directly),
+ * so this simply executes the callback.
+ * @param {Function} callback - Async function to execute
+ */
+export async function acceptConfirm(callback) {
+  await callback();
 }
 
 /**

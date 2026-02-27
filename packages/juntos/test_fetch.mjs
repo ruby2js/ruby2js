@@ -31,8 +31,15 @@ export function installFetchInterceptor() {
       typeof input === 'string' ? input : input.url,
       'http://localhost'
     );
-    const method = (init.method || 'GET').toUpperCase();
+    let method = (init.method || 'GET').toUpperCase();
     const path = url.pathname;
+
+    // Rails _method override: HTML forms only support GET/POST, so Rails
+    // uses a hidden _method field to signal PATCH/PUT/DELETE.
+    if (method === 'POST' && typeof init.body === 'string') {
+      const match = init.body.match(/(?:^|&)_method=(\w+)/);
+      if (match) method = match[1].toUpperCase();
+    }
 
     const result = RouterBase.match(path, method);
     if (!result) {

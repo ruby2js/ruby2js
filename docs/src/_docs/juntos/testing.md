@@ -83,25 +83,32 @@ The filter transforms `get`, `post`, etc. into controller action calls, `assert_
 
 ### System Tests
 
-Write Capybara-style system tests that run in jsdom without a browser. Use `visit`, `fill_in`, `click_button`, and assertion helpers — same API as Rails system tests:
+Write Capybara-style system tests that run in jsdom without a browser. Use `visit`, `fill_in`, `click_on`, and assertion helpers — same API as Rails system tests:
 
 ```ruby
-class ChatSystemTest < ApplicationSystemTestCase
-  test "clears input after sending message" do
-    visit messages_url
-    fill_in "Your name", with: "Alice"
-    fill_in "Type a message...", with: "Hello!"
-    click_button "Send"
-    assert_field "Type a message...", with: ""
-  end
+class StudiosSystemTest < ApplicationSystemTestCase
+  test "create, edit, and delete a studio" do
+    visit root_url
+    click_on "Studios"
+    assert_text "Studios"
 
-  test "creates message and displays it" do
-    visit messages_url
-    fill_in "Your name", with: "Alice"
-    fill_in "Type a message...", with: "Hello!"
-    click_button "Send"
-    visit messages_url
-    assert_selector "#messages", text: "Hello!"
+    click_on "New studio"
+    fill_in "Name", with: "Galaxy Dance"
+    click_on "Create Studio"
+    assert_text "Galaxy Dance"
+    assert_text "Showing studio"
+
+    click_on "Edit this studio"
+    fill_in "Name", with: "Galaxy Ballroom"
+    click_on "Update Studio"
+    assert_text "Galaxy Ballroom"
+    assert_text "Showing studio"
+
+    accept_confirm do
+      click_on "Destroy this studio"
+    end
+    assert_text "Studios"
+    assert_text "New studio"
   end
 end
 ```
@@ -110,24 +117,33 @@ Place system tests in `test/system/`. They work under both `rails test:system` (
 
 **How it works:**
 
-- `visit messages_url` — fetches the page via the fetch interceptor (routes to your controller action), renders the HTML into `document.body`, auto-discovers `data-controller` attributes, and starts Stimulus controllers
-- `fill_in "placeholder", with: "value"` — finds an input by placeholder text, label, or name, then sets its value
-- `click_button "Send"` — finds the button, builds `FormData` from its parent form, submits via `fetch`, and handles Turbo Stream responses or redirects
+- `visit root_url` — fetches the page via the fetch interceptor (routes to your controller action), renders the HTML into `document.body`, auto-discovers `data-controller` attributes, and starts Stimulus controllers
+- `fill_in "Name", with: "value"` — finds an input by label text, placeholder, or name attribute, then sets its value
+- `click_on "Studios"` — finds a link or button by text and clicks it. For links, follows the `href` via `visit`. For buttons, submits the parent form via `fetch` and handles Turbo Stream responses or redirects
+- `click_button "Send"` — like `click_on` but only matches buttons (useful when a page has both a link and button with the same text)
+- `accept_confirm { click_on "Destroy" }` — executes the block, accepting any confirmation dialog. In jsdom, Turbo `data-turbo-confirm` dialogs are bypassed (fetch submits directly), so this simply executes the callback
 - `assert_field`, `assert_selector`, `assert_text` — DOM assertions using `querySelector` and `textContent`
 - Stimulus controllers are auto-registered from `test/setup.mjs` — `juntos test` discovers controllers in `app/javascript/controllers/` and calls `registerController()` at setup time
+- All fixtures are loaded before each system test in a `beforeEach` block, matching Rails behavior where all fixtures are available regardless of whether the test references them directly
 - DOM cleanup runs automatically after each test via `afterEach(() => cleanup())`
 
 **Capybara methods transpiled:**
 
 | Ruby | JavaScript |
 |------|-----------|
-| `visit messages_url` | `await visit(messages_path())` |
+| `visit root_url` | `await visit(root_path())` |
 | `fill_in "Name", with: "Alice"` | `await fillIn("Name", "Alice")` |
+| `click_on "Studios"` | `await clickOn("Studios")` |
+| `click_link "Studios"` | `await clickOn("Studios")` |
 | `click_button "Send"` | `await clickButton("Send")` |
+| `accept_confirm { click_on "X" }` | `await acceptConfirm(async () => await clickOn("X"))` |
 | `assert_field "Name", with: ""` | `expect(findField("Name").value).toBe("")` |
 | `assert_selector "#el", text: "Hi"` | `expect(document.querySelector("#el").textContent).toContain("Hi")` |
 | `assert_text "Welcome"` | `expect(document.body.textContent).toContain("Welcome")` |
+| `assert_no_text "Error"` | `expect(document.body.textContent).not.toContain("Error")` |
 | `assert_no_selector ".error"` | `expect(document.querySelector(".error")).toBeNull()` |
+
+**Notes on flash messages:** Flash notices (e.g., "Studio was successfully created") are available under Rails (via session/cookies) but not yet in jsdom system tests (where redirects don't carry flash data). Write assertions against page content rather than flash text for cross-environment compatibility.
 
 ### Testing Stimulus Controllers
 
