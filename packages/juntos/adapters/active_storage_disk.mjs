@@ -250,7 +250,9 @@ export class DiskStorage extends StorageService {
     if (data instanceof Buffer) {
       buffer = data;
     } else if (data instanceof Blob) {
-      buffer = Buffer.from(await data.arrayBuffer());
+      buffer = Buffer.from(typeof data.arrayBuffer === 'function'
+        ? await data.arrayBuffer()
+        : await new Response(data).arrayBuffer());
     } else if (data instanceof ArrayBuffer) {
       buffer = Buffer.from(data);
     } else if (data instanceof Uint8Array) {

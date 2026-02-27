@@ -568,14 +568,13 @@ CONFIG
 
 # Create integration test for clips
 cat > test/clips.test.mjs << 'TEST'
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 
 // Initialize Active Storage before tests
-import { initActiveStorage, purgeActiveStorage } from 'juntos:active-storage';
+import { initActiveStorage } from 'juntos:active-storage';
 
-beforeEach(async () => {
+beforeAll(async () => {
   await initActiveStorage();
-  await purgeActiveStorage();
 });
 
 describe('Clip Model', () => {
@@ -656,7 +655,10 @@ describe('Clip Active Storage', () => {
     const downloaded = await clip.audio.download();
     expect(downloaded).toBeDefined();
 
-    const downloadedArray = new Uint8Array(await downloaded.arrayBuffer());
+    const buffer = typeof downloaded.arrayBuffer === 'function'
+      ? await downloaded.arrayBuffer()
+      : await new Response(downloaded).arrayBuffer();
+    const downloadedArray = new Uint8Array(buffer);
     expect(downloadedArray.length).toBe(5);
     expect(downloadedArray[0]).toBe(10);
   });
