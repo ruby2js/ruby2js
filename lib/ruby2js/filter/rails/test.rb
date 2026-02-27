@@ -758,25 +758,27 @@ module Ruby2JS
           # Eject mode: fixture import goes at top level (build_test_imports), not inside describe
           return [] if import_mode == 'eject'
 
-          # Virtual/dev mode: existing per-file fixture setup
-          return [] unless plan && plan['setupCode']
+          return [] unless plan
 
-          # Add fixture model names to @rails_test_models for import generation
-          if plan['fixtureModels']
-            plan['fixtureModels'].each do |name|
-              @rails_test_models << name unless @rails_test_models.include?(name)
+          if plan['setupCode']
+            # Per-file fixture mode: generate let _fixtures = {} + beforeEach
+            if plan['fixtureModels']
+              plan['fixtureModels'].each do |name|
+                @rails_test_models << name unless @rails_test_models.include?(name)
+              end
             end
+
+            [s(:lvasgn, :_fixtures, s(:hash)), s(:jsraw, plan['setupCode'])]
+          elsif plan['replacements']
+            # Shared fixture mode: assign from global fixtures in beforeAll
+            # (globalThis.__fixtures is set by setup.mjs's beforeAll, which runs first)
+            [
+              s(:lvasgn, :_fixtures, s(:hash)),
+              s(:jsraw, 'beforeAll(() => { _fixtures = globalThis.__fixtures })')
+            ]
+          else
+            []
           end
-
-          nodes = []
-
-          # let _fixtures = {};
-          nodes.push(s(:lvasgn, :_fixtures, s(:hash)))
-
-          # beforeEach(async () => { ... }) as raw JS
-          nodes.push(s(:jsraw, plan['setupCode']))
-
-          nodes
         end
 
         # Pre-resolve fixture references in the AST tree before wrap_ar_operations.

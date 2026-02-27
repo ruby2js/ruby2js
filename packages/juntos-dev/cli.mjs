@@ -1018,6 +1018,18 @@ async function transpileTestFiles(appRoot, config) {
   // Parse fixture YAML files
   const fixtures = parseFixtureFiles(appRoot);
 
+  // Build shared fixture plan (all fixtures, loaded once in beforeAll)
+  const hasFixtures = Object.keys(fixtures).length > 0;
+  const fullPlan = hasFixtures
+    ? buildFixturePlan('', fixtures, associationMap, { loadAll: true })
+    : null;
+
+  // Shared plan for test files: replacements only, no setupCode
+  // (fixtures are loaded globally via __fixtures.mjs, not per-file)
+  const sharedPlan = fullPlan
+    ? { replacements: fullPlan.replacements, fixtureModels: fullPlan.fixtureModels }
+    : null;
+
   let count = 0;
 
   // Transpile model tests
@@ -1035,11 +1047,7 @@ async function transpileTestFiles(appRoot, config) {
 
       try {
         const source = readFileSync(join(modelTestDir, file), 'utf-8');
-        if (Object.keys(fixtures).length > 0) {
-          metadata.fixture_plan = buildFixturePlan(source, fixtures, associationMap);
-        } else {
-          metadata.fixture_plan = null;
-        }
+        metadata.fixture_plan = sharedPlan;
         const result = await transformRuby(source, join(modelTestDir, file), 'test', config, appRoot, metadata);
         let code = result.code;
 
@@ -1072,11 +1080,7 @@ async function transpileTestFiles(appRoot, config) {
 
       try {
         const source = readFileSync(join(controllerTestDir, file), 'utf-8');
-        if (Object.keys(fixtures).length > 0) {
-          metadata.fixture_plan = buildFixturePlan(source, fixtures, associationMap);
-        } else {
-          metadata.fixture_plan = null;
-        }
+        metadata.fixture_plan = sharedPlan;
         const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, appRoot, metadata);
         let code = result.code;
 
@@ -1109,11 +1113,7 @@ async function transpileTestFiles(appRoot, config) {
 
       try {
         const source = readFileSync(join(systemTestDir, file), 'utf-8');
-        if (Object.keys(fixtures).length > 0) {
-          metadata.fixture_plan = buildFixturePlan(source, fixtures, associationMap, { loadAll: true });
-        } else {
-          metadata.fixture_plan = null;
-        }
+        metadata.fixture_plan = sharedPlan;
         const result = await transformRuby(source, join(systemTestDir, file), 'test', config, appRoot, metadata);
         let code = result.code;
 
@@ -1134,6 +1134,116 @@ async function transpileTestFiles(appRoot, config) {
   if (count > 0) {
     console.log(`Transpiled ${count} test file${count > 1 ? 's' : ''}.`);
   }
+
+  // Generate test/__fixtures.mjs — shared fixture creation module
+  const fixturesModulePath = join(testDir, '__fixtures.mjs');
+  if (fullPlan) {
+    const models = fullPlan.fixtureModels || [];
+    const importLine = models.length > 0
+      ? `import { ${models.join(', ')} } from "juntos:models";\n\n`
+      : '';
+    // Extract creation body from setupCode (strip beforeEach wrapper)
+    const body = fullPlan.setupCode
+      .replace(/^beforeEach\(async \(\) => \{\n/, '')
+      .replace(/\n\}\);$/, '');
+
+    writeFileSync(fixturesModulePath,
+`${importLine}export const _fixtures = {};
+
+export async function loadFixtures() {
+  for (const key of Object.keys(_fixtures)) delete _fixtures[key];
+${body}
+}
+`);
+  } else {
+    writeFileSync(fixturesModulePath,
+`export const _fixtures = {};
+
+export async function loadFixtures() {}
+`);
+  }
+
+  // Generate test/setup.mjs — always regenerate to match current juntos version
+  let stimSection = '';
+  const stimDir = join(appRoot, 'app/javascript/controllers');
+  if (hasSystemTests && existsSync(stimDir)) {
+    const stimEntries = [];
+    for (const f of readdirSync(stimDir)) {
+      if (f.endsWith('_controller.rb') || f.endsWith('_controller.js')) {
+        const name = f.replace(/_controller\.(rb|js)$/, '').replace(/_/g, '-');
+        const className = f.replace(/_controller\.(rb|js)$/, '')
+          .split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('') + 'Controller';
+        const ext = f.endsWith('.rb') ? '.rb' : '.js';
+        stimEntries.push({ name, className, file: f.replace(/\.js$/, ext) });
+      }
+    }
+    if (stimEntries.length > 0) {
+      const imports = stimEntries.map(c =>
+        `import ${c.className} from '../app/javascript/controllers/${c.file}';`
+      ).join('\n');
+      const regs = stimEntries.map(c =>
+        `registerController('${c.name}', ${c.className});`
+      ).join('\n');
+      stimSection = `\nimport { registerController } from 'juntos/system_test.mjs';\n${imports}\n${regs}\n`;
+    }
+  }
+
+  const setupPath = join(testDir, 'setup.mjs');
+  writeFileSync(setupPath, `// Test setup for Vitest
+// Initializes the database once, loads fixtures, uses savepoints per test
+
+import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
+import { installFetchInterceptor } from 'juntos/test_fetch.mjs';
+import { loadFixtures, _fixtures } from './__fixtures.mjs';${stimSection}
+
+// Suppress ActiveRecord CRUD logging during tests
+const _info = console.info;
+const _debug = console.debug;
+console.info = () => {};
+console.debug = () => {};
+
+afterAll(() => {
+  console.info = _info;
+  console.debug = _debug;
+});
+
+let dbReady = false;
+
+beforeAll(async () => {
+  // Import models (registers them with Application and modelRegistry)
+  await import('juntos:models');
+
+  // Configure migrations
+  const rails = await import('juntos:rails');
+  const migrations = await import('juntos:migrations');
+  rails.Application.configure({ migrations: migrations.migrations });
+
+  // Import routes (registers routes with Router via RouterBase.resources())
+  await import('../config/routes.rb');
+
+  // Install fetch interceptor so Stimulus controllers can reach controller actions
+  installFetchInterceptor();
+
+  if (!dbReady) {
+    const activeRecord = await import('juntos:active-record');
+    await activeRecord.initDatabase({ database: ':memory:' });
+    await rails.Application.runMigrations(activeRecord);
+    await loadFixtures();
+    globalThis.__fixtures = _fixtures;
+    dbReady = true;
+  }
+});
+
+beforeEach(async () => {
+  const activeRecord = await import('juntos:active-record');
+  activeRecord.beginSavepoint();
+});
+
+afterEach(async () => {
+  const activeRecord = await import('juntos:active-record');
+  activeRecord.rollbackSavepoint();
+});
+`);
 }
 
 // ============================================
@@ -1511,10 +1621,11 @@ export default mergeConfig(viteConfig, defineConfig({
     }
 
     writeFileSync(setupPath, `// Test setup for Vitest
-// Initializes the database once, wraps each test in a transaction
+// Initializes the database once, loads fixtures, uses savepoints per test
 
 import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
-import { installFetchInterceptor } from 'juntos/test_fetch.mjs';${stimSection}
+import { installFetchInterceptor } from 'juntos/test_fetch.mjs';
+import { loadFixtures, _fixtures } from './__fixtures.mjs';${stimSection}
 
 // Suppress ActiveRecord CRUD logging during tests
 const _info = console.info;
@@ -1548,18 +1659,20 @@ beforeAll(async () => {
     const activeRecord = await import('juntos:active-record');
     await activeRecord.initDatabase({ database: ':memory:' });
     await rails.Application.runMigrations(activeRecord);
+    await loadFixtures();
+    globalThis.__fixtures = _fixtures;
     dbReady = true;
   }
 });
 
 beforeEach(async () => {
   const activeRecord = await import('juntos:active-record');
-  activeRecord.beginTransaction();
+  activeRecord.beginSavepoint();
 });
 
 afterEach(async () => {
   const activeRecord = await import('juntos:active-record');
-  activeRecord.rollbackTransaction();
+  activeRecord.rollbackSavepoint();
 });
 `);
   } else {

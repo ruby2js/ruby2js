@@ -195,3 +195,15 @@ export function beginTransaction() {
 export function rollbackTransaction() {
   if (db) db.exec('ROLLBACK');
 }
+
+// Savepoint support for per-test isolation with persistent fixtures
+export function beginSavepoint() {
+  if (db) db.exec('SAVEPOINT test_sp');
+}
+
+export function rollbackSavepoint() {
+  if (db) {
+    db.exec('ROLLBACK TO test_sp');
+    db.exec('RELEASE test_sp');
+  }
+}
