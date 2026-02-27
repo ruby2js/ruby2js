@@ -1462,7 +1462,7 @@ import viteConfig from './vite.config.js';
 export default mergeConfig(viteConfig, defineConfig({
   test: {
     globals: true,
-    environment: 'node',
+    environment: 'jsdom',
     include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
     setupFiles: ['./test/setup.mjs'],
     pool: 'forks',
@@ -3841,29 +3841,14 @@ async function runTest(options, testArgs) {
     }
   }
 
-  // Ensure jsdom is installed if any test file uses @vitest-environment jsdom
+  // Ensure jsdom is installed (default test environment)
   if (!isPackageInstalled('jsdom')) {
-    const testDir = join(APP_ROOT, 'test');
-    let needsJsdom = false;
-    if (existsSync(testDir)) {
-      const walk = (dir) => {
-        for (const entry of readdirSync(dir, { withFileTypes: true })) {
-          if (entry.isDirectory()) { walk(join(dir, entry.name)); continue; }
-          if (!entry.name.endsWith('.test.mjs')) continue;
-          const content = readFileSync(join(dir, entry.name), 'utf8');
-          if (content.includes('@vitest-environment jsdom')) { needsJsdom = true; return; }
-        }
-      };
-      walk(testDir);
-    }
-    if (needsJsdom) {
-      console.log('Installing jsdom (required by assert_select tests)...');
-      try {
-        execSync('npm install jsdom', { cwd: APP_ROOT, stdio: 'inherit' });
-      } catch (e) {
-        console.error('Failed to install jsdom.');
-        process.exit(1);
-      }
+    console.log('Installing jsdom (required by test environment)...');
+    try {
+      execSync('npm install jsdom', { cwd: APP_ROOT, stdio: 'inherit' });
+    } catch (e) {
+      console.error('Failed to install jsdom.');
+      process.exit(1);
     }
   }
 

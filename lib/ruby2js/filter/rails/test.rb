@@ -1458,11 +1458,7 @@ module Ruby2JS
         def transform_system_test_method(target, method, args)
           return nil unless target.nil?
 
-          # Emit @vitest-environment jsdom directive once per file
-          unless @rails_test_has_system_test
-            @rails_test_has_system_test = true
-            self.prepend_list << s(:jsraw, '// @vitest-environment jsdom')
-          end
+          @rails_test_has_system_test = true
 
           case method
           when :visit
@@ -1597,12 +1593,6 @@ module Ruby2JS
             @rails_test_stimulus_controllers << controller_name
           end
 
-          # Emit @vitest-environment jsdom directive once per file
-          unless @rails_test_has_assert_select
-            @rails_test_has_assert_select = true
-            self.prepend_list << s(:jsraw, '// @vitest-environment jsdom')
-          end
-
           # Emit import { Application } from "@hotwired/stimulus" once
           unless @rails_test_has_stimulus
             self.prepend_list << s(:import, ['@hotwired/stimulus'],
@@ -1643,12 +1633,6 @@ module Ruby2JS
         # assert_select "h1", 3 -> count shorthand
         def transform_assert_select(args)
           return nil if args.empty?
-
-          # Emit @vitest-environment jsdom directive once per file
-          unless @rails_test_has_assert_select
-            @rails_test_has_assert_select = true
-            self.prepend_list << s(:jsraw, '// @vitest-environment jsdom')
-          end
 
           selector_node = args[0]
           return nil unless selector_node.type == :str || selector_node.type == :dstr
@@ -1717,12 +1701,6 @@ module Ruby2JS
         def transform_assert_select_block(call, body)
           args = call.children[2..-1]
           return nil if args.empty?
-
-          # Emit @vitest-environment jsdom directive once per file
-          unless @rails_test_has_assert_select
-            @rails_test_has_assert_select = true
-            self.prepend_list << s(:jsraw, '// @vitest-environment jsdom')
-          end
 
           selector_node = args[0]
           return nil unless selector_node.type == :str || selector_node.type == :dstr

@@ -842,20 +842,6 @@ describe Ruby2JS::Filter::Rails::Test do
   end
 
   describe "assert_select" do
-    it "emits vitest jsdom environment directive" do
-      result = to_controller_js(<<~RUBY)
-        class FooControllerTest < ActionDispatch::IntegrationTest
-          test "index" do
-            get foos_url
-            assert_select "h1"
-          end
-        end
-      RUBY
-      assert_includes result, '// @vitest-environment jsdom'
-      # Directive should be at the top, before describe
-      assert result.index('// @vitest-environment jsdom') < result.index('describe(')
-    end
-
     it "converts existence check" do
       result = to_controller_js(<<~RUBY)
         class FooControllerTest < ActionDispatch::IntegrationTest
@@ -1452,22 +1438,6 @@ describe Ruby2JS::Filter::Rails::Test do
       assert_includes result, 'setTimeout(resolve, 0)'
     end
 
-    it "emits jsdom directive before describe" do
-      result = to_stimulus_js(<<~RUBY)
-        class MessagesControllerTest < ActionDispatch::IntegrationTest
-          test "stimulus" do
-            get messages_url
-            connect_stimulus "chat", ChatController
-          end
-        end
-      RUBY
-      assert_includes result, '// @vitest-environment jsdom'
-      # jsdom directive should appear before the describe
-      jsdom_pos = result.index('// @vitest-environment jsdom')
-      describe_pos = result.index('describe(')
-      assert jsdom_pos < describe_pos, "jsdom directive should precede describe"
-    end
-
     it "imports Application from @hotwired/stimulus" do
       result = to_stimulus_js(<<~RUBY)
         class MessagesControllerTest < ActionDispatch::IntegrationTest
@@ -1622,17 +1592,6 @@ describe Ruby2JS::Filter::Rails::Test do
         end
       RUBY
       assert_includes result, 'afterEach(() => cleanup())'
-    end
-
-    it "emits jsdom vitest environment directive" do
-      result = to_system_js(<<~RUBY)
-        class ChatSystemTest < ApplicationSystemTestCase
-          test "works" do
-            visit messages_url
-          end
-        end
-      RUBY
-      assert_includes result, '// @vitest-environment jsdom'
     end
 
     it "imports system test helpers" do
