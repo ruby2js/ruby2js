@@ -256,9 +256,18 @@ export function createFlash(cookieHeader = '') {
       return msg || '';
     },
 
-    // Convenience methods
-    consumeNotice() { return this.get('notice'); },
-    consumeAlert() { return this.get('alert'); },
+    // Convenience methods — return objects with .present and .toString()
+    // so transpiled ERB like `if notice.present?` / `<%= notice %>` works
+    // (each call to the helper transpiles to a separate consumeNotice() call).
+    // Non-destructive: the flash cookie is cleared by the response lifecycle.
+    consumeNotice() {
+      const msg = this._current['notice'] || '';
+      return { present: msg !== '', toString() { return msg; } };
+    },
+    consumeAlert() {
+      const msg = this._current['alert'] || '';
+      return { present: msg !== '', toString() { return msg; } };
+    },
 
     // Get cookie string for pending messages (for Set-Cookie header or document.cookie)
     getResponseCookie() {
