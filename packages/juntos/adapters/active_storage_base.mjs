@@ -25,7 +25,9 @@ export async function computeChecksum(data) {
   // Convert to ArrayBuffer if needed
   let buffer;
   if (data instanceof Blob) {
-    buffer = await data.arrayBuffer();
+    buffer = typeof data.arrayBuffer === 'function'
+      ? await data.arrayBuffer()
+      : await new Response(data).arrayBuffer();
   } else if (data instanceof ArrayBuffer) {
     buffer = data;
   } else if (typeof data === 'string') {
