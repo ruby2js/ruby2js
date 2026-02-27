@@ -183,9 +183,10 @@ module Ruby2JS
 
           target, method, *args = node.children
 
-          # Strip require "test_helper"
+          # Strip require "test_helper" and "application_system_test_case"
           if target.nil? && method == :require && args.length == 1 &&
-             args.first.type == :str && args.first.children.first == 'test_helper'
+             args.first.type == :str &&
+             %w[test_helper application_system_test_case].include?(args.first.children.first)
             return s(:hide)
           end
 

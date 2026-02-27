@@ -12,231 +12,188 @@ The original showcase app is four years old and doesn't always reflect current b
 
 The **ballroom** app (`test/ballroom`, pushed to `github.com:rubys/ballroom`) provides a working foundation:
 
-- **33 models** with the same schema as showcase (same migrations, same tables)
+- **33 models** with schema matching showcase (same migrations, same tables)
 - **28 scaffold controllers** with full CRUD
 - **196 tests** passing under both Rails (`bin/rails test`) and Juntos (`bin/juntos test`)
+- **Root dashboard** (`events/root.html.erb`) with navigation links to all major sections
 - Same database — a ballroom instance and showcase instance can share a SQLite file
 
-What's missing: showcase-specific model logic (methods, validations, scopes, normalizes, callbacks), custom controller actions, custom views, and domain algorithms.
+Models already enriched beyond scaffolds: Event (`current`, `assign_judges?`), Person (`display_name`, `present?`, `by_name` scope, associations), Studio (`normalizes`, `validates`, `by_name` scope, `pairs`, studio pair associations), Judge (`alias_attribute`), Level, Age.
 
 ## Approach
 
-- Work directly in `test/ballroom` — no creation scripts needed
-- Each phase enriches existing scaffold models/controllers with showcase functionality
-- Use current Rails idioms, not necessarily the original's patterns — prefer simpler, cleaner code that serves both Rails and JS deployment
-- Test after each change under both Rails and Juntos
-- Juntos failures drive transpiler/runtime improvements in ruby2js
-- Commit to ballroom repo; update submodule pointer in ruby2js
+Work is driven by **user scenarios reachable from the root page**, not model-by-model enrichment. Each step:
+
+1. Pick a scenario (e.g., "create, modify, and delete studios")
+2. Implement in modern Rails idioms — update models, views, controllers
+3. Add tests: controller tests for CRUD/custom actions, system test for the user flow
+4. Get it working under `bin/rails test` first
+5. Verify under `npx juntos test`, fixing transpiler/runtime issues as needed
+6. Commit to ballroom repo; update submodule pointer in ruby2js
+
+System tests use Capybara-style helpers (`visit`, `fill_in`, `click_button`, `assert_text`) and run in jsdom under `juntos test` — no browser required. Each scenario gets at least one system test to exercise the transpiled views end-to-end.
 
 ## Verification
 
 ```bash
 cd test/ballroom
 bin/rails test           # Rails tests
-bin/juntos test          # Juntos tests
+npx juntos test          # Juntos tests (jsdom, no browser)
 ```
 
 Both must show 0 failures. Any Juntos failures drive improvements to the transpiler/runtime.
 
-## Phase Breakdown
+## Root Page Navigation
 
-### Phase 1: Level + Age + Studio — Model Logic
+The root page (`events#root`) links to these sections, which define the scenario order:
 
-Enrich the simplest models with showcase-specific logic.
+| Link | Route | Controller | Priority |
+|------|-------|------------|----------|
+| Studios | `studios_path` | StudiosController | Step 1 |
+| Students | `students_people_path` | PeopleController | Step 3 |
+| Heats | `heats_path` | HeatsController | Step 7 |
+| Dances | `dances_path` | DancesController | Step 4 |
+| Agenda | `categories_path` | CategoriesController | Step 5 |
+| Backs | `backs_people_path` | PeopleController | Step 3 |
+| Summary | `summary_events_path` | EventsController | Step 8 |
+| Publish | `publish_events_path` | EventsController | Step 8 |
+| Settings | `settings_events_path` | EventsController | Step 2 |
+| Judge/DJ links | `person_path(person)` | PeopleController | Step 3 |
 
-**Level:**
-- Add method: `initials` (first letter of each word)
-- Add model tests: presence, `initials` method
+## Step Breakdown
 
-**Age:**
-- Add model tests: fixture loading, category values
+### Step 1: Studios — CRUD + Pair/Unpair
 
-**AgeCost:**
-- belongs_to :age already exists
-- Add model tests: associations
+**Scenario:** Navigate from root to studios list, create a studio, edit it, pair two studios, unpair them, delete a studio.
 
-**Studio:**
-- Add `validates :name, presence: true, uniqueness: true`
-- Add `normalizes :name, with: -> name { name.strip }`
-- Add `scope :by_name, -> { order(:name) }` (simplified from arel_table version)
-- Add model tests: name validation, uniqueness, normalization, scope
+**Already done (model):** `validates :name`, `normalizes :name`, `scope :by_name`, `pairs` method, studio pair associations.
 
-**StudioPair:**
-- Add model tests: associations
+**Remaining work:**
+- Rework studios views beyond scaffold (index with pair status, form with pair controls)
+- Enrich StudiosController: `pair` action, `unpair` action, index ordering by name
+- Controller tests: CRUD + pair/unpair
+- System test: create → edit → delete flow; pair/unpair flow
+- Verify under `juntos test`
 
-**StudiosController:**
-- Add `unpair` custom action
-- Add `pair` via create/update
-- Add controller tests: pair/unpair (4 tests beyond scaffold CRUD)
-
-**Likely Juntos improvements needed:**
-- `normalizes` support in model filter
-- Scope support verification (basic scopes should work)
-
----
-
-### Phase 2: Category + CatExtension — Validations & Delegates
-
-**Category:**
-- Add validates: name presence/uniqueness (unless spacer), order presence/uniqueness
-- Add `normalizes :name`
-- Add `before_destroy :delete_owned_dances`
-- Add `scope :ordered, -> { order(:order) }`
-- Add methods: `heats`, `is_spacer?`, `base_category`, `part`
-- Replace scaffold controller with: CRUD + `drop` (drag-drop reorder) + `toggle_lock`
-- Add/adapt showcase tests (568 lines model, 652 lines controller)
-
-**CatExtension:**
-- Add delegates: `name`, `ballrooms`, `cost_override`, `pro`, `routines`, `locked`, `base_category` (all to :category)
-
-**Likely Juntos improvements needed:**
-- `before_destroy` callback with method reference
-- Delegation pattern (`delegate :name, to: :category`)
-- Turbo Stream responses for `drop` action
-- `assert_select` alternatives for DOM assertions
+**Likely Juntos issues:** Custom controller actions, Turbo responses for pair/unpair.
 
 ---
 
-### Phase 3: Dance + Multi + MultiLevel — Complex Associations
+### Step 2: Settings — Event Configuration
 
-**Dance:**
-- Add 8 belongs_to Category associations (open, closed, solo, multi + pro variants)
-- Add has_many: heats, songs, multi_children, multi_dances, multi_levels
-- Add `normalizes :name`
-- Add custom `name_unique` validation
-- Add methods: `effective_limit`, `uses_scrutineering?`, `freestyle_category`
-- Replace scaffold controller with: CRUD + `drop` + `trophies` + `heats`
-- Add/adapt showcase tests (839 lines model, 135 lines controller)
+**Scenario:** Navigate from root to settings, update event configuration fields, return to root and see changes reflected.
 
-**Multi:**
-- belongs_to :parent (Dance), belongs_to :dance
+**Remaining work:**
+- Implement `settings` collection action on EventsController (form for Event.current)
+- Settings view with grouped fields (general, scoring, display, costs)
+- Controller tests: get settings, update event
+- System test: visit settings → change event name → verify root reflects change
 
-**MultiLevel:**
-- belongs_to :dance
-- Add validates: age/level ranges
-
-**Likely Juntos improvements needed:**
-- Models with 8+ belongs_to associations
-- Complex custom validators
+**Likely Juntos issues:** Collection routes, `Event.sole` / `Event.current` singleton pattern.
 
 ---
 
-### Phase 4: Person + Judge — STI & Conditional Validations
+### Step 3: People — Students, Judges, DJs
 
-**Person:**
-- Add STI-like type column (Student, Professional, Guest, Judge, Placeholder)
-- Add conditional validation: level required if type == 'Student'
-- Add `normalizes :name` (complex: strip, whitespace, comma handling)
-- Add associations: studio, level, age, entries (3 types), formations, options, scores, payments
-- Add methods: `active?`, `display_name`, `first_name`, `last_name`, `eligible_heats`, `default_package`
-- Add scopes: `by_name`, `with_option`, `with_option_unassigned`
-- Replace scaffold controller with showcase-specific actions
-- Add/adapt showcase tests
+**Scenario:** Navigate from root to students list, create a student with studio/level/age associations. View a judge's detail page from root. Browse the backs list.
 
-**Judge:**
-- `alias_attribute :sort_order, :sort` (already done)
-- Add showcase-specific logic as needed
+**Remaining work:**
+- Implement `students` and `backs` collection actions on PeopleController
+- Rework people views: students list (filtered by type), person show with role-specific display
+- Enrich Person model as needed for views (conditional validations for students, name normalization)
+- Controller tests: students list, backs list, CRUD for students
+- System test: create student → assign to studio → verify on students list
 
-**Likely Juntos improvements needed:**
-- STI-like inheritance with type column
-- Complex normalizes with multi-step lambda
-- Conditional validations with lambdas
-- Complex scopes with joins/subqueries
+**Likely Juntos issues:** Collection routes with type filtering, conditional validations, complex `normalizes`.
 
 ---
 
-### Phase 5: Billable + Package/Option System — True STI
+### Step 4: Dances — CRUD + Category Associations
 
-**Billable:**
-- Add STI: Package < Billable, Option < Billable
+**Scenario:** Navigate from root to dances list, create a dance, assign it to categories, reorder dances.
 
-**PackageInclude:**
-- Self-referential: belongs_to :package (Billable), belongs_to :option (Billable)
+**Remaining work:**
+- Enrich Dance model: category belongs_to associations, `normalizes :name`, custom validations
+- Rework dances views: index with category grouping, form with category selects
+- Enrich DancesController: `drop` (reorder) action
+- Multi/MultiLevel model logic as needed
+- Controller tests: CRUD + reorder
+- System test: create dance → assign category → verify on list
 
-**PersonOption, Table, Question, Answer, Payment:**
-- Add showcase-specific associations and validations
-
-**Likely Juntos improvements needed:**
-- True STI (Package < Billable, Option < Billable)
-- Self-referential associations via PackageInclude
-- Nested attributes
+**Likely Juntos issues:** Models with many belongs_to associations, drag-drop reorder via Turbo.
 
 ---
 
-### Phase 6: Entry — Complex Validations
+### Step 5: Agenda — Categories + CatExtensions
 
-**Entry:**
-- Add belongs_to: lead/follow/instructor (Person), studio, age, level
-- Add custom `has_one_instructor` validation
-- Add has_many :heats
-- Add methods: `subject`, `partner`, `pro`, `level_name`, `age_category`, `invoice_studio`
-- Add/adapt showcase tests (719 lines)
+**Scenario:** Navigate from root to agenda (categories list), reorder categories, toggle lock, manage category extensions.
 
-**Likely Juntos improvements needed:**
-- Custom validator classes
-- Association-based validation (checking type of associated records)
+**Remaining work:**
+- Enrich Category model: validations, `before_destroy`, `is_spacer?`, `heats` method
+- CatExtension: delegation to category
+- Rework categories views: ordered list with lock toggle, drag-drop reorder
+- CategoriesController: `drop`, `toggle_lock`, `delete_owned_dances`
+- Controller tests: CRUD + custom actions
+- System test: reorder categories → toggle lock → verify
 
----
-
-### Phase 7: Heat + Score + Solo + Formation + Recording — Domain Logic
-
-**Heat:**
-- Add complex `rank_placement` and `rank_summaries` methods (scrutineering Rules 5-11)
-- Add delegation through Entry to Person
-
-**Score:**
-- Add scopes: category_scores, heat_scores
-
-**Solo:**
-- Add has_one_attached :song_file
-- Add belongs_to: combo_dance, category_override
-
-**Formation, Recording, Song:**
-- Add Active Storage attachments where needed
-
-**Tests:**
-- Add/adapt showcase tests (841 lines heat, plus score tests)
-
-**Likely Juntos improvements needed:**
-- Active Storage (`has_one_attached`)
-- Deep delegation chains (Heat -> Entry -> Person)
-- Complex algorithmic methods (scrutineering)
+**Likely Juntos issues:** `before_destroy` callbacks, `delegate`, Turbo Stream for reorder/toggle.
 
 ---
 
-### Phase 8: Event + User + Location + Showcase — Configuration & Auth
+### Step 6: Entries — Complex Associations + Validations
 
-**Event:**
-- Singleton pattern (`Event.current`)
-- Many configuration fields
+**Scenario:** Create entries linking students to dances (via lead/follow/instructor associations).
 
-**User:**
-- Authentication, authorization
-- `owned?`, `authorized?`
+**Remaining work:**
+- Enrich Entry model: belongs_to associations (lead, follow, instructor as Person), custom `has_one_instructor` validation, helper methods
+- Rework entries views: form with person/dance selects
+- Controller tests: CRUD with validation edge cases
+- System test: create entry → verify associations
 
-**Location, Showcase, Region, Feedback:**
-- Standard associations
-
-**Likely Juntos improvements needed:**
-- Singleton pattern
-- Authentication/authorization
+**Likely Juntos issues:** Custom validator classes, association-based validations.
 
 ---
 
-### Phase 9: Concerns + Advanced Features
+### Step 7: Heats — Scheduling + Scoring
 
-**Concerns:**
-- Printable (PDF rendering)
-- HeatScheduler (heat scheduling algorithm)
-- DanceLimitCalculator (per-dance limit enforcement)
-- BlobUploadable (S3/Tigris uploads)
-- Compmngr (spreadsheet import)
+**Scenario:** Navigate from root to heats list, view heat details, enter scores.
+
+**Remaining work:**
+- Enrich Heat model: delegation through Entry to Person, scheduling logic
+- Score model: scopes, scoring methods
+- Rework heats views: heat list with entries, scoring form
+- Controller tests: CRUD + scoring
+- System test: view heat → enter score → verify
+
+**Likely Juntos issues:** Deep delegation chains, complex algorithmic methods (scrutineering).
 
 ---
 
-### Phase 10: System Tests
+### Step 8: Summary + Publish + Remaining Event Actions
 
-Browser-based system tests using Capybara/Selenium. Full stack including JavaScript interactions.
+**Scenario:** Navigate from root to summary view, publish results.
+
+**Remaining work:**
+- Implement `summary` and `publish` collection actions on EventsController
+- Summary/publish views
+- User/auth as needed
+- Controller tests
+- System test: view summary → publish
+
+**Likely Juntos issues:** Authentication, authorization, report generation.
+
+---
+
+### Step 9: Supporting Models + Advanced Features
+
+Implement as needed when reached through scenarios above:
+
+- **Billable/Package/Option:** STI, self-referential PackageInclude
+- **Solo/Formation/Recording/Song:** Active Storage, specialized views
+- **Location/Showcase/Region/Feedback:** Standard CRUD
+- **Concerns:** Printable, HeatScheduler, DanceLimitCalculator, BlobUploadable, Compmngr
+
+---
 
 ## Already Resolved
 
@@ -249,3 +206,4 @@ Issues discovered and fixed while building the ballroom base:
 - **Test output noise** — CRUD logging uses `console.info`/`console.debug`, suppressed in test setup
 - **Compound controller names** — AgeCosts, CatExtensions, PersonOptions now generate correct view imports
 - **Pluralization in helpers** — `form_with(model:)` uses `Inflector.pluralize` for path helpers
+- **`polymorphic_path` for local variables** — `link_to text, lvar` now uses `polymorphic_path()` instead of inferring path helper from variable name (fixes `dj`/`emcee` routing)

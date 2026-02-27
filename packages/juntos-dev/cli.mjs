@@ -1641,8 +1641,8 @@ const DATABASE_PACKAGES = {
 
 const RUNTIME_PACKAGES = {
   browser: ['@hotwired/turbo', '@hotwired/stimulus', 'react', 'react-dom'],
-  node: [],
-  bun: [],
+  node: ['@hotwired/turbo', '@hotwired/stimulus'],
+  bun: ['@hotwired/turbo', '@hotwired/stimulus'],
   deno: []
 };
 
