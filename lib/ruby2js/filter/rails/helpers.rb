@@ -23,6 +23,7 @@ module Ruby2JS
           @erb_view_modules = [] # Track view module imports (PhotoViews, etc.)
           @rails_helpers_needed = [] # Track Rails helpers that need importing from juntos:rails
           @erb_asset_imports = [] # Track asset imports (images, videos, etc.) for Vite
+          @erb_needs_polymorphic_path = false # Track if polymorphic_path is needed
         end
 
         # Mark render function as async - sets flag directly since filter chain
@@ -69,6 +70,12 @@ module Ruby2JS
           unless @erb_path_helpers.empty?
             helpers = @erb_path_helpers.uniq.sort.map { |name| s(:const, nil, name) }
             self.prepend_list << s(:import, '@config/paths.js', helpers)
+          end
+
+          # Add import for polymorphic_path if needed (for lvar model references)
+          if @erb_needs_polymorphic_path
+            self.prepend_list << s(:import, 'juntos/url_helpers.mjs',
+              [s(:const, nil, :polymorphic_path)])
           end
 
           # Add import for view helpers (truncate, etc.) from rails.js
@@ -667,13 +674,11 @@ module Ruby2JS
             @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
             path_expr = s(:send, nil, path_helper, s(:lvar, model_name.to_sym))
           elsif path_node.type == :lvar
-            # Local variable: article -> article_path(article)
-            model_name = path_node.children.first.to_s
-            path_helper = "#{model_name}_path".to_sym
-            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
-            path_expr = s(:send, nil, path_helper, path_node)
+            # Local variable: use polymorphic_path for runtime route resolution
+            @erb_needs_polymorphic_path = true
+            path_expr = s(:send, nil, :polymorphic_path, path_node)
           elsif path_node.type == :send && path_node.children[0].nil? && path_node.children.length == 2
-            # Bare method call (parser treats partial locals as method calls): article -> article_path(article)
+            # Bare method call (parser treats partial locals as method calls)
             method_name = path_node.children[1].to_s
             if method_name.end_with?('_path', '_url')
               # Already a path/url helper (e.g., articles_path) - use as-is
@@ -681,10 +686,9 @@ module Ruby2JS
               @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
               path_expr = s(:send, nil, path_helper)
             else
-              # Model name - convert to path helper: article -> article_path(article)
-              path_helper = "#{method_name}_path".to_sym
-              @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
-              path_expr = s(:send, nil, path_helper, s(:lvar, method_name.to_sym))
+              # Model name: use polymorphic_path for runtime route resolution
+              @erb_needs_polymorphic_path = true
+              path_expr = s(:send, nil, :polymorphic_path, s(:lvar, method_name.to_sym))
             end
           elsif path_node.type == :array && path_node.children.length == 2
             # Nested resource: [@article, comment] -> article_comment_path(article, comment)
@@ -819,11 +823,9 @@ module Ruby2JS
             @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
             path_expr = s(:send, nil, path_helper, s(:lvar, model_name.to_sym))
           elsif path_node.type == :lvar
-            # Local variable: article -> article_path(article)
-            model_name = path_node.children.first.to_s
-            path_helper = "#{model_name}_path".to_sym
-            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
-            path_expr = s(:send, nil, path_helper, path_node)
+            # Local variable: use polymorphic_path for runtime route resolution
+            @erb_needs_polymorphic_path = true
+            path_expr = s(:send, nil, :polymorphic_path, path_node)
           elsif path_node.type == :array && path_node.children.length == 2
             # Nested resource: [@article, comment] -> article_comment_path(article, comment)
             parent, child = path_node.children
@@ -935,10 +937,9 @@ module Ruby2JS
 
           # Convert model object to path helper call
           if path_node&.type == :lvar
-            model_name = path_node.children.first.to_s
-            path_helper = "#{model_name}_path".to_sym
-            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
-            path_expr = s(:send, nil, path_helper, path_node)
+            # Local variable: use polymorphic_path for runtime route resolution
+            @erb_needs_polymorphic_path = true
+            path_expr = s(:send, nil, :polymorphic_path, path_node)
           elsif path_node&.type == :ivar
             model_name = path_node.children.first.to_s.sub(/^@/, '')
             path_helper = "#{model_name}_path".to_sym
@@ -946,7 +947,7 @@ module Ruby2JS
             # In ERB context, ivars are passed as locals
             path_expr = s(:send, nil, path_helper, s(:lvar, model_name.to_sym))
           elsif path_node&.type == :send && path_node.children[0].nil? && path_node.children.length == 2
-            # Bare method call (parser treats partial locals as method calls): article -> article_path(article)
+            # Bare method call (parser treats partial locals as method calls)
             method_name = path_node.children[1].to_s
             if method_name.end_with?('_path', '_url')
               # Already a path/url helper (e.g., articles_path) - use as-is
@@ -954,10 +955,9 @@ module Ruby2JS
               @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
               path_expr = s(:send, nil, path_helper)
             else
-              # Model name - convert to path helper: article -> article_path(article)
-              path_helper = "#{method_name}_path".to_sym
-              @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
-              path_expr = s(:send, nil, path_helper, s(:lvar, method_name.to_sym))
+              # Model name: use polymorphic_path for runtime route resolution
+              @erb_needs_polymorphic_path = true
+              path_expr = s(:send, nil, :polymorphic_path, s(:lvar, method_name.to_sym))
             end
           elsif path_node&.type == :array && path_node.children.length == 2
             # Nested resource: [@article, comment] -> article_comment_path(article, comment)
@@ -1138,10 +1138,9 @@ module Ruby2JS
         # Resolve path expression for button_to (shared logic)
         def resolve_button_path(path_node)
           if path_node&.type == :lvar
-            model_name = path_node.children.first.to_s
-            path_helper = "#{model_name}_path".to_sym
-            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
-            s(:send, nil, path_helper, path_node)
+            # Local variable: use polymorphic_path for runtime route resolution
+            @erb_needs_polymorphic_path = true
+            s(:send, nil, :polymorphic_path, path_node)
           elsif path_node&.type == :ivar
             model_name = path_node.children.first.to_s.sub(/^@/, '')
             path_helper = "#{model_name}_path".to_sym
