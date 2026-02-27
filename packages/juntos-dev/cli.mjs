@@ -1679,6 +1679,16 @@ afterEach(async () => {
     if (!quiet) console.log('  Skipping test/setup.mjs (already exists)');
   }
 
+  // Create test/__fixtures.mjs stub (transpileTestFiles overwrites with real fixtures)
+  const fixturesStubPath = join(testDir, '__fixtures.mjs');
+  if (!existsSync(fixturesStubPath)) {
+    writeFileSync(fixturesStubPath,
+`export const _fixtures = {};
+
+export async function loadFixtures() {}
+`);
+  }
+
   // Create bin/juntos binstub
   const binDir = join(destDir, 'bin');
   const binstubPath = join(binDir, 'juntos');
