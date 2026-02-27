@@ -35,13 +35,51 @@ System tests use Capybara-style helpers (`visit`, `fill_in`, `click_button`, `as
 
 ## Verification
 
+### Rails tests
+
 ```bash
 cd test/ballroom
-bin/rails test           # Rails tests
-npx juntos test          # Juntos tests (jsdom, no browser)
+bin/rails test                    # All tests
+bin/rails test test/system        # System tests only
+```
+
+### Juntos tests (local setup)
+
+Juntos packages aren't published to npm — they're built from the ruby2js repo and installed as tarballs. First-time setup:
+
+```bash
+# 1. Build tarballs (from ruby2js root)
+bundle exec rake -f demo/selfhost/Rakefile release
+
+# 2. Initialize ballroom submodule (if not already)
+git submodule update --init test/ballroom
+
+# 3. Install tarballs into ballroom
+cd test/ballroom
+npm install \
+  ../../artifacts/tarballs/ruby2js-beta.tgz \
+  ../../artifacts/tarballs/juntos-beta.tgz \
+  ../../artifacts/tarballs/juntos-dev-beta.tgz \
+  ../../artifacts/tarballs/vite-plugin-ruby2js-beta.tgz
+
+# 4. Initialize juntos (creates package.json, vite.config.js, etc.)
+npx juntos init --no-install
+
+# 5. Install hotwire dependencies (auto-installed on next run, but needed first time)
+npm install @hotwired/stimulus @hotwired/turbo
+```
+
+After initial setup, re-run steps 1 and 3 when ruby2js transpiler changes need testing. Step 4-5 are one-time only.
+
+```bash
+# Run juntos tests
+cd test/ballroom
+npx juntos test
 ```
 
 Both must show 0 failures. Any Juntos failures drive improvements to the transpiler/runtime.
+
+**Note:** `juntos init` may modify `Gemfile.lock` (adding platform entries). Restore it with `git checkout Gemfile.lock` before running `bin/rails test` again.
 
 ## Root Page Navigation
 
