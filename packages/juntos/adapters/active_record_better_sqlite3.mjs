@@ -182,3 +182,16 @@ export class ActiveRecord extends SQLiteDialect {
     db.pragma(`foreign_keys = ${enabled ? 'OFF' : 'ON'}`);
   }
 }
+
+// Transaction support for test isolation (like Rails transactional tests)
+export function beginTransaction() {
+  if (db) {
+    db.exec('BEGIN');
+    // Defer FK checks until COMMIT; since we ROLLBACK, they never fire
+    db.pragma('defer_foreign_keys = ON');
+  }
+}
+
+export function rollbackTransaction() {
+  if (db) db.exec('ROLLBACK');
+}

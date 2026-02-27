@@ -172,7 +172,11 @@ export async function insert(tableName, data) {
 
 // Transaction support for test isolation (like Rails transactional tests)
 export function beginTransaction() {
-  if (db) db.exec('BEGIN');
+  if (db) {
+    db.exec('BEGIN');
+    // Defer FK checks until COMMIT; since we ROLLBACK, they never fire
+    db.exec('PRAGMA defer_foreign_keys = ON');
+  }
 }
 
 export function rollbackTransaction() {

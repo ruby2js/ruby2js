@@ -1464,7 +1464,9 @@ export default mergeConfig(viteConfig, defineConfig({
     globals: true,
     environment: 'node',
     include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
-    setupFiles: ['./test/setup.mjs']
+    setupFiles: ['./test/setup.mjs'],
+    pool: 'forks',
+    poolOptions: { forks: { singleFork: true } }
   }
 }));
 `);
@@ -1509,9 +1511,9 @@ export default mergeConfig(viteConfig, defineConfig({
     }
 
     writeFileSync(setupPath, `// Test setup for Vitest
-// Initializes the database before each test
+// Initializes the database once, wraps each test in a transaction
 
-import { beforeAll, beforeEach, afterAll } from 'vitest';
+import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { installFetchInterceptor } from 'juntos/test_fetch.mjs';${stimSection}
 
 // Suppress ActiveRecord CRUD logging during tests
@@ -1524,6 +1526,8 @@ afterAll(() => {
   console.info = _info;
   console.debug = _debug;
 });
+
+let dbReady = false;
 
 beforeAll(async () => {
   // Import models (registers them with Application and modelRegistry)
@@ -1539,15 +1543,23 @@ beforeAll(async () => {
 
   // Install fetch interceptor so Stimulus controllers can reach controller actions
   installFetchInterceptor();
+
+  if (!dbReady) {
+    const activeRecord = await import('juntos:active-record');
+    await activeRecord.initDatabase({ database: ':memory:' });
+    await rails.Application.runMigrations(activeRecord);
+    dbReady = true;
+  }
 });
 
 beforeEach(async () => {
-  // Fresh in-memory database for each test
   const activeRecord = await import('juntos:active-record');
-  await activeRecord.initDatabase({ database: ':memory:' });
+  activeRecord.beginTransaction();
+});
 
-  const rails = await import('juntos:rails');
-  await rails.Application.runMigrations(activeRecord);
+afterEach(async () => {
+  const activeRecord = await import('juntos:active-record');
+  activeRecord.rollbackTransaction();
 });
 `);
   } else {
