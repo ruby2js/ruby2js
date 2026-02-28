@@ -195,6 +195,20 @@ export class ActiveRecord extends ActiveRecordBase {
     return new Relation(this).count();
   }
 
+  static async deleteAll(conditions) {
+    if (conditions) {
+      return this.where(conditions).deleteAll();
+    }
+    return this.table.clear();
+  }
+
+  static async destroyAll() {
+    return new Relation(this).destroyAll();
+  }
+
+  static delete_all(conditions) { return this.deleteAll(conditions); }
+  static destroy_all() { return this.destroyAll(); }
+
   // --- Relation execution (called by Relation) ---
 
   // Execute a Relation query and return model instances
@@ -288,6 +302,16 @@ export class ActiveRecord extends ActiveRecordBase {
     }
     const records = await this._executeRelation(rel);
     return records.length;
+  }
+
+  // Execute a DELETE for a Relation (delete matching records, no callbacks)
+  static async _executeDelete(rel) {
+    const records = await this._executeRelation(rel);
+    const ids = records.map(r => r[this.primaryKey]);
+    if (ids.length > 0) {
+      await this.table.bulkDelete(ids);
+    }
+    return { changes: ids.length };
   }
 
   // Parse order option into [column, direction]
