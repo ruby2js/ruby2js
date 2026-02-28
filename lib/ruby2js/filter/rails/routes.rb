@@ -27,6 +27,7 @@ module Ruby2JS
           @rails_route_nesting = []
           @rails_resources = []  # Track resources for Router.resources() generation
           @rails_root_route = nil
+          @rails_in_member = false
         end
 
         # Detect Rails.application.routes.draw block
@@ -141,6 +142,8 @@ module Ruby2JS
             process_scope(args, body)
           when :collection
             process_collection(body)
+          when :member
+            process_member(body)
           end
         end
 
@@ -198,6 +201,7 @@ module Ruby2JS
           action = nil
           as_name = nil
           on_collection = false
+          on_member = @rails_in_member || false
 
           args.each do |arg|
             case arg.type
@@ -231,7 +235,10 @@ module Ruby2JS
                 when :as
                   as_name = value.children[0].to_s if value.type == :sym || value.type == :str
                 when :on
-                  on_collection = true if value.type == :sym && value.children[0] == :collection
+                  if value.type == :sym
+                    on_collection = true if value.children[0] == :collection
+                    on_member = true if value.children[0] == :member
+                  end
                 end
               end
             end
@@ -257,6 +264,23 @@ module Ruby2JS
             # Rails convention: as_name = "{action}_{resource}"
             if as_name.nil? && raw_path && parent[:name]
               as_name = "#{raw_path}_#{parent[:name]}"
+            end
+          end
+
+          # For on: :member or member do block, infer controller/action/as_name
+          # Member routes keep the :id param (unlike collection which removes it)
+          if on_member && !on_collection && @rails_route_nesting.any?
+            parent = @rails_route_nesting.last
+
+            if controller.nil? && parent[:controller]
+              controller = parent[:controller]
+            end
+
+            action ||= raw_path if raw_path
+
+            if as_name.nil? && raw_path && parent[:name]
+              singular = Ruby2JS::Inflector.singularize(parent[:name])
+              as_name = "#{raw_path}_#{singular}"
             end
           end
 
@@ -529,6 +553,13 @@ module Ruby2JS
           else
             process_routes_body(body)
           end
+        end
+
+        def process_member(body)
+          return unless body
+          @rails_in_member = true
+          process_routes_body(body)
+          @rails_in_member = false
         end
 
         def extract_resource_options(args)
