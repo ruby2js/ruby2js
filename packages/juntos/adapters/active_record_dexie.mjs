@@ -206,6 +206,10 @@ export class ActiveRecord extends ActiveRecordBase {
     return new Relation(this).destroyAll();
   }
 
+  static async sole() {
+    return new Relation(this).sole();
+  }
+
   static delete_all(conditions) { return this.deleteAll(conditions); }
   static destroy_all() { return this.destroyAll(); }
 

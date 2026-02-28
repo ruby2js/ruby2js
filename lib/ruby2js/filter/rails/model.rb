@@ -1525,6 +1525,7 @@ module Ruby2JS
               metadata = @options ? @options[:metadata] : nil
               models = metadata ? metadata[:models] : nil
               model_refs = models ? models.keys : []
+              model_refs = model_refs + [@rails_model_name.to_s] unless model_refs.include?(@rails_model_name.to_s)
               wrapped_body = wrap_model_ar_operations(rewritten_body, model_refs)
 
               rewritten = child.updated(nil, [
@@ -1562,6 +1563,7 @@ module Ruby2JS
                 defs_metadata = @options ? @options[:metadata] : nil
                 defs_models = defs_metadata ? defs_metadata[:models] : nil
                 defs_model_refs = defs_models ? defs_models.keys : [@rails_model_name.to_s]
+                defs_model_refs = defs_model_refs + [@rails_model_name.to_s] unless defs_model_refs.include?(@rails_model_name.to_s)
                 wrapped_defs_body = wrap_model_ar_operations(defs_body, defs_model_refs)
                 if model_body_needs_async?(wrapped_defs_body)
                   async_body = s(:autoreturn, wrapped_defs_body)
