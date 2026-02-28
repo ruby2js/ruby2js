@@ -355,7 +355,14 @@ module Ruby2JS
             call_method = call_node.type == :send ? call_node.children[1] : nil
             is_test_macro = call_method && test_macros.include?(call_method)
 
-            if !is_test_macro && self.contains_await?(new_body)
+            # Don't convert .each/.each_with_index blocks to async sends.
+            # The functions filter converts these to for/for-of loops which
+            # inherit the containing function's async scope, so await works
+            # without needing an async callback.
+            is_loop_block = [:each, :each_with_index, :each_pair, :each_key,
+                             :each_value, :each_with_object].include?(call_method)
+
+            if !is_test_macro && !is_loop_block && self.contains_await?(new_body)
               # Convert: s(:block, call, args, body) → s(call.type, *call.children, s(:async, nil, args, body))
               async_fn = new_body.updated(:async, [nil, args_node, new_body])
               return node.updated(new_call.type, [*new_call.children, async_fn])

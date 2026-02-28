@@ -1806,15 +1806,23 @@ module Ruby2JS
               [s(:lvasgn, :_),
               node.children[0].children[0], node.children[2]])
           elsif node.children[1].children.length > 1
+            receiver = node.children[0].children[0]
+            if receiver.type == :hash
+              receiver = s(:send, s(:const, nil, :Object), :entries, receiver)
+            end
             process node.updated(:for_of,
               [s(:mlhs, *node.children[1].children.map {|child|
                 args_to_lvasgn(child)}),
-              node.children[0].children[0], node.children[2]])
+              receiver, node.children[2]])
           elsif node.children[1].children[0].type == :mlhs
+            receiver = node.children[0].children[0]
+            if receiver.type == :hash
+              receiver = s(:send, s(:const, nil, :Object), :entries, receiver)
+            end
             process node.updated(:for_of,
               [s(:mlhs, *node.children[1].children[0].children.map {|child|
                 args_to_lvasgn(child)}),
-              node.children[0].children[0], node.children[2]])
+              receiver, node.children[2]])
           else
             process node.updated(:for_of,
               [s(:lvasgn, node.children[1].children[0].children[0]),
