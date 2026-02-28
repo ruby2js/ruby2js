@@ -275,33 +275,6 @@ __END__
 POSTS
 
 # ============================================
-# Level 2: Post Detail Shell
-# ============================================
-
-cat > 'src/pages/posts/[slug].astro.rb' << 'POSTDETAIL'
-import Layout, from: '../../layouts/Layout.astro'
-import PostDetail, from: '../../islands/PostDetail.jsx'
-
-# Return empty paths - this route loads data client-side from IndexedDB
-# Routes are accessed via View Transitions navigation, not pre-rendered
-export def getStaticPaths
-  []
-end
-
-@slug = Astro.params.slug
-@title = "Post"
-__END__
-<Layout title={title}>
-  <article>
-    <PostDetail client:load slug={slug} />
-    <footer style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
-      <a href={import.meta.env.BASE_URL + "posts"}>&larr; Back to all posts</a>
-    </footer>
-  </article>
-</Layout>
-POSTDETAIL
-
-# ============================================
 # Database Setup (JavaScript)
 # ============================================
 
@@ -460,10 +433,12 @@ cat > src/islands/PostList.jsx.rb << 'POSTLIST'
 import ['useState', 'useEffect'], from: 'react'
 import ['setupDatabase', 'Post'], from: '../lib/db.js'
 import ['withRevalidate', 'invalidate'], from: '../lib/isr.js'
+import PostDetail, from: './PostDetail.jsx'
 
 def PostList()
   posts, setPosts = useState([])
   loading, setLoading = useState(true)
+  selectedSlug, setSelectedSlug = useState(nil)
 
   loadPosts = -> {
     # Use ISR cache with 60 second TTL
@@ -493,6 +468,9 @@ def PostList()
     }
   }, []
 
+  # Show post detail inline when a post is selected
+  return %x{<PostDetail slug={selectedSlug} onBack={-> { setSelectedSlug(nil) }} />} if selectedSlug
+
   return %x{<div class="loading">Loading posts...</div>} if loading
   return %x{<p>No posts yet. Create one below!</p>} if posts.length == 0
 
@@ -500,10 +478,10 @@ def PostList()
   renderPost = ->(post) {
     %x{<article key={post.id} class="post-card">
       <h3>
-        <a href={import.meta.env.BASE_URL + "posts/" + post.slug}>{post.title}</a>
+        <a href="#" onClick={->(e) { e.preventDefault(); setSelectedSlug(post.slug) }}>{post.title}</a>
       </h3>
       <time style={{color: "var(--color-muted)", fontSize: "0.875rem"}}>
-        {new Date(post.created_at).toLocaleDateString()}
+        {new Date(post.createdAt).toLocaleDateString()}
       </time>
       <p style={{marginTop: "0.5rem"}}>
         {post.body.slice(0, 150)}...
@@ -649,7 +627,7 @@ import ['useState', 'useEffect'], from: 'react'
 import ['setupDatabase', 'Post'], from: '../lib/db.js'
 import PostForm, from: './PostForm.jsx'
 
-def PostDetail(slug:)
+def PostDetail(slug:, onBack: nil)
   post, setPost = useState(nil)
   loading, setLoading = useState(true)
   editing, setEditing = useState(false)
@@ -664,12 +642,24 @@ def PostDetail(slug:)
     end
   }, [slug]
 
+  handleBack = ->(e) {
+    e.preventDefault() if e
+    if onBack
+      onBack.()
+    else
+      window.location.href = import.meta.env.BASE_URL + "posts"
+    end
+  }
+
   handleDelete = -> {
     return unless window.confirm("Are you sure you want to delete this post?")
     post.destroy().then do
-      setDeleted(true)
-      # Notify PostList to refresh
       window.dispatchEvent(new CustomEvent('post-deleted'))
+      if onBack
+        onBack.()
+      else
+        setDeleted(true)
+      end
     end
   }
 
@@ -681,7 +671,7 @@ def PostDetail(slug:)
   }
 
   return %x{<p class="loading">Loading post...</p>} if loading
-  return %x{<p>Post not found. <a href={import.meta.env.BASE_URL + "posts"}>Back to posts</a></p>} unless post
+  return %x{<p>Post not found. <a href="#" onClick={handleBack}>Back to posts</a></p>} unless post
 
   if deleted
     return %x{
@@ -716,7 +706,7 @@ def PostDetail(slug:)
       <button onClick={handleDelete} style={{background: "#dc2626"}}>
         Delete
       </button>
-      <a href={import.meta.env.BASE_URL + "posts"} style={{marginLeft: "auto", color: "var(--color-muted)"}}>
+      <a href="#" onClick={handleBack} style={{marginLeft: "auto", color: "var(--color-muted)"}}>
         &larr; Back to posts
       </a>
     </div>
