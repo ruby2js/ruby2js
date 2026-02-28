@@ -1935,9 +1935,18 @@ ${aliases.join(',\n')}
  * @returns {string|null} CSS path relative to web root, or null if none found
  */
 export function detectCssPath(appRoot) {
-  if (fs.existsSync(path.join(appRoot, 'app/assets/tailwind/application.css'))) {
+  const hasTailwindPlugin = fs.existsSync(path.join(appRoot, 'node_modules/@tailwindcss/vite'));
+  // Prefer juntos.css wrapper (has @source directives for content detection)
+  if (hasTailwindPlugin &&
+      fs.existsSync(path.join(appRoot, 'app/assets/tailwind/juntos.css'))) {
+    return '/app/assets/tailwind/juntos.css';
+  }
+  // Fall back to source CSS if plugin is available
+  if (hasTailwindPlugin &&
+      fs.existsSync(path.join(appRoot, 'app/assets/tailwind/application.css'))) {
     return '/app/assets/tailwind/application.css';
   }
+  // Fall back to pre-built CSS
   if (fs.existsSync(path.join(appRoot, 'app/assets/builds/tailwind.css'))) {
     return '/app/assets/builds/tailwind.css';
   }

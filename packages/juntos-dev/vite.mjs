@@ -1151,9 +1151,14 @@ function createConfigPlugin(config, appRoot) {
       // Add CSS to inputs for server targets so Vite fingerprints it
       const serverTargets = ['node', 'bun', 'deno', 'fly', 'vercel-node'];
       if (serverTargets.includes(config.target) && rollupOptions.input) {
+        const tailwindJuntos = path.join(appRoot, 'app/assets/tailwind/juntos.css');
         const tailwindSource = path.join(appRoot, 'app/assets/tailwind/application.css');
         const tailwindBuild = path.join(appRoot, 'app/assets/builds/tailwind.css');
-        const tailwindPath = fs.existsSync(tailwindSource) ? tailwindSource : tailwindBuild;
+        const hasTailwindPlugin = fs.existsSync(path.join(appRoot, 'node_modules/@tailwindcss/vite'));
+        const tailwindPath = hasTailwindPlugin
+          ? (fs.existsSync(tailwindJuntos) ? tailwindJuntos
+            : fs.existsSync(tailwindSource) ? tailwindSource : tailwindBuild)
+          : tailwindBuild;
         if (fs.existsSync(tailwindPath)) {
           rollupOptions.input['tailwind'] = tailwindPath;
         }

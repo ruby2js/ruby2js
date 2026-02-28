@@ -610,9 +610,6 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
 end
 COMPONENT
 
-# Rebuild Tailwind CSS to include all view classes
-bin/rails tailwindcss:build
-
 # Create seeds with sample workflow
 cat > db/seeds.rb << 'SEEDS'
 # Sample workflow for the demo

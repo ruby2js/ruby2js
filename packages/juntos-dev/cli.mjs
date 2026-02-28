@@ -1714,6 +1714,17 @@ exec npx juntos "$@"
     if (!quiet) console.log('  Skipping bin/juntos (already exists)');
   }
 
+  // Create Tailwind CSS wrapper for @tailwindcss/vite content detection
+  const tailwindSourcePath = join(destDir, 'app/assets/tailwind/application.css');
+  const tailwindJuntosPath = join(destDir, 'app/assets/tailwind/juntos.css');
+  if (existsSync(tailwindSourcePath) && !existsSync(tailwindJuntosPath)) {
+    if (!quiet) console.log('  Creating app/assets/tailwind/juntos.css...');
+    writeFileSync(tailwindJuntosPath, `@import "./application.css";
+@source "../../views";
+@source "../../javascript";
+`);
+  }
+
   // Add .browser/ to .gitignore (generated at build time)
   const gitignorePath = join(destDir, '.gitignore');
   if (existsSync(gitignorePath)) {

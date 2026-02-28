@@ -516,9 +516,6 @@ describe('Note Model', () => {
 });
 TEST
 
-# Rebuild Tailwind CSS
-bin/rails tailwindcss:build
-
 echo ""
 echo "Notes demo created: $APP_NAME/"
 echo ""

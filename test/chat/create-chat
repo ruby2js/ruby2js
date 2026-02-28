@@ -171,9 +171,6 @@ cat > app/views/messages/destroy.turbo_stream.erb << 'TURBO'
 <%# Broadcast handles the removal - nothing needed here %>
 TURBO
 
-# Rebuild Tailwind CSS
-bin/rails tailwindcss:build
-
 # Create seeds with sample messages
 cat > db/seeds.rb << 'SEEDS'
 # Sample messages for the chat demo

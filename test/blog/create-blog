@@ -225,9 +225,6 @@ VIEW
 sed -i.bak 's/class="container mx-auto mt-28 px-5 flex"/class="container mx-auto mt-28 px-5 flex flex-col"/' app/views/layouts/application.html.erb
 rm -f app/views/layouts/application.html.erb.bak
 
-# Rebuild Tailwind CSS to include all view classes
-bin/rails tailwindcss:build
-
 # Create seeds with sample articles and comments
 cat > db/seeds.rb << 'SEEDS'
 # Sample articles and comments for the blog demo

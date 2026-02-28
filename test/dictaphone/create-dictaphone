@@ -549,9 +549,6 @@ class DictaphoneController < Stimulus::Controller
 end
 STIMULUS
 
-# Rebuild Tailwind CSS
-bin/rails tailwindcss:build
-
 # Create seeds (empty - clips come from recording)
 cat > db/seeds.rb << 'SEEDS'
 # Dictaphone seeds

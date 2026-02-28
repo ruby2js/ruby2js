@@ -66,15 +66,10 @@ describe('Dictaphone Demo Integration Tests', () => {
     // Verify the build pipeline works
     // Note: Uses sqlite/node for Node.js compatibility
     try {
-      execSync('JUNTOS_DATABASE=sqlite JUNTOS_TARGET=node npm run build', {
+      execSync('npx juntos build -d sqlite -t node', {
         cwd: DEMO_DIR,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          JUNTOS_DATABASE: 'sqlite',
-          JUNTOS_TARGET: 'node'
-        }
+        stdio: ['pipe', 'pipe', 'pipe']
       });
 
       // Verify dist was created

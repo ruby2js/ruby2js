@@ -66,6 +66,7 @@ export function getAssetPath(name) {
 
     // Tailwind source CSS (compiled by @tailwindcss/vite) has a different manifest key
     if (name === 'tailwind.css') {
+      candidates.push('app/assets/tailwind/juntos.css');
       candidates.push('app/assets/tailwind/application.css');
     }
 

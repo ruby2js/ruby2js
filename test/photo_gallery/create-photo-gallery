@@ -282,9 +282,6 @@ class CameraController < Stimulus::Controller
 end
 STIMULUS
 
-# Rebuild Tailwind CSS to include all view classes
-bin/rails tailwindcss:build
-
 # Create seeds with sample photos (placeholder - real photos come from camera)
 cat > db/seeds.rb << 'SEEDS'
 # Photo gallery seeds
