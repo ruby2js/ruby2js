@@ -64,6 +64,15 @@ import {
   ErbCompiler
 } from './transform.mjs';
 
+// Import @tailwindcss/vite if available (installed by ensurePackagesInstalled)
+let tailwindVitePlugin = null;
+try {
+  const mod = await import('@tailwindcss/vite');
+  tailwindVitePlugin = mod.default || mod;
+} catch {
+  // Not installed — createTailwindPlugin will return null
+}
+
 // ============================================================
 // Dual Bundle Support (SSR + Hydration)
 // ============================================================
@@ -1588,26 +1597,16 @@ function getDatabasePackages(database) {
 }
 
 /**
- * Tailwind CSS plugin - dynamically loads @tailwindcss/vite when the app
+ * Tailwind CSS plugin - returns @tailwindcss/vite plugin instance when the app
  * has Tailwind source CSS (app/assets/tailwind/application.css).
- * Returns null if no Tailwind source is detected.
+ * Returns null if no Tailwind source is detected or plugin not installed.
  */
 function createTailwindPlugin(appRoot) {
+  if (!tailwindVitePlugin) return null;
   if (!fs.existsSync(path.join(appRoot, 'app/assets/tailwind/application.css'))) {
     return null;
   }
-
-  return {
-    name: 'juntos-tailwind',
-    async config() {
-      try {
-        const mod = await import('@tailwindcss/vite');
-        return { plugins: [(mod.default || mod)()] };
-      } catch {
-        console.warn('[juntos] @tailwindcss/vite not found — run: npm install tailwindcss @tailwindcss/vite');
-      }
-    }
-  };
+  return tailwindVitePlugin();
 }
 
 /**
