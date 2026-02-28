@@ -3285,11 +3285,20 @@ function runD1Prepare(options) {
 }
 
 // Node.js database helpers
+
+// Use plain node if dist/ is pre-built, otherwise vite-node for on-the-fly transpilation
+function migrateCommand(extraArgs = '') {
+  const args = extraArgs ? ` ${extraArgs}` : '';
+  if (existsSync(join(APP_ROOT, 'dist', 'config', 'routes.js'))) {
+    return `node "${MIGRATE_SCRIPT}"${args}`;
+  }
+  return `npx vite-node "${MIGRATE_SCRIPT}"${args}`;
+}
+
 function runNodeMigrate(options) {
   console.log('Running migrations...');
   try {
-    // Run migrate.mjs from this package
-    execSync(`node "${MIGRATE_SCRIPT}" --migrate-only`, {
+    execSync(migrateCommand('--migrate-only'), {
       cwd: APP_ROOT,
       stdio: 'inherit',
       env: { ...process.env, JUNTOS_DIST_DIR: join(APP_ROOT, 'dist') }
@@ -3304,7 +3313,7 @@ function runNodeMigrate(options) {
 function runNodeSeed(options) {
   console.log('Running seeds...');
   try {
-    execSync(`node "${MIGRATE_SCRIPT}" --seed-only`, {
+    execSync(migrateCommand('--seed-only'), {
       cwd: APP_ROOT,
       stdio: 'inherit',
       env: { ...process.env, JUNTOS_DIST_DIR: join(APP_ROOT, 'dist') }
@@ -3319,7 +3328,7 @@ function runNodeSeed(options) {
 function runNodePrepare(options) {
   console.log('Running migrations and seeds...');
   try {
-    execSync(`node "${MIGRATE_SCRIPT}"`, {
+    execSync(migrateCommand(), {
       cwd: APP_ROOT,
       stdio: 'inherit',
       env: { ...process.env, JUNTOS_DIST_DIR: join(APP_ROOT, 'dist') }

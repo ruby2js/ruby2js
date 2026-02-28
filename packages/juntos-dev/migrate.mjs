@@ -87,20 +87,23 @@ async function main() {
   console.log('Ruby2JS Migration Runner');
   console.log('========================\n');
 
-  // Find the application root (where config/routes.js exists)
+  // Find the application root
   let appRoot = process.cwd();
   let projectRoot = process.cwd(); // For config files (database.yml)
 
-  // Check if we're in dist/ or the app root
-  if (!fs.existsSync(path.join(appRoot, 'config/routes.js'))) {
-    if (fs.existsSync(path.join(appRoot, 'dist/config/routes.js'))) {
-      appRoot = path.join(appRoot, 'dist');
-      // projectRoot stays as cwd for config files
-    } else {
-      console.error('Error: Cannot find config/routes.js');
-      console.error('Run this from your app root or dist/ directory');
-      process.exit(1);
-    }
+  // Locate routes: pre-built .js (dist or app root), or .rb (via vite-node)
+  let routesFile;
+  if (fs.existsSync(path.join(appRoot, 'config/routes.js'))) {
+    routesFile = path.join(appRoot, 'config/routes.js');
+  } else if (fs.existsSync(path.join(appRoot, 'dist/config/routes.js'))) {
+    appRoot = path.join(appRoot, 'dist');
+    routesFile = path.join(appRoot, 'config/routes.js');
+  } else if (fs.existsSync(path.join(appRoot, 'config/routes.rb'))) {
+    routesFile = path.join(appRoot, 'config/routes.rb');
+  } else {
+    console.error('Error: Cannot find config/routes.js or config/routes.rb');
+    console.error('Run this from your app root or dist/ directory');
+    process.exit(1);
   }
 
   console.log(`App root: ${appRoot}\n`);
@@ -110,8 +113,7 @@ async function main() {
 
   try {
     // Import the routes module which sets up Application and re-exports initDatabase
-    // The initDatabase from routes.js is the same instance used by migrations
-    const routesPath = pathToFileURL(path.join(appRoot, 'config/routes.js')).href;
+    const routesPath = pathToFileURL(routesFile).href;
     const routesModule = await import(routesPath);
     const { Application, initDatabase } = routesModule;
 
@@ -238,4 +240,4 @@ async function main() {
   }
 }
 
-main();
+await main();
