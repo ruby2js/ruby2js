@@ -50,6 +50,7 @@ import {
   generateVitestConfigForEject,
   generateBrowserIndexHtml,
   generateBrowserMainJs,
+  detectCssPath,
   ensureRuby2jsReady,
   transformRuby,
   transformErb,
@@ -1878,6 +1879,16 @@ function ensurePackagesInstalled(options) {
     }
   }
 
+  // Check if app uses Tailwind CSS (needs @tailwindcss/vite to compile from source)
+  const tailwindSource = join(APP_ROOT, 'app/assets/tailwind/application.css');
+  if (existsSync(tailwindSource)) {
+    for (const pkg of ['tailwindcss', '@tailwindcss/vite']) {
+      if (!isPackageInstalled(pkg)) {
+        missing.push(pkg);
+      }
+    }
+  }
+
   // Install missing packages
   if (missing.length > 0) {
     console.log(`Installing required packages: ${missing.join(', ')}...`);
@@ -2754,7 +2765,8 @@ async function runEject(options) {
 
   if (isBrowserTarget) {
     // Browser targets: generate index.html and browser main.js
-    writeFileSync(join(outDir, 'index.html'), generateBrowserIndexHtml(appName, './main.js'));
+    const cssPath = detectCssPath(APP_ROOT);
+    writeFileSync(join(outDir, 'index.html'), generateBrowserIndexHtml(appName, './main.js', cssPath));
     fileCount++;
     writeFileSync(join(outDir, 'main.js'), generateBrowserMainJs('./config/routes.js', './app/javascript/controllers/index.js'));
     fileCount++;

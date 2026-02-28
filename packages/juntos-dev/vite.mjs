@@ -57,6 +57,7 @@ import {
   generateViewsModule,
   generateBrowserIndexHtml,
   generateBrowserMainJs,
+  detectCssPath,
   ensureRuby2jsReady,
   buildAppManifest,
   shouldIncludeFile,
@@ -300,6 +301,9 @@ export function juntos(options = {}) {
   const config = loadConfig(appRoot, { database, target, broadcast, eslevel, external });
 
   return [
+    // Tailwind CSS compilation from source (if app/assets/tailwind/ exists)
+    createTailwindPlugin(appRoot),
+
     // Generate .browser/index.html and main.js for browser targets
     createBrowserEntryPlugin(config, appRoot),
 
@@ -328,7 +332,7 @@ export function juntos(options = {}) {
 
     // HMR support for Stimulus controllers
     ...(hmr ? [createHmrPlugin()] : [])
-  ];
+  ].filter(Boolean);
 }
 
 /**
@@ -1147,7 +1151,9 @@ function createConfigPlugin(config, appRoot) {
       // Add CSS to inputs for server targets so Vite fingerprints it
       const serverTargets = ['node', 'bun', 'deno', 'fly', 'vercel-node'];
       if (serverTargets.includes(config.target) && rollupOptions.input) {
-        const tailwindPath = path.join(appRoot, 'app/assets/builds/tailwind.css');
+        const tailwindSource = path.join(appRoot, 'app/assets/tailwind/application.css');
+        const tailwindBuild = path.join(appRoot, 'app/assets/builds/tailwind.css');
+        const tailwindPath = fs.existsSync(tailwindSource) ? tailwindSource : tailwindBuild;
         if (fs.existsSync(tailwindPath)) {
           rollupOptions.input['tailwind'] = tailwindPath;
         }
@@ -1234,7 +1240,8 @@ export { application };`,
 
       // Generate index.html content once
       const appName = detectAppName(appRoot);
-      const indexHtml = generateBrowserIndexHtml(appName, '/.browser/main.js');
+      const cssPath = detectCssPath(appRoot);
+      const indexHtml = generateBrowserIndexHtml(appName, '/.browser/main.js', cssPath);
 
       // Middleware to serve virtual index.html for HTML requests (SPA fallback)
       server.middlewares.use(async (req, res, next) => {
@@ -1576,6 +1583,29 @@ function getDatabasePackages(database) {
 }
 
 /**
+ * Tailwind CSS plugin - dynamically loads @tailwindcss/vite when the app
+ * has Tailwind source CSS (app/assets/tailwind/application.css).
+ * Returns null if no Tailwind source is detected.
+ */
+function createTailwindPlugin(appRoot) {
+  if (!fs.existsSync(path.join(appRoot, 'app/assets/tailwind/application.css'))) {
+    return null;
+  }
+
+  return {
+    name: 'juntos-tailwind',
+    async config() {
+      try {
+        const mod = await import('@tailwindcss/vite');
+        return { plugins: [(mod.default || mod)()] };
+      } catch {
+        console.warn('[juntos] @tailwindcss/vite not found — run: npm install tailwindcss @tailwindcss/vite');
+      }
+    }
+  };
+}
+
+/**
  * Browser entry plugin - serves virtual entry points for browser targets.
  *
  * In dev mode: Serves index.html and main.js as virtual modules (no files created).
@@ -1598,7 +1628,8 @@ function createBrowserEntryPlugin(config, appRoot) {
   function getIndexHtml() {
     if (!indexHtmlContent) {
       const appName = detectAppName(appRoot);
-      indexHtmlContent = generateBrowserIndexHtml(appName, '/.browser/main.js');
+      const cssPath = detectCssPath(appRoot);
+      indexHtmlContent = generateBrowserIndexHtml(appName, '/.browser/main.js', cssPath);
     }
     return indexHtmlContent;
   }

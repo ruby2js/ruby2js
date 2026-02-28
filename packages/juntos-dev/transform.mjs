@@ -1929,12 +1929,30 @@ ${aliases.join(',\n')}
 }
 
 /**
+ * Detect the CSS path for browser HTML based on available source files.
+ * Prefers Tailwind source (compiled by @tailwindcss/vite) over pre-built CSS.
+ * @param {string} appRoot - Absolute path to the app root
+ * @returns {string|null} CSS path relative to web root, or null if none found
+ */
+export function detectCssPath(appRoot) {
+  if (fs.existsSync(path.join(appRoot, 'app/assets/tailwind/application.css'))) {
+    return '/app/assets/tailwind/application.css';
+  }
+  if (fs.existsSync(path.join(appRoot, 'app/assets/builds/tailwind.css'))) {
+    return '/app/assets/builds/tailwind.css';
+  }
+  return null;
+}
+
+/**
  * Generate index.html for browser builds.
  * Used by both Vite plugin (dev) and eject command (standalone).
  * @param {string} appName - Application name for the title
  * @param {string} mainJsPath - Path to main.js (e.g., '/.browser/main.js' or './main.js')
+ * @param {string|null} cssPath - Path to CSS file, or null for no CSS link
  */
-export function generateBrowserIndexHtml(appName, mainJsPath = './main.js') {
+export function generateBrowserIndexHtml(appName, mainJsPath = './main.js', cssPath = null) {
+  const cssLink = cssPath ? `\n  <link href="${cssPath}" rel="stylesheet">` : '';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1942,8 +1960,7 @@ export function generateBrowserIndexHtml(appName, mainJsPath = './main.js') {
   <meta name="turbo-refresh-method" content="morph">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${appName}</title>
-  <link rel="icon" href="data:,">
-  <link href="/app/assets/builds/tailwind.css" rel="stylesheet">
+  <link rel="icon" href="data:,">${cssLink}
 </head>
 <body>
   <div id="loading">Loading...</div>
