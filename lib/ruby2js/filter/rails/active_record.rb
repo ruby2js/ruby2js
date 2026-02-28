@@ -23,7 +23,7 @@ module Ruby2JS
         # Chainable methods (includes, joins, limit, offset) are handled via
         # chain detection - only the final method in a chain gets awaited.
         AR_CLASS_METHODS = %i[
-          all find find_by find_by! where
+          all find find_by find_by! where not or and
           first last take sole
           count sum average minimum maximum
           create create!
@@ -180,6 +180,21 @@ module Ruby2JS
           # Check for instance method calls on instance variables (e.g., @article.save)
           if target&.type == :ivar && AR_INSTANCE_METHODS.include?(method)
             return node.updated(:await!)
+          end
+
+          # Check for custom async instance methods from model metadata
+          # e.g., @studio.pairs where 'pairs' is a custom async method on Studio
+          if (target&.type == :lvar || target&.type == :ivar) && metadata
+            models = metadata['models']
+            if models
+              models.keys.each do |_name|
+                model_meta = models[_name]
+                methods = model_meta['instance_methods']
+                if methods && methods.include?(method.to_s)
+                  return node.updated(:await!)
+                end
+              end
+            end
           end
 
           # Check for association method chains (e.g., article.comments.find(id), article.comments.count)

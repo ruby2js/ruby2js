@@ -947,7 +947,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).must_include '.destroy_all()'
       # Inner where() calls should NOT be individually awaited
       # (awaiting a Relation resolves it to Array, breaking .or())
-      _(result).wont_include 'await StudioPair.where'
+      _(result).wont_include '(await StudioPair.where'
       _(result).wont_include 'await (await'
       _(result).must_include '.or(StudioPair.where('
     end

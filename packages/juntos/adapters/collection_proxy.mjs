@@ -217,6 +217,10 @@ export class CollectionProxy {
     return (this._records || []).at(index);
   }
 
+  slice(start, end) {
+    return (this._records || []).slice(start, end);
+  }
+
   // --- Thenable (for await support) ---
 
   then(resolve, reject) {
@@ -297,6 +301,7 @@ class _ThroughProxy {
   [Symbol.iterator]() { return (this._records || [])[Symbol.iterator](); }
   map(fn) { return (this._records || []).map(fn); }
   filter(fn) { return (this._records || []).filter(fn); }
+  slice(start, end) { return (this._records || []).slice(start, end); }
   get length() { return this._records?.length ?? 0; }
   get loaded() { return this._loaded; }
   get records() { return this._records || []; }
