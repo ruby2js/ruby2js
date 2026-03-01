@@ -1932,10 +1932,7 @@ function runDev(options, extraArgs = []) {
   ensurePackagesInstalled(options);
   applyEnvOptions(options);
 
-  const args = ['vite'];
-  if (options.port !== 5173) {
-    args.push('--port', String(options.port));
-  }
+  const args = ['vite', '--port', String(options.port)];
   if (options.open) {
     args.push('--open');
   }
@@ -4081,7 +4078,7 @@ async function transpileE2EFiles(appRoot, config) {
   return count;
 }
 
-function generatePlaywrightConfig(appRoot) {
+function generatePlaywrightConfig(appRoot, port = 3000) {
   const configPath = join(appRoot, 'playwright.config.js');
   if (existsSync(configPath)) return;
 
@@ -4091,11 +4088,11 @@ export default defineConfig({
   testDir: "./test/system",
   testMatch: "**/*.spec.mjs",
   use: {
-    baseURL: "http://localhost:5173"
+    baseURL: "http://localhost:${port}"
   },
   webServer: {
-    command: "npx juntos dev",
-    url: "http://localhost:5173",
+    command: "npx juntos dev --port ${port} -- --strictPort",
+    url: "http://localhost:${port}/@vite/client",
     reuseExistingServer: !process.env.CI
   }
 });
@@ -4144,7 +4141,7 @@ async function runE2E(options, e2eArgs) {
   }
 
   // Generate playwright.config.js if missing
-  generatePlaywrightConfig(APP_ROOT);
+  generatePlaywrightConfig(APP_ROOT, options.port);
 
   // Run: npx playwright test [args]
   console.log('Running e2e tests...');
@@ -4618,7 +4615,7 @@ switch (command) {
       console.log('Usage: juntos dev [options] [-- vite-args...]\n\nStart development server with hot reload.\n');
       console.log('Options:');
       console.log('  -d, --database ADAPTER   Database adapter');
-      console.log('  -p, --port PORT          Server port (default: 5173)');
+      console.log('  -p, --port PORT          Server port (default: 3000)');
       console.log('  -o, --open               Open browser automatically');
       console.log('  --host, --binding        Listen on all interfaces (0.0.0.0)');
       console.log('\nAny arguments after -- are passed directly to Vite.');

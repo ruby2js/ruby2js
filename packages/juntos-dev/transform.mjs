@@ -230,7 +230,7 @@ export function getBuildOptions(section, target, sectionConfig = null) {
         ...baseOptions,
         filters: sectionConfig?.filters
           ? normalizeFilterNames(sectionConfig.filters)
-          : ['Pragma', 'Rails_Concern', 'Rails_Test', 'Rails_Model', ...nodeFilter, 'ActiveSupport', 'Functions', 'ESM', 'Return'],
+          : ['Pragma', 'Rails_Concern', 'Rails_Playwright', 'Rails_Test', 'Rails_Model', ...nodeFilter, 'ActiveSupport', 'Functions', 'ESM', 'Return'],
         target
       };
 
@@ -2274,6 +2274,7 @@ export async function ensureRuby2jsReady() {
     await import('ruby2js/filters/rails/helpers.js');
     await import('ruby2js/filters/rails/test.js');
     await import('ruby2js/filters/rails/logger.js');
+    await import('ruby2js/filters/rails/playwright.js');
 
     // Template filters
     await import('ruby2js/filters/erb.js');
