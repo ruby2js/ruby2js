@@ -43,6 +43,10 @@ export async function initDatabase(options = {}) {
 
 // Define schema version (call after all models are loaded)
 export function defineSchema(version = 1) {
+  // Always include schema_migrations for tracking applied migrations
+  if (!tableSchemas['schema_migrations']) {
+    tableSchemas['schema_migrations'] = 'version';
+  }
   if (Object.keys(tableSchemas).length > 0) {
     db.version(version).stores(tableSchemas);
   }
@@ -113,12 +117,12 @@ export async function query(sql, params = []) {
 // For Dexie, we simulate SQL executes for schema_migrations table
 export async function execute(sql, params = []) {
   if (sql.includes('CREATE TABLE') && sql.includes('schema_migrations')) {
-    // Dexie handles schema via version stores, but we need a runtime table
-    // Add schema_migrations to the schema if not present
-    if (!tableSchemas['schema_migrations']) {
-      tableSchemas['schema_migrations'] = 'version';
-    }
+    // Already handled by defineSchema() — no-op here
     return { changes: 0 };
+  }
+  if (sql.includes('INSERT INTO schema_migrations')) {
+    await db.table('schema_migrations').add({ version: params[0] });
+    return { changes: 1 };
   }
   return { changes: 0 };
 }
