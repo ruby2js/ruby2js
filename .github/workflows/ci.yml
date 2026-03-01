@@ -530,6 +530,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -547,6 +549,9 @@ jobs:
             tar -xzf "$tarball" -C artifacts
           done
 
+      - name: Copy ballroom submodule
+        run: cp -r test/ballroom artifacts/ballroom
+
       - name: Extract CLI for init
         run: |
           mkdir -p artifacts/cli
@@ -558,7 +563,7 @@ jobs:
 
       - name: Build browser demos
         run: |
-          for demo in blog chat photo_gallery dictaphone workflow notes; do
+          for demo in blog chat photo_gallery dictaphone workflow notes ballroom; do
             echo "Building $demo for browser..."
             base_path="/ruby2js/${demo//_/-}/"
             # Initialize Juntos config (package.json, vite.config.js, bin/juntos)
@@ -581,7 +586,7 @@ jobs:
       - name: Package editor snapshots
         run: |
           mkdir -p _site/editor/snapshots
-          for demo in blog chat photo_gallery dictaphone workflow notes ssg-blog astro-blog; do
+          for demo in blog chat photo_gallery dictaphone workflow notes ballroom ssg-blog astro-blog; do
             echo "Packaging $demo snapshot for editor..."
             (cd "artifacts/$demo" && tar --exclude='./dist' --exclude='./tmp' --exclude='./log' --exclude='./storage' --exclude='./.git' -czf "../../_site/editor/snapshots/${demo}.tar.gz" .)
           done
@@ -696,6 +701,7 @@ jobs:
           cp -r artifacts/photo_gallery/dist _site/photo-gallery
           cp -r artifacts/dictaphone/dist _site/dictaphone
           cp -r artifacts/workflow/dist _site/workflow
+          cp -r artifacts/ballroom/dist _site/ballroom
           cp -r artifacts/astro-blog/dist _site/astro-blog
           cp -r artifacts/ssg-blog/_site _site/ssg-blog
 
@@ -830,6 +836,16 @@ jobs:
                   <a href="releases/demo-workflow.tar.gz">Tarball</a>
                 </div>
               </div>
+              <div class="demo">
+                <div class="demo-content">
+                  <h3><a href="ballroom/">Ballroom</a></h3>
+                  <p>Juntos component showcase and testing ground.</p>
+                </div>
+                <div class="demo-links">
+                  <a href="editor/?demo=ballroom">Editor</a>
+                  <a href="https://github.com/ruby2js/ballroom">GitHub</a>
+                </div>
+              </div>
             </div>
 
             <div class="releases">
@@ -854,7 +870,7 @@ jobs:
               // GitHub Pages SPA redirect for direct URL access
               // Detects which demo the path belongs to and redirects there
               const path = location.pathname;
-              const demos = ['ssg-blog', 'astro-blog', 'blog', 'chat', 'notes', 'photo-gallery', 'dictaphone', 'workflow'];
+              const demos = ['ssg-blog', 'astro-blog', 'blog', 'chat', 'notes', 'photo-gallery', 'dictaphone', 'workflow', 'ballroom'];
               const base = '/ruby2js/';
 
               // Find which demo this path belongs to
