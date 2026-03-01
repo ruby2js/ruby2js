@@ -189,7 +189,7 @@ describe Ruby2JS::Filter::Rails::Playwright do
   end
 
   describe "click_on" do
-    it "converts click_on to page.getByRole link click" do
+    it "converts click_on to link.or(button).first().click()" do
       result = to_js(<<~RUBY)
         class ChatSystemTest < ApplicationSystemTestCase
           test "clicks link" do
@@ -197,7 +197,9 @@ describe Ruby2JS::Filter::Rails::Playwright do
           end
         end
       RUBY
-      assert_includes result, 'page.getByRole("link", {name: "Home"}).click()'
+      assert_includes result, 'page.getByRole("link", {name: "Home"}).or(page.getByRole('
+      assert_includes result, '{name: "Home"}'
+      assert_includes result, '.first().click()'
     end
   end
 
@@ -357,6 +359,35 @@ describe Ruby2JS::Filter::Rails::Playwright do
       assert_includes result, 'page.getByRole("button", {name: "Send"}).click()'
       assert_includes result, 'expect(page.getByLabel("Type a message...")).toHaveValue("")'
       assert_includes result, 'expect(page.locator("#messages")).toContainText("Hello!")'
+    end
+  end
+
+  describe "beforeEach reset" do
+    it "injects test.beforeEach with /__test/reset call" do
+      result = to_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "shows page" do
+            visit messages_url
+          end
+        end
+      RUBY
+      assert_includes result, 'test.beforeEach(async ({ request }) => await request.post("/__test/reset"))'
+    end
+  end
+
+  describe "accept_confirm" do
+    it "converts accept_confirm block to page.once dialog handler" do
+      result = to_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "deletes item" do
+            accept_confirm do
+              click_on "Delete"
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'page.once("dialog", dialog => dialog.accept())'
+      assert_includes result, '.first().click()'
     end
   end
 end

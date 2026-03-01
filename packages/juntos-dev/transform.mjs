@@ -230,7 +230,7 @@ export function getBuildOptions(section, target, sectionConfig = null) {
         ...baseOptions,
         filters: sectionConfig?.filters
           ? normalizeFilterNames(sectionConfig.filters)
-          : ['Pragma', 'Rails_Concern', 'Rails_Playwright', 'Rails_Test', 'Rails_Model', ...nodeFilter, 'ActiveSupport', 'Functions', 'ESM', 'Return'],
+          : ['Pragma', 'Rails_Concern', 'Rails_Test', 'Rails_Model', ...nodeFilter, 'ActiveSupport', 'Functions', 'ESM', 'Return'],
         target
       };
 
@@ -2328,7 +2328,14 @@ export async function transformRuby(source, filePath, section, config, appRoot, 
 
   // Thread shared metadata through to filters (populated by model/concern
   // filters, consumed by test filter for await/sync decisions)
-  if (metadata) options.metadata = metadata;
+  if (metadata) {
+    options.metadata = metadata;
+
+    // Add Playwright filter for e2e test transpilation
+    if (metadata.playwright && Array.isArray(options.filters)) {
+      options.filters = ['Rails_Playwright', ...options.filters];
+    }
+  }
 
   // Routes need additional options
   if (filePath.endsWith('/routes.rb')) {
