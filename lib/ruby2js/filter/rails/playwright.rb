@@ -153,6 +153,25 @@ module Ruby2JS
 
             s(:send, s(:lvar, :test), :afterEach, async_fn)
 
+          when :accept_confirm
+            # accept_confirm { click_on "X" } →
+            #   page.once("dialog", dialog => dialog.accept());
+            #   <block body>
+            return super unless @playwright_describe_depth > 0
+            body = node.children.last
+            processed_body = process(body)
+
+            # page.once("dialog", dialog => dialog.accept())
+            dialog_handler = s(:send, s(:lvar, :page), :once, s(:str, 'dialog'),
+              s(:block, s(:send, nil, :proc), s(:args, s(:arg, :dialog)),
+                s(:send!, s(:lvar, :dialog), :accept)))
+
+            if processed_body&.type == :begin
+              s(:begin, dialog_handler, *processed_body.children)
+            else
+              s(:begin, dialog_handler, processed_body)
+            end
+
           else
             super
           end
@@ -258,13 +277,17 @@ module Ruby2JS
                 :click))
 
           when :click_on
-            # click_on "Link" → await page.getByRole("link", {name: "Link"}).click()
+            # click_on "X" → await page.getByRole("link", {name: "X"})
+            #                   .or(page.getByRole("button", {name: "X"})).first().click()
             return nil if args.empty?
             text = process(args.first)
+            link_locator = s(:send, s(:lvar, :page), :getByRole, s(:str, 'link'),
+              s(:hash, s(:pair, s(:sym, :name), text)))
+            button_locator = s(:send, s(:lvar, :page), :getByRole, s(:str, 'button'),
+              s(:hash, s(:pair, s(:sym, :name), text)))
             s(:send, nil, :await,
               s(:send!,
-                s(:send, s(:lvar, :page), :getByRole, s(:str, 'link'),
-                  s(:hash, s(:pair, s(:sym, :name), text))),
+                s(:send!, s(:send, link_locator, :or, button_locator), :first),
                 :click))
 
           when :assert_field
