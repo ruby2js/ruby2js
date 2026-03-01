@@ -62,11 +62,30 @@ module Ruby2JS
             # Transform class body
             transformed_body = process(body)
 
+            # Build: test.beforeEach(async ({ request }) => {
+            #   await request.post("/__test/reset")
+            # })
+            reset_call = s(:send, nil, :await,
+              s(:send, s(:lvar, :request), :post, s(:str, '/__test/reset')))
+            before_each = s(:send, s(:lvar, :test), :beforeEach,
+              s(:async, nil,
+                s(:args, s(:kwarg, :request)),
+                reset_call))
+
+            # Wrap body with beforeEach
+            body_with_hook = if transformed_body&.type == :begin
+              s(:begin, before_each, *transformed_body.children)
+            elsif transformed_body
+              s(:begin, before_each, transformed_body)
+            else
+              before_each
+            end
+
             # Build: test.describe("Name", () => { ... })
             describe_block = s(:block,
               s(:send, s(:lvar, :test), :describe, s(:str, describe_name)),
               s(:args),
-              transformed_body)
+              body_with_hook)
 
             # Build imports and path helper imports
             imports = []

@@ -1247,41 +1247,123 @@ export { application };`,
       };
     },
 
-    // Serve virtual index.html for the root URL in dev mode
+    // Serve pages in dev mode
     configureServer(server) {
       const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun'];
-      if (!browserTargets.includes(config.target)) return;
 
-      // Generate index.html content once
-      const appName = detectAppName(appRoot);
-      const cssPath = detectCssPath(appRoot);
-      const indexHtml = generateBrowserIndexHtml(appName, '/.browser/main.js', cssPath);
+      if (browserTargets.includes(config.target)) {
+        // Browser targets: serve virtual index.html (SPA fallback)
+        const appName = detectAppName(appRoot);
+        const cssPath = detectCssPath(appRoot);
+        const indexHtml = generateBrowserIndexHtml(appName, '/.browser/main.js', cssPath);
 
-      // Middleware to serve virtual index.html for HTML requests (SPA fallback)
-      server.middlewares.use(async (req, res, next) => {
-        const url = req.url || '/';
-        const pathname = url.split('?')[0];
+        server.middlewares.use(async (req, res, next) => {
+          const url = req.url || '/';
+          const pathname = url.split('?')[0];
 
-        // Serve virtual HTML for:
-        // - Root path (/)
-        // - Paths without file extensions (SPA routes like /articles/new)
-        // - Explicit /index.html
-        const hasExtension = pathname.includes('.') && !pathname.endsWith('.html');
-        const isApiOrAsset = pathname.startsWith('/@') || pathname.startsWith('/node_modules/');
+          const hasExtension = pathname.includes('.') && !pathname.endsWith('.html');
+          const isApiOrAsset = pathname.startsWith('/@') || pathname.startsWith('/node_modules/');
 
-        if (!hasExtension && !isApiOrAsset) {
-          try {
-            // Transform HTML through Vite's pipeline (handles HMR injection, etc.)
-            const transformedHtml = await server.transformIndexHtml(url, indexHtml);
-            res.setHeader('Content-Type', 'text/html');
-            res.end(transformedHtml);
-          } catch (err) {
-            next(err);
+          if (!hasExtension && !isApiOrAsset) {
+            try {
+              const transformedHtml = await server.transformIndexHtml(url, indexHtml);
+              res.setHeader('Content-Type', 'text/html');
+              res.end(transformedHtml);
+            } catch (err) {
+              next(err);
+            }
+            return;
           }
-          return;
+          next();
+        });
+      } else if (isServerTarget(config.target)) {
+        // Server targets: SSR via ssrLoadModule (instant hot reload)
+        const routesPath = path.join(appRoot, 'config/routes.rb');
+        let dbInitialized = false;
+        let fixturesLoaded = false;
+        let savepointActive = false;
+        let adapterRef = null;
+
+        // Ensure the database is initialized (shared by normal requests and test reset)
+        async function ensureDbInitialized() {
+          if (dbInitialized) return;
+          const { Application } = await server.ssrLoadModule(routesPath);
+          const adapter = await server.ssrLoadModule('juntos:active-record');
+          Application.activeRecordModule = adapter;
+          if (adapter.modelRegistry && Application.models) {
+            Object.assign(adapter.modelRegistry, Application.models);
+          }
+          await adapter.initDatabase();
+          await Application.runMigrations(adapter);
+          adapterRef = adapter;
+          dbInitialized = true;
         }
-        next();
-      });
+
+        server.middlewares.use(async (req, res, next) => {
+          const url = req.url || '/';
+          const pathname = url.split('?')[0];
+
+          // Let Vite handle its own requests
+          const isViteRequest = pathname.startsWith('/@') ||
+            pathname.startsWith('/node_modules/') ||
+            pathname.startsWith('/__vite');
+          if (isViteRequest) return next();
+
+          // Let Vite handle files with extensions (CSS, JS, images, etc.)
+          const hasExtension = pathname.includes('.') && !pathname.endsWith('.html');
+          if (hasExtension) return next();
+
+          // Test lifecycle endpoint: load fixtures + savepoint reset (e2e only)
+          if (pathname === '/__test/reset' && req.method === 'POST' && process.env.JUNTOS_E2E) {
+            try {
+              await ensureDbInitialized();
+
+              if (!fixturesLoaded) {
+                const fixturesPath = path.join(appRoot, 'test/system/__fixtures.mjs');
+                const fixtures = await server.ssrLoadModule(fixturesPath);
+                await fixtures.loadFixtures();
+                fixturesLoaded = true;
+              }
+
+              if (savepointActive) {
+                adapterRef.rollbackSavepoint();
+              }
+              adapterRef.beginSavepoint();
+              savepointActive = true;
+
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end('{"ok":true}');
+            } catch (err) {
+              server.ssrFixStacktrace(err);
+              console.error('/__test/reset failed:', err);
+              if (!res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+              }
+            }
+            return;
+          }
+
+          try {
+            // Load routes (configures Application with route table)
+            await server.ssrLoadModule(routesPath);
+
+            // Initialize database on first request
+            await ensureDbInitialized();
+
+            // Load Router from the node target (has dispatch with req/res)
+            const { Router } = await server.ssrLoadModule('juntos/targets/node/rails.js');
+            await Router.dispatch(req, res);
+          } catch (err) {
+            server.ssrFixStacktrace(err);
+            console.error(err);
+            if (!res.headersSent) {
+              res.writeHead(500, { 'Content-Type': 'text/html' });
+              res.end(`<h1>500 Server Error</h1><pre>${err.stack || err.message}</pre>`);
+            }
+          }
+        });
+      }
     },
 
     // Flatten .browser/ output to dist root for browser targets

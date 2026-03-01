@@ -2274,7 +2274,6 @@ export async function ensureRuby2jsReady() {
     await import('ruby2js/filters/rails/helpers.js');
     await import('ruby2js/filters/rails/test.js');
     await import('ruby2js/filters/rails/logger.js');
-    await import('ruby2js/filters/rails/playwright.js');
 
     // Template filters
     await import('ruby2js/filters/erb.js');
@@ -2290,6 +2289,19 @@ export async function ensureRuby2jsReady() {
   }
 
   return ruby2jsModule;
+}
+
+let playwrightFilterLoaded = false;
+
+/**
+ * Load the Playwright filter on demand (only needed for e2e transpilation).
+ */
+export async function ensurePlaywrightFilter() {
+  if (!playwrightFilterLoaded) {
+    await ensureRuby2jsReady();
+    await import('ruby2js/filters/rails/playwright.js');
+    playwrightFilterLoaded = true;
+  }
 }
 
 /**

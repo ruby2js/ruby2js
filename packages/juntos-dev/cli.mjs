@@ -52,6 +52,7 @@ import {
   generateBrowserMainJs,
   detectCssPath,
   ensureRuby2jsReady,
+  ensurePlaywrightFilter,
   transformRuby,
   transformErb,
   transformJsxRb,
@@ -991,6 +992,39 @@ function generateFixturesModule(fixtures, associationMap, currentAttributes, mod
 // s(:import, ...) nodes with correct paths for eject vs. virtual mode.
 
 /**
+ * Generate test/__fixtures.mjs — shared fixture creation module.
+ * Called by both transpileTestFiles (vitest) and transpileE2EFiles (playwright).
+ */
+function generateFixturesFile(testDir, fullPlan) {
+  const fixturesModulePath = join(testDir, '__fixtures.mjs');
+  if (fullPlan) {
+    const models = fullPlan.fixtureModels || [];
+    const importLine = models.length > 0
+      ? `import { ${models.join(', ')} } from "juntos:models";\n\n`
+      : '';
+    // Extract creation body from setupCode (strip beforeEach wrapper)
+    const body = fullPlan.setupCode
+      .replace(/^beforeEach\(async \(\) => \{\n/, '')
+      .replace(/\n\}\);$/, '');
+
+    writeFileSync(fixturesModulePath,
+`${importLine}export const _fixtures = {};
+
+export async function loadFixtures() {
+  for (const key of Object.keys(_fixtures)) delete _fixtures[key];
+${body}
+}
+`);
+  } else {
+    writeFileSync(fixturesModulePath,
+`export const _fixtures = {};
+
+export async function loadFixtures() {}
+`);
+  }
+}
+
+/**
  * Transpile Ruby test files to .test.mjs for Vitest consumption.
  * Called by `juntos test` before running vitest.
  * Writes .test.mjs files alongside the .rb source files.
@@ -1137,32 +1171,7 @@ async function transpileTestFiles(appRoot, config) {
   }
 
   // Generate test/__fixtures.mjs — shared fixture creation module
-  const fixturesModulePath = join(testDir, '__fixtures.mjs');
-  if (fullPlan) {
-    const models = fullPlan.fixtureModels || [];
-    const importLine = models.length > 0
-      ? `import { ${models.join(', ')} } from "juntos:models";\n\n`
-      : '';
-    // Extract creation body from setupCode (strip beforeEach wrapper)
-    const body = fullPlan.setupCode
-      .replace(/^beforeEach\(async \(\) => \{\n/, '')
-      .replace(/\n\}\);$/, '');
-
-    writeFileSync(fixturesModulePath,
-`${importLine}export const _fixtures = {};
-
-export async function loadFixtures() {
-  for (const key of Object.keys(_fixtures)) delete _fixtures[key];
-${body}
-}
-`);
-  } else {
-    writeFileSync(fixturesModulePath,
-`export const _fixtures = {};
-
-export async function loadFixtures() {}
-`);
-  }
+  generateFixturesFile(testDir, fullPlan);
 
   // Generate test/setup.mjs — always regenerate to match current juntos version
   let stimSection = '';
@@ -4040,6 +4049,18 @@ async function transpileE2EFiles(appRoot, config) {
 
   const { metadata } = await buildAppManifest(appRoot, config, { mode: 'virtual' });
   metadata.playwright = true;
+  await ensurePlaywrightFilter();
+
+  // Build fixture plan for e2e tests (same as vitest flow)
+  const associationMap = deriveAssociationMap(metadata);
+  const fixtures = parseFixtureFiles(appRoot);
+  const hasFixtures = Object.keys(fixtures).length > 0;
+  const fullPlan = hasFixtures
+    ? buildFixturePlan('', fixtures, associationMap, { loadAll: true })
+    : null;
+
+  // Generate test/system/__fixtures.mjs for the SSR server to load
+  generateFixturesFile(systemTestDir, fullPlan);
 
   let count = 0;
   for (const file of files) {
@@ -4055,7 +4076,6 @@ async function transpileE2EFiles(appRoot, config) {
 
     try {
       const source = readFileSync(join(systemTestDir, file), 'utf-8');
-      metadata.fixture_plan = null;
       const result = await transformRuby(source, join(systemTestDir, file), 'test', config, appRoot, metadata);
       let code = result.code;
 
@@ -4087,13 +4107,15 @@ function generatePlaywrightConfig(appRoot, port = 3000) {
 export default defineConfig({
   testDir: "./test/system",
   testMatch: "**/*.spec.mjs",
+  workers: 1,
   use: {
     baseURL: "http://localhost:${port}"
   },
   webServer: {
     command: "npx juntos dev --port ${port} -- --strictPort",
     url: "http://localhost:${port}/@vite/client",
-    reuseExistingServer: !process.env.CI
+    reuseExistingServer: !process.env.CI,
+    env: { JUNTOS_E2E: "1" }
   }
 });
 `;
