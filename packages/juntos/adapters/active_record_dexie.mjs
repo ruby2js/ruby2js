@@ -210,6 +210,10 @@ export class ActiveRecord extends ActiveRecordBase {
     return new Relation(this).sole();
   }
 
+  static async pluck(...columns) {
+    return new Relation(this).pluck(...columns);
+  }
+
   static delete_all(conditions) { return this.deleteAll(conditions); }
   static destroy_all() { return this.destroyAll(); }
 
@@ -316,6 +320,18 @@ export class ActiveRecord extends ActiveRecordBase {
       await this.table.bulkDelete(ids);
     }
     return { changes: ids.length };
+  }
+
+  // Execute a PLUCK query for a Relation (returns values, not models)
+  static async _executePluck(rel, columns) {
+    const records = await this._executeRelation(rel);
+
+    // Single column: return flat array of values
+    if (columns.length === 1) {
+      return records.map(r => r[columns[0]]);
+    }
+    // Multiple columns: return array of arrays
+    return records.map(r => columns.map(col => r[col]));
   }
 
   // Parse order option into [column, direction]
