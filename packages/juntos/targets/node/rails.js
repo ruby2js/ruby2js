@@ -194,9 +194,8 @@ export class Router extends RouterServer {
           const result = await controller.update(context, parentId, id, params);
           return this.handleResultNode(context, res, result, `/${route.parentName}/${parentId}`);
         } else if (method === 'DELETE') {
-          await controller.destroy(context, parentId, id);
-          this.redirectNode(context, res, `/${route.parentName}/${parentId}`);
-          return;
+          const result = await controller.destroy(context, parentId, id);
+          return this.handleResultNode(context, res, result, `/${route.parentName}/${parentId}`);
         } else {
           html = id ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
         }
@@ -210,9 +209,8 @@ export class Router extends RouterServer {
           const result = await controller.update(context, id, params);
           return this.handleResultNode(context, res, result, `/${controllerName}/${id}`);
         } else if (method === 'DELETE') {
-          await controller.destroy(context, id);
-          this.redirectNode(context, res, `/${controllerName}`);
-          return;
+          const result = await controller.destroy(context, id);
+          return this.handleResultNode(context, res, result, `/${controllerName}`);
         } else {
           html = id ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
         }
