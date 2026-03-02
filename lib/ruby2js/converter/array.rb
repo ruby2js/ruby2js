@@ -6,6 +6,13 @@ module Ruby2JS
     #   (int 2))
 
     handle :array do |*items|
+      # Sentinel: s(:array, s(:begin, expr)) marks expr as array-typed
+      # without adding literal brackets — just emit the inner expression.
+      if items.length == 1 && items.first.type == :begin
+        parse items.first
+        next
+      end
+
       splat = items.rindex { |a| a.type == :splat }
       if splat
         # Array contains splat - must use [...x] syntax to preserve copy semantics

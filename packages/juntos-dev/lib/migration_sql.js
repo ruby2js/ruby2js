@@ -1,4 +1,4 @@
-import { Ruby2JS } from "../ruby2js.js";
+import { Ruby2JS } from "ruby2js/ruby2js.js";
 
 export class MigrationSQL {
   // Generate SQL for all migrations in a directory

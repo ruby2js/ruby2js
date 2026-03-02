@@ -2196,6 +2196,10 @@ module Ruby2JS
           destroy_all delete_all
         ].freeze
 
+        # AR methods known to return arrays — used to wrap results with an
+        # array sentinel so the functions filter can treat + as concat.
+        AR_ARRAY_METHODS = %i[pluck ids].freeze
+
         # Recursively wrap AR association method calls with await in model method bodies.
         # Handles self.association.method patterns (e.g., self.studio1_pairs.pluck(:id)).
         def wrap_model_ar_operations(node, model_refs)
@@ -2212,7 +2216,8 @@ module Ruby2JS
                 new_args = args.map { |a| a.respond_to?(:type) ? wrap_model_ar_operations(a, model_refs) : a }
                 new_target = wrap_model_ar_operations(target, model_refs)
                 new_node = node.updated(nil, [new_target, method, *new_args])
-                return new_node.updated(:await!)
+                awaited = new_node.updated(:await!)
+                return AR_ARRAY_METHODS.include?(method) ? s(:array, s(:begin, awaited)) : awaited
               end
             end
 
@@ -2223,7 +2228,8 @@ module Ruby2JS
               if model_refs.include?(const_name) && ar_class_methods.include?(method)
                 new_args = args.map { |a| a.respond_to?(:type) ? wrap_model_ar_operations(a, model_refs) : a }
                 new_node = node.updated(nil, [target, method, *new_args])
-                return new_node.updated(:await!)
+                awaited = new_node.updated(:await!)
+                return AR_ARRAY_METHODS.include?(method) ? s(:array, s(:begin, awaited)) : awaited
               end
             end
 
@@ -2241,7 +2247,8 @@ module Ruby2JS
                     new_target = wrap_model_ar_operations(target, model_refs)
                     new_args = args.map { |a| a.respond_to?(:type) ? wrap_model_ar_operations(a, model_refs) : a }
                     new_node = node.updated(nil, [new_target, method, *new_args])
-                    return new_node.updated(:await!)
+                    awaited = new_node.updated(:await!)
+                    return AR_ARRAY_METHODS.include?(method) ? s(:array, s(:begin, awaited)) : awaited
                   end
                 end
               end

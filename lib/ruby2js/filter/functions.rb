@@ -949,15 +949,21 @@ module Ruby2JS
               :flat)
           end
 
-        elsif method == :+ and target.type == :array and args.length == 1 and args.first.type == :array
-          # [a, b] + [c] => [...[a, b], ...[c]] or [a, b].concat([c])
-          # Using concat for clarity
-          process S(:send, target, :concat, args.first)
-
-        elsif method == :+ and args.length == 1 and args.first.type == :array
-          # expr + [c] where expr might be an array - use concat
-          # This handles cases like Array(n).fill(x) + [y]
-          process S(:send, target, :concat, args.first)
+        elsif method == :+ and args.length == 1 and
+              (target.type == :array or args.first.type == :array)
+          # Array concatenation when either side is known to be an array.
+          # Check for array-typed sentinels (s(:array, s(:begin, expr))) — these
+          # wrap async expressions (e.g., await pluck()) and need spread syntax
+          # to avoid await precedence issues with .concat() chaining.
+          has_sentinel = [target, args.first].any? { |n|
+            n.type == :array && n.children.length == 1 &&
+            n.children.first.respond_to?(:type) && n.children.first.type == :begin
+          }
+          if has_sentinel
+            process s(:array, s(:splat, target), s(:splat, args.first))
+          else
+            process S(:send, target, :concat, args.first)
+          end
 
         elsif [:is_a?, :kind_of?].include? method and args.length == 1
           if args[0].type == :const

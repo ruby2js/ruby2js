@@ -1,4 +1,4 @@
-import { Ruby2JS } from "../ruby2js.js";
+import { Ruby2JS } from "ruby2js/ruby2js.js";
 
 export class SeedSQL {
   // Generate SQL for a seeds.rb file
