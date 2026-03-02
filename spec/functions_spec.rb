@@ -441,6 +441,10 @@ describe Ruby2JS::Filter::Functions do
         'match => `${match[0]}${d}${match[2]}`)')
     end
 
+    it "should handle size" do
+      to_js( 'a.size' ).must_equal 'a.length'
+    end
+
     it "should handle empty?" do
       to_js( 'a.empty?' ).must_equal 'a.length == 0'
     end

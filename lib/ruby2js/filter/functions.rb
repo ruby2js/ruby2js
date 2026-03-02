@@ -643,6 +643,9 @@ module Ruby2JS
             process S(:send, s(:const, nil, :String), :fromCharCode, target)
           end
 
+        elsif method == :size and args.length == 0
+          process S(:attr, target, :length)
+
         elsif method == :empty? and args.length == 0
           process S(:send, S(:attr, target, :length), :==, s(:int, 0))
 

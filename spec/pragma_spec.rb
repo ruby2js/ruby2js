@@ -934,6 +934,21 @@ describe Ruby2JS::Filter::Pragma do
           must_equal 'let s = new Set; s.clear()'
       end
 
+      it "should keep .size for set (JS Set uses .size not .length)" do
+        to_js_with_functions('s = Set.new; s.size').
+          must_equal 'let s = new Set; s.size'
+      end
+
+      it "should keep .size for map (JS Map uses .size not .length)" do
+        to_js_with_functions('m = Map.new; m.size').
+          must_equal 'let m = new Map; m.size'
+      end
+
+      it "should convert .size for hash to Object.keys().length" do
+        to_js_with_functions('h = {}; h.size').
+          must_equal 'let h = {}; Object.keys(h).length'
+      end
+
       it "should disambiguate .empty? for set (uses .size not .length)" do
         to_js_with_functions('s = Set.new; s.empty?').
           must_equal 'let s = new Set; s.size == 0'

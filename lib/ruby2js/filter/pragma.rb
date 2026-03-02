@@ -1235,6 +1235,23 @@ module Ruby2JS
             record_ambiguous_diagnostic(node, method, [:hash], strict: true) if target
           end
 
+        # .size - Set/Map: keep .size (JS native), Hash: Object.keys(hash).length
+        when :size
+          type = if pragma?(node, :set) then :set
+                 elsif pragma?(node, :map) then :map
+                 elsif pragma?(node, :hash) then :hash
+                 else var_type(target)
+                 end
+
+          if (type == :set || type == :map) && args.empty?
+            # .size is correct for JS Set/Map — don't let functions filter convert to .length
+            return node.updated(nil, [process(target), :size])
+          elsif type == :hash && args.empty?
+            # Object.keys(target).length
+            return process s(:attr, s(:send, s(:const, nil, :Object), :keys, target), :length)
+          end
+          # array/string/unknown: fall through to functions filter → .length
+
         # .empty? - Hash: Object.keys(hash).length === 0, Set/Map: size === 0
         when :empty?
           # Check pragma first, then fall back to inferred type

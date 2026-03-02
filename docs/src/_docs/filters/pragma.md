@@ -245,6 +245,12 @@ obj.compact # Pragma: hash
 obj.flatten # Pragma: hash
 # => Object.entries(obj).flat(Infinity)
 
+obj.size # Pragma: hash
+# => Object.keys(obj).length
+
+obj.empty? # Pragma: hash
+# => Object.keys(obj).length === 0
+
 # Block methods with entries wrapping:
 obj.reduce(init) { |acc, (k, v)| ... } # Pragma: hash
 # => Object.entries(obj).reduce((acc, [k, v]) => ..., init)
@@ -279,6 +285,12 @@ s.delete(item) # Pragma: set
 
 s.clear() # Pragma: set
 # => s.clear()
+
+s.size # Pragma: set
+# => s.size  (JS Set uses .size, not .length)
+
+s.empty? # Pragma: set
+# => s.size == 0
 ```
 
 **When to use:** When working with JavaScript `Set` or `Map` objects. By default:
@@ -287,9 +299,11 @@ s.clear() # Pragma: set
 - `.merge()` becomes `{...a, ...b}` (hash/object behavior)
 - `.delete()` becomes `delete obj[key]` (hash/object behavior)
 - `.clear()` becomes `.length = 0` (array behavior)
+- `.size` becomes `.length` (array/string behavior)
+- `.empty?` becomes `.length == 0` (array/string behavior)
 
 Use this pragma to get the correct Set methods: `.add()`, `.has()`,
-`.merge()`, `.delete()`, and `.clear()`.
+`.merge()`, `.delete()`, `.clear()`, `.size`, and `.empty?`.
 
 ### `map`
 
@@ -310,6 +324,12 @@ m.delete(key) # Pragma: map
 
 m.clear # Pragma: map
 # => m.clear()
+
+m.size # Pragma: map
+# => m.size  (JS Map uses .size, not .length)
+
+m.empty? # Pragma: map
+# => m.size == 0
 ```
 
 **When to use:** When working with JavaScript `Map` objects. By default:
@@ -318,9 +338,11 @@ m.clear # Pragma: map
 - `.key?()` becomes `key in obj` (object behavior)
 - `.delete()` becomes `delete obj[key]` (object behavior)
 - `.clear()` becomes `.length = 0` (array behavior)
+- `.size` becomes `.length` (array/string behavior)
+- `.empty?` becomes `.length == 0` (array/string behavior)
 
 Use this pragma to get the correct Map methods: `.get()`, `.set()`, `.has()`,
-`.delete()`, and `.clear()`.
+`.delete()`, `.clear()`, `.size`, and `.empty?`.
 
 ### `string`
 

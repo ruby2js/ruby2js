@@ -85,6 +85,7 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `.scan` {{ caret }} `.match(//g)`
 * `.select {}` {{ caret }} `.filter()`
 * `.send` {{ caret }} dynamic method dispatch `obj.send(:foo, x)` becomes `obj.foo(x)` or `obj[method](x)`
+* `.size` {{ caret }} `.length`
 * `.sort_by {}` {{ caret }} `.toSorted()` (ES2023+) or `.slice().sort()` fallback
 * `.sum` {{ caret }} `.reduce((a, b) => a + b, 0)`
 * `.reduce(:+)` {{ caret }} `.reduce((a, b) => a + b)` (symbol-to-proc for operators)
