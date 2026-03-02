@@ -220,6 +220,26 @@ export async function clickOn(text) {
 }
 
 /**
+ * Select an option from a <select> dropdown by its visible text.
+ * @param {string} value - The visible text of the option to select
+ * @param {object} options - Options hash with `from` key (field locator)
+ */
+export async function select(value, { from }) {
+  const field = findField(from);
+  if (!field) {
+    throw new Error(`select: could not find select field "${from}"`);
+  }
+
+  const option = Array.from(field.options).find(o => o.text.trim() === value);
+  if (!option) {
+    throw new Error(`select: could not find option "${value}" in "${from}"`);
+  }
+
+  field.value = option.value;
+  field.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/**
  * Accept a confirmation dialog and execute the callback.
  * In jsdom, Turbo confirm dialogs are bypassed (fetch submits directly),
  * so this simply executes the callback.

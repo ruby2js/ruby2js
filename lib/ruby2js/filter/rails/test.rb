@@ -78,6 +78,7 @@ module Ruby2JS
           @rails_test_stimulus_controllers = []
           @rails_test_has_stimulus = false
           @rails_test_has_system_test = false
+          @rails_test_within_var = nil
         end
 
         # Handle class-based test definitions
@@ -207,6 +208,12 @@ module Ruby2JS
               if @rails_test_system
                 result = transform_system_test_method(target, method, args)
                 return result if result
+
+                # find("selector").hover -> no-op (jsdom has no CSS rendering)
+                if method == :hover && target && target.type == :send &&
+                   target.children[1] == :find
+                  return s(:nil)
+                end
               else
                 # HTTP method calls -> controller action calls
                 if target.nil? && [:get, :post, :patch, :put, :delete].include?(method)
@@ -407,6 +414,32 @@ module Ruby2JS
             async_fn = s(:async, nil, s(:args), processed_body)
             s(:send, nil, :await, s(:send!, nil, :acceptConfirm, async_fn))
 
+          when :within
+            return super unless @rails_test_describe_depth > 0
+            return super unless @rails_test_system
+            # within("ul") { assert_no_text "Three" } ->
+            #   let _el = document.querySelector("ul"); <body with scoped assertions>
+            call_args = call.children[2..-1]
+            return super if call_args.empty?
+            selector = process(call_args.first)
+
+            # Save previous within var (supports nesting)
+            prev_within = @rails_test_within_var
+            @rails_test_within_var = :_el
+
+            body = node.children.last
+            wrapped_body = wrap_test_ar_operations(body)
+            wrapped_body = ensure_statement_method_calls(wrapped_body)
+            processed_body = process(wrapped_body)
+
+            @rails_test_within_var = prev_within
+
+            # let _el = document.querySelector("selector")
+            assign = s(:lvasgn, :_el,
+              s(:send, s(:lvar, :document), :querySelector, selector))
+
+            s(:begin, assign, processed_body)
+
           when :assert_difference, :assert_no_difference
             return super unless @rails_test_describe_depth > 0
             transform_assert_difference(call, node.children.last, method == :assert_no_difference)
@@ -574,7 +607,7 @@ module Ruby2JS
 
           # System test imports don't depend on metadata
           if @rails_test_has_system_test
-            system_helpers = [:visit, :fillIn, :clickButton, :clickOn, :acceptConfirm, :findField, :findButton, :cleanup]
+            system_helpers = [:visit, :fillIn, :clickButton, :clickOn, :acceptConfirm, :findField, :findButton, :cleanup, :select]
             system_consts = system_helpers.map { |name| s(:const, nil, name) }
             imports.push(s(:import, ['juntos/system_test.mjs'], system_consts))
           end
@@ -1496,6 +1529,22 @@ module Ruby2JS
             text = process(args.first)
             s(:send, nil, :await, s(:send!, nil, :clickOn, text))
 
+          when :select
+            # select "Three", from: "Pair" -> await select("Three", {from: "Pair"})
+            return nil if args.empty?
+            value = process(args[0])
+            from_node = nil
+            if args.length >= 2 && args[1].type == :hash
+              args[1].children.each do |pair|
+                if pair.children[0].type == :sym && pair.children[0].children[0] == :from
+                  from_node = process(pair.children[1])
+                end
+              end
+            end
+            return nil unless from_node
+            s(:send, nil, :await,
+              s(:send!, nil, :select, value, s(:hash, s(:pair, s(:sym, :from), from_node))))
+
           when :assert_field
             # assert_field "locator", with: "value" -> expect(findField("locator").value).toBe("value")
             return nil if args.empty?
@@ -1548,11 +1597,17 @@ module Ruby2JS
 
           when :assert_text
             # assert_text "content" -> expect(document.body.textContent).toContain("content")
+            # When inside a within block, uses the scoped element instead of document.body
             return nil if args.empty?
             text = process(args.first)
+            container = if @rails_test_within_var
+              s(:lvar, @rails_test_within_var)
+            else
+              s(:attr, s(:lvar, :document), :body)
+            end
             s(:send,
               s(:send, nil, :expect,
-                s(:attr, s(:attr, s(:lvar, :document), :body), :textContent)),
+                s(:attr, container, :textContent)),
               :toContain, text)
 
           when :assert_no_selector
@@ -1566,12 +1621,18 @@ module Ruby2JS
 
           when :assert_no_text
             # assert_no_text "content" -> expect(document.body.textContent).not.toContain("content")
+            # When inside a within block, uses the scoped element instead of document.body
             return nil if args.empty?
             text = process(args.first)
+            container = if @rails_test_within_var
+              s(:lvar, @rails_test_within_var)
+            else
+              s(:attr, s(:lvar, :document), :body)
+            end
             s(:send,
               s(:attr,
                 s(:send, nil, :expect,
-                  s(:attr, s(:attr, s(:lvar, :document), :body), :textContent)),
+                  s(:attr, container, :textContent)),
                 :not),
               :toContain, text)
 
