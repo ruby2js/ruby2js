@@ -40,11 +40,13 @@ Rich text is table stakes for many applications. Currently Juntos has no equival
 
 | Editor | Collaboration | Juntos Targets | Ecosystem |
 |--------|---------------|----------------|-----------|
-| Trix | No | Awkward (Rails-specific) | Basecamp only |
-| Lexxy | No | Awkward (Rails-specific) | Basecamp only |
+| Trix | No | Rails-specific | Basecamp only |
+| Lexxy | Not yet | All targets (standalone JS package) | Lexical (Meta) + Basecamp |
 | Tiptap | Yes (Yjs) | All targets | Large plugin ecosystem |
 
-Trix and Lexxy are designed for Rails' Action Text. Tiptap is framework-agnostic and works everywhere Juntos runs.
+Trix is designed specifically for Rails' Action Text. Tiptap is framework-agnostic and works everywhere Juntos runs.
+
+**Lexxy is worth watching.** Built on Meta's [Lexical](https://lexical.dev) framework with a standalone JS package, Lexxy aims for complete Rails Action Text compatibility—including bug-for-bug HTML output parity. This makes it particularly valuable for converting existing Rails applications to run system tests with vitest or deploy to edge targets: the editor output will match exactly what a Rails app produces, so no content migration or normalization is needed. Lexxy is currently early beta; once it stabilizes and adds collaboration support, it becomes a strong candidate to replace or complement Tiptap here.
 
 ## Design
 
@@ -337,7 +339,7 @@ action_text:
 | Feature | Rails Action Text | Juntos Action Text |
 |---------|-------------------|-------------------|
 | Model macro | `has_rich_text` | `has_rich_text` |
-| Editor | Trix (Lexxy soon) | Tiptap |
+| Editor | Trix (Lexxy: watch) | Tiptap |
 | Storage | Active Storage | Pluggable |
 | Collaboration | No | Yes (Yjs) |
 | Offline | No | Yes |
