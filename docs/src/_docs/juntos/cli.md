@@ -662,6 +662,53 @@ The `type_hints` section maps variable names to their types. Supported types: `a
 4. Run `juntos lint` to see remaining warnings
 5. Add `# Pragma:` comments for the remaining cases
 
+## juntos transform
+
+Show transpiled JavaScript output for one or more files. Useful for debugging transpilation issues without running a full `juntos eject`.
+
+```bash
+npx juntos transform [options] <files...>
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-d, --database ADAPTER` | Database adapter |
+| `-t, --target TARGET` | Build target |
+| `--intermediate` | Show intermediate Ruby (ERB files only) |
+| `-h, --help` | Show help |
+
+**Examples:**
+
+```bash
+npx juntos transform app/models/studio.rb                  # Transform a model
+npx juntos transform app/views/studios/_form.html.erb      # Transform an ERB view
+npx juntos transform --intermediate app/views/studios/edit.html.erb  # Show intermediate Ruby
+npx juntos transform test/system/studios_test.rb           # Transform a test file
+npx juntos transform app/models/studio.rb app/models/tag.rb  # Multiple files
+```
+
+**What it does:**
+
+1. Detects the file type from its path (model, controller, view, test, etc.)
+2. Applies the same filters and transformations used by `juntos dev` and `juntos eject`
+3. Prints the transpiled JavaScript to stdout
+
+The `--intermediate` flag is useful for ERB files — it shows the Ruby code that the ERB compiler generates before JavaScript transpilation. This helps debug cases where the ERB-to-Ruby step produces unexpected output.
+
+**Section inference from path:**
+
+| Path pattern | Section |
+|--------------|---------|
+| `*.html.erb`, `*.turbo_stream.erb` | ERB (transformErb) |
+| `*.jsx.rb` | JSX (transformJsxRb) |
+| `app/controllers/` | controllers |
+| `app/javascript/controllers/` | stimulus |
+| `test/`, `*_test.rb` | test (with full metadata) |
+| `config/routes.rb` | routes |
+| Everything else (`app/models/`, `db/migrate/`, etc.) | default |
+
 ## Database Adapters
 
 The CLI auto-installs the required npm package for each adapter:

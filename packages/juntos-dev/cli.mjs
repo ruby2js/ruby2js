@@ -11,6 +11,7 @@
  *   test      Run tests with Vitest
  *   db        Database commands (migrate, seed, prepare, reset, create, drop)
  *   lint      Scan Ruby files for transpilation issues
+ *   transform Show transpiled JavaScript for a file (debugging)
  *   info      Show current configuration
  *   doctor    Check environment and prerequisites
  */
@@ -1285,7 +1286,9 @@ function parseCommonArgs(args) {
     disable: [],      // --disable rules (can be repeated)
     strict: false,    // --strict: enable strict lint warnings
     summary: false,   // --summary: show untyped variable summary
-    suggest: false    // --suggest: auto-generate type hints
+    suggest: false,   // --suggest: auto-generate type hints
+    // Transform options
+    intermediate: false // --intermediate: show intermediate Ruby (ERB only)
   };
 
   const remaining = [];
@@ -1384,6 +1387,8 @@ function parseCommonArgs(args) {
       options.summary = true;
     } else if (arg === '--suggest') {
       options.suggest = true;
+    } else if (arg === '--intermediate') {
+      options.intermediate = true;
     } else {
       remaining.push(arg);
     }
@@ -3976,6 +3981,131 @@ function runDoctor(options) {
 }
 
 // ============================================
+// Command: transform
+// ============================================
+
+async function runTransform(options, files) {
+  validateRailsApp();
+  loadDatabaseConfig(options);
+  applyEnvOptions(options);
+
+  const { loadConfig } = await import('./vite.mjs');
+  const config = loadConfig(APP_ROOT, {
+    database: options.database,
+    target: options.target
+  });
+
+  // Build models list and class name map (needed for import resolution)
+  config.models = findModels(APP_ROOT);
+  const collisions = findLeafCollisions(config.models);
+  config.modelClassMap = {};
+  for (const m of config.models) {
+    config.modelClassMap[modelClassName(m, collisions)] = m;
+  }
+
+  await ensureRuby2jsReady();
+
+  const multiple = files.length > 1;
+  let hasError = false;
+
+  for (const file of files) {
+    const fullPath = join(APP_ROOT, file);
+    if (!existsSync(fullPath)) {
+      console.error(`File not found: ${file}`);
+      hasError = true;
+      continue;
+    }
+
+    if (multiple) {
+      console.log(`// === ${file} ===`);
+    }
+
+    try {
+      const source = readFileSync(fullPath, 'utf-8');
+      let code;
+
+      if (file.endsWith('.html.erb') || file.endsWith('.turbo_stream.erb') || file.endsWith('.erb')) {
+        // ERB file
+        if (options.intermediate) {
+          // Show intermediate Ruby output from ErbCompiler
+          const compiler = new ErbCompiler(source);
+          code = compiler.src;
+        } else {
+          const isLayout = file.includes('app/views/layouts/');
+          const result = await transformErb(source, fullPath, isLayout, config);
+          code = result.code;
+        }
+      } else if (file.endsWith('.jsx.rb')) {
+        // JSX Ruby file
+        const result = await transformJsxRb(source, fullPath, config);
+        code = result.code;
+      } else {
+        // Regular Ruby file — determine section from path
+        let section = null;
+        let metadata = null;
+
+        if (file.match(/^test\//) || file.match(/_test\.rb$/)) {
+          section = 'test';
+          // Build metadata for test files (needed for fixture resolution, etc.)
+          const manifest = await buildAppManifest(APP_ROOT, config, { mode: 'virtual' });
+          metadata = manifest.metadata;
+
+          // Build fixture plan if fixtures exist
+          const fixtures = parseFixtureFiles(APP_ROOT);
+          if (Object.keys(fixtures).length > 0) {
+            const associationMap = deriveAssociationMap(metadata);
+            const fullPlan = buildFixturePlan('', fixtures, associationMap, { loadAll: true });
+            metadata.fixture_plan = fullPlan
+              ? { replacements: fullPlan.replacements, fixtureModels: fullPlan.fixtureModels }
+              : null;
+          }
+        } else if (file.match(/^app\/controllers\//)) {
+          section = 'controllers';
+        } else if (file.match(/^app\/javascript\/controllers\//)) {
+          section = 'stimulus';
+        } else if (file.match(/^config\/routes\.rb$/)) {
+          // Routes use base option
+          const routesSectionConfig = config.sections?.routes || null;
+          const routesOptions = {
+            ...getBuildOptions(null, config.target, routesSectionConfig),
+            file: 'config/routes.rb',
+            database: config.database,
+            target: config.target,
+            base: config.base || '/'
+          };
+          const { convert } = await ensureRuby2jsReady();
+          const result = convert(source, routesOptions);
+          code = result.toString();
+          console.log(code);
+          continue;
+        }
+
+        if (!metadata) {
+          // Build metadata for non-test files (populates association info, etc.)
+          const manifest = await buildAppManifest(APP_ROOT, config, { mode: 'virtual' });
+          metadata = manifest.metadata;
+        }
+
+        const result = await transformRuby(source, fullPath, section, config, APP_ROOT, metadata);
+        code = result.code;
+      }
+
+      console.log(code);
+    } catch (err) {
+      console.error(`Error transforming ${file}: ${formatError(err)}`);
+      if (process.env.DEBUG) {
+        console.error(err.stack);
+      }
+      hasError = true;
+    }
+  }
+
+  if (hasError) {
+    process.exit(1);
+  }
+}
+
+// ============================================
 // Command: test
 // ============================================
 
@@ -4570,6 +4700,7 @@ Commands:
   up        Build and run locally (node, bun, browser)
   db        Database commands (create, migrate, seed, prepare, drop, reset)
   lint      Scan Ruby files for transpilation issues
+  transform Show transpiled JavaScript for a file (debugging)
   info      Show current configuration
   doctor    Check environment and prerequisites
 
@@ -4756,6 +4887,26 @@ switch (command) {
     }
     runLint(commandArgs, options).catch(err => {
       console.error('Lint failed:', formatError(err));
+      process.exit(1);
+    });
+    break;
+
+  case 'transform':
+    if (options.help || commandArgs.length === 0) {
+      console.log('Usage: juntos transform [options] <files...>\n\nShow transpiled JavaScript output for one or more files.\n');
+      console.log('Options:');
+      console.log('  -d, --database ADAPTER   Database adapter');
+      console.log('  -t, --target TARGET      Build target');
+      console.log('  --intermediate           Show intermediate Ruby (ERB files only)');
+      console.log('\nExamples:');
+      console.log('  juntos transform app/views/studios/_form.html.erb');
+      console.log('  juntos transform app/models/studio.rb');
+      console.log('  juntos transform --intermediate app/views/studios/edit.html.erb');
+      console.log('  juntos transform test/system/studios_test.rb');
+      process.exit(options.help ? 0 : 1);
+    }
+    runTransform(options, commandArgs).catch(err => {
+      console.error('Transform failed:', formatError(err));
       process.exit(1);
     });
     break;
