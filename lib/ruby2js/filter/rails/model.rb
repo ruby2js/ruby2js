@@ -2217,7 +2217,7 @@ module Ruby2JS
                 new_target = wrap_model_ar_operations(target, model_refs)
                 new_node = node.updated(nil, [new_target, method, *new_args])
                 awaited = new_node.updated(:await!)
-                return AR_ARRAY_METHODS.include?(method) ? s(:array, s(:begin, awaited)) : awaited
+                return AR_ARRAY_METHODS.include?(method) ? s(:array, s(:cast, awaited)) : awaited
               end
             end
 
@@ -2229,7 +2229,7 @@ module Ruby2JS
                 new_args = args.map { |a| a.respond_to?(:type) ? wrap_model_ar_operations(a, model_refs) : a }
                 new_node = node.updated(nil, [target, method, *new_args])
                 awaited = new_node.updated(:await!)
-                return AR_ARRAY_METHODS.include?(method) ? s(:array, s(:begin, awaited)) : awaited
+                return AR_ARRAY_METHODS.include?(method) ? s(:array, s(:cast, awaited)) : awaited
               end
             end
 
@@ -2248,7 +2248,7 @@ module Ruby2JS
                     new_args = args.map { |a| a.respond_to?(:type) ? wrap_model_ar_operations(a, model_refs) : a }
                     new_node = node.updated(nil, [new_target, method, *new_args])
                     awaited = new_node.updated(:await!)
-                    return AR_ARRAY_METHODS.include?(method) ? s(:array, s(:begin, awaited)) : awaited
+                    return AR_ARRAY_METHODS.include?(method) ? s(:array, s(:cast, awaited)) : awaited
                   end
                 end
               end

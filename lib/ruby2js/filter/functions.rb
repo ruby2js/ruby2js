@@ -952,12 +952,12 @@ module Ruby2JS
         elsif method == :+ and args.length == 1 and
               (target.type == :array or args.first.type == :array)
           # Array concatenation when either side is known to be an array.
-          # Check for array-typed sentinels (s(:array, s(:begin, expr))) — these
+          # Check for array-typed sentinels (s(:array, s(:cast, expr))) — these
           # wrap async expressions (e.g., await pluck()) and need spread syntax
           # to avoid await precedence issues with .concat() chaining.
           has_sentinel = [target, args.first].any? { |n|
             n.type == :array && n.children.length == 1 &&
-            n.children.first.respond_to?(:type) && n.children.first.type == :begin
+            n.children.first.respond_to?(:type) && n.children.first.type == :cast
           }
           if has_sentinel
             process s(:array, s(:splat, target), s(:splat, args.first))

@@ -6,9 +6,9 @@ module Ruby2JS
     #   (int 2))
 
     handle :array do |*items|
-      # Sentinel: s(:array, s(:begin, expr)) marks expr as array-typed
+      # Sentinel: s(:array, s(:cast, expr)) marks expr as array-typed
       # without adding literal brackets — just emit the inner expression.
-      if items.length == 1 && items.first.type == :begin
+      if items.length == 1 && items.first.type == :cast
         parse items.first
         next
       end
