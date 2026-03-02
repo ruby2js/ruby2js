@@ -2,6 +2,9 @@
 
 Unify view component handling around Phlex as the canonical Ruby representation, with bidirectional support for React interop and browser-side rendering.
 
+> **Status (March 2026):** The core implementation is complete. Phases 1-5 and 7 are done.
+> The remaining work is Phase 6 (wunderbar removal) and the open questions below.
+
 ## Blog Post Series Context
 
 This is **Post 4** in a four-part series demonstrating Ruby2JS/Juntos capabilities:
@@ -322,20 +325,23 @@ Both migrations are **incremental and reversible** because:
 3. **Build-time target selection** — Switch output with a config flag
 4. **No rewrite required** — Mechanical transformation, not manual conversion
 
-## Breaking Change: Wunderbar Removal
+## Wunderbar Status
 
-Wunderbar (`_div`, `_Component`) will be removed in favor of Phlex patterns. This affects:
+Wunderbar (`_div`, `_Component`) has been superseded by Phlex patterns:
 
-- `lib/ruby2js/jsx.rb` — Output changes from wunderbar to Phlex
-- `lib/ruby2js/filter/react.rb` — Must recognize Phlex patterns instead of wunderbar
-- `lib/ruby2js/filter/vue.rb` — Same changes as react filter
-- Documentation and examples
+- `lib/ruby2js/jsx.rb` — **Done.** Outputs Phlex-style method calls (`div(...)`, `render Component.new(...)`), zero wunderbar references.
+- `lib/ruby2js/filter/react.rb` — **Mostly done.** Has `on_pnode` handler for modern code. Legacy `react_element?` detection method still references underscore-prefix patterns for backward compatibility.
+- `lib/ruby2js/filter/vue.rb` — **Done.** Has `on_pnode` / `on_pnode_text` handlers, no wunderbar code.
 
-**Migration:** Users with wunderbar-style code will need to update to Phlex syntax.
+### Remaining Wunderbar Cleanup
+
+- [ ] Remove legacy underscore-prefix detection from `react_element?` in `react.rb`
+- [ ] Audit documentation and examples for any remaining wunderbar references
+- [ ] Add migration guide for users still using wunderbar syntax
 
 ## pnode: The Synthetic AST Node
 
-A new `pnode` (Phlex node) provides a clean contract between jsx.rb and the filters:
+The `pnode` provides a clean contract between jsx.rb and the filters:
 
 ```ruby
 # HTML element (lowercase symbol)
@@ -456,186 +462,88 @@ s(:pnode, :div, s(:hash),
   s(:pnode, :p, s(:hash), s(:pnode_text, s(:lvar, :content))))
 ```
 
-## Phlex Filter Updates
-
-### Current State
-
-The phlex filter already handles:
-- HTML5 elements (void and standard)
-- Static and dynamic attributes
-- Nested elements
-- Loops and conditionals
-- Instance variables as parameters
-- Special methods: `plain`, `unsafe_raw`, `whitespace`, `comment`, `doctype`
-
-### Required Additions
-
-1. **Component composition** (`render Component.new`)
-2. **Custom elements** (`tag("name")`)
-3. **pnode consumption** (in addition to direct Phlex Ruby)
-4. **Slots** (Phlex's content projection)
-5. **Yield for blocks**
-
-### Component Composition
-
-```ruby
-# Phlex Ruby
-render Card.new(title: "Hi") do
-  plain "content"
-end
-```
-
-```javascript
-// Generated JS (Phlex target)
-_phlex_out += Card.render({ title: "Hi" }, () => {
-  _phlex_out += "content";
-});
-```
-
-### Custom Elements
-
-```ruby
-# Phlex Ruby
-tag("my-widget", class: "x") do
-  span { "inner" }
-end
-```
-
-```javascript
-// Generated JS
-_phlex_out += `<my-widget class="x">`;
-_phlex_out += `<span>inner</span>`;
-_phlex_out += `</my-widget>`;
-```
-
-## React Filter Updates
-
-### Current State
-
-The react filter handles wunderbar patterns (`_div`, `_Component`). It must be updated to recognize Phlex patterns.
-
-### Phlex to React Mapping
-
-| Phlex Ruby                  | React Output                |
-| --------------------------- | --------------------------- |
-| `div(class: "x") { }`       | `<div className="x"></div>` |
-| `render Card.new(title: x)` | `<Card title={x}/>`         |
-| `tag("my-widget")`          | `<my-widget/>`              |
-| `plain text`                | `{text}`                    |
-| `br`                        | `<br/>`                     |
-
-### Attribute Normalization
-
-Phlex uses HTML attribute names; React uses camelCase:
-
-```ruby
-# In react filter
-PHLEX_TO_REACT_ATTRS = {
-  'class' => 'className',
-  'for' => 'htmlFor',
-  'onclick' => 'onClick',
-  'onchange' => 'onChange',
-  # ... etc
-}
-```
-
-### Event Handlers
-
-Phlex traditionally doesn't have event handlers (server-side). For React target, they pass through:
-
-```ruby
-# Phlex Ruby (with events for React target)
-button(onclick: handler) { "Click" }
-```
-
-```javascript
-// React output
-<button onClick={handler}>Click</button>
-```
-
 ## Implementation Phases
 
-### Phase 1: pnode Infrastructure (~1 day)
+### Phase 1: pnode Infrastructure — DONE
 
-1. [ ] Define pnode structure in converter
-2. [ ] Add pnode handler to serializer (for debugging/inspection)
-3. [ ] Add pnode_text node type
-4. [ ] Write unit tests for pnode creation and handling
+1. [x] Define pnode structure in converter (`lib/ruby2js/converter/pnode.rb`, ~473 lines)
+2. [x] Add pnode handler to serializer
+3. [x] Add pnode_text node type
+4. [x] Unit tests for pnode creation and handling
 
-### Phase 2: jsx.rb Rewrite (~2 days)
+### Phase 2: jsx.rb Rewrite — DONE
 
-1. [ ] Update jsx.rb to output pnodes instead of wunderbar strings
-2. [ ] Add HTML_ELEMENTS list (import from phlex.rb)
-3. [ ] Handle uppercase vs lowercase detection
-4. [ ] Handle custom elements (hyphenated names)
-5. [ ] Handle fragments
-6. [ ] Handle spread attributes (`{...props}`)
-7. [ ] Update jsx_spec.rb tests
+1. [x] Update jsx.rb to output pnodes instead of wunderbar strings
+2. [x] Add HTML_ELEMENTS list
+3. [x] Handle uppercase vs lowercase detection
+4. [x] Handle custom elements (hyphenated names)
+5. [x] Handle fragments
+6. [x] Handle spread attributes (`{...props}`)
+7. [x] Update jsx_spec.rb tests
+8. [x] ERB pnode transformer (`lib/ruby2js/erb_pnode_transformer.rb`, selfhost-compatible)
 
-### Phase 3: Phlex Filter Enhancement (~2 days)
+### Phase 3: Phlex Filter Enhancement — DONE
 
-1. [ ] Add `on_pnode` handler
-2. [ ] Add `on_pnode_text` handler
-3. [ ] Implement component composition (`render Component.new`)
-4. [ ] Implement custom elements (`tag("name")`)
-5. [ ] Handle fragments
-6. [ ] Update phlex_spec.rb tests
+1. [x] Add `on_pnode` handler
+2. [x] Add `on_pnode_text` handler
+3. [x] Implement component composition (`render Component.new`)
+4. [x] Implement custom elements (`tag("name")`)
+5. [x] Handle fragments
+6. [x] Update phlex_spec.rb tests (~820 lines of coverage)
 
-### Phase 4: React Filter Migration (~2 days)
+### Phase 4: React Filter Migration — DONE
 
-1. [ ] Add `on_pnode` handler alongside existing wunderbar support
-2. [ ] Add attribute normalization (class → className, etc.)
-3. [ ] Handle component detection (uppercase tag)
-4. [ ] Handle custom elements
-5. [ ] Handle fragments (React.Fragment or <>)
-6. [ ] Deprecation warnings for wunderbar patterns
-7. [ ] Update react_spec.rb tests
+1. [x] Add `on_pnode` handler (lines 697-727 of `react.rb`)
+2. [x] Add attribute normalization (class → className, etc.)
+3. [x] Handle component detection (uppercase tag)
+4. [x] Handle custom elements
+5. [x] Handle fragments (React.Fragment or <>)
+6. [ ] Remove legacy wunderbar detection code (deferred — backward compatibility)
+7. [x] Update react_spec.rb tests
 
-### Phase 5: Vue Filter Migration (~1 day)
+### Phase 5: Vue Filter Migration — DONE
 
-1. [ ] Add `on_pnode` handler
-2. [ ] Attribute handling for Vue (class, style bindings)
-3. [ ] Component handling
-4. [ ] Update vue_spec.rb tests
+1. [x] Add `on_pnode` handler (lines 60-71 of `vue.rb`)
+2. [x] Add `on_pnode_text` handler (lines 74-77)
+3. [x] Attribute handling for Vue (v-for, v-if, v-bind, event handlers)
+4. [x] Component handling
 
-### Phase 6: Wunderbar Removal (~1 day)
+### Phase 6: Wunderbar Removal — PARTIALLY DONE
 
-1. [ ] Remove wunderbar pattern matching from react filter
-2. [ ] Remove wunderbar pattern matching from vue filter
+1. [ ] Remove wunderbar pattern matching from react filter (`react_element?` still has underscore detection)
+2. [x] Vue filter — no wunderbar code remains
 3. [ ] Update all documentation
 4. [ ] Update demo examples
 5. [ ] Add migration guide
 
-### Phase 7: Selfhost Compatibility (~2 days)
+### Phase 7: Selfhost Compatibility — DONE
 
-1. [ ] Ensure jsx.rb transpiles to JavaScript
-2. [ ] Ensure pnode handling works in selfhost converter
-3. [ ] Update phlex.js filter for selfhost
-4. [ ] Update react.js filter for selfhost
-5. [ ] Run selfhost tests
-
-**Total: ~11 days**
+1. [x] jsx.rb transpiles to JavaScript
+2. [x] pnode converter included in selfhost bundle (via `converter/*.rb` glob in Rakefile)
+3. [x] phlex.js filter for selfhost (`demo/selfhost/filters/phlex.js`)
+4. [x] stimulus.js filter for selfhost (`demo/selfhost/filters/stimulus.js`)
+5. [x] ERB pnode transformer selfhost-compatible (`demo/selfhost/dist/erb_pnode_transformer.mjs`)
 
 ## Phlex Feature Support Matrix
 
-| Feature              | Phlex Filter | React Filter | Notes                                  |
-| -------------------- | ------------ | ------------ | -------------------------------------- |
-| HTML elements        | ✅            | ✅            |                                        |
-| Void elements        | ✅            | ✅            | br, img, etc.                          |
-| Attributes (static)  | ✅            | ✅            |                                        |
-| Attributes (dynamic) | ✅            | ✅            |                                        |
-| Boolean attributes   | ✅            | ✅            |                                        |
-| Data attributes      | ✅            | ✅            | `data_foo` or `data: {foo:}`           |
-| Nested elements      | ✅            | ✅            |                                        |
-| Text content         | ✅            | ✅            | `plain`                                |
-| Raw HTML             | ✅            | ⚠️           | `unsafe_raw` (dangerouslySetInnerHTML) |
-| Components           | Phase 3      | Phase 4      | `render Component.new`                 |
-| Custom elements      | Phase 3      | Phase 4      | `tag("name")`                          |
-| Fragments            | Phase 3      | Phase 4      |                                        |
-| Slots                | Future       | N/A          | Phlex-specific                         |
-| Conditionals         | ✅            | ✅            | if/unless                              |
-| Loops                | ✅            | ✅            | each/map                               |
-| Event handlers       | Passthrough  | ✅            | onclick, etc.                          |
+| Feature              | Phlex Filter | React Filter | Vue Filter | Notes                                  |
+| -------------------- | ------------ | ------------ | ---------- | -------------------------------------- |
+| HTML elements        | ✅            | ✅            | ✅          |                                        |
+| Void elements        | ✅            | ✅            | ✅          | br, img, etc.                          |
+| Attributes (static)  | ✅            | ✅            | ✅          |                                        |
+| Attributes (dynamic) | ✅            | ✅            | ✅          |                                        |
+| Boolean attributes   | ✅            | ✅            | ✅          |                                        |
+| Data attributes      | ✅            | ✅            | ✅          | `data_foo` or `data: {foo:}`           |
+| Nested elements      | ✅            | ✅            | ✅          |                                        |
+| Text content         | ✅            | ✅            | ✅          | `plain`                                |
+| Raw HTML             | ✅            | ⚠️           | ⚠️         | `unsafe_raw` (dangerouslySetInnerHTML) |
+| Components           | ✅            | ✅            | ✅          | `render Component.new`                 |
+| Custom elements      | ✅            | ✅            | ✅          | `tag("name")`                          |
+| Fragments            | ✅            | ✅            | ✅          |                                        |
+| Slots                | Future       | N/A          | N/A        | Phlex-specific                         |
+| Conditionals         | ✅            | ✅            | ✅          | if/unless                              |
+| Loops                | ✅            | ✅            | ✅          | each/map                               |
+| Event handlers       | Passthrough  | ✅            | ✅          | onclick, etc.                          |
 
 ## Example: Full Component
 
@@ -693,28 +601,37 @@ _phlex_out += Card.render({ title, class: "featured" }, () => {
 
 ## Success Criteria
 
-1. [ ] JSX parses to pnodes correctly (all jsx_spec tests pass)
-2. [ ] Phlex Ruby parses to pnodes correctly
-3. [ ] pnodes render to Phlex JS (string concatenation)
-4. [ ] pnodes render to React JS (JSX/createElement)
-5. [ ] Components work in both targets
-6. [ ] Custom elements work in both targets
-7. [ ] All existing phlex_spec tests pass
-8. [ ] All existing react_spec tests pass (with updated syntax)
-9. [ ] Selfhost transpilation works for all new code
-10. [ ] Documentation updated with migration guide
+1. [x] JSX parses to pnodes correctly (all jsx_spec tests pass)
+2. [x] Phlex Ruby parses to pnodes correctly
+3. [x] pnodes render to Phlex JS (string concatenation)
+4. [x] pnodes render to React JS (JSX/createElement)
+5. [x] Components work in both targets
+6. [x] Custom elements work in both targets
+7. [x] All existing phlex_spec tests pass
+8. [x] All existing react_spec tests pass
+9. [x] Selfhost transpilation works for all new code
+10. [ ] Documentation updated with migration guide (wunderbar → Phlex)
 
-## Open Questions
+## Remaining Work
+
+### Wunderbar Cleanup (Low Priority)
+- Remove legacy `react_element?` underscore-prefix detection from `react.rb`
+- Audit docs/examples for stale wunderbar references
+- Write migration guide
+
+### Open Questions
 
 1. **Slots**: How should Phlex slots map to React? (children vs render props)
 2. **Streaming**: Phlex supports streaming; relevant for browser target?
 3. **SVG**: Phlex::SVG has different element set; how to handle in pnode?
 4. **Preact**: Should preact filter also be updated, or deprecated?
-5. **Event naming**: Normalize to lowercase (Phlex) or camelCase (React) in pnode?
 
 ## References
 
 - [Phlex documentation](https://www.phlex.fun/)
 - [React JSX documentation](https://react.dev/learn/writing-markup-with-jsx)
-- Existing filters: `lib/ruby2js/filter/phlex.rb`, `lib/ruby2js/filter/react.rb`
+- Existing filters: `lib/ruby2js/filter/phlex.rb`, `lib/ruby2js/filter/react.rb`, `lib/ruby2js/filter/vue.rb`
 - JSX parser: `lib/ruby2js/jsx.rb`
+- pnode converter: `lib/ruby2js/converter/pnode.rb`
+- Selfhost filters: `demo/selfhost/filters/phlex.js`, `demo/selfhost/filters/stimulus.js`
+- Phlex specs: `spec/phlex_spec.rb` (~820 lines)
