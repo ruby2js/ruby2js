@@ -7,8 +7,13 @@
       {% assign current_section = doc_page.top_section %}
       <li class="mt-4 mb-2"><h3 class="title is-5">{{ current_section }}</h3></li>
     {% endif %}
-    {% if doc_page.category == page.category %}
+    {% if doc_page.relative_url == page.relative_url %}
       {% assign active = "has-text-weight-bold" %}
+    {% elsif page.hide_in_toc %}
+      {% assign parent_category = page.category | replace: "/", "-" %}
+      {% if doc_page.category == parent_category %}
+        {% assign active = "has-text-weight-bold" %}
+      {% endif %}
     {% endif %}
     {% unless doc_page.hide_in_toc %}
       <li><a href="{{ doc_page.relative_url }}" class="{{ active }}">{{ doc_page.title }}</a></li>
