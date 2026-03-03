@@ -4190,6 +4190,28 @@ async function transpileE2EFiles(appRoot, config) {
   metadata.playwright = true;
   await ensurePlaywrightFilter();
 
+  // Pre-transpile config/routes.js for Playwright's Node.js runner
+  // (Playwright tests import path helpers from ../config/routes.js,
+  // but that file only exists as .rb — Vite transpiles it on-the-fly for dev)
+  const routesFile = join(appRoot, 'config/routes.rb');
+  const routesOut = join(appRoot, 'config/routes.js');
+  if (existsSync(routesFile)) {
+    const routesSource = readFileSync(routesFile, 'utf-8');
+    const { convert } = await ensureRuby2jsReady();
+    const routesSectionConfig = config.sections?.routes || null;
+    const routesOptions = {
+      ...getBuildOptions(null, config.target, routesSectionConfig),
+      file: 'config/routes.rb',
+      database: config.database,
+      target: config.target,
+      paths_only: true,
+      base: config.base || '/',
+      metadata
+    };
+    const routesResult = convert(routesSource, routesOptions);
+    writeFileSync(routesOut, routesResult.toString());
+  }
+
   // Build fixture plan for e2e tests (same as vitest flow)
   const associationMap = deriveAssociationMap(metadata);
   const fixtures = parseFixtureFiles(appRoot);
@@ -4200,6 +4222,13 @@ async function transpileE2EFiles(appRoot, config) {
 
   // Generate test/system/__fixtures.mjs for the SSR server to load
   generateFixturesFile(systemTestDir, fullPlan);
+
+  // Set fixture plan on metadata so the test filter resolves fixture refs in AST
+  // (same pattern as transpileTestFiles — replacements only, no setupCode)
+  const sharedPlan = fullPlan
+    ? { replacements: fullPlan.replacements, fixtureModels: fullPlan.fixtureModels }
+    : null;
+  metadata.fixture_plan = sharedPlan;
 
   let count = 0;
   for (const file of files) {

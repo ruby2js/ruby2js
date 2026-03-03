@@ -62,27 +62,39 @@ module Ruby2JS
           begin
             @playwright_active = true
             @playwright_describe_depth += 1
+            # Also set the test filter's describe depth so fixture references
+            # are resolved when on_send falls through to the test filter
+            @rails_test_describe_depth = (@rails_test_describe_depth || 0) + 1
 
             # Transform class body
             transformed_body = process(body)
 
+            # Build: let _fixtures = {};
+            fixtures_decl = s(:lvasgn, :_fixtures, s(:hash))
+
             # Build: test.beforeEach(async ({ request }) => {
-            #   await request.post("/__test/reset")
+            #   let resp = await request.post("/__test/reset");
+            #   Object.assign(_fixtures, await resp.json());
             # })
-            reset_call = s(:send, nil, :await,
-              s(:send, s(:lvar, :request), :post, s(:str, '/__test/reset')))
+            resp_assign = s(:lvasgn, :resp,
+              s(:send, nil, :await,
+                s(:send, s(:lvar, :request), :post, s(:str, '/__test/reset'))))
+            fixtures_assign = s(:send, s(:const, nil, :Object), :assign,
+              s(:lvar, :_fixtures),
+              s(:send, nil, :await,
+                s(:send!, s(:lvar, :resp), :json)))
             before_each = s(:send, s(:lvar, :test), :beforeEach,
               s(:async, nil,
                 s(:args, s(:kwarg, :request)),
-                reset_call))
+                s(:begin, resp_assign, fixtures_assign)))
 
-            # Wrap body with beforeEach
+            # Wrap body with fixtures declaration and beforeEach
             body_with_hook = if transformed_body&.type == :begin
-              s(:begin, before_each, *transformed_body.children)
+              s(:begin, fixtures_decl, before_each, *transformed_body.children)
             elsif transformed_body
-              s(:begin, before_each, transformed_body)
+              s(:begin, fixtures_decl, before_each, transformed_body)
             else
-              before_each
+              s(:begin, fixtures_decl, before_each)
             end
 
             # Build: test.describe("Name", () => { ... })
@@ -98,13 +110,14 @@ module Ruby2JS
 
             if @playwright_path_helpers.any?
               path_consts = @playwright_path_helpers.map { |name| s(:const, nil, name.to_sym) }
-              imports.push(s(:import, ['../config/routes.js'], path_consts))
+              imports.push(s(:import, ['../../config/routes.js'], path_consts))
             end
 
             result = s(:begin, *imports, describe_block)
           ensure
             @playwright_active = false
             @playwright_describe_depth -= 1
+            @rails_test_describe_depth -= 1
             @playwright_path_helpers = []
           end
           result
@@ -291,11 +304,13 @@ module Ruby2JS
         def transform_capybara_to_playwright(method, args)
           case method
           when :visit
-            # visit messages_url → await page.goto(messages_path())
+            # visit messages_url → await page.goto(messages_path().toString())
+            # Path helpers return objects with toString(); Playwright needs a plain string
             return nil if args.empty?
             url_node = process(args.first)
             s(:send, nil, :await,
-              s(:send, s(:lvar, :page), :goto, url_node))
+              s(:send, s(:lvar, :page), :goto,
+                s(:send!, url_node, :toString)))
 
           when :fill_in
             # fill_in "X", with: "Y" → await page.getByLabel("X").fill("Y")

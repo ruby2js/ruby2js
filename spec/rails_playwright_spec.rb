@@ -88,7 +88,7 @@ describe Ruby2JS::Filter::Rails::Playwright do
           end
         end
       RUBY
-      assert_includes result, 'import { messages_path } from "../config/routes.js"'
+      assert_includes result, 'import { messages_path } from "../../config/routes.js"'
     end
   end
 
@@ -158,7 +158,7 @@ describe Ruby2JS::Filter::Rails::Playwright do
           end
         end
       RUBY
-      assert_includes result, 'await page.goto(messages_path())'
+      assert_includes result, 'await page.goto(messages_path().toString())'
     end
   end
 
@@ -342,7 +342,7 @@ describe Ruby2JS::Filter::Rails::Playwright do
 
       # Imports
       assert_includes result, 'import { test, expect } from "@playwright/test"'
-      assert_includes result, 'import { messages_path } from "../config/routes.js"'
+      assert_includes result, 'import { messages_path } from "../../config/routes.js"'
 
       # No test_helper
       refute_includes result, 'test_helper'
@@ -354,7 +354,7 @@ describe Ruby2JS::Filter::Rails::Playwright do
       assert_includes result, 'async ({ page }) =>'
 
       # Capybara transforms
-      assert_includes result, 'page.goto(messages_path())'
+      assert_includes result, 'page.goto(messages_path().toString())'
       assert_includes result, 'page.getByLabel("Your name").fill("Alice")'
       assert_includes result, 'page.getByRole("button", {name: "Send"}).click()'
       assert_includes result, 'expect(page.getByLabel("Type a message...")).toHaveValue("")'
@@ -363,7 +363,7 @@ describe Ruby2JS::Filter::Rails::Playwright do
   end
 
   describe "beforeEach reset" do
-    it "injects test.beforeEach with /__test/reset call" do
+    it "injects test.beforeEach with /__test/reset call and fixture loading" do
       result = to_js(<<~RUBY)
         class ChatSystemTest < ApplicationSystemTestCase
           test "shows page" do
@@ -371,7 +371,10 @@ describe Ruby2JS::Filter::Rails::Playwright do
           end
         end
       RUBY
-      assert_includes result, 'test.beforeEach(async ({ request }) => await request.post("/__test/reset"))'
+      assert_includes result, 'let _fixtures = {}'
+      assert_includes result, 'test.beforeEach(async ({ request }) =>'
+      assert_includes result, 'request.post("/__test/reset")'
+      assert_includes result, 'Object.assign(_fixtures, await(resp.json()))'
     end
   end
 

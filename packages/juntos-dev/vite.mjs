@@ -1281,6 +1281,7 @@ export { application };`,
         const routesPath = path.join(appRoot, 'config/routes.rb');
         let dbInitialized = false;
         let fixturesLoaded = false;
+        let fixturesModule = null;
         let savepointActive = false;
         let adapterRef = null;
 
@@ -1320,8 +1321,8 @@ export { application };`,
 
               if (!fixturesLoaded) {
                 const fixturesPath = path.join(appRoot, 'test/system/__fixtures.mjs');
-                const fixtures = await server.ssrLoadModule(fixturesPath);
-                await fixtures.loadFixtures();
+                fixturesModule = await server.ssrLoadModule(fixturesPath);
+                await fixturesModule.loadFixtures();
                 fixturesLoaded = true;
               }
 
@@ -1331,8 +1332,17 @@ export { application };`,
               adapterRef.beginSavepoint();
               savepointActive = true;
 
+              // Return fixture IDs so Playwright tests can reference them
+              const fixtureData = {};
+              const loadedFixtures = fixturesModule?._fixtures;
+              if (loadedFixtures) {
+                for (const [key, val] of Object.entries(loadedFixtures)) {
+                  fixtureData[key] = val && typeof val === 'object' ? { id: val.id } : val;
+                }
+              }
+
               res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end('{"ok":true}');
+              res.end(JSON.stringify(fixtureData));
             } catch (err) {
               server.ssrFixStacktrace(err);
               console.error('/__test/reset failed:', err);
