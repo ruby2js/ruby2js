@@ -72,7 +72,7 @@ export function installFetchInterceptor() {
     if (route.nested && match[1]) args.push(parseInt(match[1]));
     const idIndex = route.nested ? 2 : 1;
     if (match[idIndex]) args.push(parseInt(match[idIndex]));
-    if (params && ['create', 'update'].includes(route.action)) args.push(params);
+    if (params && method !== 'GET') args.push(params);
 
     const actionName = route.action === 'new' ? '$new' : route.action;
     const action = route.controller[actionName];

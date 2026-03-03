@@ -889,6 +889,7 @@ module Ruby2JS
           confirm_msg = nil
           css_class = nil
           form_class = nil
+          form_params = []
 
           if options&.type == :hash
             options.children.each do |pair|
@@ -902,6 +903,39 @@ module Ruby2JS
                   css_class = extract_class_value(value)
                 when :form_class
                   form_class = extract_class_value(value)
+                when :form
+                  # form: { class: "inline", data: { turbo_confirm: "..." } }
+                  if value.type == :hash
+                    value.children.each do |form_pair|
+                      form_key = form_pair.children[0]
+                      form_value = form_pair.children[1]
+                      if form_key.type == :sym && form_key.children[0] == :class
+                        form_class = extract_class_value(form_value)
+                      elsif form_key.type == :sym && form_key.children[0] == :data
+                        if form_value.type == :hash
+                          form_value.children.each do |data_pair|
+                            data_key = data_pair.children[0]
+                            data_value = data_pair.children[1]
+                            if data_key.type == :sym &&
+                               [:confirm, :turbo_confirm].include?(data_key.children[0])
+                              confirm_msg = data_value if data_value.type == :str
+                            end
+                          end
+                        end
+                      end
+                    end
+                  end
+                when :params
+                  # params: { key: value, ... } → hidden inputs
+                  if value.type == :hash
+                    value.children.each do |param_pair|
+                      param_key = param_pair.children[0]
+                      param_value = param_pair.children[1]
+                      if param_key.type == :sym
+                        form_params << { name: param_key.children[0].to_s, value: param_value }
+                      end
+                    end
+                  end
                 when :data
                   if value.type == :hash
                     value.children.each do |data_pair|
@@ -922,15 +956,15 @@ module Ruby2JS
           confirm_str = confirm_msg ? confirm_msg.children[0] : 'Are you sure?'
 
           if http_method == :delete
-            build_delete_button(text_str, path_node, confirm_str, css_class, form_class)
+            build_delete_button(text_str, path_node, confirm_str, css_class, form_class, form_params)
           else
-            build_form_button(text_str, path_node, http_method, css_class, form_class)
+            build_form_button(text_str, path_node, http_method, css_class, form_class, form_params)
           end
         end
 
         # Build a delete button using Turbo-compatible form
         # Turbo intercepts the form submission and handles the DELETE request
-        def build_delete_button(text_str, path_node, confirm_str, css_class = nil, form_class = nil)
+        def build_delete_button(text_str, path_node, confirm_str, css_class = nil, form_class = nil, form_params = [])
           # Build class attributes - Rails uses "button_to" as default form class
           btn_class_attr = css_class ? " class=\"#{css_class}\"" : ""
           form_class_attr = " class=\"#{form_class || 'button_to'}\""
@@ -1002,35 +1036,71 @@ module Ruby2JS
           # Use data-turbo-confirm on the button (Rails puts it there, not on the form)
           turbo_confirm = " data-turbo-confirm=\"#{confirm_str}\""
 
+          # Build hidden inputs for params
+          param_inputs = []
+          form_params.each do |param|
+            if param[:value].type == :str
+              param_inputs << s(:str, "<input type=\"hidden\" name=\"#{param[:name]}\" value=\"#{param[:value].children[0]}\">")
+            else
+              param_inputs << s(:str, "<input type=\"hidden\" name=\"#{param[:name]}\" value=\"")
+              param_inputs << s(:begin, process(param[:value]))
+              param_inputs << s(:str, "\">")
+            end
+          end
+
           # Generate form with action and method - Turbo handles the submission
           # Include authenticity_token for CSRF protection
-          # Rails order: form, _method input, button, authenticity_token input
-          s(:dstr,
+          # Rails order: form, _method input, button, params inputs, authenticity_token input
+          parts = [
             s(:str, "<form#{form_class_attr} method=\"post\" action=\""),
             s(:begin, path_expr),
-            s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button#{btn_class_attr}#{turbo_confirm} type=\"submit\">#{text_str}</button><input type=\"hidden\" name=\"authenticity_token\" value=\""),
-            s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
-            s(:str, "\"></form>"))
+            s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button#{btn_class_attr}#{turbo_confirm} type=\"submit\">#{text_str}</button>")
+          ]
+          parts.push(*param_inputs)
+          parts << s(:str, "<input type=\"hidden\" name=\"authenticity_token\" value=\"")
+          parts << s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, '')))
+          parts << s(:str, "\"></form>")
+
+          s(:dstr, *parts)
         end
 
         # Build a regular form button
-        def build_form_button(text_str, path_node, http_method, css_class = nil, form_class = nil)
+        def build_form_button(text_str, path_node, http_method, css_class = nil, form_class = nil, form_params = [])
           path_expr = process(path_node)
 
           # Build class attributes - Rails uses "button_to" as default form class
           btn_class_attr = css_class ? " class=\"#{css_class}\"" : ""
           form_class_attr = " class=\"#{form_class || 'button_to'}\""
 
+          # Build hidden inputs for params
+          param_inputs = []
+          form_params.each do |param|
+            if param[:value].type == :str
+              # Static value
+              param_inputs << s(:str, "<input type=\"hidden\" name=\"#{param[:name]}\" value=\"#{param[:value].children[0]}\">")
+            else
+              # Dynamic value
+              param_inputs << s(:str, "<input type=\"hidden\" name=\"#{param[:name]}\" value=\"")
+              param_inputs << s(:begin, process(param[:value]))
+              param_inputs << s(:str, "\">")
+            end
+          end
+
           # Include authenticity_token for CSRF protection
-          # Rails order: form, button, authenticity_token input
-          s(:dstr,
+          # Rails order: form, button, params inputs, authenticity_token input
+          parts = [
             s(:str, "<form#{form_class_attr} method=\""),
             s(:str, http_method.to_s),
             s(:str, "\" action=\""),
             s(:begin, path_expr),
-            s(:str, "\"><button#{btn_class_attr} type=\"submit\">#{text_str}</button><input type=\"hidden\" name=\"authenticity_token\" value=\""),
-            s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
-            s(:str, "\"></form>"))
+            s(:str, "\"><button#{btn_class_attr} type=\"submit\">#{text_str}</button>")
+          ]
+          parts.push(*param_inputs)
+          parts << s(:str, "<input type=\"hidden\" name=\"authenticity_token\" value=\"")
+          parts << s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, '')))
+          parts << s(:str, "\"></form>")
+
+          s(:dstr, *parts)
         end
 
         # Process button_to block form

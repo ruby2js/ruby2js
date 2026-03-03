@@ -41,6 +41,34 @@ export class RouterBase {
       });
     });
 
+    // Handle custom member routes (e.g., post :unpair → POST /studios/:id/unpair)
+    const memberRoutes = options.member || [];
+    memberRoutes.forEach(route => {
+      const path = `${base}/${name}/:id/${route.action}`;
+      const pattern = new RegExp('^' + path.replace(/:id/g, '(\\d+)') + '$');
+      this.routes.push({
+        method: route.method,
+        pattern,
+        controller,
+        controllerName: name,
+        action: route.action
+      });
+    });
+
+    // Handle custom collection routes (e.g., get :students → GET /people/students)
+    const collectionRoutes = options.collection || [];
+    collectionRoutes.forEach(route => {
+      const path = `${base}/${name}/${route.action}`;
+      const pattern = new RegExp('^' + path + '$');
+      this.routes.push({
+        method: route.method,
+        pattern,
+        controller,
+        controllerName: name,
+        action: route.action
+      });
+    });
+
     // Handle nested resources
     nested.forEach(nestedConfig => {
       this.nestedResources(name, nestedConfig.name, nestedConfig.controller, nestedConfig.only);

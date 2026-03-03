@@ -263,6 +263,41 @@ export function find(selector, options = {}) {
 }
 
 /**
+ * Scope subsequent assertions to within a matched element — equivalent to
+ * Capybara's within(selector).  In a real browser, hidden elements
+ * (display:none via CSS) are excluded.  jsdom does not compute external
+ * stylesheets, so we approximate visibility:
+ *   1. Skip elements with inline style display:none
+ *   2. Skip elements with class "hidden" or aria-hidden="true"
+ *   3. Skip elements inside a hidden ancestor
+ * If all candidates appear visible, return the last match (content panels
+ * typically come after decorative/info elements in DOM order).
+ * @param {string} selector - CSS selector
+ * @returns {HTMLElement|null}
+ */
+export function within(selector) {
+  const elements = document.querySelectorAll(selector);
+  if (elements.length === 0) return null;
+  if (elements.length === 1) return elements[0];
+
+  // Filter to "visible" elements
+  const visible = [];
+  for (const el of elements) {
+    if (el.style && el.style.display === 'none') continue;
+    if (el.hidden) continue;
+    if (el.getAttribute('aria-hidden') === 'true') continue;
+    if (el.classList && el.classList.contains('hidden')) continue;
+    if (el.closest('[hidden], [aria-hidden="true"], .hidden')) continue;
+    visible.push(el);
+  }
+
+  // If filtering narrowed to one, use it; otherwise return last match
+  if (visible.length === 1) return visible[0];
+  if (visible.length > 1) return visible[visible.length - 1];
+  return elements[elements.length - 1];
+}
+
+/**
  * Accept a confirmation dialog and execute the callback.
  * In jsdom, Turbo confirm dialogs are bypassed (fetch submits directly),
  * so this simply executes the callback.

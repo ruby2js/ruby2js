@@ -1797,5 +1797,34 @@ describe Ruby2JS::Filter::Rails::Test do
       assert_includes result, 'find'
       assert_includes result, 'from "juntos/system_test.mjs"'
     end
+
+    it "converts within to within() helper call" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "scoped assertions" do
+            within("ul") do
+              assert_text "Hello"
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'within("ul")'
+      assert_includes result, 'within'
+      assert_includes result, 'from "juntos/system_test.mjs"'
+    end
+
+    it "imports within helper" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "with within" do
+            within("div") do
+              assert_text "content"
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'within'
+      assert_includes result, 'from "juntos/system_test.mjs"'
+    end
   end
 end

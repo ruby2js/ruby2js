@@ -28,6 +28,7 @@ module Ruby2JS
           @rails_resources = []  # Track resources for Router.resources() generation
           @rails_root_route = nil
           @rails_in_member = false
+          @rails_current_resource = nil
         end
 
         # Detect Rails.application.routes.draw block
@@ -298,6 +299,19 @@ module Ruby2JS
               action: transform_action_name(action.to_sym).to_s,
               method: http_method.to_s.upcase
             }
+
+            # Track member/collection routes on the current resource
+            if @rails_current_resource && raw_path
+              route_entry = {
+                action: raw_path.to_s,
+                method: http_method.to_s.upcase
+              }
+              if on_member
+                @rails_current_resource[:member_routes] << route_entry
+              elsif on_collection
+                @rails_current_resource[:collection_routes] << route_entry
+              end
+            end
           end
 
           # Generate path helper if as: is specified
@@ -373,7 +387,9 @@ module Ruby2JS
             controller_name: controller_name,
             controller_file: "#{resource_name}_controller",
             only: only_actions,
-            nested: []
+            nested: [],
+            member_routes: [],
+            collection_routes: []
           }
 
           # If nested, add to parent; otherwise add to top level
@@ -406,8 +422,10 @@ module Ruby2JS
           # Generate path helpers
           generate_path_helpers(resource_name, singular_name, resource_path, actions, options)
 
-          # Process nested resources
+          # Process nested resources and member/collection routes
           if body
+            saved_resource = @rails_current_resource
+            @rails_current_resource = resource_info
             @rails_route_nesting.push({
               path: url_segment,
               param: param_name,
@@ -417,6 +435,7 @@ module Ruby2JS
             })
             process_routes_body(body)
             @rails_route_nesting.pop
+            @rails_current_resource = saved_resource
           end
         end
 
@@ -907,6 +926,24 @@ module Ruby2JS
             options << s(:pair, s(:sym, :nested), s(:array, *nested_configs))
           end
 
+          if resource[:member_routes]&.any?
+            member_configs = resource[:member_routes].map do |route|
+              s(:hash,
+                s(:pair, s(:sym, :action), s(:str, route[:action])),
+                s(:pair, s(:sym, :method), s(:str, route[:method])))
+            end
+            options << s(:pair, s(:sym, :member), s(:array, *member_configs))
+          end
+
+          if resource[:collection_routes]&.any?
+            collection_configs = resource[:collection_routes].map do |route|
+              s(:hash,
+                s(:pair, s(:sym, :action), s(:str, route[:action])),
+                s(:pair, s(:sym, :method), s(:str, route[:method])))
+            end
+            options << s(:pair, s(:sym, :collection), s(:array, *collection_configs))
+          end
+
           args << s(:hash, *options) if options.any?
 
           s(:send, s(:const, nil, :Router), :resources, *args)
@@ -1037,6 +1074,65 @@ module Ruby2JS
               end
 
               pairs << s(:pair, s(:sym, singular.to_sym), s(:hash, *member_methods)) if member_methods.any?
+
+              # Custom member routes: unpair_studio (post)
+              if resource[:member_routes]&.any?
+                resource[:member_routes].each do |custom_route|
+                  custom_name = "#{custom_route[:action]}_#{singular}".to_sym
+                  custom_action = transform_action_name(custom_route[:action].to_sym)
+                  http_method = custom_route[:method].downcase.to_sym
+
+                  if http_method == :get
+                    # GET: sync handler, pass context and id
+                    custom_method = s(:pair, s(:sym, http_method),
+                      s(:block,
+                        s(:send, nil, :proc),
+                        s(:args, s(:arg, :id)),
+                        s(:send, controller, custom_action, s(:send, nil, :createContext), s(:lvar, :id))))
+                  else
+                    # POST/PATCH/PUT/DELETE: async handler with result handling
+                    controller_call = s(:send, controller, custom_action,
+                      s(:lvar, :context),
+                      s(:lvar, :id),
+                      s(:lvar, :params))
+                    custom_method = s(:pair, s(:sym, http_method),
+                      s(:block,
+                        s(:send, nil, :async),
+                        s(:args, s(:arg, :event), s(:arg, :id)),
+                        wrap_with_result_handler(controller_call)))
+                  end
+
+                  pairs << s(:pair, s(:sym, custom_name), s(:hash, custom_method))
+                end
+              end
+
+              # Custom collection routes: students_people (get)
+              if resource[:collection_routes]&.any?
+                resource[:collection_routes].each do |custom_route|
+                  custom_name = "#{custom_route[:action]}_#{plural}".to_sym
+                  custom_action = transform_action_name(custom_route[:action].to_sym)
+                  http_method = custom_route[:method].downcase.to_sym
+
+                  if http_method == :get
+                    custom_method = s(:pair, s(:sym, http_method),
+                      s(:block,
+                        s(:send, nil, :proc),
+                        s(:args),
+                        s(:send, controller, custom_action, s(:send, nil, :createContext))))
+                  else
+                    controller_call = s(:send, controller, custom_action,
+                      s(:lvar, :context),
+                      s(:lvar, :params))
+                    custom_method = s(:pair, s(:sym, http_method),
+                      s(:block,
+                        s(:send, nil, :async),
+                        s(:args, s(:arg, :event)),
+                        wrap_with_result_handler(controller_call)))
+                  end
+
+                  pairs << s(:pair, s(:sym, custom_name), s(:hash, custom_method))
+                end
+              end
             end
 
             # Process nested resources

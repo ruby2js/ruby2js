@@ -435,9 +435,9 @@ module Ruby2JS
 
             @rails_test_within_var = prev_within
 
-            # let _el = document.querySelector("selector")
+            # let _el = within("selector")
             assign = s(:lvasgn, :_el,
-              s(:send, s(:lvar, :document), :querySelector, selector))
+              s(:send, nil, :within, selector))
 
             s(:begin, assign, processed_body)
 
@@ -608,7 +608,7 @@ module Ruby2JS
 
           # System test imports don't depend on metadata
           if @rails_test_has_system_test
-            system_helpers = [:visit, :fillIn, :clickButton, :clickOn, :acceptConfirm, :findField, :findButton, :cleanup, :select, :find]
+            system_helpers = [:visit, :fillIn, :clickButton, :clickOn, :acceptConfirm, :findField, :findButton, :cleanup, :select, :find, :within]
             system_consts = system_helpers.map { |name| s(:const, nil, name) }
             imports.push(s(:import, ['juntos/system_test.mjs'], system_consts))
           end

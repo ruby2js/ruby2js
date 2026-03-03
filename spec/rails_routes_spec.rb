@@ -446,4 +446,59 @@ describe Ruby2JS::Filter::Rails::Routes do
       assert_includes result, '/email_addresses/'
     end
   end
+
+  describe "member routes" do
+    it "passes member routes to Router.resources" do
+      result = to_js(<<~RUBY)
+        Rails.application.routes.draw do
+          resources :studios do
+            member do
+              post :unpair
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'member: [{action: "unpair", method: "POST"}]'
+    end
+
+    it "generates dispatch entry for member route" do
+      result = to_js(<<~RUBY)
+        Rails.application.routes.draw do
+          resources :studios do
+            member do
+              post :unpair
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'unpair_studio:'
+    end
+  end
+
+  describe "collection routes in Router.resources" do
+    it "passes collection routes to Router.resources" do
+      result = to_js(<<~RUBY)
+        Rails.application.routes.draw do
+          resources :people do
+            get "students", on: :collection
+            get "backs", on: :collection
+          end
+        end
+      RUBY
+      assert_includes result, 'collection: ['
+      assert_includes result, '{action: "students", method: "GET"}'
+      assert_includes result, '{action: "backs", method: "GET"}'
+    end
+
+    it "generates dispatch entries for collection routes" do
+      result = to_js(<<~RUBY)
+        Rails.application.routes.draw do
+          resources :people do
+            get "students", on: :collection
+          end
+        end
+      RUBY
+      assert_includes result, 'students_people:'
+    end
+  end
 end

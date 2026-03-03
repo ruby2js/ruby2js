@@ -395,6 +395,22 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.wont_include '{ _path }'  # Should not import generic _path
       result.must_include '>Delete</button>'
     end
+
+    it "should handle button_to with params option" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( button_to("Unpair", unpair_studio_path(@studio), params: { pair: pair.name }, class: "btn-red") ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'name="pair"'
+      result.must_include '${pair.name}'
+      result.must_include 'type="hidden"'
+      result.must_include '>Unpair</button>'
+    end
+
+    it "should handle button_to with form: { class: } option" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( button_to("Submit", articles_path, form: { class: "inline" }) ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'class="inline"'
+      result.wont_include 'class="button_to"'
+    end
   end
 
   describe 'render helper' do
