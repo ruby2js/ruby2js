@@ -107,7 +107,7 @@ def PostList()
 
   %x{<div class="posts">
     {posts.map { |post| <article key={post.id}>
-      <h3><a href={"#" + post.slug}>{post.title}</a></h3>
+      <h3><a href={'#' + post.slug}>{post.title}</a></h3>
     </article> }}
   </div>}
 end
