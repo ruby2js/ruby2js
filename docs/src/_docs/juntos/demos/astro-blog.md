@@ -93,11 +93,9 @@ import PostDetail, from: './PostDetail.jsx'
 def PostList()
   posts, setPosts = useState([])
   loading, setLoading = useState(true)
-  selectedSlug, setSelectedSlug = useState(
-    window.location.hash.replace('#', '')
-  )
+  selectedSlug, setSelectedSlug = useState("")
 
-  # ... data loading, event listeners ...
+  # ... data loading, useEffect reads window.location.hash ...
 
   # Hash-based routing: show detail when slug is selected
   if selectedSlug != ""

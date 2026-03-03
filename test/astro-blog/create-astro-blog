@@ -438,9 +438,7 @@ import PostDetail, from: './PostDetail.jsx'
 def PostList()
   posts, setPosts = useState([])
   loading, setLoading = useState(true)
-  selectedSlug, setSelectedSlug = useState(
-    window.location.hash.replace('#', '')
-  )
+  selectedSlug, setSelectedSlug = useState("")
 
   loadPosts = -> {
     # Use ISR cache with 60 second TTL
@@ -454,8 +452,9 @@ def PostList()
     setupDatabase().then { loadPosts.() }
   }, []
 
-  # Listen for hash changes to update selected post
+  # Read initial hash and listen for hash changes (client-side only)
   useEffect -> {
+    setSelectedSlug(window.location.hash.replace('#', ''))
     handler = -> {
       setSelectedSlug(window.location.hash.replace('#', ''))
     }
