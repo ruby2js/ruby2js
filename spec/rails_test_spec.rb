@@ -1773,4 +1773,29 @@ describe Ruby2JS::Filter::Rails::Test do
       assert_includes result, 'expect(document.body.textContent).not.toContain("Error")'
     end
   end
+
+  describe "Capybara find with hover" do
+    it "converts find.hover to await find().hover()" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "hovers element" do
+            find("li.group", match: :first).hover
+          end
+        end
+      RUBY
+      assert_includes result, 'await find("li.group", {match: "first"}).hover()'
+    end
+
+    it "imports find helper" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "hovers element" do
+            find("li.group", match: :first).hover
+          end
+        end
+      RUBY
+      assert_includes result, 'find'
+      assert_includes result, 'from "juntos/system_test.mjs"'
+    end
+  end
 end

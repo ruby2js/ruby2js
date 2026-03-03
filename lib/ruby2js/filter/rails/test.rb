@@ -209,10 +209,11 @@ module Ruby2JS
                 result = transform_system_test_method(target, method, args)
                 return result if result
 
-                # find("selector").hover -> no-op (jsdom has no CSS rendering)
+                # find("selector", match: :first).hover -> find("selector", {match: "first"}).hover()
                 if method == :hover && target && target.type == :send &&
                    target.children[1] == :find
-                  return s(:nil)
+                  return s(:send, nil, :await,
+                    s(:send, process(target), :hover))
                 end
               else
                 # HTTP method calls -> controller action calls
@@ -607,7 +608,7 @@ module Ruby2JS
 
           # System test imports don't depend on metadata
           if @rails_test_has_system_test
-            system_helpers = [:visit, :fillIn, :clickButton, :clickOn, :acceptConfirm, :findField, :findButton, :cleanup, :select]
+            system_helpers = [:visit, :fillIn, :clickButton, :clickOn, :acceptConfirm, :findField, :findButton, :cleanup, :select, :find]
             system_consts = system_helpers.map { |name| s(:const, nil, name) }
             imports.push(s(:import, ['juntos/system_test.mjs'], system_consts))
           end

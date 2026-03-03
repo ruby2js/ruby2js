@@ -240,6 +240,29 @@ export async function select(value, { from }) {
 }
 
 /**
+ * Find an element by CSS selector — equivalent to Capybara's find.
+ * Returns a wrapper with .hover() for chaining.
+ * @param {string} selector - CSS selector
+ * @param {object} options - Options hash (e.g., {match: "first"})
+ * @returns {object} Element wrapper with hover() method
+ */
+export function find(selector, options = {}) {
+  const el = document.querySelector(selector);
+  if (!el) {
+    throw new Error(`find: could not find element matching "${selector}"`);
+  }
+
+  return {
+    element: el,
+    async hover() {
+      el.dispatchEvent(new Event('mouseenter', { bubbles: true }));
+      el.dispatchEvent(new Event('mouseover', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 0));
+    }
+  };
+}
+
+/**
  * Accept a confirmation dialog and execute the callback.
  * In jsdom, Turbo confirm dialogs are bypassed (fetch submits directly),
  * so this simply executes the callback.
