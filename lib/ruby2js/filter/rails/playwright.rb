@@ -19,6 +19,9 @@
 #   assert_text "T"                   → await expect(page.locator("body")).toContainText("T")
 #   assert_no_selector "css"          → await expect(page.locator("css")).not.toBeVisible()
 #   assert_no_text "T"                → await expect(page.locator("body")).not.toContainText("T")
+#   select "X", from: "Y"            → await page.getByLabel("Y").selectOption("X")
+#   find("css", match: :first).hover → await page.locator("css").first().hover()
+#   within("css") { ... }            → const _el = page.locator("css"); <scoped assertions>
 #   defined? Playwright               → true
 #
 # Usage:
@@ -37,6 +40,7 @@ module Ruby2JS
           @playwright_active = false
           @playwright_describe_depth = 0
           @playwright_path_helpers = []
+          @playwright_within_var = nil
         end
 
         # Handle class-based test definitions
@@ -153,6 +157,30 @@ module Ruby2JS
 
             s(:send, s(:lvar, :test), :afterEach, async_fn)
 
+          when :within
+            # within("ul") { assert_text "Two" } →
+            #   const _el = page.locator("ul");
+            #   await expect(_el).toContainText("Two")
+            return super unless @playwright_describe_depth > 0
+            call_args = call.children[2..-1]
+            return super if call_args.empty?
+            selector = process(call_args.first)
+
+            # Save previous within var (supports nesting)
+            prev_within = @playwright_within_var
+            @playwright_within_var = :_el
+
+            body = node.children.last
+            processed_body = process(body)
+
+            @playwright_within_var = prev_within
+
+            # const _el = page.locator("selector")
+            assign = s(:lvasgn, :_el,
+              s(:send, s(:lvar, :page), :locator, selector))
+
+            s(:begin, assign, processed_body)
+
           when :accept_confirm
             # accept_confirm { click_on "X" } →
             #   page.once("dialog", dialog => dialog.accept());
@@ -190,13 +218,34 @@ module Ruby2JS
           end
 
           # Only transform inside describe blocks
-          if @playwright_describe_depth > 0 && target.nil?
-            result = transform_capybara_to_playwright(method, args)
-            return result if result
+          if @playwright_describe_depth > 0
+            # find("selector", match: :first).hover → await page.locator("selector").first().hover()
+            if target.nil? == false && method == :hover && target.type == :send &&
+               target.children[1] == :find
+              find_args = target.children[2..-1]
+              return nil if find_args.empty?
+              selector = process(find_args.first)
+              locator = s(:send, s(:lvar, :page), :locator, selector)
+              # Check for match: :first option
+              if find_args.length >= 2 && find_args[1].type == :hash
+                find_args[1].children.each do |pair|
+                  if pair.children[0].type == :sym && pair.children[0].children[0] == :match
+                    locator = s(:send!, locator, :first)
+                  end
+                end
+              end
+              return s(:send, nil, :await,
+                s(:send!, locator, :hover))
+            end
 
-            # URL helper -> path helper
-            if method.to_s.end_with?('_url')
-              return transform_url_to_path_playwright(method, args)
+            if target.nil?
+              result = transform_capybara_to_playwright(method, args)
+              return result if result
+
+              # URL helper -> path helper
+              if method.to_s.end_with?('_url')
+                return transform_url_to_path_playwright(method, args)
+              end
             end
           end
 
@@ -279,6 +328,7 @@ module Ruby2JS
           when :click_on
             # click_on "X" → await page.getByRole("link", {name: "X"})
             #                   .or(page.getByRole("button", {name: "X"})).first().click()
+            # click_on "X", match: :first → same (match: option is stripped)
             return nil if args.empty?
             text = process(args.first)
             link_locator = s(:send, s(:lvar, :page), :getByRole, s(:str, 'link'),
@@ -289,6 +339,24 @@ module Ruby2JS
               s(:send!,
                 s(:send!, s(:send, link_locator, :or, button_locator), :first),
                 :click))
+
+          when :select
+            # select "Three", from: "Pair" → await page.getByLabel("Pair").selectOption("Three")
+            return nil if args.empty?
+            value = process(args[0])
+            from_node = nil
+            if args.length >= 2 && args[1].type == :hash
+              args[1].children.each do |pair|
+                if pair.children[0].type == :sym && pair.children[0].children[0] == :from
+                  from_node = process(pair.children[1])
+                end
+              end
+            end
+            return nil unless from_node
+            s(:send, nil, :await,
+              s(:send,
+                s(:send, s(:lvar, :page), :getByLabel, from_node),
+                :selectOption, value))
 
           when :assert_field
             # assert_field "X", with: "Y" → await expect(page.getByLabel("X")).toHaveValue("Y")
@@ -344,12 +412,17 @@ module Ruby2JS
 
           when :assert_text
             # assert_text "T" → await expect(page.locator("body")).toContainText("T")
+            # Inside within: → await expect(_el).toContainText("T")
             return nil if args.empty?
             text = process(args.first)
+            container = if @playwright_within_var
+              s(:lvar, @playwright_within_var)
+            else
+              s(:send, s(:lvar, :page), :locator, s(:str, 'body'))
+            end
             s(:send, nil, :await,
               s(:send,
-                s(:send, nil, :expect,
-                  s(:send, s(:lvar, :page), :locator, s(:str, 'body'))),
+                s(:send, nil, :expect, container),
                 :toContainText, text))
 
           when :assert_no_selector
@@ -366,13 +439,18 @@ module Ruby2JS
 
           when :assert_no_text
             # assert_no_text "T" → await expect(page.locator("body")).not.toContainText("T")
+            # Inside within: → await expect(_el).not.toContainText("T")
             return nil if args.empty?
             text = process(args.first)
+            container = if @playwright_within_var
+              s(:lvar, @playwright_within_var)
+            else
+              s(:send, s(:lvar, :page), :locator, s(:str, 'body'))
+            end
             s(:send, nil, :await,
               s(:send,
                 s(:attr,
-                  s(:send, nil, :expect,
-                    s(:send, s(:lvar, :page), :locator, s(:str, 'body'))),
+                  s(:send, nil, :expect, container),
                   :not),
                 :toContainText, text))
 

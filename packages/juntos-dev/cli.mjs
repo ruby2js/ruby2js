@@ -1288,7 +1288,8 @@ function parseCommonArgs(args) {
     summary: false,   // --summary: show untyped variable summary
     suggest: false,   // --suggest: auto-generate type hints
     // Transform options
-    intermediate: false // --intermediate: show intermediate Ruby (ERB only)
+    intermediate: false, // --intermediate: show intermediate Ruby (ERB only)
+    e2e: false          // --e2e: use Playwright filter for test files
   };
 
   const remaining = [];
@@ -1389,6 +1390,8 @@ function parseCommonArgs(args) {
       options.suggest = true;
     } else if (arg === '--intermediate') {
       options.intermediate = true;
+    } else if (arg === '--e2e') {
+      options.e2e = true;
     } else {
       remaining.push(arg);
     }
@@ -4050,6 +4053,12 @@ async function runTransform(options, files) {
           const manifest = await buildAppManifest(APP_ROOT, config, { mode: 'virtual' });
           metadata = manifest.metadata;
 
+          // --e2e flag: use Playwright filter instead of jsdom/vitest
+          if (options.e2e) {
+            metadata.playwright = true;
+            await ensurePlaywrightFilter();
+          }
+
           // Build fixture plan if fixtures exist
           const fixtures = parseFixtureFiles(APP_ROOT);
           if (Object.keys(fixtures).length > 0) {
@@ -4898,11 +4907,13 @@ switch (command) {
       console.log('  -d, --database ADAPTER   Database adapter');
       console.log('  -t, --target TARGET      Build target');
       console.log('  --intermediate           Show intermediate Ruby (ERB files only)');
+      console.log('  --e2e                    Use Playwright filter (test files only)');
       console.log('\nExamples:');
       console.log('  juntos transform app/views/studios/_form.html.erb');
       console.log('  juntos transform app/models/studio.rb');
       console.log('  juntos transform --intermediate app/views/studios/edit.html.erb');
       console.log('  juntos transform test/system/studios_test.rb');
+      console.log('  juntos transform --e2e test/system/studios_test.rb');
       process.exit(options.help ? 0 : 1);
     }
     runTransform(options, commandArgs).catch(err => {

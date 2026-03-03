@@ -232,6 +232,9 @@ On first run, `juntos e2e` auto-installs `@playwright/test` and Chromium, genera
 | `assert_text "Welcome"` | `await expect(page.locator("body")).toContainText("Welcome")` |
 | `assert_no_selector ".error"` | `await expect(page.locator(".error")).not.toBeVisible()` |
 | `assert_no_text "Error"` | `await expect(page.locator("body")).not.toContainText("Error")` |
+| `select "X", from: "Y"` | `await page.getByLabel("Y").selectOption("X")` |
+| `find("css", match: :first).hover` | `await page.locator("css").first().hover()` |
+| `within("css") { ... }` | Scopes assertions to `page.locator("css")` |
 
 The test structure uses Playwright conventions — `test.describe` / `test` with `{ page }` destructuring:
 

@@ -390,4 +390,86 @@ describe Ruby2JS::Filter::Rails::Playwright do
       assert_includes result, '.first().click()'
     end
   end
+
+  describe "select" do
+    it "converts select from: to page.getByLabel().selectOption()" do
+      result = to_js(<<~RUBY)
+        class StudiosSystemTest < ApplicationSystemTestCase
+          test "selects option" do
+            select "Three", from: "Pair"
+          end
+        end
+      RUBY
+      assert_includes result, 'await page.getByLabel("Pair").selectOption("Three")'
+    end
+  end
+
+  describe "find().hover()" do
+    it "converts find with match: :first and hover to locator().first().hover()" do
+      result = to_js(<<~RUBY)
+        class StudiosSystemTest < ApplicationSystemTestCase
+          test "hovers element" do
+            find("li.group", match: :first).hover
+          end
+        end
+      RUBY
+      assert_includes result, 'page.locator("li.group").first().hover()'
+    end
+
+    it "converts find without match option to locator().hover()" do
+      result = to_js(<<~RUBY)
+        class StudiosSystemTest < ApplicationSystemTestCase
+          test "hovers element" do
+            find("li.group").hover
+          end
+        end
+      RUBY
+      assert_includes result, 'page.locator("li.group").hover()'
+      refute_includes result, 'first()'
+    end
+  end
+
+  describe "click_on with match:" do
+    it "strips match: option (already uses .first())" do
+      result = to_js(<<~RUBY)
+        class StudiosSystemTest < ApplicationSystemTestCase
+          test "clicks first match" do
+            click_on "Unpair", match: :first
+          end
+        end
+      RUBY
+      assert_includes result, 'page.getByRole("link", {name: "Unpair"})'
+      assert_includes result, '.first().click()'
+    end
+  end
+
+  describe "within" do
+    it "scopes assertions to a locator" do
+      result = to_js(<<~RUBY)
+        class StudiosSystemTest < ApplicationSystemTestCase
+          test "checks within scope" do
+            within("ul") do
+              assert_no_text "Three"
+              assert_text "Two"
+            end
+          end
+        end
+      RUBY
+      assert_includes result, 'let _el = page.locator("ul")'
+      assert_includes result, 'expect(_el).not.toContainText("Three")'
+      assert_includes result, 'expect(_el).toContainText("Two")'
+      refute_includes result, 'page.locator("body")'
+    end
+
+    it "uses page.locator(body) outside within" do
+      result = to_js(<<~RUBY)
+        class StudiosSystemTest < ApplicationSystemTestCase
+          test "checks body" do
+            assert_text "Hello"
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(page.locator("body")).toContainText("Hello")'
+    end
+  end
 end

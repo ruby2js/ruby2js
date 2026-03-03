@@ -677,6 +677,7 @@ npx juntos transform [options] <files...>
 | `-d, --database ADAPTER` | Database adapter |
 | `-t, --target TARGET` | Build target |
 | `--intermediate` | Show intermediate Ruby (ERB files only) |
+| `--e2e` | Use Playwright filter (test files only) |
 | `-h, --help` | Show help |
 
 **Examples:**
@@ -686,6 +687,7 @@ npx juntos transform app/models/studio.rb                  # Transform a model
 npx juntos transform app/views/studios/_form.html.erb      # Transform an ERB view
 npx juntos transform --intermediate app/views/studios/edit.html.erb  # Show intermediate Ruby
 npx juntos transform test/system/studios_test.rb           # Transform a test file
+npx juntos transform --e2e test/system/studios_test.rb     # Transform as Playwright test
 npx juntos transform app/models/studio.rb app/models/tag.rb  # Multiple files
 ```
 

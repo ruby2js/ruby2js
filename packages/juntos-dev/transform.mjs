@@ -2332,6 +2332,9 @@ export async function transformRuby(source, filePath, section, config, appRoot, 
     options.metadata = metadata;
 
     // Add Playwright filter for e2e test transpilation
+    // Must be FIRST in the array: pipeline.rb reverses the filter list before
+    // building the mixin chain, so the first element ends up last-included
+    // (highest priority in Ruby's mixin MRO)
     if (metadata.playwright && Array.isArray(options.filters)) {
       options.filters = ['Rails_Playwright', ...options.filters];
     }
