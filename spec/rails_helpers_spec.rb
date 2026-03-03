@@ -764,6 +764,29 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.wont_include '${}'
     end
 
+    it "should handle select with choices and include_blank" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @entry) do |form| %><%= form.select "pair", avail, {include_blank: true}, class: "input" %><% end %>')
+      result.must_include '<select'
+      result.must_include 'entry[pair]'
+      result.must_include 'class="input"'
+      result.must_include '<option value=""></option>'
+      result.must_include 'avail.map'
+      result.must_include '<option value="'
+      result.must_include '</option>'
+      result.must_include '</select>'
+    end
+
+    it "should handle select with choices but no include_blank" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @entry) do |form| %><%= form.select "status", statuses, {}, class: "input" %><% end %>')
+      result.must_include '<select'
+      result.must_include 'entry[status]'
+      result.must_include 'statuses.map'
+      result.wont_include '<option value=""></option>'
+      result.must_include '</select>'
+    end
+
     it "should handle text_field with string argument" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_with(model: @entry) do |form| %><%= form.text_field "name", class: "input" %><% end %>')

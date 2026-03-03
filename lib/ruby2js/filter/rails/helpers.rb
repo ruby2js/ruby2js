@@ -2071,8 +2071,61 @@ module Ruby2JS
             if field_name&.type == :sym || field_name&.type == :str
               name = field_name.children.first.to_s
               extra_attrs = build_field_attrs(options)
-              html = %(<select name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs}></select>)
-              s(:str, html)
+              open_tag = %(<select name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs}>)
+
+              # Extract choices collection (2nd arg, if not a hash)
+              choices = args[1] if args[1] && args[1].type != :hash
+
+              # Check for include_blank in Rails options hash
+              # Rails options is a hash that's NOT the last arg (HTML options),
+              # or the only hash when there's no HTML options hash
+              include_blank = false
+              args.each_with_index do |arg, i|
+                next if i == 0 # skip field name
+                next unless arg.type == :hash
+                arg.children.each do |pair|
+                  key = pair.children[0]
+                  if key.type == :sym && key.children[0] == :include_blank
+                    include_blank = true
+                  end
+                end
+              end
+
+              blank_option = include_blank ? '<option value=""></option>' : ''
+
+              if choices
+                # Dynamic choices — generate option elements by mapping over the collection.
+                # Supports both simple arrays ["a","b"] and [label, value] pairs.
+                # Uses a ternary to detect pairs: Array.isArray(c) ? [c[1], c[0]] : [c, c]
+                map_expr = s(:send,
+                  s(:send,
+                    process(choices), :map,
+                    s(:block, s(:send, nil, :proc),
+                      s(:args, s(:arg, :_c)),
+                      s(:dstr,
+                        s(:str, '<option value="'),
+                        s(:begin,
+                          s(:if,
+                            s(:send, s(:const, nil, :Array), :isArray, s(:lvar, :_c)),
+                            s(:send, s(:lvar, :_c), :[], s(:int, 1)),
+                            s(:lvar, :_c))),
+                        s(:str, '">'),
+                        s(:begin,
+                          s(:if,
+                            s(:send, s(:const, nil, :Array), :isArray, s(:lvar, :_c)),
+                            s(:send, s(:lvar, :_c), :[], s(:int, 0)),
+                            s(:lvar, :_c))),
+                        s(:str, '</option>')))),
+                  :join, s(:str, ''))
+
+                s(:dstr,
+                  s(:str, "#{open_tag}#{blank_option}"),
+                  s(:begin, map_expr),
+                  s(:str, '</select>'))
+              else
+                # No choices provided — empty select
+                s(:str, "#{open_tag}#{blank_option}</select>")
+              end
             else
               nil
             end
