@@ -188,9 +188,16 @@ module Ruby2JS
 
             @playwright_within_var = prev_within
 
-            # const _el = page.locator("selector")
+            # Capybara's within() filters by visibility; match with :visible pseudo-class
+            visible_selector = if selector.type == :str
+              s(:str, "#{selector.children[0]}:visible")
+            else
+              selector
+            end
+
+            # const _el = page.locator("selector:visible")
             assign = s(:lvasgn, :_el,
-              s(:send, s(:lvar, :page), :locator, selector))
+              s(:send, s(:lvar, :page), :locator, visible_selector))
 
             s(:begin, assign, processed_body)
 

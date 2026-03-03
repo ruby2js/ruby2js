@@ -1312,7 +1312,19 @@ export { application };`,
 
           // Let Vite handle files with extensions (CSS, JS, images, etc.)
           const hasExtension = pathname.includes('.') && !pathname.endsWith('.html');
-          if (hasExtension) return next();
+          if (hasExtension) {
+            // Serve /assets/tailwind.css from the pre-built CSS file
+            // (Vite dev server doesn't process Tailwind source CSS via URL requests)
+            if (pathname === '/assets/tailwind.css') {
+              const twBuild = path.join(appRoot, 'app/assets/builds/tailwind.css');
+              if (fs.existsSync(twBuild)) {
+                res.writeHead(200, { 'Content-Type': 'text/css' });
+                res.end(fs.readFileSync(twBuild, 'utf-8'));
+                return;
+              }
+            }
+            return next();
+          }
 
           // Test lifecycle endpoint: load fixtures + savepoint reset (e2e only)
           if (pathname === '/__test/reset' && req.method === 'POST' && process.env.JUNTOS_E2E) {
@@ -1361,8 +1373,9 @@ export { application };`,
             // Initialize database on first request
             await ensureDbInitialized();
 
-            // Load Router from the node target (has dispatch with req/res)
-            const { Router } = await server.ssrLoadModule('juntos/targets/node/rails.js');
+            // Load Router from the same virtual module that routes.rb uses
+            // (must match so Application.configure() and Router.dispatch() share the same class)
+            const { Router } = await server.ssrLoadModule('juntos:rails');
             await Router.dispatch(req, res);
           } catch (err) {
             server.ssrFixStacktrace(err);

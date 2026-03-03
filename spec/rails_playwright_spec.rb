@@ -458,7 +458,7 @@ describe Ruby2JS::Filter::Rails::Playwright do
           end
         end
       RUBY
-      assert_includes result, 'let _el = page.locator("ul")'
+      assert_includes result, 'let _el = page.locator("ul:visible")'
       assert_includes result, 'expect(_el).not.toContainText("Three")'
       assert_includes result, 'expect(_el).toContainText("Two")'
       refute_includes result, 'page.locator("body")'

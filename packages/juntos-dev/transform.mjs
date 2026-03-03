@@ -563,9 +563,9 @@ export function fixImports(js, fromFile) {
     return match;
   });
 
-  // Layout: ../app/views/layouts/application.js → app/views/layouts/application.html.erb
+  // Layout: ../app/views/layouts/application.js → @views/layouts/application.html.erb
   js = js.replace(/from ['"]\.\.\/app\/views\/layouts\/application\.js['"]/g,
-    "from 'app/views/layouts/application.html.erb'");
+    "from '@views/layouts/application.html.erb'");
 
   return js;
 }
