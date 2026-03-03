@@ -9,6 +9,7 @@
 //   polymorphic_url(card, { host: "https://example.com" }) → "https://example.com/cards/42"
 
 import { createPathHelper } from 'juntos/path_helper.mjs';
+import { RouterBase } from 'juntos/rails_base.js';
 
 function modelToPathSegment(record) {
   const tableName = record.constructor.tableName || record.constructor.table_name;
@@ -16,6 +17,7 @@ function modelToPathSegment(record) {
 }
 
 export function polymorphic_path(record_or_array, options = {}) {
+  const base = RouterBase.basePath || '';
   if (Array.isArray(record_or_array)) {
     let path = '';
     for (const item of record_or_array) {
@@ -25,9 +27,9 @@ export function polymorphic_path(record_or_array, options = {}) {
         path += modelToPathSegment(item);
       }
     }
-    return createPathHelper(path);
+    return createPathHelper(base + path);
   }
-  return createPathHelper(modelToPathSegment(record_or_array));
+  return createPathHelper(base + modelToPathSegment(record_or_array));
 }
 
 export function polymorphic_url(record_or_array, options = {}) {
