@@ -115,7 +115,9 @@ export class RouterBase {
   // action: the action name (default: "index")
   static root(basePath, controller, action = 'index') {
     // Store base path (without trailing slash) for resources() to use
-    this.basePath = basePath.replace(/\/$/, '');
+    // Set on RouterBase explicitly so subclasses (Router) don't shadow it —
+    // polymorphic_path reads RouterBase.basePath directly.
+    RouterBase.basePath = basePath.replace(/\/$/, '');
 
     // Escape special regex characters and make trailing slash optional
     const escaped = basePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
