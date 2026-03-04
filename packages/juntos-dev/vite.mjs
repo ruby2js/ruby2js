@@ -1313,9 +1313,26 @@ export { application };`,
           // Let Vite handle files with extensions (CSS, JS, images, etc.)
           const hasExtension = pathname.includes('.') && !pathname.endsWith('.html');
           if (hasExtension) {
-            // Serve /assets/tailwind.css from the pre-built CSS file
-            // (Vite dev server doesn't process Tailwind source CSS via URL requests)
+            // Serve Tailwind CSS through Vite's pipeline so @tailwindcss/vite
+            // scans source files and generates utility classes on the fly
             if (pathname === '/assets/tailwind.css') {
+              const twSource = path.join(appRoot, 'app/assets/tailwind/application.css');
+              const twJuntos = path.join(appRoot, 'app/assets/tailwind/juntos.css');
+              const sourceFile = fs.existsSync(twJuntos) ? twJuntos
+                : fs.existsSync(twSource) ? twSource : null;
+              if (sourceFile) {
+                try {
+                  const result = await server.transformRequest(sourceFile + '?direct');
+                  if (result) {
+                    res.writeHead(200, { 'Content-Type': 'text/css' });
+                    res.end(result.code);
+                    return;
+                  }
+                } catch {
+                  // Fall through to pre-built file
+                }
+              }
+              // Fallback: serve pre-built CSS if no source or transform failed
               const twBuild = path.join(appRoot, 'app/assets/builds/tailwind.css');
               if (fs.existsSync(twBuild)) {
                 res.writeHead(200, { 'Content-Type': 'text/css' });
