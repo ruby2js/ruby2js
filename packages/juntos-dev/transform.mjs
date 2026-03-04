@@ -1762,7 +1762,7 @@ globalThis.assert_no_enqueued_jobs = function(fn) { if (fn) return fn(); };
 /**
  * Get the active record adapter filename for a database.
  */
-function getActiveRecordAdapterFile(database) {
+export function getActiveRecordAdapterFile(database) {
   const adapterMap = {
     'sqlite': 'active_record_sqlite.mjs',
     'sqlite3': 'active_record_sqlite.mjs',

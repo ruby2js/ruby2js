@@ -63,7 +63,8 @@ import {
   matchesAny,
   shouldIncludeFile,
   lintRuby,
-  ErbCompiler
+  ErbCompiler,
+  getActiveRecordAdapterFile
 } from './transform.mjs';
 
 import { singularize, camelize, pluralize, underscore } from 'juntos/adapters/inflector.mjs';
@@ -2998,7 +2999,7 @@ function runServer(options) {
 
 const BROWSER_DATABASES = ['dexie'];
 
-function runDb(args, options) {
+async function runDb(args, options) {
   const subcommand = args[0];
 
   if (!subcommand || options.help) {
@@ -3020,16 +3021,16 @@ function runDb(args, options) {
 
   switch (subcommand) {
     case 'migrate':
-      runDbMigrate(options);
+      await runDbMigrate(options);
       break;
     case 'seed':
-      runDbSeed(options);
+      await runDbSeed(options);
       break;
     case 'prepare':
-      runDbPrepare(options);
+      await runDbPrepare(options);
       break;
     case 'reset':
-      runDbReset(options);
+      await runDbReset(options);
       break;
     case 'create':
       runDbCreate(options);
@@ -3048,27 +3049,27 @@ function validateNotBrowser(options, command) {
   }
 }
 
-function runDbMigrate(options) {
+async function runDbMigrate(options) {
   validateNotBrowser(options, 'migrate');
 
   if (options.database === 'd1') {
     runD1Migrate(options);
   } else {
-    runNodeMigrate(options);
+    await runNodeMigrate(options);
   }
 }
 
-function runDbSeed(options) {
+async function runDbSeed(options) {
   validateNotBrowser(options, 'seed');
 
   if (options.database === 'd1') {
     runD1Seed(options);
   } else {
-    runNodeSeed(options);
+    await runNodeSeed(options);
   }
 }
 
-function runDbPrepare(options) {
+async function runDbPrepare(options) {
   validateNotBrowser(options, 'prepare');
 
   if (options.database === 'd1') {
@@ -3081,11 +3082,11 @@ function runDbPrepare(options) {
     }
     runD1Prepare(options);
   } else {
-    runNodePrepare(options);
+    await runNodePrepare(options);
   }
 }
 
-function runDbReset(options) {
+async function runDbReset(options) {
   validateNotBrowser(options, 'reset');
 
   const env = options.environment || 'development';
@@ -3102,10 +3103,10 @@ function runDbReset(options) {
   }
 
   console.log('\nStep 3/4: Running migrations...');
-  runDbMigrate(options);
+  await runDbMigrate(options);
 
   console.log('\nStep 4/4: Running seeds...');
-  runDbSeed(options);
+  await runDbSeed(options);
 
   console.log('\nDatabase reset complete.');
 }
@@ -3323,17 +3324,63 @@ function runD1Prepare(options) {
 
 // Node.js database helpers
 
-// Use plain node if dist/ is pre-built, otherwise vite-node for on-the-fly transpilation
-function migrateCommand(extraArgs = '') {
-  const args = extraArgs ? ` ${extraArgs}` : '';
-  if (existsSync(join(APP_ROOT, 'dist', 'config', 'routes.js'))) {
-    return `node "${MIGRATE_SCRIPT}"${args}`;
+// Ensure migrate.mjs can run: pre-transpile migrations and generate bootstrap if needed
+async function ensureMigrateBootstrap(options) {
+  // Already have pre-built routes.js? Nothing to do.
+  if (existsSync(join(APP_ROOT, 'dist', 'config', 'routes.js')) ||
+      existsSync(join(APP_ROOT, 'config', 'routes.js'))) {
+    return;
   }
-  return `npx vite-node "${MIGRATE_SCRIPT}"${args}`;
+
+  const { loadConfig } = await import('./vite.mjs');
+  const config = loadConfig(APP_ROOT, {
+    database: options.database,
+    target: options.target
+  });
+
+  const target = config.target || 'node';
+  const adapterFile = getActiveRecordAdapterFile(config.database);
+
+  // Transpile migration files
+  const migrateDir = join(APP_ROOT, 'db/migrate');
+  let hasMigrations = false;
+  if (existsSync(migrateDir)) {
+    const migrations = findMigrations(APP_ROOT);
+    if (migrations.length > 0) {
+      const { convert } = await ensureRuby2jsReady();
+      for (const m of migrations) {
+        const outFile = join(migrateDir, m.name + '.js');
+        if (!existsSync(outFile)) {
+          const source = readFileSync(join(migrateDir, m.file), 'utf-8');
+          const result = await transformRuby(source, join(migrateDir, m.file), null, config, APP_ROOT, null);
+          writeFileSync(outFile, result.code);
+        }
+      }
+      writeFileSync(join(migrateDir, 'index.js'), generateMigrationsModuleForEject(APP_ROOT));
+      hasMigrations = true;
+    }
+  }
+
+  // Generate minimal bootstrap config/routes.js (no actual routes needed for migrations)
+  let routesCode = `import { Application } from 'juntos/targets/${target}/rails.js';\n`;
+  routesCode += `export { Application };\n`;
+  routesCode += `export { initDatabase } from 'juntos/adapters/${adapterFile}';\n`;
+  routesCode += `export * from 'juntos/adapters/${adapterFile}';\n`;
+  if (hasMigrations) {
+    routesCode += `import { migrations } from '../db/migrate/index.js';\n`;
+    routesCode += `Application.configure({ migrations });\n`;
+  }
+  writeFileSync(join(APP_ROOT, 'config/routes.js'), routesCode);
 }
 
-function runNodeMigrate(options) {
+function migrateCommand(extraArgs = '') {
+  const args = extraArgs ? ` ${extraArgs}` : '';
+  return `node "${MIGRATE_SCRIPT}"${args}`;
+}
+
+async function runNodeMigrate(options) {
   console.log('Running migrations...');
+  await ensureMigrateBootstrap(options);
   try {
     execSync(migrateCommand('--migrate-only'), {
       cwd: APP_ROOT,
@@ -3342,13 +3389,15 @@ function runNodeMigrate(options) {
     });
     console.log('Migrations completed.');
   } catch (e) {
+    if (DEBUG && e.message) console.error(e.message);
     console.error('Error: Migration failed.');
     process.exit(1);
   }
 }
 
-function runNodeSeed(options) {
+async function runNodeSeed(options) {
   console.log('Running seeds...');
+  await ensureMigrateBootstrap(options);
   try {
     execSync(migrateCommand('--seed-only'), {
       cwd: APP_ROOT,
@@ -3362,8 +3411,9 @@ function runNodeSeed(options) {
   }
 }
 
-function runNodePrepare(options) {
+async function runNodePrepare(options) {
   console.log('Running migrations and seeds...');
+  await ensureMigrateBootstrap(options);
   try {
     execSync(migrateCommand(), {
       cwd: APP_ROOT,
@@ -4899,7 +4949,7 @@ switch (command) {
     break;
 
   case 'db':
-    runDb(commandArgs, options);
+    await runDb(commandArgs, options);
     break;
 
   case 'lint':
