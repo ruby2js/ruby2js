@@ -183,7 +183,7 @@ export function getBuildOptions(section, target, sectionConfig = null) {
     stimulus: ['Pragma', 'Stimulus', 'Functions', 'ESM', 'Return'],
     controllers: ['Pragma', 'Rails_Controller', ...nodeFilter, 'ActiveSupport', 'Functions', 'ESM', 'Return'],
     jsx: ['Pragma', 'Rails_Helpers', 'React', 'Functions', 'ESM', 'Return'],
-    erb: ['Pragma', 'Rails_Helpers', 'Erb', ...nodeFilter, 'Functions', 'Return'],
+    erb: ['Pragma', 'Rails_Helpers', 'Erb', ...nodeFilter, 'ActiveSupport', 'Functions', 'Return'],
     default: ['Pragma', 'Rails_Concern', 'Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', ...nodeFilter, 'ActiveSupport', 'Functions', 'ESM', 'Return']
   };
 
