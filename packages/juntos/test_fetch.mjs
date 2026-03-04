@@ -168,7 +168,7 @@ function extractParams(body) {
  * - { json } → JSON response (200)
  * - { turbo_stream } → Turbo Stream response (200)
  */
-function buildResponse(result, context) {
+async function buildResponse(result, context) {
   const headers = new Headers();
 
   // Move redirect notice/alert into flash before checking hasPending
@@ -210,7 +210,7 @@ function buildResponse(result, context) {
 
     if (result.render) {
       headers.set('Content-Type', 'text/html');
-      return new Response(result.render, { status: result.status || 200, headers });
+      return new Response(await Promise.resolve(result.render), { status: result.status || 200, headers });
     }
 
     if (result.json) {
@@ -220,7 +220,7 @@ function buildResponse(result, context) {
 
     if (result.turbo_stream) {
       headers.set('Content-Type', 'text/vnd.turbo-stream.html');
-      return new Response(result.turbo_stream, { status: 200, headers });
+      return new Response(await Promise.resolve(result.turbo_stream), { status: 200, headers });
     }
   }
 

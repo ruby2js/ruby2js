@@ -4253,6 +4253,16 @@ async function transpileE2EFiles(appRoot, config) {
         continue;
       }
 
+      // Write sourcemap for Playwright UI mode (maps back to Ruby source)
+      if (result.map) {
+        const map = result.map;
+        map.file = outName;
+        map.sources = [file];
+        map.sourcesContent = [source];
+        writeFileSync(outPath + '.map', JSON.stringify(map));
+        code += `\n//# sourceMappingURL=${outName}.map\n`;
+      }
+
       writeFileSync(outPath, code);
       count++;
     } catch (err) {

@@ -276,10 +276,12 @@ class MessagesControllerTest < ActionDispatch::IntegrationTest
 end
 TEST
 
-# System tests (Capybara-style, runs in jsdom via Juntos)
-mkdir -p test/system
+# Generate system test infrastructure (creates application_system_test_case.rb)
+rails generate system_test chat
+
+# System tests (Capybara-style, transpiled to Playwright by Juntos)
 cat > test/system/chat_system_test.rb << 'TEST'
-require "test_helper"
+require "application_system_test_case"
 
 class ChatSystemTest < ApplicationSystemTestCase
   test "clears input after sending message" do
