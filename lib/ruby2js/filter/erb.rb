@@ -191,10 +191,20 @@ module Ruby2JS
               return result if result
             end
 
+            # Detect raw()/html_safe — these skip HTML escaping
+            is_raw = false
+            if inner&.type == :send
+              if inner.children[1] == :raw && inner.children[0].nil?
+                is_raw = true
+              elsif inner.children[1] == :html_safe
+                is_raw = true
+              end
+            end
+
             arg = process(inner)
-            # Skip String() wrapper if already a string literal or template literal
+            # Skip wrapper if already a string literal or template literal
             unless arg&.type == :str || arg&.type == :dstr
-              arg = s(:send, nil, :String, arg)
+              arg = s(:send, nil, is_raw ? :String : :escapeHTML, arg)
             end
           else
             # Handle non-block sends that need special processing

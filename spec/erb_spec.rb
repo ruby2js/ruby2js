@@ -14,7 +14,7 @@ describe Ruby2JS::Filter::Erb do
       # ERB output format: _erbout = +''; _erbout.<< "str".freeze; _erbout
       erb_src = '_erbout = +\'\'; _erbout.<< "<h1>".freeze; _erbout.<<(( @title ).to_s); _erbout.<< "</h1>".freeze; _erbout'
       to_js(erb_src).must_include 'function render({ title })'
-      to_js(erb_src).must_include 'return `<h1>${title}</h1>`'
+      to_js(erb_src).must_include 'return `<h1>${escapeHTML(title)}</h1>`'
       to_js(erb_src).wont_include 'let _erbout'
     end
 
@@ -27,7 +27,7 @@ describe Ruby2JS::Filter::Erb do
     it "should convert ivars to local variables" do
       erb_src = '_erbout = +\'\'; _erbout.<<(( @name ).to_s); _erbout'
       result = to_js(erb_src)
-      result.must_include 'String(name)'
+      result.must_include 'escapeHTML(name)'
       result.wont_include '@name'
       result.wont_include 'this.name'
     end
@@ -37,7 +37,7 @@ describe Ruby2JS::Filter::Erb do
       erb_src = '_erbout = +\'\'; @scores = [1, 2, 3]; _erbout.<<(( @scores ).to_s); _erbout'
       result = to_js(erb_src)
       result.must_include 'scores = [1, 2, 3]'
-      result.must_include 'String(scores)'
+      result.must_include 'escapeHTML(scores)'
       result.wont_include '@scores'
       result.wont_include 'this.#scores'  # Not private field
     end
@@ -48,7 +48,7 @@ describe Ruby2JS::Filter::Erb do
       # HERB output format: _buf = ::String.new; _buf << 'str'.freeze; _buf.to_s
       herb_src = "_buf = ::String.new; _buf << '<h1>'.freeze; _buf << (@title).to_s; _buf << '</h1>'.freeze; _buf.to_s"
       to_js(herb_src).must_include 'function render({ title })'
-      to_js(herb_src).must_include 'return `<h1>${title}</h1>`'
+      to_js(herb_src).must_include 'return `<h1>${escapeHTML(title)}</h1>`'
       to_js(herb_src).wont_include 'let _buf'
     end
 
@@ -65,7 +65,7 @@ describe Ruby2JS::Filter::Erb do
       result = to_js(erb_src)
       result.must_include 'function render({ items })'
       result.must_include 'for (let item of items)'
-      result.must_include 'String(item.name)'
+      result.must_include 'escapeHTML(item.name)'
     end
   end
 
@@ -85,7 +85,7 @@ describe Ruby2JS::Filter::Erb do
     it "should inline .each as .map().join in template literal" do
       erb_src = '_erbout = +\'\'; _erbout.<< "<ul>".freeze; for item in items; _erbout.<< "<li>".freeze; _erbout.<<(( item.name ).to_s); _erbout.<< "</li>".freeze; end; _erbout.<< "</ul>".freeze; _erbout'
       result = to_js(erb_src)
-      result.must_include '`<ul>${items.map(item => (`<li>${item.name}</li>`)).join("")}</ul>`'
+      result.must_include '`<ul>${items.map(item => (`<li>${escapeHTML(item.name)}</li>`)).join("")}</ul>`'
     end
 
     it "should not inline if with non-buf-only branches" do
@@ -103,14 +103,14 @@ describe Ruby2JS::Filter::Erb do
       return skip() unless defined?(Ruby2JS::Erubi)
       erb_src = '_erbout = +\'\'; if show; _erbout.<< "<p>".freeze; _erbout.<<(( @name ).to_s); _erbout.<< "</p>".freeze; end; _erbout'
       result = to_js(erb_src)
-      result.must_include '`<p>${name}</p>`'
+      result.must_include '`<p>${escapeHTML(name)}</p>`'
       result.must_include 'if (show)'
     end
 
     it "should inline if with expression values" do
       erb_src = '_erbout = +\'\'; _erbout.<< "<span>".freeze; if active; _erbout.<<(( @name ).to_s); else; _erbout.<< "anonymous".freeze; end; _erbout.<< "</span>".freeze; _erbout'
       result = to_js(erb_src)
-      result.must_include '`<span>${active ? name : "anonymous"}</span>`'
+      result.must_include '`<span>${active ? escapeHTML(name) : "anonymous"}</span>`'
     end
   end
 
@@ -143,15 +143,15 @@ describe Ruby2JS::Filter::Erb do
       erb_src = '_erbout = +\'\'; @scores = [1, 2, 3]; _erbout.<< "<div>".freeze; _erbout.<<(( @scores ).to_s); _erbout.<< "</div>".freeze; _erbout'
       result = to_js(erb_src)
       result.must_include 'scores = [1, 2, 3]'
-      result.must_include 'return `<div>${scores}</div>`'
+      result.must_include 'return `<div>${escapeHTML(scores)}</div>`'
       result.wont_include 'let _erbout'
     end
 
     it "should absorb first append for multiple appends" do
       erb_src = '_erbout = +\'\'; _erbout.<< "<h1>".freeze; _erbout.<<(( @title ).to_s); _erbout.<< "</h1>".freeze; @scores = [1]; _erbout.<< "<p>".freeze; _erbout.<<(( @scores ).to_s); _erbout.<< "</p>".freeze; _erbout'
       result = to_js(erb_src)
-      result.must_include 'let _erbout = `<h1>${title}</h1>`'
-      result.must_include 'return _erbout + `<p>${scores}</p>`'
+      result.must_include 'let _erbout = `<h1>${escapeHTML(title)}</h1>`'
+      result.must_include 'return _erbout + `<p>${escapeHTML(scores)}</p>`'
     end
   end
 
@@ -219,7 +219,7 @@ describe Ruby2JS::Filter::Erb do
       erb_src = "def render\n_buf = ::String.new; _buf << \"<h1>\".freeze; _buf << (@title).to_s; _buf << \"</h1>\".freeze; _buf.to_s\nend"
       result = to_js(erb_src)
       result.must_include 'function render({ title })'
-      result.must_include 'return `<h1>${title}</h1>`'
+      result.must_include 'return `<h1>${escapeHTML(title)}</h1>`'
       result.wont_include 'let _buf'
     end
 

@@ -516,6 +516,12 @@ function createErbPlugin(config) {
     // For layouts: export function layout(context, content)
     // For views: export function render(context)
     let js = result.toString();
+
+    // Add escapeHTML import if used by the compiled template
+    if (js.includes('escapeHTML(')) {
+      js = `import { escapeHTML } from "juntos/erb_runtime.mjs";\n` + js;
+    }
+
     if (isLayout) {
       js = js.replace(/(^|\n)(async )?function layout/, '$1export $2function layout');
     } else {
