@@ -191,27 +191,28 @@ module Ruby2JS
               return result if result
             end
 
-            # Detect expressions that return HTML-safe content.
-            # These use String() (stripped in template literals) instead of escapeHTML().
-            is_raw = false
-            if inner&.type == :send
-              method_name = inner.children[1]
+            # Determine if this expression needs HTML escaping.
+            # Only simple value access (ivars, lvars, zero-arg attribute calls)
+            # gets escapeHTML — these represent user data that may contain HTML
+            # chars or null values. Everything else (helper calls, blocks, yield)
+            # uses String() which is stripped in template literals.
+            needs_escape = case inner&.type
+            when :ivar, :lvar
+              true
+            when :send
               target = inner.children[0]
-              if method_name == :raw && target.nil?
-                is_raw = true
-              elsif method_name == :html_safe
-                is_raw = true
-              elsif method_name == :render && target.nil?
-                is_raw = true
-              elsif method_name == :content_for && target.nil?
-                is_raw = true
-              end
+              method_name = inner.children[1]
+              extra_args = inner.children[2..]
+              # Zero-arg method on an object: object.attribute
+              target && extra_args.empty? && method_name != :html_safe
+            else
+              false
             end
 
             arg = process(inner)
             # Skip wrapper if already a string literal or template literal
             unless arg&.type == :str || arg&.type == :dstr
-              arg = s(:send, nil, is_raw ? :String : :escapeHTML, arg)
+              arg = s(:send, nil, needs_escape ? :escapeHTML : :String, arg)
             end
           else
             # Handle non-block sends that need special processing
