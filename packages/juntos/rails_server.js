@@ -84,7 +84,7 @@ export function getAssetPath(name) {
 // Generate stylesheet link tag with fingerprinted path
 export function stylesheetLinkTag(name = 'tailwind.css') {
   const href = getAssetPath(name);
-  return `<link rel="stylesheet" href="${href}">`;
+  return `<link rel="stylesheet" href="${href}" data-turbo-track="reload">`;
 }
 
 // Lazy-loaded ReactDOMServer for rendering React elements

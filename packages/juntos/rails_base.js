@@ -286,17 +286,17 @@ export function createFlash(cookieHeader = '') {
       return msg || '';
     },
 
-    // Convenience methods — return objects with .present and .toString()
-    // so transpiled ERB like `if notice.present?` / `<%= notice %>` works
-    // (each call to the helper transpiles to a separate consumeNotice() call).
+    // Convenience methods — return the flash message string (or '').
+    // Transpiled ERB calls consumeNotice() for both `notice.present?` and
+    // `<%= notice %>`.  Returning a plain string lets the active_support
+    // filter's `present?` translation (`x != null && x !== ''`) work
+    // correctly: an empty string is `=== ''` → falsy.
     // Non-destructive: the flash cookie is cleared by the response lifecycle.
     consumeNotice() {
-      const msg = this._current['notice'] || '';
-      return { present: msg !== '', toString() { return msg; } };
+      return this._current['notice'] || '';
     },
     consumeAlert() {
-      const msg = this._current['alert'] || '';
-      return { present: msg !== '', toString() { return msg; } };
+      return this._current['alert'] || '';
     },
 
     // Get cookie string for pending messages (for Set-Cookie header or document.cookie)
