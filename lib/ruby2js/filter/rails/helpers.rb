@@ -887,6 +887,7 @@ module Ruby2JS
           # Extract options
           http_method = :post
           confirm_msg = nil
+          confirm_on_form = false  # true when confirm comes from form: { data: turbo_confirm }
           css_class = nil
           form_class = nil
           form_params = []
@@ -919,6 +920,7 @@ module Ruby2JS
                             if data_key.type == :sym &&
                                [:confirm, :turbo_confirm].include?(data_key.children[0])
                               confirm_msg = data_value if data_value.type == :str
+                              confirm_on_form = true
                             end
                           end
                         end
@@ -956,7 +958,7 @@ module Ruby2JS
           confirm_str = confirm_msg ? confirm_msg.children[0] : 'Are you sure?'
 
           if http_method == :delete
-            build_delete_button(text_str, path_node, confirm_str, css_class, form_class, form_params)
+            build_delete_button(text_str, path_node, confirm_str, css_class, form_class, form_params, confirm_on_form)
           else
             build_form_button(text_str, path_node, http_method, css_class, form_class, form_params)
           end
@@ -964,7 +966,7 @@ module Ruby2JS
 
         # Build a delete button using Turbo-compatible form
         # Turbo intercepts the form submission and handles the DELETE request
-        def build_delete_button(text_str, path_node, confirm_str, css_class = nil, form_class = nil, form_params = [])
+        def build_delete_button(text_str, path_node, confirm_str, css_class = nil, form_class = nil, form_params = [], confirm_on_form = false)
           # Build class attributes - Rails uses "button_to" as default form class
           btn_class_attr = css_class ? " class=\"#{css_class}\"" : ""
           form_class_attr = " class=\"#{form_class || 'button_to'}\""
@@ -1033,8 +1035,9 @@ module Ruby2JS
             path_expr = process(path_node)
           end
 
-          # Use data-turbo-confirm on the button (Rails puts it there, not on the form)
-          turbo_confirm = " data-turbo-confirm=\"#{confirm_str}\""
+          # Place data-turbo-confirm on form or button depending on source
+          form_turbo = confirm_on_form ? " data-turbo-confirm=\"#{confirm_str}\"" : ""
+          btn_turbo = confirm_on_form ? "" : " data-turbo-confirm=\"#{confirm_str}\""
 
           # Build hidden inputs for params
           param_inputs = []
@@ -1052,9 +1055,9 @@ module Ruby2JS
           # Include authenticity_token for CSRF protection
           # Rails order: form, _method input, button, params inputs, authenticity_token input
           parts = [
-            s(:str, "<form#{form_class_attr} method=\"post\" action=\""),
+            s(:str, "<form#{form_class_attr}#{form_turbo} method=\"post\" action=\""),
             s(:begin, path_expr),
-            s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button#{btn_class_attr}#{turbo_confirm} type=\"submit\">#{text_str}</button>")
+            s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button#{btn_class_attr}#{btn_turbo} type=\"submit\">#{text_str}</button>")
           ]
           parts.push(*param_inputs)
           parts << s(:str, "<input type=\"hidden\" name=\"authenticity_token\" value=\"")
@@ -1183,9 +1186,9 @@ module Ruby2JS
           if http_method == :delete
             # Form with hidden _method field for DELETE
             form_html = s(:dstr,
-              s(:str, "<form#{form_class_attr} method=\"post\" action=\""),
+              s(:str, "<form#{form_class_attr}#{turbo_confirm} method=\"post\" action=\""),
               s(:begin, path_expr),
-              s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button#{btn_class_attr}#{turbo_confirm} type=\"submit\">#{block_content}</button><input type=\"hidden\" name=\"authenticity_token\" value=\""),
+              s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button#{btn_class_attr} type=\"submit\">#{block_content}</button><input type=\"hidden\" name=\"authenticity_token\" value=\""),
               s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
               s(:str, "\"></form>"))
           else
@@ -1194,9 +1197,9 @@ module Ruby2JS
             method_field = needs_method_field ? "<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\">" : ""
 
             form_html = s(:dstr,
-              s(:str, "<form#{form_class_attr} method=\"#{actual_method}\" action=\""),
+              s(:str, "<form#{form_class_attr}#{turbo_confirm} method=\"#{actual_method}\" action=\""),
               s(:begin, path_expr),
-              s(:str, "\">#{method_field}<button#{btn_class_attr}#{turbo_confirm} type=\"submit\">#{block_content}</button><input type=\"hidden\" name=\"authenticity_token\" value=\""),
+              s(:str, "\">#{method_field}<button#{btn_class_attr} type=\"submit\">#{block_content}</button><input type=\"hidden\" name=\"authenticity_token\" value=\""),
               s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
               s(:str, "\"></form>"))
           end
@@ -2002,27 +2005,34 @@ module Ruby2JS
               # Check for conditional classes
               static_attrs, dynamic_class_expr = build_field_attrs_dynamic(options)
 
-              # For new models, use empty value; for existing, pre-fill from model
-              value_expr = if model_is_new
-                s(:str, '')
+              if model_is_new
+                # New models: omit value attribute (Rails convention)
+                if dynamic_class_expr
+                  s(:dstr,
+                    s(:str, %(<input class=")),
+                    s(:begin, process(dynamic_class_expr)),
+                    s(:str, %(" type="#{input_type}"#{static_attrs} name="#{model}[#{name}]" id="#{model}_#{name}">)))
+                else
+                  s(:str, %(<input#{static_attrs} type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}">))
+                end
               else
-                s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))
-              end
+                # Existing models: pre-fill value from model
+                value_expr = s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))
 
-              if dynamic_class_expr
-                # Has conditional classes - generate dynamic class attribute
-                s(:dstr,
-                  s(:str, %(<input type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}" class=")),
-                  s(:begin, process(dynamic_class_expr)),
-                  s(:str, %("#{static_attrs} value=")),
-                  s(:begin, value_expr),
-                  s(:str, '">'))
-              else
-                # Static classes only
-                s(:dstr,
-                  s(:str, %(<input type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}"#{static_attrs} value=")),
-                  s(:begin, value_expr),
-                  s(:str, '">'))
+                if dynamic_class_expr
+                  s(:dstr,
+                    s(:str, %(<input class=")),
+                    s(:begin, process(dynamic_class_expr)),
+                    s(:str, %(" type="#{input_type}"#{static_attrs} value=")),
+                    s(:begin, value_expr),
+                    s(:str, %(" name="#{model}[#{name}]" id="#{model}_#{name}">)))
+                else
+                  # Rails attribute order: class, type, value, name, id
+                  s(:dstr,
+                    s(:str, %(<input#{static_attrs} type="#{input_type}" value=")),
+                    s(:begin, value_expr),
+                    s(:str, %(" name="#{model}[#{name}]" id="#{model}_#{name}">)))
+                end
               end
             else
               nil
@@ -2068,15 +2078,17 @@ module Ruby2JS
 
             if field_name&.type == :sym
               name = field_name.children.first.to_s
-              html = %(<input type="checkbox" name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs} value="1">)
-              s(:str, html)
+              hidden = %(<input name="#{model}[#{name}]" type="hidden" value="0">)
+              html = %(<input#{extra_attrs} type="checkbox" value="1" name="#{model}[#{name}]" id="#{model}_#{name}">)
+              s(:str, hidden + html)
             elsif field_name&.type == :str
               # Static string field name: form.check_box "custom_field"
               name = field_name.children.first.to_s
               # Generate id by replacing brackets with underscores
               id_name = name.gsub(/[\[\]]/, '_').gsub(/_+/, '_').gsub(/^_|_$/, '')
-              html = %(<input type="checkbox" name="#{model}[#{name}]" id="#{model}_#{id_name}"#{extra_attrs} value="1">)
-              s(:str, html)
+              hidden = %(<input name="#{model}[#{name}]" type="hidden" value="0">)
+              html = %(<input#{extra_attrs} type="checkbox" value="1" name="#{model}[#{name}]" id="#{model}_#{id_name}">)
+              s(:str, hidden + html)
             elsif field_name&.type == :dstr
               # Dynamic/interpolated string field name: form.check_box "options][#{option.id}"
               # Build name parts - wrap expressions in begin nodes
@@ -2121,8 +2133,9 @@ module Ruby2JS
             field_name = args.first
             if field_name&.type == :sym || field_name&.type == :str
               name = field_name.children.first.to_s
-              # Inline capitalize for JS compatibility (see inflector.rb)
-              label_text = name.gsub('_', ' ')
+              # Humanize: strip _id suffix, replace _ with space, capitalize
+              humanized = name.sub(/_id$/, '')
+              label_text = humanized.gsub('_', ' ')
               label_text = label_text[0].upcase + label_text[1..-1].to_s
               extra_attrs = build_field_attrs(options)
               html = %(<label for="#{model}_#{name}"#{extra_attrs}>#{label_text}</label>)
@@ -2141,7 +2154,7 @@ module Ruby2JS
             if field_name&.type == :sym || field_name&.type == :str
               name = field_name.children.first.to_s
               extra_attrs = build_field_attrs(options)
-              open_tag = %(<select name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs}>)
+              open_tag = %(<select#{extra_attrs} name="#{model}[#{name}]" id="#{model}_#{name}">)
 
               # Extract choices collection (2nd arg, if not a hash)
               choices = args[1] if args[1] && args[1].type != :hash
@@ -2161,7 +2174,7 @@ module Ruby2JS
                 end
               end
 
-              blank_option = include_blank ? '<option value=""></option>' : ''
+              blank_option = include_blank ? '<option value="" label=" "></option>' : ''
 
               if choices
                 # Dynamic choices — generate option elements by mapping over the collection.
@@ -2212,7 +2225,7 @@ module Ruby2JS
             end
             extra_attrs = build_field_attrs(options)
             if label
-              html = %(<input type="submit" value="#{label}"#{extra_attrs}>)
+              html = %(<input type="submit" name="commit" value="#{label}"#{extra_attrs} data-disable-with="#{label}">)
               s(:str, html)
             elsif @erb_model_name
               # Generate dynamic label like Rails: "Create Model" / "Update Model"
@@ -2220,13 +2233,17 @@ module Ruby2JS
               humanized = humanized[0].upcase + humanized[1..]
               model_sym = @erb_model_name.to_sym
               s(:dstr,
-                s(:str, %(<input type="submit" value=")),
+                s(:str, %(<input type="submit" name="commit" value=")),
                 s(:begin,
                   s(:if, s(:attr, s(:lvar, model_sym), :id),
                     s(:str, "Update"), s(:str, "Create"))),
-                s(:str, %( #{humanized}"#{extra_attrs}>)))
+                s(:str, %( #{humanized}"#{extra_attrs} data-disable-with=")),
+                s(:begin,
+                  s(:if, s(:attr, s(:lvar, model_sym), :id),
+                    s(:str, "Update"), s(:str, "Create"))),
+                s(:str, %( #{humanized}">)))
             else
-              html = %(<input type="submit"#{extra_attrs}>)
+              html = %(<input type="submit" name="commit"#{extra_attrs}>)
               s(:str, html)
             end
 
@@ -2536,27 +2553,27 @@ module Ruby2JS
                 parent_var = s(:lvar, parent_model_name.to_sym)
                 statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                   s(:dstr,
-                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr}#{data_attr} action=\""),
+                    s(:str, "<form#{class_attr}#{data_attr} action=\""),
                     s(:begin, s(:send, nil, nested_plural_path, parent_var)),
-                    s(:str, "\" method=\"post\">")))
+                    s(:str, "\" accept-charset=\"UTF-8\" method=\"post\">")))
               else
                 statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                   s(:dstr,
-                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr}#{data_attr} action=\""),
+                    s(:str, "<form#{class_attr}#{data_attr} action=\""),
                     s(:begin, s(:send, nil, plural_path)),
-                    s(:str, "\" method=\"post\">")))
+                    s(:str, "\" accept-charset=\"UTF-8\" method=\"post\">")))
               end
             else
               # Existing model - check ID to determine POST vs PATCH
               # <form action="<%= article.id ? article_path(article) : articles_path() %>" method="post">
               statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                 s(:dstr,
-                  s(:str, "<form data-model=\"#{model_name}\"#{class_attr}#{data_attr} action=\""),
+                  s(:str, "<form#{class_attr}#{data_attr} action=\""),
                   s(:begin,
                     s(:if, s(:attr, model_var, :id),
                       s(:send, nil, singular_path, model_var),
                       s(:send, nil, plural_path))),
-                  s(:str, "\" method=\"post\">")))
+                  s(:str, "\" accept-charset=\"UTF-8\" method=\"post\">")))
 
               # Add hidden _method field for existing records (PATCH)
               # <% if article.id %><input type="hidden" name="_method" value="patch"><% end %>

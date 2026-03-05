@@ -786,7 +786,7 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include '<select'
       result.must_include 'entry[pair]'
       result.must_include 'class="input"'
-      result.must_include '<option value=""></option>'
+      result.must_include '<option value="" label=" "></option>'
       result.must_include 'avail.map'
       result.must_include '<option value="'
       result.must_include '</option>'
