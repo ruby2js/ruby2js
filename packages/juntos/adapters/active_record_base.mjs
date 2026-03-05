@@ -36,8 +36,8 @@ export class ActiveRecordBase {
   }
 
   constructor(attributes = {}) {
-    this._id = attributes.id || null;
-    this._persisted = !!attributes.id;
+    this._id = attributes.id ?? null;
+    this._persisted = attributes.id != null;
     this._changes = {};
     this._errors = { _all: [] };
 

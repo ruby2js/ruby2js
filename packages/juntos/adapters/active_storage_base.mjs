@@ -87,7 +87,7 @@ export class StorageService {
 // This is a simple data class, not a full ActiveRecord model
 export class BlobMetadata {
   constructor(attrs = {}) {
-    this.id = attrs.id || null;
+    this.id = attrs.id ?? null;
     this.key = attrs.key || null;
     this.filename = attrs.filename || null;
     this.content_type = attrs.content_type || 'application/octet-stream';

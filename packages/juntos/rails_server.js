@@ -365,7 +365,7 @@ export class Router extends RouterBase {
           await controller.destroy(context, parentId, id);
           return this.redirect(context, `/${route.parentName}/${parentId}`);
         } else {
-          html = id ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
+          html = id != null ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
         }
       } else {
         const id = match[1] ? parseInt(match[1]) : null;
@@ -380,7 +380,7 @@ export class Router extends RouterBase {
           await controller.destroy(context, id);
           return this.redirect(context, `/${controllerName}`);
         } else {
-          html = id ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
+          html = id != null ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
         }
       }
 

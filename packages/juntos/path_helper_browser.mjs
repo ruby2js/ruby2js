@@ -205,7 +205,7 @@ async function invokeController(method, path, format, params) {
 
     // Invoke the appropriate controller action
     if (method === 'GET') {
-      response = id
+      response = id != null
         ? await controller[actionMethod](context, id)
         : await controller[actionMethod](context);
     } else if (method === 'POST') {

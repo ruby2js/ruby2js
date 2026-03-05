@@ -197,7 +197,7 @@ export class Router extends RouterServer {
           const result = await controller.destroy(context, parentId, id);
           return this.handleResultNode(context, res, result, `/${route.parentName}/${parentId}`);
         } else {
-          html = id ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
+          html = id != null ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
         }
       } else {
         const id = match[1] ? parseInt(match[1]) : null;
@@ -213,12 +213,12 @@ export class Router extends RouterServer {
           return this.handleResultNode(context, res, result, `/${controllerName}`);
         } else if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
           // Custom member/collection route (e.g., POST /studios/:id/unpair)
-          const result = id
+          const result = id != null
             ? await controller[actionMethod](context, id, params)
             : await controller[actionMethod](context, params);
-          return this.handleResultNode(context, res, result, `/${controllerName}${id ? '/' + id : ''}`);
+          return this.handleResultNode(context, res, result, `/${controllerName}${id != null ? '/' + id : ''}`);
         } else {
-          html = id ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
+          html = id != null ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
         }
       }
 

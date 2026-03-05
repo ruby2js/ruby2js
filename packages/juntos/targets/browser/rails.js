@@ -80,10 +80,10 @@ export class Router extends RouterBase {
       if (route.nested) {
         const parentId = parseInt(match[1]);
         const id = match[2] ? parseInt(match[2]) : null;
-        html = id ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
+        html = id != null ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
       } else {
         const id = match[1] ? parseInt(match[1]) : null;
-        html = id ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
+        html = id != null ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
       }
 
       console.log(`  Rendering ${controllerName}/${action}`);
@@ -178,12 +178,12 @@ export class Router extends RouterBase {
       if (route.nested) {
         const parentId = parseInt(match[1]);
         const id = match[2] ? parseInt(match[2]) : null;
-        content = id
+        content = id != null
           ? await controller[actionMethod](context, parentId, id)
           : await controller[actionMethod](context, parentId);
       } else {
         const id = match[1] ? parseInt(match[1]) : null;
-        content = id
+        content = id != null
           ? await controller[actionMethod](context, id)
           : await controller[actionMethod](context);
       }
@@ -635,7 +635,7 @@ export class Application extends ApplicationBase {
           if (controllerAction) {
             // Pass id for update actions (from route match, not key match)
             const id = match[1] ? parseInt(match[1]) : null;
-            const response = id
+            const response = id != null
               ? await controllerAction.call(route.controller, context, id, params)
               : await controllerAction.call(route.controller, context, params);
             await FormHandler.handleResult(context, response, route.controllerName, route.action, route.controller, id);
@@ -651,12 +651,12 @@ export class Application extends ApplicationBase {
             if (route.nested) {
               const parentId = parseInt(match[1]);
               const id = match[2] ? parseInt(match[2]) : null;
-              data = id
+              data = id != null
                 ? await controller[actionMethod](context, parentId, id)
                 : await controller[actionMethod](context, parentId);
             } else {
               const id = match[1] ? parseInt(match[1]) : null;
-              data = id
+              data = id != null
                 ? await controller[actionMethod](context, id)
                 : await controller[actionMethod](context);
             }

@@ -52,7 +52,7 @@ String.prototype.strftime = function(format) {
 export function dom_id(record, prefix = null) {
   const modelName = (record.constructor?.modelName || record.constructor?.name || 'record').toLowerCase();
 
-  if (record.id) {
+  if (record.id != null) {
     return prefix ? `${prefix}_${modelName}_${record.id}` : `${modelName}_${record.id}`;
   } else {
     return prefix ? `${prefix}_new_${modelName}` : `new_${modelName}`;

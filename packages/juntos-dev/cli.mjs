@@ -2969,12 +2969,12 @@ async function runRender(options, paths) {
         if (route.nested) {
           const parentId = parseInt(match[1]);
           const id = match[2] ? parseInt(match[2]) : null;
-          html = id
+          html = id != null
             ? await route.controller[actionMethod](context, parentId, id)
             : await route.controller[actionMethod](context, parentId);
         } else {
           const id = match[1] ? parseInt(match[1]) : null;
-          html = id
+          html = id != null
             ? await route.controller[actionMethod](context, id)
             : await route.controller[actionMethod](context);
         }
