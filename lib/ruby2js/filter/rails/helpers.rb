@@ -1532,7 +1532,7 @@ module Ruby2JS
               process(value))
           else
             # Getting content: content_for(:title)
-            # context.contentFor.title || ""
+            # context.contentFor.title ?? ""
             s(:or,
               s(:attr, s(:attr, context_ref, :contentFor), key_name),
               s(:str, ''))

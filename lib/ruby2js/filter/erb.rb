@@ -191,12 +191,19 @@ module Ruby2JS
               return result if result
             end
 
-            # Detect raw()/html_safe — these skip HTML escaping
+            # Detect expressions that return HTML-safe content.
+            # These use String() (stripped in template literals) instead of escapeHTML().
             is_raw = false
             if inner&.type == :send
-              if inner.children[1] == :raw && inner.children[0].nil?
+              method_name = inner.children[1]
+              target = inner.children[0]
+              if method_name == :raw && target.nil?
                 is_raw = true
-              elsif inner.children[1] == :html_safe
+              elsif method_name == :html_safe
+                is_raw = true
+              elsif method_name == :render && target.nil?
+                is_raw = true
+              elsif method_name == :content_for && target.nil?
                 is_raw = true
               end
             end
