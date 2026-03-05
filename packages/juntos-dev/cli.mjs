@@ -10,6 +10,7 @@
  *   up        Build and run locally
  *   test      Run tests with Vitest
  *   db        Database commands (migrate, seed, prepare, reset, create, drop)
+ *   render    Render pages without starting a server
  *   lint      Scan Ruby files for transpilation issues
  *   transform Show transpiled JavaScript for a file (debugging)
  *   info      Show current configuration
@@ -1290,7 +1291,11 @@ function parseCommonArgs(args) {
     suggest: false,   // --suggest: auto-generate type hints
     // Transform options
     intermediate: false, // --intermediate: show intermediate Ruby (ERB only)
-    e2e: false          // --e2e: use Playwright filter for test files
+    e2e: false,         // --e2e: use Playwright filter for test files
+    // Render options
+    html: false,        // --html: output full HTML content
+    check: false,       // --check: silent success/failure check
+    search: null        // --search TEXT: search for text in output
   };
 
   const remaining = [];
@@ -1393,6 +1398,14 @@ function parseCommonArgs(args) {
       options.intermediate = true;
     } else if (arg === '--e2e') {
       options.e2e = true;
+    } else if (arg === '--html') {
+      options.html = true;
+    } else if (arg === '--check') {
+      options.check = true;
+    } else if (arg === '--search') {
+      options.search = args[++i];
+    } else if (arg.startsWith('--search=')) {
+      options.search = arg.slice(9);
     } else {
       remaining.push(arg);
     }
@@ -2872,6 +2885,151 @@ async function runEject(options) {
     if (!DEBUG && errors.some(e => e.stack)) {
       console.log('\nTip: Set DEBUG=1 for full stack traces');
     }
+  }
+}
+
+// ============================================
+// Command: render
+// ============================================
+
+async function runRender(options, paths) {
+  validateRailsApp();
+  loadEnvLocal();
+  loadDatabaseConfig(options);
+  applyEnvOptions(options);
+
+  // Create Vite server for on-the-fly .rb/.erb transforms
+  const { createServer: createViteServer } = await import('vite');
+  const vite = await createViteServer({
+    server: { middlewareMode: true },
+    appType: 'custom',
+    root: APP_ROOT,
+    configFile: join(APP_ROOT, 'vite.config.js'),
+    logLevel: options.verbose ? 'info' : 'silent'
+  });
+
+  let exitCode = 0;
+
+  try {
+    // Load app via SSR (transforms .rb on-the-fly via Vite plugin)
+    const routesPath = join(APP_ROOT, 'config/routes.rb');
+    const routesMod = await vite.ssrLoadModule(routesPath);
+    const { Application } = routesMod;
+
+    // Load Router from the same virtual module routes.rb uses
+    // (must match so Application.configure() and Router share the same class)
+    const railsMod = await vite.ssrLoadModule('juntos:rails');
+    const { Router, createContext } = railsMod;
+
+    // resolveContent is not re-exported by the target module, load from server module
+    const serverMod = await vite.ssrLoadModule('juntos/rails_server.js');
+    const { resolveContent } = serverMod;
+
+    // Initialize database via Vite's virtual module resolver
+    // (Application.initDatabase() uses import('juntos:active-record') which bypasses Vite)
+    const adapter = await vite.ssrLoadModule('juntos:active-record');
+    Application.activeRecordModule = adapter;
+    if (adapter.modelRegistry && Application.models) {
+      Object.assign(adapter.modelRegistry, Application.models);
+    }
+    // Pass database config with absolute path (adapter opens relative to process.cwd())
+    const dbConfig = _loadDatabaseConfig(APP_ROOT, { quiet: true });
+    if (dbConfig.database && !dbConfig.database.startsWith('/')) {
+      dbConfig.database = join(APP_ROOT, dbConfig.database);
+    }
+    await adapter.initDatabase(dbConfig);
+    await Application.runMigrations(adapter);
+
+    // Dispatch each path
+    for (const urlPath of paths) {
+      const [pathInfo] = urlPath.split('?', 2);
+      const result = Router.match(pathInfo, 'GET');
+
+      if (!result) {
+        if (options.check) {
+          exitCode = 1;
+        } else {
+          console.error(`404 Not Found: ${urlPath}`);
+        }
+        continue;
+      }
+
+      const { route, match } = result;
+      const mockReq = {
+        method: 'GET',
+        url: `http://localhost${urlPath}`,
+        headers: { accept: 'text/html', host: 'localhost' }
+      };
+      const context = createContext(mockReq, {});
+
+      const actionMethod = route.action === 'new' ? '$new' : route.action;
+
+      try {
+        let html;
+        if (route.nested) {
+          const parentId = parseInt(match[1]);
+          const id = match[2] ? parseInt(match[2]) : null;
+          html = id
+            ? await route.controller[actionMethod](context, parentId, id)
+            : await route.controller[actionMethod](context, parentId);
+        } else {
+          const id = match[1] ? parseInt(match[1]) : null;
+          html = id
+            ? await route.controller[actionMethod](context, id)
+            : await route.controller[actionMethod](context);
+        }
+
+        const resolved = await resolveContent(html);
+        const fullHtml = Application.wrapInLayout(context, resolved);
+
+        // Output based on mode
+        if (options.html) {
+          console.log(fullHtml);
+        } else if (options.search) {
+          if (fullHtml.includes(options.search)) {
+            console.log(`Found "${options.search}" in ${urlPath}`);
+          } else {
+            console.error(`Not found: "${options.search}" in ${urlPath}`);
+            exitCode = 1;
+          }
+        } else if (options.check) {
+          // Silent - success means no output
+        } else {
+          // Default summary: path, status, size
+          const size = Buffer.byteLength(fullHtml, 'utf-8');
+          const sizeStr = size > 1024 ? `${(size / 1024).toFixed(1)}KB` : `${size}B`;
+          console.log(`200 OK  ${urlPath}  (${sizeStr})`);
+        }
+      } catch (e) {
+        if (options.check) {
+          exitCode = 1;
+        } else {
+          console.error(`500 Error: ${urlPath}`);
+          if (options.verbose) {
+            console.error(e.stack || e.message);
+          } else {
+            console.error(`  ${e.message}`);
+          }
+          exitCode = 1;
+        }
+      }
+    }
+
+    // Close database
+    if (adapter.closeDatabase) {
+      await adapter.closeDatabase();
+    }
+
+    await vite.close();
+  } catch (e) {
+    await vite.close();
+    throw e;
+  }
+
+  if (exitCode !== 0) {
+    const err = new Error(options.check ? 'Check failed' : 'Render encountered errors');
+    err.exitCode = exitCode;
+    throw err;
   }
 }
 
@@ -4797,6 +4955,7 @@ Commands:
   deploy    Build and deploy to serverless platform
   up        Build and run locally (node, bun, browser)
   db        Database commands (create, migrate, seed, prepare, drop, reset)
+  render    Render pages without starting a server
   lint      Scan Ruby files for transpilation issues
   transform Show transpiled JavaScript for a file (debugging)
   info      Show current configuration
@@ -4987,6 +5146,34 @@ switch (command) {
       console.error('Lint failed:', formatError(err));
       process.exit(1);
     });
+    break;
+
+  case 'render':
+    if (options.help || commandArgs.length === 0) {
+      console.log('Usage: juntos render [options] PATH [PATH...]\n\nRender pages without starting a server.\n');
+      console.log('Options:');
+      console.log('  -d, --database ADAPTER   Database adapter');
+      console.log('  -t, --target TARGET      Build target');
+      console.log('  --html                   Output full HTML content');
+      console.log('  --check                  Only check if page renders (exit 0/1)');
+      console.log('  --search TEXT            Search for text in rendered output');
+      console.log('  -v, --verbose            Show detailed information');
+      console.log('\nExamples:');
+      console.log('  juntos render /people');
+      console.log('  juntos render --check /heats /solos /people');
+      console.log('  juntos render --html /people/1');
+      console.log('  juntos render --search "Students" /people');
+      process.exit(options.help ? 0 : 1);
+    }
+    try {
+      await runRender(options, commandArgs);
+    } catch (err) {
+      // Errors with exitCode were already reported per-path
+      if (!err.exitCode) {
+        console.error('Render failed:', formatError(err));
+      }
+      process.exit(err.exitCode || 1);
+    }
     break;
 
   case 'transform':

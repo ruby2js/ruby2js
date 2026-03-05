@@ -744,8 +744,10 @@ function createRubyTransformPlugin(config, appRoot) {
 
     async buildStart() {
       await ensureManifest();
-      const modelCount = metadata.models ? Object.keys(metadata.models).length : 0;
-      console.log(`[juntos] Pre-analyzed ${modelCount} models`);
+      if (this.environment?.config?.logLevel !== 'silent') {
+        const modelCount = metadata.models ? Object.keys(metadata.models).length : 0;
+        console.log(`[juntos] Pre-analyzed ${modelCount} models`);
+      }
     },
 
     handleHotUpdate({ file, server }) {
@@ -1058,6 +1060,7 @@ function createStructurePlugin(config, appRoot) {
     name: 'juntos-structure',
 
     async buildStart() {
+      if (this.environment?.config?.logLevel === 'silent') return;
       // Log configuration
       const database = config.database || 'dexie';
       const target = config.target || 'browser';
@@ -1079,7 +1082,9 @@ function createStructurePlugin(config, appRoot) {
         }
       }
 
-      console.log(`[juntos] Watching source files in ${appRoot}`);
+      if (server.config.logLevel !== 'silent') {
+        console.log(`[juntos] Watching source files in ${appRoot}`);
+      }
     },
 
     // For server builds, symlink node_modules and copy CSS for runtime resolution
@@ -1095,9 +1100,13 @@ function createStructurePlugin(config, appRoot) {
       try {
         await fs.promises.unlink(nodeModulesLink).catch(() => {});
         await fs.promises.symlink(nodeModulesTarget, nodeModulesLink, 'junction');
-        console.log('[juntos] Linked node_modules to dist/');
+        if (this.environment?.config?.logLevel !== 'silent') {
+          console.log('[juntos] Linked node_modules to dist/');
+        }
       } catch (e) {
-        console.warn('[juntos] Could not create node_modules symlink:', e.message);
+        if (this.environment?.config?.logLevel !== 'silent') {
+          console.warn('[juntos] Could not create node_modules symlink:', e.message);
+        }
       }
 
       // CSS is now added as a Vite input (see createConfigPlugin)

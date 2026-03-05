@@ -351,6 +351,59 @@ npx juntos server -t node         # Start Node.js server
 npx juntos server -p 8080         # Custom port
 ```
 
+## juntos render
+
+Render pages without starting a server. Loads the app via Vite's SSR module system, connects to the database, and dispatches GET requests through the router.
+
+```bash
+npx juntos render [options] PATH [PATH...]
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-d, --database ADAPTER` | Database adapter |
+| `-t, --target TARGET` | Build target |
+| `--html` | Output full HTML content |
+| `--check` | Only check if pages render (exit 0/1) |
+| `--search TEXT` | Search for text in rendered output |
+| `-v, --verbose` | Show detailed information |
+| `-h, --help` | Show help |
+
+**Examples:**
+
+```bash
+npx juntos render /                              # Summary: status, path, size
+npx juntos render /studios /people /heats        # Render multiple pages
+npx juntos render --html /studios                # Print full HTML to stdout
+npx juntos render --check / /studios /people     # Silent pass/fail (for CI)
+npx juntos render --search "Students" /people    # Check if text appears in output
+```
+
+**Output modes:**
+
+| Mode | Behavior |
+|------|----------|
+| (default) | `200 OK  /path  (12.3KB)` per page |
+| `--html` | Full HTML to stdout (pipe to file or tool) |
+| `--check` | Silent; exit 0 if all pages render, 1 if any fail |
+| `--search TEXT` | Reports whether text is found in each page |
+
+**What it does:**
+
+1. Creates a Vite dev server in middleware mode (transforms `.rb`/`.erb` on-the-fly)
+2. Loads routes via `ssrLoadModule('config/routes.rb')`
+3. Connects to the database and runs any pending migrations
+4. For each path: matches route, calls controller action, wraps in layout, outputs result
+
+This is useful for:
+
+- **CI checks:** `juntos render --check /` to verify pages render without starting a server
+- **Content search:** `juntos render --search "expected text" /path` for regression checks
+- **Debugging:** `juntos render --html /path | grep pattern` to inspect rendered output
+- **Smoke tests:** `juntos render / /studios /people` to quickly verify multiple pages
+
 ## juntos db
 
 Database management commands. Supports Rails-style colon syntax (`db:migrate`) or space syntax (`db migrate`).
