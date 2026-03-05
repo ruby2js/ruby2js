@@ -1,247 +1,168 @@
-# Incremental Showcase Rebuild Plan
+# Ballroom Testing & Development Plan
 
 ## Context
 
-The showcase application (dance competition management) has 33 models, 34 controller test files, and 104 total test files. Porting it wholesale to Juntos was too large a step.
+The ballroom app (`test/ballroom`, pushed to `github.com:rubys/ballroom`) is a dance competition management system rebuilt from the original showcase app using current Rails idioms. The goal is a single Ruby codebase deployable as both a Rails app and a JavaScript app via Juntos.
 
-## Goal
+## Current State (March 2025)
 
-The original showcase app is four years old and doesn't always reflect current best practices. This rebuild aims for the same functionality using current Rails idioms — cleaner, more maintainable Ruby that also transpiles cleanly to JavaScript. The result should be a single codebase deployable as both a Rails app and a JavaScript app.
+### What exists
 
-## Current State
+- **33 models** — most scaffold-level; Event, Person, Studio, Dance enriched with scopes, validations, associations
+- **29 controllers** — 27 standard CRUD scaffolds; EventsController has `root`, StudiosController has `unpair`
+- **214 Rails tests passing** (29 controller test suites + 2 system tests + 32 model tests)
+- **214/217 Juntos tests passing** — 3 system test failures (events root, studios pair/unpair, studios CRUD)
+- **5 collection routes defined but not implemented:** `students`, `backs`, `summary`, `publish`, `settings`
 
-The **ballroom** app (`test/ballroom`, pushed to `github.com:rubys/ballroom`) provides a working foundation:
+### What renders via `juntos render`
 
-- **33 models** with schema matching showcase (same migrations, same tables)
-- **28 scaffold controllers** with full CRUD
-- **196 tests** passing under both Rails (`bin/rails test`) and Juntos (`bin/juntos test`)
-- **Root dashboard** (`events/root.html.erb`) with navigation links to all major sections
-- Same database — a ballroom instance and showcase instance can share a SQLite file
+19 pages confirmed working:
+```
+200 OK  /            (2.7KB)    200 OK  /studios       (4.3KB)
+200 OK  /studios/1   (2.1KB)   200 OK  /studios/1/edit (3.9KB)
+200 OK  /studios/new (2.7KB)   200 OK  /people        (489.0KB)
+200 OK  /people/1    (2.8KB)   200 OK  /people/new    (4.6KB)
+200 OK  /heats       (8362.5KB) 200 OK  /dances       (127.2KB)
+200 OK  /dances/1    (3.1KB)   200 OK  /dances/new    (5.6KB)
+200 OK  /categories  (31.8KB)  200 OK  /categories/1  (2.9KB)
+200 OK  /events/1    (6.6KB)   200 OK  /events/1/edit (16.3KB)
+200 OK  /levels      (8.5KB)   200 OK  /ages         (10.1KB)
+200 OK  /judges      (7.0KB)
+```
 
-Models already enriched beyond scaffolds: Event (`current`, `assign_judges?`), Person (`display_name`, `present?`, `by_name` scope, associations), Studio (`normalizes`, `validates`, `by_name` scope, `pairs`, studio pair associations), Judge (`alias_attribute`), Level, Age.
+5 collection action pages fail (controller actions not implemented):
+`/events/summary`, `/events/publish`, `/events/settings`, `/people/students`, `/people/backs`
 
-## Approach
+### Test data
 
-Work is driven by **user scenarios reachable from the root page**, not model-by-model enrichment. Each step:
+544 real competition SQLite databases in `~/git/showcase/db/` (318 MB total). Any can be copied to `storage/development.sqlite3` for testing with diverse data.
 
-1. Pick a scenario (e.g., "create, modify, and delete studios")
-2. Implement in modern Rails idioms — update models, views, controllers
-3. Add tests: controller tests for CRUD/custom actions, system test for the user flow
-4. Get it working under `bin/rails test` first
-5. Verify under `npx juntos test`, fixing transpiler/runtime issues as needed
-6. Commit to ballroom repo; update submodule pointer in ruby2js
+## Two Testing Dimensions
 
-System tests use Capybara-style helpers (`visit`, `fill_in`, `click_button`, `assert_text`) and run in jsdom under `juntos test` — no browser required. Each scenario gets at least one system test to exercise the transpiled views end-to-end.
+### Behavior (system tests)
 
-## Verification
+System tests exercise user flows end-to-end: visit page, click link, fill form, assert result. They run under both Rails (`bin/rails test test/system`) and Juntos (`npx juntos test`). Differences reveal transpiler/runtime bugs.
 
-### Rails tests
+**Current:** 2 system test files (studios, events). 3 Juntos failures to fix.
+
+### Presentation (render comparison)
+
+`juntos render` outputs HTML for any route without starting a server. A matching Rails render script can produce the same. Normalizing and diffing the two outputs catches presentation drift: missing CSS classes, wrong links, absent associations, layout differences.
+
+**Current:** `juntos render` works. Rails render script needs to be written.
+
+## Tooling Needed
+
+### 1. Rails render script
+
+A script that renders a Rails page to stdout without starting a server. Must bypass `HostAuthorization` middleware. Something like:
 
 ```bash
 cd test/ballroom
-bin/rails test                    # All tests
+bin/rails runner scripts/render.rb /studios
+```
+
+### 2. Comparison harness
+
+A script or rake task that:
+1. Renders a path via Rails → HTML
+2. Renders the same path via `juntos render --html` → HTML
+3. Normalizes both (strip CSRF tokens, asset fingerprints, whitespace)
+4. Reports meaningful differences
+
+Can be run against different databases to test variety:
+```bash
+cp ~/git/showcase/db/2025-charlotte.sqlite3 storage/development.sqlite3
+bin/compare-render /studios /people /heats /dances
+```
+
+## Development Sequence
+
+Work is driven by **what the root page links to**, fixing issues as encountered. Each step produces:
+- Working Rails implementation
+- Passing Rails tests
+- Passing Juntos tests
+- Clean render comparison (no presentation drift)
+
+### Phase 1: Fix what's broken
+
+1. **Fix 3 Juntos system test failures** — events root, studios pair/unpair, studios CRUD
+2. **Write Rails render script** — enables presentation comparison
+3. **Run render comparison on all 19 working pages** — establish baseline, fix any drift
+
+### Phase 2: Implement missing collection actions
+
+Each follows the same pattern: implement action + view in Rails, add controller test, add system test, verify Juntos, compare render output.
+
+| Priority | Route | Controller Action | Complexity |
+|----------|-------|-------------------|------------|
+| 1 | `/events/settings` | Event config form | Medium — form for Event.current |
+| 2 | `/people/students` | Filtered people list | Low — index with type filter |
+| 3 | `/people/backs` | Back number list | Low — index with number display |
+| 4 | `/events/summary` | Competition summary | Medium — aggregation views |
+| 5 | `/events/publish` | Publish controls | Medium — status management |
+
+### Phase 3: Enrich beyond scaffolds
+
+The scaffold views work but don't match the showcase's real UI. Enrich views and controllers to match actual competition workflows, testing each change against multiple databases:
+
+| Area | Key changes |
+|------|-------------|
+| **Studios** | Pair management UI, student counts per studio |
+| **People** | Role-based views (student/judge/DJ), display_name formatting |
+| **Dances** | Category grouping, drag-drop reorder |
+| **Heats** | Entry display, scheduling, multi-dance heats |
+| **Categories** | Ordered list, lock toggle, extensions |
+| **Entries** | Lead/follow/instructor associations, validation |
+| **Scores** | Scoring forms, judge assignment |
+
+### Phase 4: Advanced features
+
+- **Concerns:** HeatScheduler, DanceLimitCalculator, Printable
+- **STI models:** Billable subtypes, Package/Option/PackageInclude
+- **Active Storage:** Solo recordings, formations
+- **Authentication:** User model, session management
+
+## Verification Commands
+
+```bash
+# Rails tests
+cd test/ballroom
+bin/rails test                    # All tests (214 currently)
 bin/rails test test/system        # System tests only
-```
 
-### Juntos tests (local setup)
-
-Juntos packages aren't published to npm — they're built from the ruby2js repo and installed as tarballs. First-time setup:
-
-```bash
-# 1. Build tarballs (from ruby2js root)
+# Juntos tests (after tarball rebuild)
+cd ~/git/ruby2js
 bundle exec rake -f demo/selfhost/Rakefile release
-
-# 2. Initialize ballroom submodule (if not already)
-git submodule update --init test/ballroom
-
-# 3. Install tarballs into ballroom
 cd test/ballroom
-npm install \
-  ../../artifacts/tarballs/ruby2js-beta.tgz \
-  ../../artifacts/tarballs/juntos-beta.tgz \
-  ../../artifacts/tarballs/juntos-dev-beta.tgz \
-  ../../artifacts/tarballs/vite-plugin-ruby2js-beta.tgz
+npm install ../../artifacts/tarballs/juntos-dev-beta.tgz
+npx juntos test                   # All tests
 
-# 4. Initialize juntos (creates package.json, vite.config.js, etc.)
-npx juntos init --no-install
+# Render smoke test
+npx juntos render --check / /studios /people /heats /dances /categories
 
-# 5. Install hotwire dependencies (auto-installed on next run, but needed first time)
-npm install @hotwired/stimulus @hotwired/turbo
+# Render with specific database
+cp ~/git/showcase/db/2025-charlotte.sqlite3 storage/development.sqlite3
+npx juntos render / /studios /people
+
+# Full HTML for inspection
+npx juntos render --html /studios | less
+
+# Search for expected content
+npx juntos render --search "Studios" /
 ```
-
-After initial setup, re-run steps 1 and 3 when ruby2js transpiler changes need testing. Step 4-5 are one-time only.
-
-```bash
-# Run juntos tests
-cd test/ballroom
-npx juntos test
-```
-
-Both must show 0 failures. Any Juntos failures drive improvements to the transpiler/runtime.
-
-**Note:** `juntos init` may modify `Gemfile.lock` (adding platform entries). Restore it with `git checkout Gemfile.lock` before running `bin/rails test` again.
-
-## Root Page Navigation
-
-The root page (`events#root`) links to these sections, which define the scenario order:
-
-| Link | Route | Controller | Priority |
-|------|-------|------------|----------|
-| Studios | `studios_path` | StudiosController | Step 1 |
-| Students | `students_people_path` | PeopleController | Step 3 |
-| Heats | `heats_path` | HeatsController | Step 7 |
-| Dances | `dances_path` | DancesController | Step 4 |
-| Agenda | `categories_path` | CategoriesController | Step 5 |
-| Backs | `backs_people_path` | PeopleController | Step 3 |
-| Summary | `summary_events_path` | EventsController | Step 8 |
-| Publish | `publish_events_path` | EventsController | Step 8 |
-| Settings | `settings_events_path` | EventsController | Step 2 |
-| Judge/DJ links | `person_path(person)` | PeopleController | Step 3 |
-
-## Step Breakdown
-
-### Step 1: Studios — CRUD + Pair/Unpair
-
-**Scenario:** Navigate from root to studios list, create a studio, edit it, pair two studios, unpair them, delete a studio.
-
-**Already done (model):** `validates :name`, `normalizes :name`, `scope :by_name`, `pairs` method, studio pair associations.
-
-**Remaining work:**
-- Rework studios views beyond scaffold (index with pair status, form with pair controls)
-- Enrich StudiosController: `pair` action, `unpair` action, index ordering by name
-- Controller tests: CRUD + pair/unpair
-- System test: create → edit → delete flow; pair/unpair flow
-- Verify under `juntos test`
-
-**Likely Juntos issues:** Custom controller actions, Turbo responses for pair/unpair.
-
----
-
-### Step 2: Settings — Event Configuration
-
-**Scenario:** Navigate from root to settings, update event configuration fields, return to root and see changes reflected.
-
-**Remaining work:**
-- Implement `settings` collection action on EventsController (form for Event.current)
-- Settings view with grouped fields (general, scoring, display, costs)
-- Controller tests: get settings, update event
-- System test: visit settings → change event name → verify root reflects change
-
-**Likely Juntos issues:** Collection routes, `Event.sole` / `Event.current` singleton pattern.
-
----
-
-### Step 3: People — Students, Judges, DJs
-
-**Scenario:** Navigate from root to students list, create a student with studio/level/age associations. View a judge's detail page from root. Browse the backs list.
-
-**Remaining work:**
-- Implement `students` and `backs` collection actions on PeopleController
-- Rework people views: students list (filtered by type), person show with role-specific display
-- Enrich Person model as needed for views (conditional validations for students, name normalization)
-- Controller tests: students list, backs list, CRUD for students
-- System test: create student → assign to studio → verify on students list
-
-**Likely Juntos issues:** Collection routes with type filtering, conditional validations, complex `normalizes`.
-
----
-
-### Step 4: Dances — CRUD + Category Associations
-
-**Scenario:** Navigate from root to dances list, create a dance, assign it to categories, reorder dances.
-
-**Remaining work:**
-- Enrich Dance model: category belongs_to associations, `normalizes :name`, custom validations
-- Rework dances views: index with category grouping, form with category selects
-- Enrich DancesController: `drop` (reorder) action
-- Multi/MultiLevel model logic as needed
-- Controller tests: CRUD + reorder
-- System test: create dance → assign category → verify on list
-
-**Likely Juntos issues:** Models with many belongs_to associations, drag-drop reorder via Turbo.
-
----
-
-### Step 5: Agenda — Categories + CatExtensions
-
-**Scenario:** Navigate from root to agenda (categories list), reorder categories, toggle lock, manage category extensions.
-
-**Remaining work:**
-- Enrich Category model: validations, `before_destroy`, `is_spacer?`, `heats` method
-- CatExtension: delegation to category
-- Rework categories views: ordered list with lock toggle, drag-drop reorder
-- CategoriesController: `drop`, `toggle_lock`, `delete_owned_dances`
-- Controller tests: CRUD + custom actions
-- System test: reorder categories → toggle lock → verify
-
-**Likely Juntos issues:** `before_destroy` callbacks, `delegate`, Turbo Stream for reorder/toggle.
-
----
-
-### Step 6: Entries — Complex Associations + Validations
-
-**Scenario:** Create entries linking students to dances (via lead/follow/instructor associations).
-
-**Remaining work:**
-- Enrich Entry model: belongs_to associations (lead, follow, instructor as Person), custom `has_one_instructor` validation, helper methods
-- Rework entries views: form with person/dance selects
-- Controller tests: CRUD with validation edge cases
-- System test: create entry → verify associations
-
-**Likely Juntos issues:** Custom validator classes, association-based validations.
-
----
-
-### Step 7: Heats — Scheduling + Scoring
-
-**Scenario:** Navigate from root to heats list, view heat details, enter scores.
-
-**Remaining work:**
-- Enrich Heat model: delegation through Entry to Person, scheduling logic
-- Score model: scopes, scoring methods
-- Rework heats views: heat list with entries, scoring form
-- Controller tests: CRUD + scoring
-- System test: view heat → enter score → verify
-
-**Likely Juntos issues:** Deep delegation chains, complex algorithmic methods (scrutineering).
-
----
-
-### Step 8: Summary + Publish + Remaining Event Actions
-
-**Scenario:** Navigate from root to summary view, publish results.
-
-**Remaining work:**
-- Implement `summary` and `publish` collection actions on EventsController
-- Summary/publish views
-- User/auth as needed
-- Controller tests
-- System test: view summary → publish
-
-**Likely Juntos issues:** Authentication, authorization, report generation.
-
----
-
-### Step 9: Supporting Models + Advanced Features
-
-Implement as needed when reached through scenarios above:
-
-- **Billable/Package/Option:** STI, self-referential PackageInclude
-- **Solo/Formation/Recording/Song:** Active Storage, specialized views
-- **Location/Showcase/Region/Feedback:** Standard CRUD
-- **Concerns:** Printable, HeatScheduler, DanceLimitCalculator, BlobUploadable, Compmngr
-
----
 
 ## Already Resolved
 
 Issues discovered and fixed while building the ballroom base:
 
-- **Inflector integration** — Controller and helpers filters now use `Inflector.underscore`, `classify`, `pluralize` instead of naive string operations
-- **`classify()` helper** — Added to transform.mjs/vite.mjs, replacing 8 inline split/map/capitalize/join patterns
+- **Inflector integration** — filters use `Inflector.underscore`, `classify`, `pluralize`
+- **`classify()` helper** — added to transform.mjs/vite.mjs
 - **Empty test suites** — cli.mjs skips generating .test.mjs for model tests with no test() calls
-- **`alias_attribute`** — Model filter generates getter/setter pairs via `this.attributes[original]`; constructor invokes setters for scalar values
-- **Test output noise** — CRUD logging uses `console.info`/`console.debug`, suppressed in test setup
-- **Compound controller names** — AgeCosts, CatExtensions, PersonOptions now generate correct view imports
+- **`alias_attribute`** — model filter generates getter/setter pairs
+- **Test output noise** — CRUD logging uses `console.info`/`console.debug`, suppressed in test
+- **Compound controller names** — AgeCosts, CatExtensions, PersonOptions generate correct view imports
 - **Pluralization in helpers** — `form_with(model:)` uses `Inflector.pluralize` for path helpers
-- **`polymorphic_path` for local variables** — `link_to text, lvar` now uses `polymorphic_path()` instead of inferring path helper from variable name (fixes `dj`/`emcee` routing)
+- **`polymorphic_path` for local variables** — `link_to text, lvar` uses `polymorphic_path()`
+- **`juntos render` command** — renders pages via Vite SSR without starting a server
+- **Vite plugin log suppression** — `[juntos]` messages silenced when `logLevel: 'silent'`
