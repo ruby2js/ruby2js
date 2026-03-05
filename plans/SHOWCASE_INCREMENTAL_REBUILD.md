@@ -2,7 +2,7 @@
 
 ## Context
 
-The ballroom app (`test/ballroom`, pushed to `github.com:rubys/ballroom`) is a dance competition management system rebuilt from the original showcase app using current Rails idioms. The goal is a single Ruby codebase deployable as both a Rails app and a JavaScript app via Juntos.
+The ballroom app (`test/ballroom`, pushed to `github.com:rubys/ballroom`) is a dance competition management system rebuilt from the original showcase app (`~/git/showcase`) using current Rails idioms. The goal is a single Ruby codebase deployable as both a Rails app and a JavaScript app via Juntos.
 
 ## Current State (March 2025)
 
@@ -10,8 +10,7 @@ The ballroom app (`test/ballroom`, pushed to `github.com:rubys/ballroom`) is a d
 
 - **33 models** — most scaffold-level; Event, Person, Studio, Dance enriched with scopes, validations, associations
 - **29 controllers** — 27 standard CRUD scaffolds; EventsController has `root`, StudiosController has `unpair`
-- **214 Rails tests passing** (29 controller test suites + 2 system tests + 32 model tests)
-- **214/217 Juntos tests passing** — 3 system test failures (events root, studios pair/unpair, studios CRUD)
+- **217 Juntos tests passing** (29 controller test suites + 2 system tests + 32 model tests)
 - **5 collection routes defined but not implemented:** `students`, `backs`, `summary`, `publish`, `settings`
 
 ### What renders via `juntos render`
@@ -37,84 +36,134 @@ The ballroom app (`test/ballroom`, pushed to `github.com:rubys/ballroom`) is a d
 
 544 real competition SQLite databases in `~/git/showcase/db/` (318 MB total). Any can be copied to `storage/development.sqlite3` for testing with diverse data.
 
-## Two Testing Dimensions
+## Three Testing Dimensions
 
-### Behavior (system tests)
+### 1. Behavior (system tests)
 
 System tests exercise user flows end-to-end: visit page, click link, fill form, assert result. They run under both Rails (`bin/rails test test/system`) and Juntos (`npx juntos test`). Differences reveal transpiler/runtime bugs.
 
-**Current:** 2 system test files (studios, events). 3 Juntos failures to fix.
+**Current:** 217/217 Juntos tests passing (2 system test files + 29 controller + 32 model).
 
-### Presentation (render comparison)
+### 2. Transpiler fidelity (ballroom Rails vs ballroom Juntos)
 
-`juntos render` outputs HTML for any route without starting a server. A matching Rails render script can produce the same. Normalizing and diffing the two outputs catches presentation drift: missing CSS classes, wrong links, absent associations, layout differences.
+Both render the same ballroom app from the same database. Normalizing and diffing the HTML catches transpiler bugs: missing CSS classes, wrong links, absent associations, layout differences.
 
-**Current:** `juntos render` works. Rails render script needs to be written.
+**Tools:**
+- `scripts/render.rb --html /path` — Rails render (done)
+- `npx juntos render --html /path` — Juntos render (done)
 
-## Tooling Needed
+### 3. Showcase parity (showcase Rails vs ballroom Rails)
 
-### 1. Rails render script
+Ballroom was rebuilt from showcase. Comparing their HTML output for the same routes and database verifies that the ballroom rebuild actually matches the original UI. This drives Phase 3 (enriching beyond scaffolds).
 
-A script that renders a Rails page to stdout without starting a server. Must bypass `HostAuthorization` middleware. Something like:
+**Tools:**
+- Showcase: `~/git/showcase/.claude/skills/render-page/scripts/render.rb DB --html /path`
+- Ballroom: `test/ballroom/scripts/render.rb --html /path`
+
+**Route differences to account for:**
+| Showcase route | Ballroom route | Notes |
+|---------------|---------------|-------|
+| `/event/settings` | `/events/settings` | Singular vs plural controller |
+| `/event/summary` | `/events/summary` | |
+| `/event/publish` | `/events/publish` | |
+| `/people/students` | `/people/students` | Same |
+| `/people/backs` | `/people/backs` | Same |
+| `/studios` | `/studios` | Same |
+| `/people` | `/people` | Same |
+| `/heats` | `/heats` | Same |
+| `/dances` | `/dances` | Same |
+| `/categories` | `/categories` | Same |
+
+## Tooling
+
+### 1. Rails render script — DONE
+
+`test/ballroom/scripts/render.rb` renders Rails pages without starting a server, bypassing HostAuthorization middleware.
 
 ```bash
 cd test/ballroom
-bin/rails runner scripts/render.rb /studios
+ruby scripts/render.rb / /studios /people
+ruby scripts/render.rb --html /studios
+ruby scripts/render.rb --test /studios           # uses test fixtures
+ruby scripts/render.rb --search "Studios" /
+ruby scripts/render.rb --check / /studios /people
 ```
 
-### 2. Comparison harness
+### 2. Transpiler comparison harness — TODO
 
-A script or rake task that:
-1. Renders a path via Rails → HTML
-2. Renders the same path via `juntos render --html` → HTML
+A script that:
+1. Renders a path via `scripts/render.rb --html` → Rails HTML
+2. Renders the same path via `npx juntos render --html` → Juntos HTML
 3. Normalizes both (strip CSRF tokens, asset fingerprints, whitespace)
 4. Reports meaningful differences
 
-Can be run against different databases to test variety:
 ```bash
-cp ~/git/showcase/db/2025-charlotte.sqlite3 storage/development.sqlite3
-bin/compare-render /studios /people /heats /dances
+cd test/ballroom
+scripts/compare.rb /studios /people /heats /dances
 ```
+
+### 3. Showcase comparison harness — TODO
+
+A script that:
+1. Copies a database to both showcase and ballroom `storage/development.sqlite3`
+2. Renders shared routes via both render scripts
+3. Normalizes both (strip layout chrome, asset paths, CSRF tokens)
+4. Reports content-level differences (the actual view body, ignoring layout/head)
+
+```bash
+scripts/compare-showcase.rb ~/git/showcase/db/2025-charlotte.sqlite3 / /studios /people /heats /dances
+```
+
+**Normalization challenges:**
+- Different layouts (showcase may have different nav, head tags)
+- Different asset fingerprints
+- Different Turbo/Stimulus attributes
+- Showcase views are mature; ballroom views are scaffolds → expect large diffs initially
+- Focus on **body content** within `<main>` or similar container, not full page
 
 ## Development Sequence
 
 Work is driven by **what the root page links to**, fixing issues as encountered. Each step produces:
 - Working Rails implementation
-- Passing Rails tests
 - Passing Juntos tests
-- Clean render comparison (no presentation drift)
+- Clean transpiler comparison (no ballroom Rails vs Juntos drift)
+- Reduced showcase comparison diff (ballroom converging on showcase output)
 
-### Phase 1: Fix what's broken
+### Phase 1: Establish baselines — IN PROGRESS
 
-1. **Fix 3 Juntos system test failures** — events root, studios pair/unpair, studios CRUD
-2. **Write Rails render script** — enables presentation comparison
-3. **Run render comparison on all 19 working pages** — establish baseline, fix any drift
+1. ~~Fix Juntos test failures~~ — **DONE** (vitest.config.js fix, 217/217 passing)
+2. ~~Write Rails render script~~ — **DONE** (`scripts/render.rb`)
+3. **Build transpiler comparison harness** — compare ballroom Rails vs Juntos HTML
+4. **Run transpiler comparison on all 19 working pages** — fix any drift
+5. **Build showcase comparison harness** — compare showcase vs ballroom HTML
+6. **Run showcase comparison on root page** — understand the gap
 
 ### Phase 2: Implement missing collection actions
 
-Each follows the same pattern: implement action + view in Rails, add controller test, add system test, verify Juntos, compare render output.
+Each follows the same pattern: study the showcase implementation, implement action + view in ballroom, verify Juntos, compare both ways.
 
-| Priority | Route | Controller Action | Complexity |
-|----------|-------|-------------------|------------|
-| 1 | `/events/settings` | Event config form | Medium — form for Event.current |
-| 2 | `/people/students` | Filtered people list | Low — index with type filter |
-| 3 | `/people/backs` | Back number list | Low — index with number display |
-| 4 | `/events/summary` | Competition summary | Medium — aggregation views |
-| 5 | `/events/publish` | Publish controls | Medium — status management |
+| Priority | Route | Showcase controller | Notes |
+|----------|-------|-------------------|-------|
+| 1 | `/events/settings` | `event#settings` | Event config form |
+| 2 | `/people/students` | `people#students` | Filtered people list |
+| 3 | `/people/backs` | `people#backs` | Back number assignment |
+| 4 | `/events/summary` | `event#summary` | Competition summary |
+| 5 | `/events/publish` | `event#publish` | Publish controls |
 
 ### Phase 3: Enrich beyond scaffolds
 
-The scaffold views work but don't match the showcase's real UI. Enrich views and controllers to match actual competition workflows, testing each change against multiple databases:
+Replace scaffold views with showcase-matching views, driven by showcase comparison diffs. Test each change against multiple databases. Work page by page, starting from the root:
 
-| Area | Key changes |
-|------|-------------|
-| **Studios** | Pair management UI, student counts per studio |
-| **People** | Role-based views (student/judge/DJ), display_name formatting |
-| **Dances** | Category grouping, drag-drop reorder |
-| **Heats** | Entry display, scheduling, multi-dance heats |
-| **Categories** | Ordered list, lock toggle, extensions |
-| **Entries** | Lead/follow/instructor associations, validation |
-| **Scores** | Scoring forms, judge assignment |
+| Area | Key changes | Showcase reference |
+|------|-------------|-------------------|
+| **Root (/)** | Event info, judge list, navigation grid | `event#root` |
+| **Studios** | Pair management UI, student counts | `studios_controller.rb` |
+| **People** | Role-based views, display_name formatting | `people_controller.rb` |
+| **Dances** | Category grouping, drag-drop reorder | `dances_controller.rb` |
+| **Heats** | Entry display, scheduling, multi-dance | `heats_controller.rb` |
+| **Categories** | Ordered list, lock toggle, extensions | `categories_controller.rb` |
+| **Entries** | Lead/follow/instructor associations | `entries_controller.rb` |
+| **Scores** | Scoring forms, judge assignment | `scores_controller.rb` |
 
 ### Phase 4: Advanced features
 
@@ -126,30 +175,28 @@ The scaffold views work but don't match the showcase's real UI. Enrich views and
 ## Verification Commands
 
 ```bash
-# Rails tests
-cd test/ballroom
-bin/rails test                    # All tests (214 currently)
-bin/rails test test/system        # System tests only
-
 # Juntos tests (after tarball rebuild)
 cd ~/git/ruby2js
 bundle exec rake -f demo/selfhost/Rakefile release
 cd test/ballroom
 npm install ../../artifacts/tarballs/juntos-dev-beta.tgz
-npx juntos test                   # All tests
+npx juntos test                   # All tests (217 currently)
 
-# Render smoke test
-npx juntos render --check / /studios /people /heats /dances /categories
+# Rails render
+cd test/ballroom
+ruby scripts/render.rb / /studios /people /heats /dances /categories
+
+# Juntos render
+npx juntos render / /studios /people /heats /dances /categories
 
 # Render with specific database
 cp ~/git/showcase/db/2025-charlotte.sqlite3 storage/development.sqlite3
+ruby scripts/render.rb / /studios /people
 npx juntos render / /studios /people
 
-# Full HTML for inspection
-npx juntos render --html /studios | less
-
-# Search for expected content
-npx juntos render --search "Studios" /
+# Showcase render (same database)
+cd ~/git/showcase
+RAILS_APP_DB=2025-charlotte .claude/skills/render-page/scripts/render.rb --html /studios
 ```
 
 ## Already Resolved
@@ -166,3 +213,4 @@ Issues discovered and fixed while building the ballroom base:
 - **`polymorphic_path` for local variables** — `link_to text, lvar` uses `polymorphic_path()`
 - **`juntos render` command** — renders pages via Vite SSR without starting a server
 - **Vite plugin log suppression** — `[juntos]` messages silenced when `logLevel: 'silent'`
+- **Vitest config** — ballroom needs `environment: 'jsdom'`, `pool: 'forks'`, `singleFork: true`
