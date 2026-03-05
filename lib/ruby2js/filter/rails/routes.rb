@@ -1254,16 +1254,18 @@ module Ruby2JS
 
         def build_extract_id_helper
           # function extract_id(obj) {
-          #   return (obj && obj.id) || obj
+          #   return obj != null && obj.id != null ? obj.id : obj
           # }
-          # Handles both objects with id property and raw id values
+          # Handles both objects with id property and raw id values.
+          # Uses null-safe checks instead of truthiness to handle id=0.
           s(:def, :extract_id,
             s(:args, s(:arg, :obj)),
             s(:autoreturn,
-              s(:or,
+              s(:if,
                 s(:and,
-                  s(:lvar, :obj),
-                  s(:attr, s(:lvar, :obj), :id)),
+                  s(:send, s(:lvar, :obj), :!=, s(:nil)),
+                  s(:send, s(:attr, s(:lvar, :obj), :id), :!=, s(:nil))),
+                s(:attr, s(:lvar, :obj), :id),
                 s(:lvar, :obj))))
         end
 
