@@ -427,6 +427,7 @@ export function createMetadata(mode, appRoot) {
   return {
     models: {},
     concerns: {},
+    helpers: {},
     controller_files: {},
     import_mode: mode,
     current_attributes: parseCurrentAttributes(appRoot)
@@ -471,7 +472,76 @@ export async function buildAppManifest(appRoot, config, { mode = 'vite' } = {}) 
     }
   }
 
+  // Scan app/helpers/ for application helper modules
+  const helpersDir = path.join(appRoot, 'app/helpers');
+  if (fs.existsSync(helpersDir)) {
+    const helperFiles = fs.readdirSync(helpersDir)
+      .filter(f => f.endsWith('_helper.rb'));
+
+    for (const file of helperFiles) {
+      const filePath = path.join(helpersDir, file);
+      try {
+        const source = fs.readFileSync(filePath, 'utf-8');
+        const result = await transformRuby(source, filePath, null, config, appRoot, metadata);
+        const methods = extractHelperMethods(result.code);
+        if (methods.length > 0) {
+          const baseName = file.replace('.rb', '');
+          metadata.helpers[baseName] = methods;
+          modelCache.set(filePath, { code: result.code, map: result.map });
+        }
+      } catch (err) {
+        console.warn(`[juntos] buildAppManifest: skipped helper ${file}: ${err.message}`);
+      }
+    }
+  }
+
   return { metadata, modelCache };
+}
+
+/**
+ * Extract method names from a transpiled helper module.
+ * Helpers transpile as `const XHelper = { method1() {}, method2() {} }`.
+ * We parse method signatures using brace-balanced extraction.
+ *
+ * @param {string} code - Transpiled JavaScript code
+ * @returns {string[]} Array of method names
+ */
+export function extractHelperMethods(code) {
+  // Match the object literal body: const XHelper = { ... }
+  const moduleMatch = code.match(/^(?:export\s+)?const \w+ = \{([\s\S]*)\}\s*$/);
+  if (!moduleMatch) return [];
+
+  const body = moduleMatch[1];
+  const methods = [];
+  let i = 0;
+  while (i < body.length) {
+    // Skip whitespace and commas
+    while (i < body.length && /[\s,]/.test(body[i])) i++;
+    if (i >= body.length) break;
+
+    // Match method signature: name(params) {
+    const sigMatch = body.slice(i).match(/^(?:get\s+)?(\w+)\(([^)]*)\)\s*\{/);
+    if (!sigMatch) { i++; continue; }
+
+    const methodName = sigMatch[1];
+    const braceStart = i + sigMatch[0].length - 1;
+
+    // Find matching close brace
+    let depth = 0;
+    let end = -1;
+    for (let j = braceStart; j < body.length; j++) {
+      if (body[j] === '{') depth++;
+      else if (body[j] === '}') {
+        depth--;
+        if (depth === 0) { end = j; break; }
+      }
+    }
+    if (end === -1) break;
+
+    methods.push(methodName);
+    i = end + 1;
+  }
+  return methods;
 }
 
 /**
@@ -545,6 +615,9 @@ export function fixImports(js, fromFile) {
   // This breaks the circular dependency between routes.rb and controllers
   js = js.replace(/from ['"]\.\.\/\.\.\/config\/paths\.js['"]/g, "from 'juntos:paths'");
   js = js.replace(/from ['"]\.\/paths\.js['"]/g, "from 'juntos:paths'");
+
+  // Helpers: @helpers/*.js → @helpers/*.rb (Vite resolves @helpers alias to app/helpers/)
+  js = js.replace(/from ['"]@helpers\/([\w]+)\.js['"]/g, "from '@helpers/$1.rb'");
 
   // Controllers: ../app/controllers/*.js → app/controllers/*.rb
   js = js.replace(/from ['"]\.\.\/app\/controllers\/(\w+)\.js['"]/g, "from 'app/controllers/$1.rb'");
@@ -642,6 +715,15 @@ export function fixImportsForEject(js, fromFile, config = {}) {
   } else {
     // Fallback: assume we're one level deep
     js = js.replace(/from ['"]@config\/paths\.js['"]/g, "from '../config/paths.js'");
+  }
+
+  // Virtual module @helpers/*.js → app/helpers/*.js with correct relative path
+  if (fromFile) {
+    const depth = fromFile.split('/').length - 1;
+    const prefix = '../'.repeat(depth);
+    js = js.replace(/from ['"]@helpers\/([\w]+\.js)['"]/g, `from '${prefix}app/helpers/$1'`);
+  } else {
+    js = js.replace(/from ['"]@helpers\/([\w]+\.js)['"]/g, "from '../app/helpers/$1'");
   }
 
   // Fix selfhost converter Struct.new pattern: [(X = function X(...) {...}).prototype] = [X.prototype]
@@ -2437,7 +2519,7 @@ export async function lintRuby(source, filePath, section, config, appRoot, lintO
  * @param {Object} config - Configuration object
  * @returns {Promise<{code: string, map: Object|null}>}
  */
-export async function transformErb(code, id, isLayout, config) {
+export async function transformErb(code, id, isLayout, config, metadata = null) {
   const { convert } = await ensureRuby2jsReady();
 
   let template = code;
@@ -2457,6 +2539,10 @@ export async function transformErb(code, id, isLayout, config) {
     target: config.target,
     file: id
   };
+
+  if (metadata) {
+    options.metadata = metadata;
+  }
 
   if (isLayout) {
     options.layout = true;

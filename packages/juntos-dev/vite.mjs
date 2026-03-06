@@ -486,6 +486,7 @@ function createErbPlugin(config) {
 
   async function transformErb(code, id, isLayout = false) {
     await ensureReady();
+    const meta = await ensureManifest();
 
     let template = code;
 
@@ -502,7 +503,8 @@ function createErbPlugin(config) {
       include: ['class', 'call'],
       database: config.database,
       target: config.target,
-      file: id
+      file: id,
+      metadata: meta
     };
 
     // Layout mode changes the function signature to layout(context, content)
@@ -552,6 +554,10 @@ function createErbPlugin(config) {
     // Match pattern: import { <Name>Views } from "../<resource>.js"
     js = js.replace(/import\s*\{\s*(\w+)Views\s*\}\s*from\s*["']\.\.\/(\w+)\.js["']/g,
       (match, name, plural) => `import { ${name}Views } from "juntos:views/${plural}"`);
+
+    // Fix helper imports: @helpers/*.js -> @helpers/*.rb
+    // Helpers are source .rb files that Vite transforms on-the-fly via @helpers alias
+    js = js.replace(/from ["']@helpers\/([\w]+)\.js["']/g, 'from "@helpers/$1.rb"');
 
     // Fix model imports from views: ../photos.js -> app/models/photo.rb
     // Views import models like Photo from "../photos.js" (plural, relative up)
@@ -1142,6 +1148,7 @@ function createConfigPlugin(config, appRoot) {
         '@controllers': path.join(appRoot, 'app/javascript/controllers'),
         '@models': path.join(appRoot, 'app/models'),
         '@views': path.join(appRoot, 'app/views'),
+        '@helpers': path.join(appRoot, 'app/helpers'),
         'components': path.join(appRoot, 'app/components'),
 
         // Config aliases (used by rails/helpers filter for ERB transforms)

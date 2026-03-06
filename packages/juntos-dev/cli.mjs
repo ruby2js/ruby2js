@@ -2243,6 +2243,27 @@ async function runEject(options) {
     }
   }
 
+  // Write application helpers (pre-analyzed by buildAppManifest)
+  if (Object.keys(metadata.helpers).length > 0) {
+    const helpersOutDir = join(outDir, 'app/helpers');
+    if (!existsSync(helpersOutDir)) {
+      mkdirSync(helpersOutDir, { recursive: true });
+    }
+    console.log('  Writing helpers...');
+    const modelNames = Object.keys(metadata.models || {});
+    for (const [helperFile, methods] of Object.entries(metadata.helpers)) {
+      const filePath = join(APP_ROOT, 'app/helpers', helperFile + '.rb');
+      const cached = modelCache.get(filePath);
+      if (cached) {
+        const { code: processedCode } = postProcessTestHelper(cached.code, modelNames);
+        const relativeOutPath = `app/helpers/${helperFile}.js`;
+        const code = fixImportsForEject(processedCode, relativeOutPath, config);
+        writeFileSync(join(helpersOutDir, helperFile + '.js'), code);
+        fileCount++;
+      }
+    }
+  }
+
   // Transform migrations
   const migrateDir = join(APP_ROOT, 'db/migrate');
   if (existsSync(migrateDir)) {
@@ -2385,7 +2406,7 @@ async function runEject(options) {
         if (relFile.endsWith('.html.erb')) {
           try {
             const source = readFileSync(fullPath, 'utf-8');
-            const result = await transformErb(source, fullPath, false, config);
+            const result = await transformErb(source, fullPath, false, config, metadata);
             const relativeOutPath = `app/views/${resource}/${relFile.replace('.html.erb', '.js')}`;
             let code = fixImportsForEject(result.code, relativeOutPath, config);
             const outFile = join(outDir, 'app/views', resource, relFile.replace('.html.erb', '.js'));
@@ -2411,7 +2432,7 @@ async function runEject(options) {
         } else if (relFile.endsWith('.turbo_stream.erb')) {
           try {
             const source = readFileSync(fullPath, 'utf-8');
-            const result = await transformErb(source, fullPath, false, config);
+            const result = await transformErb(source, fullPath, false, config, metadata);
             const relativeOutPath = `app/views/${resource}/${relFile.replace('.turbo_stream.erb', '.turbo_stream.js')}`;
             let code = fixImportsForEject(result.code, relativeOutPath, config);
             const outFile = join(outDir, 'app/views', resource, relFile.replace('.turbo_stream.erb', '.turbo_stream.js'));
@@ -2452,7 +2473,7 @@ async function runEject(options) {
         const relativePath = `app/views/layouts/${file}`;
         try {
           const source = readFileSync(join(layoutsDir, file), 'utf-8');
-          const result = await transformErb(source, join(layoutsDir, file), true, config);
+          const result = await transformErb(source, join(layoutsDir, file), true, config, metadata);
           // Pass relative output path for correct import resolution
           const relativeOutPath = `app/views/layouts/${file.replace('.html.erb', '.js')}`;
           let code = fixImportsForEject(result.code, relativeOutPath, config);

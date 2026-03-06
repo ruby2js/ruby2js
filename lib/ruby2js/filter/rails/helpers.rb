@@ -24,6 +24,7 @@ module Ruby2JS
           @rails_helpers_needed = [] # Track Rails helpers that need importing from juntos:rails
           @erb_asset_imports = [] # Track asset imports (images, videos, etc.) for Vite
           @erb_needs_polymorphic_path = false # Track if polymorphic_path is needed
+          @erb_app_helpers = [] # Track application helper usage for imports
         end
 
         # Mark render function as async - sets flag directly since filter chain
@@ -220,6 +221,19 @@ module Ruby2JS
               # Format: s(:import, path, default_name)
               self.prepend_list << s(:import, full_import_path,
                 s(:const, nil, var_name.to_sym))
+            end
+          end
+
+          # Add imports for application helper methods
+          # e.g., import { localized_date } from '@helpers/application_helper.js'
+          unless @erb_app_helpers.empty?
+            # Group by helper file, then generate one import per file
+            files = @erb_app_helpers.map { |info| info[:file] }.uniq
+            files.each do |file|
+              methods = @erb_app_helpers.select { |info| info[:file] == file }
+                .map { |info| info[:method] }.uniq.sort
+              helpers = methods.map { |name| s(:const, nil, name) }
+              self.prepend_list << s(:import, "@helpers/#{file}.js", helpers)
             end
           end
         end
@@ -449,6 +463,20 @@ module Ruby2JS
               # Use :send! to force parentheses on zero-arg method call
               forced_call = target.updated(:send!)
               return process(s(:send, forced_call, method, *args))
+            end
+          end
+
+          # Track application helper calls for import generation
+          # e.g., localized_date(event.date, locale) -> import { localizedDate } from '@helpers/application_helper.js'
+          if target.nil? && @erb_bufvar && @options&.dig(:metadata, 'helpers')
+            helpers = @options[:metadata]['helpers']
+            method_str = method.to_s
+            helper_keys = helpers.keys
+            helper_keys.each do |helper_file|
+              helper_methods = helpers[helper_file]
+              if helper_methods.include?(method_str)
+                @erb_app_helpers << { method: method, file: helper_file } unless @erb_app_helpers.any? { |h| h[:method] == method }
+              end
             end
           end
 
