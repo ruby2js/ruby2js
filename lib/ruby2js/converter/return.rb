@@ -107,9 +107,35 @@ module Ruby2JS
           # For ensure blocks, apply autoreturn to the try body only
           try_body = inner.children.first
           ensure_body = inner.children.last
-          block.push kwbegin.updated(nil, [
-            inner.updated(nil, [s(:autoreturn, try_body), ensure_body])
-          ])
+          if try_body&.type == :rescue
+            # ensure wrapping rescue: autoreturn both try body and resbodies
+            rescue_children = try_body.children.dup
+            rescue_children[0] = s(:autoreturn, rescue_children[0]) if rescue_children[0]
+            (1...rescue_children.length).each do |i|
+              next unless rescue_children[i]&.type == :resbody
+              rc = rescue_children[i].children.dup
+              rc[2] = s(:autoreturn, rc[2]) if rc[2]
+              rescue_children[i] = rescue_children[i].updated(nil, rc)
+            end
+            block.push kwbegin.updated(nil, [
+              inner.updated(nil, [try_body.updated(nil, rescue_children), ensure_body])
+            ])
+          else
+            block.push kwbegin.updated(nil, [
+              inner.updated(nil, [s(:autoreturn, try_body), ensure_body])
+            ])
+          end
+        elsif inner&.type == :rescue
+          # For rescue blocks, apply autoreturn to both try body and each resbody
+          rescue_children = inner.children.dup
+          rescue_children[0] = s(:autoreturn, rescue_children[0]) if rescue_children[0]
+          (1...rescue_children.length).each do |i|
+            next unless rescue_children[i]&.type == :resbody
+            rc = rescue_children[i].children.dup
+            rc[2] = s(:autoreturn, rc[2]) if rc[2]
+            rescue_children[i] = rescue_children[i].updated(nil, rc)
+          end
+          block.push kwbegin.updated(nil, [inner.updated(nil, rescue_children)])
         else
           block.push kwbegin.updated(nil, [s(:autoreturn, *kwbegin.children)])
         end
