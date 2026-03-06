@@ -30,7 +30,7 @@ module Ruby2JS
           find_or_create_by find_or_create_by!
           find_or_initialize_by
           order
-          distinct pluck ids exists?
+          distinct pluck pick ids exists?
           find_each find_in_batches
           update_all destroy_all delete_all
         ].freeze

@@ -60,6 +60,7 @@ import {
   detectCssPath,
   ensureRuby2jsReady,
   buildAppManifest,
+  extractHelperMethods,
   shouldIncludeFile,
   ErbCompiler
 } from './transform.mjs';
@@ -657,16 +658,22 @@ function createRubyTransformPlugin(config, appRoot) {
   // Scans for bare ClassName.method or new ClassName( patterns and adds
   // import statements for models that aren't already imported.
   function addCrossModelImports(js, filePath) {
-    // Only process model files
     const relPath = path.relative(appRoot, filePath);
-    if (!relPath.startsWith('app/models/') && !relPath.startsWith('app' + path.sep + 'models' + path.sep)) return js;
+    const isModel = relPath.startsWith('app/models/') || relPath.startsWith('app' + path.sep + 'models' + path.sep);
+    const isHelper = relPath.startsWith('app/helpers/') || relPath.startsWith('app' + path.sep + 'helpers' + path.sep);
+    if (!isModel && !isHelper) return js;
 
     const modelMap = getModelClassMap();
-    const modelRelPath = relPath.replace(/^app\/models\/|^app\\models\\/g, '').replace(/\.rb$|\.js$/, '');
+    let currentRelPath;
+    if (isModel) {
+      currentRelPath = relPath.replace(/^app\/models\/|^app\\models\\/g, '').replace(/\.rb$|\.js$/, '');
+    } else {
+      currentRelPath = relPath.replace(/^app\/helpers\/|^app\\helpers\\/g, '').replace(/\.rb$|\.js$/, '');
+    }
 
     for (const [className, modelPath] of Object.entries(modelMap)) {
-      // Skip self
-      if (modelPath === modelRelPath) continue;
+      // Skip self (only relevant for models)
+      if (isModel && modelPath === currentRelPath) continue;
 
       // Skip if already imported
       const importPattern = new RegExp(`import\\s+\\{[^}]*\\b${className}\\b[^}]*\\}\\s+from`);
@@ -680,27 +687,40 @@ function createRubyTransformPlugin(config, appRoot) {
       const refPattern = new RegExp(`\\b${className}\\b\\.\\w|\\bnew\\s+${className}\\b`);
       if (!refPattern.test(js)) continue;
 
-      // Compute relative path from current model to target model
-      const currentParts = modelRelPath.split('/');
-      const targetParts = modelPath.split('/');
-      const currentDir = currentParts.slice(0, -1);
-      const targetDir = targetParts.slice(0, -1);
-      const targetFile = targetParts[targetParts.length - 1];
-
-      let common = 0;
-      while (common < currentDir.length && common < targetDir.length &&
-             currentDir[common] === targetDir[common]) {
-        common++;
-      }
-      const up = currentDir.length - common;
-      const down = targetDir.slice(common);
       let importPath;
-      if (up === 0 && down.length === 0) {
-        importPath = `./${targetFile}.rb`;
-      } else if (up === 0) {
-        importPath = `./${[...down, targetFile + '.rb'].join('/')}`;
+      if (isModel) {
+        // Compute relative path from current model to target model
+        const currentParts = currentRelPath.split('/');
+        const targetParts = modelPath.split('/');
+        const currentDir = currentParts.slice(0, -1);
+        const targetDir = targetParts.slice(0, -1);
+        const targetFile = targetParts[targetParts.length - 1];
+
+        let common = 0;
+        while (common < currentDir.length && common < targetDir.length &&
+               currentDir[common] === targetDir[common]) {
+          common++;
+        }
+        const up = currentDir.length - common;
+        const down = targetDir.slice(common);
+        if (up === 0 && down.length === 0) {
+          importPath = `./${targetFile}.rb`;
+        } else if (up === 0) {
+          importPath = `./${[...down, targetFile + '.rb'].join('/')}`;
+        } else {
+          importPath = [...Array(up).fill('..'), ...down, targetFile + '.rb'].join('/');
+        }
       } else {
-        importPath = [...Array(up).fill('..'), ...down, targetFile + '.rb'].join('/');
+        // Compute relative path from helper to model (app/helpers/ → app/models/)
+        const currentParts = currentRelPath.split('/');
+        const currentDir = currentParts.slice(0, -1);
+        const targetParts = modelPath.split('/');
+        const targetDir = targetParts.slice(0, -1);
+        const targetFile = targetParts[targetParts.length - 1];
+
+        // Go up from helpers/subdir to app/, then down to models/subdir
+        const upCount = currentDir.length + 1; // +1 to exit helpers/
+        importPath = [...Array(upCount).fill('..'), 'models', ...targetDir, targetFile + '.rb'].join('/');
       }
 
       js = `import { ${className} } from '${importPath}';\n${js}`;
@@ -716,12 +736,26 @@ function createRubyTransformPlugin(config, appRoot) {
       }
       const manifest = await manifestPromise;
       metadata = manifest.metadata;
-      // Seed transform cache from pre-analyzed models
+      // Seed transform cache from pre-analyzed models and helpers
       for (const [filePath, result] of manifest.modelCache) {
         try {
           const stat = fs.statSync(filePath);
           let js = fixImports(result.code, filePath);
+
+          // For helper files, extract methods BEFORE addCrossModelImports
+          // (which prepends import lines that break the ^ anchored regex)
+          if (filePath.includes('/app/helpers/') && filePath.endsWith('_helper.rb')) {
+            const helperMatch = js.match(/(?:export\s+)?const\s+(\w+)\s*=\s*\{/);
+            if (helperMatch) {
+              const methods = extractHelperMethods(js);
+              if (methods.length > 0) {
+                js += `\nexport const { ${methods.join(', ')} } = ${helperMatch[1]};\n`;
+              }
+            }
+          }
+
           js = addCrossModelImports(js, filePath);
+
           const map = result.map;
           if (map) {
             const fileContent = fs.readFileSync(filePath, 'utf-8');
@@ -1017,6 +1051,20 @@ export { application };
 
         let js = result.toString();
         js = fixImports(js, id);
+
+        // For helper files, extract methods BEFORE addCrossModelImports
+        // (which prepends import lines that break the ^ anchored regex)
+        if (id.includes('/app/helpers/') && id.endsWith('_helper.rb')) {
+          const helperMatch = js.match(/(?:export\s+)?const\s+(\w+)\s*=\s*\{/);
+          if (helperMatch) {
+            const helperName = helperMatch[1];
+            const methods = extractHelperMethods(js);
+            if (methods.length > 0) {
+              js += `\nexport const { ${methods.join(', ')} } = ${helperName};\n`;
+            }
+          }
+        }
+
         js = addCrossModelImports(js, id);
 
         // For routes.rb, re-export database functions from the bundled adapter

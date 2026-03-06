@@ -2064,6 +2064,10 @@ module Ruby2JS
         elsif node.children[0].nil? && node.children[1] == :RuntimeError
           s(:const, nil, :Error)
 
+        # ArgumentError => TypeError (closest JS equivalent)
+        elsif node.children[0].nil? && node.children[1] == :ArgumentError
+          s(:const, nil, :TypeError)
+
         else
           super
         end

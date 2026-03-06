@@ -2257,7 +2257,17 @@ async function runEject(options) {
       const filePath = join(APP_ROOT, 'app/helpers', helperFile + '.rb');
       const cached = modelCache.get(filePath);
       if (cached) {
-        const { code: processedCode } = postProcessTestHelper(cached.code, modelNames);
+        let { code: processedCode } = postProcessTestHelper(cached.code, modelNames);
+
+        // Add cross-model imports for model classes referenced in helper code
+        for (const [className, modelPath] of Object.entries(config.modelClassMap || {})) {
+          const importPat = new RegExp(`import\\s+\\{[^}]*\\b${className}\\b[^}]*\\}\\s+from`);
+          if (importPat.test(processedCode)) continue;
+          const refPat = new RegExp(`\\b${className}\\b\\.\\w|\\bnew\\s+${className}\\b`);
+          if (!refPat.test(processedCode)) continue;
+          processedCode = `import { ${className} } from '../models/${modelPath}.js';\n${processedCode}`;
+        }
+
         const relativeOutPath = `app/helpers/${helperFile}.js`;
         const code = fixImportsForEject(processedCode, relativeOutPath, config);
         writeFileSync(join(helpersOutDir, helperFile + '.js'), code);
