@@ -500,7 +500,11 @@ module Ruby2JS
       method = method.to_s[0..-2] if method =~ /\w[!?]$/
 
       # optional chaining
-      parse receiver
+      if receiver && GROUP_OPERATORS.include?(receiver.type)
+        group receiver
+      else
+        parse receiver
+      end
       put "?."
       if method == :[]
         put '['

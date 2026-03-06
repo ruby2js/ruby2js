@@ -199,7 +199,7 @@ module Ruby2JS
             needs_escape = case inner&.type
             when :ivar, :lvar
               true
-            when :send
+            when :send, :csend
               target = inner.children[0]
               method_name = inner.children[1]
               extra_args = inner.children[2..]

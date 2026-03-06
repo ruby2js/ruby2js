@@ -1335,8 +1335,9 @@ module Ruby2JS
                         else action_name
                         end
 
-          # Build props hash for view: { $context: context, articles }
+          # Build props hash for view: { $context: context, action_name: "show", articles }
           pairs = [s(:pair, s(:sym, :"$context"), s(:lvar, :context))]
+          pairs << s(:pair, s(:sym, :action_name), s(:str, action_name.to_s))
           ivars.each do |ivar|
             pairs << s(:pair, s(:sym, ivar), s(:lvar, ivar))
           end

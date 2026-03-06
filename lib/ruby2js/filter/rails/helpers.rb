@@ -62,6 +62,46 @@ module Ruby2JS
           end
         end
 
+        # Handle for loops that iterate over association collections
+        # e.g., studio.people.sort_by(&:name).each -> needs await on the collection
+        def on_for(node)
+          if @erb_bufvar
+            collection = node.children[1]
+            if collection_involves_association?(collection)
+              self.erb_mark_async!()
+              new_collection = wrap_association_with_await(collection)
+              return s(:for, node.children[0], process(new_collection), process(node.children[2]))
+            end
+          end
+          super
+        end
+
+        def on_for_of(node)
+          if @erb_bufvar
+            collection = node.children[1]
+            if collection_involves_association?(collection)
+              self.erb_mark_async!()
+              new_collection = wrap_association_with_await(collection)
+              return s(:for_of, node.children[0], process(new_collection), process(node.children[2]))
+            end
+          end
+          super
+        end
+
+        # Handle safe navigation on belongs_to associations in ERB
+        # person.level&.name -> (await person.level)?.name
+        def on_csend(node)
+          if @erb_bufvar
+            receiver = node.children[0]
+            if receiver&.type == :send && belongs_to_access?(receiver)
+              self.erb_mark_async!()
+              awaited = s(:begin, s(:send, nil, :await, process(receiver)))
+              return node.updated(:csend, [awaited, node.children[1], *node.children[2..].map { |c| process(c) }])
+            end
+          end
+          super
+        end
+
         # Add imports for path helpers and view helpers
         # Called by Erb filter's on_begin via erb_prepend_imports hook
         def erb_prepend_imports
@@ -340,6 +380,28 @@ module Ruby2JS
           # Track path helper usage for imports (e.g., article_path, new_article_path)
           if target.nil? && method.to_s.end_with?('_path') && @erb_bufvar
             @erb_path_helpers << method unless @erb_path_helpers.include?(method)
+
+            # Handle extra hash args as query parameters
+            # e.g., new_person_path(studio: @studio) -> `${new_person_path()}?studio=${extract_id(studio)}`
+            if args.length == 1 && args[0].type == :hash
+              hash_node = args[0]
+              pairs = hash_node.children
+              # Check if all keys are symbols (query param keys)
+              if pairs.all? { |p| p.type == :pair && p.children[0].type == :sym }
+                # Import extract_id along with the path helper
+                @erb_path_helpers << :extract_id unless @erb_path_helpers.include?(:extract_id)
+                # Build query string as template literal
+                base_call = process(s(:send, nil, method))
+                query_parts = []
+                pairs.each_with_index do |pair, i|
+                  key = pair.children[0].children[0].to_s
+                  value_expr = s(:send, nil, :extract_id, pair.children[1])
+                  query_parts << s(:str, "#{i == 0 ? '?' : '&'}#{key}=")
+                  query_parts << s(:begin, process(value_expr))
+                end
+                return s(:dstr, s(:begin, base_call), *query_parts)
+              end
+            end
           end
 
           # Handle turbo_stream_from helper - subscribes to broadcast channel
@@ -1785,9 +1847,10 @@ module Ruby2JS
           module_base = partial_directory ? "#{partial_directory}/#{partial_name}" : partial_name
           module_name = "_#{module_base.gsub('/', '_')}_module".to_sym
 
-          # Build unified props hash with $context and locals
+          # Build unified props hash with $context, action_name, and locals
           # Use the appropriate context reference (context in layout mode, $context otherwise)
           pairs = [s(:pair, s(:sym, :"$context"), context_ref)]
+          pairs << s(:pair, s(:sym, :action_name), s(:lvar, :action_name))
           locals.keys.each do |key|
             pairs << s(:pair, s(:sym, key), process(locals[key]))
           end
@@ -2756,6 +2819,77 @@ module Ruby2JS
         end
 
         private
+
+        # Check if a method chain involves an association access at its root
+        # e.g., studio.people.sort_by(&:name) -> true (studio.people is association)
+        def collection_involves_association?(node)
+          return false unless node
+          return association_access?(node) if node.type == :send && node.children[2..]&.empty?
+          # Walk the chain: node is send(receiver, method, args...)
+          # The receiver might be the association or another chained call
+          if node.type == :send
+            receiver = node.children[0]
+            return true if association_access?(node)
+            return collection_involves_association?(receiver) if receiver
+          end
+          false
+        end
+
+        # Wrap the association part of a method chain with await
+        # studio.people.sort_by(...) -> (await studio.people).sort_by(...)
+        def wrap_association_with_await(node)
+          return node unless node&.type == :send
+          if association_access?(node)
+            return s(:begin, s(:send, nil, :await, node))
+          end
+          receiver = node.children[0]
+          if receiver && collection_involves_association?(receiver)
+            new_receiver = wrap_association_with_await(receiver)
+            return s(:send, new_receiver, node.children[1], *node.children[2..])
+          end
+          node
+        end
+
+        # Check if a node looks like a belongs_to access (e.g., person.level)
+        # Heuristic: singular method name on a model instance, not a known builtin
+        KNOWN_BUILTINS = %i[
+          name type id class to_s to_i to_f inspect freeze dup clone
+          nil? blank? present? empty? any? none? size length count
+          first last new save create update destroy delete valid?
+          errors persisted? new_record? changed? frozen?
+          strip chomp chop upcase downcase capitalize
+          abs round floor ceil truncate
+          keys values merge select reject map flat_map reduce
+          split join gsub sub match scan replace
+          push pop shift unshift sort reverse uniq compact flatten
+          include? start_with? end_with? respond_to? is_a? kind_of?
+        ]
+
+        def belongs_to_access?(node)
+          return false unless node&.type == :send
+          receiver = node.children[0]
+          method = node.children[1]
+          args = node.children[2..]
+
+          # Must have a receiver (not a bare function call)
+          return false unless receiver
+          return false unless [:lvar, :ivar, :send].include?(receiver.type)
+
+          # Must be a zero-arg method call
+          return false unless args.empty?
+
+          # Must be singular (not a has_many)
+          method_str = method.to_s
+          return false if method_str != Ruby2JS::Inflector.singularize(method_str)
+
+          # Must not be a known builtin
+          return false if KNOWN_BUILTINS.include?(method)
+
+          # Must not end with common non-association suffixes
+          return false if method_str.end_with?('_id', '_at', '_on', '_count', '_type')
+
+          true
+        end
 
         # Check if a node represents an association access (e.g., article.comments)
         # Association access returns a Promise that needs to be awaited
