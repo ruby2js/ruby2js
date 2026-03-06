@@ -276,6 +276,7 @@ CLI flags take precedence over the config file. This is useful for:
 ejected/
   app/
     models/         # Transpiled models + index.js
+    helpers/        # Transpiled application helpers
     views/          # Transpiled ERB templates
     controllers/    # Transpiled Rails controllers
     javascript/
@@ -521,7 +522,7 @@ npx juntos deploy --force             # Clear cache and deploy
 
 ## juntos info
 
-Show current Juntos configuration.
+Show current Juntos configuration, or dump pre-analyzed metadata.
 
 ```bash
 npx juntos info [options]
@@ -531,6 +532,7 @@ npx juntos info [options]
 
 | Option | Description |
 |--------|-------------|
+| `--metadata` | Dump pre-analyzed metadata as JSON (models, helpers, concerns, etc.) |
 | `-v, --verbose` | Show detailed information |
 | `-h, --help` | Show help |
 
@@ -556,6 +558,26 @@ Project:
   node_modules: Installed
   dist/:        Not built
 ```
+
+**Metadata dump (`--metadata`):**
+
+The `--metadata` flag runs the same `buildAppManifest()` pre-analysis that `juntos dev`, `juntos eject`, and `juntos render` use, and prints the result as JSON. This is useful for debugging import resolution, association detection, and helper discovery.
+
+```bash
+npx juntos info --metadata                     # Full metadata as JSON
+npx juntos info --metadata | jq .helpers       # Just the helpers section
+npx juntos info --metadata | jq '.models.Article'  # One model's metadata
+```
+
+The output includes:
+
+| Field | Description |
+|-------|-------------|
+| `models` | Each model's associations, scopes, enums, and source file |
+| `concerns` | Concern modules detected in `app/models/concerns/` |
+| `helpers` | Application helper files and their exported method names |
+| `controller_files` | Controller files detected during analysis |
+| `current_attributes` | Current attributes parsed from `test/test_helper.rb` |
 
 ## juntos doctor
 
@@ -756,7 +778,7 @@ The `--intermediate` flag is useful for ERB files — it shows the Ruby code tha
 
 | Path pattern | Section |
 |--------------|---------|
-| `*.html.erb`, `*.turbo_stream.erb` | ERB (transformErb) |
+| `*.html.erb`, `*.turbo_stream.erb` | ERB (with full metadata for helper imports) |
 | `*.jsx.rb` | JSX (transformJsxRb) |
 | `app/controllers/` | controllers |
 | `app/javascript/controllers/` | stimulus |

@@ -486,7 +486,6 @@ function createErbPlugin(config) {
 
   async function transformErb(code, id, isLayout = false) {
     await ensureReady();
-    const meta = await ensureManifest();
 
     let template = code;
 
@@ -503,9 +502,13 @@ function createErbPlugin(config) {
       include: ['class', 'call'],
       database: config.database,
       target: config.target,
-      file: id,
-      metadata: meta
+      file: id
     };
+
+    // Pass metadata if available (populated by createRubyTransformPlugin's ensureManifest)
+    if (config._metadata) {
+      options.metadata = config._metadata;
+    }
 
     // Layout mode changes the function signature to layout(context, content)
     if (isLayout) {
@@ -731,6 +734,8 @@ function createRubyTransformPlugin(config, appRoot) {
         } catch {}
       }
     }
+    // Share metadata with other plugins via config object
+    config._metadata = metadata;
     return metadata;
   }
 

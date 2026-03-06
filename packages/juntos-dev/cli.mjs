@@ -1396,6 +1396,8 @@ function parseCommonArgs(args) {
       options.suggest = true;
     } else if (arg === '--intermediate') {
       options.intermediate = true;
+    } else if (arg === '--metadata') {
+      options.metadata = true;
     } else if (arg === '--e2e') {
       options.e2e = true;
     } else if (arg === '--html') {
@@ -4112,9 +4114,24 @@ function suggestTypeHints(diagnostics) {
 // Command: info
 // ============================================
 
-function runInfo(options) {
+async function runInfo(options) {
   loadEnvLocal();
   loadDatabaseConfig(options);
+
+  if (options.metadata) {
+    // Show pre-analyzed metadata from buildAppManifest
+    applyEnvOptions(options);
+    const { loadConfig } = await import('./vite.mjs');
+    const config = loadConfig(APP_ROOT, {
+      database: options.database,
+      target: options.target
+    });
+    config.models = findModels(APP_ROOT);
+    await ensureRuby2jsReady();
+    const { metadata } = await buildAppManifest(APP_ROOT, config, { mode: 'virtual' });
+    console.log(JSON.stringify(metadata, null, 2));
+    return;
+  }
 
   const env = options.environment || process.env.RAILS_ENV || 'development';
 
@@ -4264,7 +4281,9 @@ async function runTransform(options, files) {
           code = compiler.src;
         } else {
           const isLayout = file.includes('app/views/layouts/');
-          const result = await transformErb(source, fullPath, isLayout, config);
+          // Build metadata so ERB can resolve app helper imports, etc.
+          const manifest = await buildAppManifest(APP_ROOT, config, { mode: 'virtual' });
+          const result = await transformErb(source, fullPath, isLayout, config, manifest.metadata);
           code = result.code;
         }
       } else if (file.endsWith('.jsx.rb')) {
@@ -5220,7 +5239,19 @@ switch (command) {
     break;
 
   case 'info':
-    runInfo(options);
+    if (options.help) {
+      console.log('Usage: juntos info [options]\n\nShow current configuration.\n');
+      console.log('Options:');
+      console.log('  --metadata               Dump pre-analyzed metadata as JSON');
+      console.log('  -d, --database ADAPTER   Database adapter');
+      console.log('  -t, --target TARGET      Build target');
+      console.log('\nExamples:');
+      console.log('  juntos info');
+      console.log('  juntos info --metadata');
+      console.log('  juntos info --metadata | jq .helpers');
+      process.exit(0);
+    }
+    await runInfo(options);
     break;
 
   case 'doctor':
