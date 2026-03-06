@@ -2080,21 +2080,30 @@ module Ruby2JS
                 end
               else
                 # Existing models: pre-fill value from model
-                value_expr = s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))
+                # Omit value attribute if model attribute is null/undefined (new record via ivar)
+                # HTML-escape the value for safety (e.g., "< 17" -> "&lt; 17")
+                raw_value = s(:attr, s(:lvar, model.to_sym), name.to_sym)
+                value_conditional = s(:if,
+                  s(:send, raw_value, :!=, s(:nil)),
+                  s(:dstr,
+                    s(:str, ' value="'),
+                    s(:begin, s(:send, nil, :escapeHTML, raw_value)),
+                    s(:str, '"')),
+                  s(:str, ''))
 
                 if dynamic_class_expr
                   s(:dstr,
                     s(:str, %(<input class=")),
                     s(:begin, process(dynamic_class_expr)),
-                    s(:str, %(" type="#{input_type}"#{static_attrs} value=")),
-                    s(:begin, value_expr),
-                    s(:str, %(" name="#{model}[#{name}]" id="#{model}_#{name}">)))
+                    s(:str, %(" type="#{input_type}"#{static_attrs})),
+                    s(:begin, value_conditional),
+                    s(:str, %( name="#{model}[#{name}]" id="#{model}_#{name}">)))
                 else
                   # Rails attribute order: class, type, value, name, id
                   s(:dstr,
-                    s(:str, %(<input#{static_attrs} type="#{input_type}" value=")),
-                    s(:begin, value_expr),
-                    s(:str, %(" name="#{model}[#{name}]" id="#{model}_#{name}">)))
+                    s(:str, %(<input#{static_attrs} type="#{input_type}")),
+                    s(:begin, value_conditional),
+                    s(:str, %( name="#{model}[#{name}]" id="#{model}_#{name}">)))
                 end
               end
             else
@@ -2249,7 +2258,7 @@ module Ruby2JS
                     s(:block, s(:send, nil, :proc),
                       s(:args, s(:arg, :_c)),
                       s(:dstr,
-                        s(:str, '<option value="'),
+                        s(:str, "\n<option value=\""),
                         s(:begin,
                           s(:if,
                             s(:send, s(:const, nil, :Array), :isArray, s(:lvar, :_c)),
@@ -2618,13 +2627,13 @@ module Ruby2JS
                   s(:dstr,
                     s(:str, "<form#{class_attr}#{data_attr} action=\""),
                     s(:begin, s(:send, nil, nested_plural_path, parent_var)),
-                    s(:str, "\" accept-charset=\"UTF-8\" method=\"post\">")))
+                    s(:str, "\" accept-charset=\"UTF-8\" method=\"post\">\n")))
               else
                 statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                   s(:dstr,
                     s(:str, "<form#{class_attr}#{data_attr} action=\""),
                     s(:begin, s(:send, nil, plural_path)),
-                    s(:str, "\" accept-charset=\"UTF-8\" method=\"post\">")))
+                    s(:str, "\" accept-charset=\"UTF-8\" method=\"post\">\n")))
               end
             else
               # Existing model - check ID to determine POST vs PATCH
@@ -2638,12 +2647,14 @@ module Ruby2JS
                       s(:send, nil, plural_path))),
                   s(:str, "\" accept-charset=\"UTF-8\" method=\"post\">")))
 
-              # Add hidden _method field for existing records (PATCH)
-              # <% if article.id %><input type="hidden" name="_method" value="patch"><% end %>
+              # Add hidden _method field for existing records (PATCH), or newline for new
+              # Rails: <form ...><input type="hidden" name="_method" value="patch">\n  (same line)
+              # Rails: <form ...>\n  (new record, just newline)
               statements << s(:if, s(:attr, model_var, :id),
                 s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
-                  s(:str, '<input type="hidden" name="_method" value="patch">')),
-                nil)
+                  s(:str, "<input type=\"hidden\" name=\"_method\" value=\"patch\">\n")),
+                s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                  s(:str, "\n")))
             end
           elsif url_node
             # Form with explicit url: option
