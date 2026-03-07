@@ -105,7 +105,9 @@ export async function clickButton(text) {
     throw new Error(`clickButton: could not find button "${text}"`);
   }
 
-  const form = button.closest('form');
+  // Support external submit buttons with form="form-id" attribute
+  const formAttr = button.getAttribute('form');
+  const form = formAttr ? document.getElementById(formAttr) : button.closest('form');
   if (!form) {
     // Just click the button if it's not in a form
     button.click();
