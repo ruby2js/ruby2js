@@ -2845,7 +2845,9 @@ async function runEject(options) {
     const cssPath = detectCssPath(APP_ROOT);
     writeFileSync(join(outDir, 'index.html'), generateBrowserIndexHtml(appName, './main.js', cssPath));
     fileCount++;
-    writeFileSync(join(outDir, 'main.js'), generateBrowserMainJs('./config/routes.js', './app/javascript/controllers/index.js'));
+    const layoutFile = join(APP_ROOT, 'app/views/layouts/application.html.erb');
+    const layoutPath = existsSync(layoutFile) ? './app/views/layouts/application.html.erb' : null;
+    writeFileSync(join(outDir, 'main.js'), generateBrowserMainJs('./config/routes.js', './app/javascript/controllers/index.js', layoutPath));
     fileCount++;
   } else {
     // Server targets: generate Node.js server entry

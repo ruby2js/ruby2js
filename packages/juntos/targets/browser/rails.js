@@ -14,6 +14,10 @@ import {
 // Note: createContext is defined in this file with browser-specific logic
 export { createFlash, truncate, pluralize, dom_id };
 
+// Browser no-ops for layout helpers (CSS is handled by Vite, no CSRF needed)
+export function stylesheetLinkTag() { return ''; }
+export function getAssetPath(name) { return `/assets/${name}`; }
+
 // Create a fresh request context for browser navigation
 // Each navigation gets its own context with isolated state
 export function createContext(params = {}) {
@@ -59,7 +63,7 @@ export class Router extends RouterBase {
 
     if (!result) {
       console.warn('  No route matched');
-      document.getElementById('content').innerHTML = '<h1>404 Not Found</h1>';
+      await this.renderContent(context, '<h1>404 Not Found</h1>');
       return;
     }
 
@@ -90,22 +94,22 @@ export class Router extends RouterBase {
       await this.renderContent(context, html);
     } catch (e) {
       console.error('  Error:', e.message || e);
-      document.getElementById('content').innerHTML = '<h1>Not Found</h1>';
+      await this.renderContent(context, '<h1>Not Found</h1>');
     }
   }
 
   // Render content and handle flash cookie
   // Handles both sync and async views, and both string and React element returns
+  // When a layout is configured, produces a full HTML document and uses Turbo
+  // morphing to update the page (matching Rails/Turbo Drive behavior).
   static async renderContent(context, content) {
-    const container = document.getElementById('content');
-
     // Await if content is a promise (async ERB or async React component)
     const resolved = await Promise.resolve(content);
 
     // Check if content is a React element (has $$typeof Symbol)
     if (resolved && typeof resolved === 'object' && resolved.$$typeof) {
       // React element - use ReactDOM to render
-      // Wrap in layout if needed (layout returns React element or passes through)
+      const container = document.getElementById('content');
       const wrappedContent = Application.wrapInLayout(context, resolved);
 
       // Import ReactDOM dynamically and render
@@ -117,10 +121,25 @@ export class Router extends RouterBase {
       const root = createRoot(container);
       container._reactRoot = root;
       root.render(wrappedContent);
-    } else {
-      // HTML string - use innerHTML
+    } else if (Application.layoutFn) {
+      // HTML string with layout - produce full document, morph body via Turbo
       const fullHtml = Application.wrapInLayout(context, resolved);
-      container.innerHTML = fullHtml;
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(fullHtml, 'text/html');
+      // Update page title from layout (Turbo doesn't see the document
+      // because we intercept navigation via turbo:before-visit)
+      const newTitle = doc.querySelector('title');
+      if (newTitle) document.title = newTitle.textContent;
+      // Morph body to match layout output
+      if (typeof Turbo !== 'undefined' && Turbo.morphBodyElements) {
+        Turbo.morphBodyElements(document.body, doc.body);
+      } else {
+        document.body.innerHTML = doc.body.innerHTML;
+      }
+    } else {
+      // HTML string without layout - direct innerHTML on container
+      const container = document.getElementById('content');
+      container.innerHTML = resolved;
     }
 
     // Clear flash cookie after rendering (consumed)
@@ -506,8 +525,10 @@ export class Application extends ApplicationBase {
     try {
       await this.initDatabase();
 
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
+      if (!this.layoutFn) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+      }
 
       // Handle browser back/forward via Turbo
       window.addEventListener('popstate', async () => {
@@ -713,8 +734,14 @@ export class Application extends ApplicationBase {
       }
       await Router.dispatch(initialPath);
     } catch (e) {
-      document.getElementById('loading').innerHTML =
-        `<p style="color: red;">Error: ${e.message}</p><pre>${e.stack}</pre>`;
+      const loadingEl = document.getElementById('loading');
+      if (loadingEl) {
+        loadingEl.innerHTML =
+          `<p style="color: red;">Error: ${e.message}</p><pre>${e.stack}</pre>`;
+      } else {
+        document.body.innerHTML =
+          `<p style="color: red;">Error: ${e.message}</p><pre>${e.stack}</pre>`;
+      }
       console.error(e);
     }
   }

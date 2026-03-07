@@ -1839,7 +1839,12 @@ function createBrowserEntryPlugin(config, appRoot) {
     // Virtual modules resolve from project root, real files from .browser/
     const routesPath = isVirtual ? '/config/routes.rb' : '../config/routes.rb';
     const controllersPath = isVirtual ? '/app/javascript/controllers/index.js' : '../app/javascript/controllers/index.js';
-    return generateBrowserMainJs(routesPath, controllersPath);
+    // Detect layout file for full-document Turbo morphing
+    const layoutFile = path.join(appRoot, 'app/views/layouts/application.html.erb');
+    const layoutPath = fs.existsSync(layoutFile)
+      ? (isVirtual ? '/app/views/layouts/application.html.erb' : '../app/views/layouts/application.html.erb')
+      : null;
+    return generateBrowserMainJs(routesPath, controllersPath, layoutPath);
   }
 
   return {
@@ -2648,10 +2653,6 @@ function createVirtualPlugin(config, appRoot) {
   function isClientBundlePath(filePath) {
     if (!filePath) return false;
 
-    // Layouts are server-side only - never use client runtime
-    // They use server-only helpers like stylesheetLinkTag, getAssetPath, etc.
-    if (filePath.includes('/layouts/') || filePath.includes('\\layouts\\')) return false;
-
     // Direct .client/ path
     if (filePath.includes('/.client/') || filePath.includes('\\.client\\')) return true;
 
@@ -2668,25 +2669,18 @@ function createVirtualPlugin(config, appRoot) {
     // Track modules imported from .client/ entry
     resolveId(id, importer) {
       // Track client bundle module paths for transitive imports
-      // But exclude server-only modules like layouts
       if (importer && isClientBundlePath(importer)) {
         // This module is being imported from the client bundle
         // Track it so we can use browser runtime for its imports too
         if (id.startsWith('.')) {
           // Relative path - resolve to absolute
           const resolvedPath = path.resolve(path.dirname(importer), id);
-          // Don't track layouts - they're server-only
-          if (!resolvedPath.includes('/layouts/') && !resolvedPath.includes('\\layouts\\')) {
-            clientModulePaths.add(resolvedPath);
-          }
+          clientModulePaths.add(resolvedPath);
         } else if (!id.startsWith('\0') && !id.includes(':')) {
           // Non-virtual, non-relative - could be a source file
           const absPath = path.join(appRoot, id);
-          // Don't track layouts
-          if (!absPath.includes('/layouts/') && !absPath.includes('\\layouts\\')) {
-            if (fs.existsSync(absPath)) {
-              clientModulePaths.add(absPath);
-            }
+          if (fs.existsSync(absPath)) {
+            clientModulePaths.add(absPath);
           }
         }
       }

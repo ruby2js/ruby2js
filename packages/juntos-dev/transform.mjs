@@ -2069,13 +2069,16 @@ export function generateBrowserIndexHtml(appName, mainJsPath = './main.js', cssP
  * Used by both Vite plugin (dev) and eject command (standalone).
  * @param {string} routesPath - Import path for routes (e.g., '../config/routes.rb' or './config/routes.js')
  * @param {string} controllersPath - Import path for controllers (e.g., '../app/javascript/controllers/index.js')
+ * @param {string|null} layoutPath - Import path for layout (e.g., './app/views/layouts/application.html.erb')
  */
-export function generateBrowserMainJs(routesPath = './config/routes.js', controllersPath = './app/javascript/controllers/index.js') {
+export function generateBrowserMainJs(routesPath = './config/routes.js', controllersPath = './app/javascript/controllers/index.js', layoutPath = null) {
+  const layoutImport = layoutPath ? `\nimport { layout } from '${layoutPath}';` : '';
+  const layoutConfig = layoutPath ? '\nApplication.configure({ layout: layout });' : '';
   return `// Main entry point for browser
 import * as Turbo from '@hotwired/turbo';
 import { Application } from '${routesPath}';
-import '${controllersPath}';
-window.Turbo = Turbo;
+import '${controllersPath}';${layoutImport}
+window.Turbo = Turbo;${layoutConfig}
 Application.start();
 
 // Dev-mode HMR handlers
