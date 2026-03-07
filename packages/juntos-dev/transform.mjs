@@ -2056,7 +2056,7 @@ export function generateBrowserIndexHtml(appName, mainJsPath = './main.js', cssP
 <body>
   <div id="loading">Loading...</div>
   <div id="app" style="display:none">
-    <main class="container mx-auto mt-28 px-5" id="content"></main>
+    <main class="container mx-auto mt-28 px-5 flex" id="content"></main>
   </div>
   <script type="module" src="${mainJsPath}"></script>
 </body>
