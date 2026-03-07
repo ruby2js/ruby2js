@@ -45,16 +45,66 @@ export function createContext(params = {}) {
 
 // Browser Router with DOM-based dispatch
 export class Router extends RouterBase {
-  // Dispatch a path to the appropriate controller action
-  // Context is created fresh for each navigation, or passed from form handlers
-  static async dispatch(path, context = null) {
+  // Render a route to a full HTML document string (for Turbo to process)
+  // Returns the layout-wrapped HTML, or null if the route wasn't found
+  static async renderPage(path, context = null) {
     // Normalize path to string (handle URL objects from Turbo)
     if (path && typeof path !== 'string') {
       path = path.pathname || path.toString();
     }
     console.log(`Started GET "${path}"`);
 
-    // Create context if not provided (fresh navigation)
+    if (!context) {
+      context = createContext();
+    }
+
+    const result = this.match(path, 'GET');
+
+    if (!result) {
+      console.warn('  No route matched');
+      return Application.wrapInLayout(context, '<h1>404 Not Found</h1>');
+    }
+
+    const { route, match } = result;
+
+    if (route.redirect) {
+      // Return null to signal redirect — caller handles it
+      return { redirect: route.redirect };
+    }
+
+    const { controller, controllerName, action } = route;
+    const actionMethod = action === 'new' ? '$new' : action;
+
+    console.log(`Processing ${controller.name || controllerName}#${action}`);
+
+    try {
+      let html;
+      if (route.nested) {
+        const parentId = parseInt(match[1]);
+        const id = match[2] ? parseInt(match[2]) : null;
+        html = id != null ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
+      } else {
+        const id = match[1] ? parseInt(match[1]) : null;
+        html = id != null ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
+      }
+
+      console.log(`  Rendering ${controllerName}/${action}`);
+      context.flash.writeToCookie();
+      return Application.wrapInLayout(context, html);
+    } catch (e) {
+      console.error('  Error:', e.message || e);
+      return Application.wrapInLayout(context, '<h1>Not Found</h1>');
+    }
+  }
+
+  // Dispatch a path to the appropriate controller action
+  // Used for non-Turbo rendering (no layout fallback, React elements)
+  static async dispatch(path, context = null) {
+    if (path && typeof path !== 'string') {
+      path = path.pathname || path.toString();
+    }
+    console.log(`Started GET "${path}"`);
+
     if (!context) {
       context = createContext();
     }
@@ -98,23 +148,17 @@ export class Router extends RouterBase {
     }
   }
 
-  // Render content and handle flash cookie
-  // Handles both sync and async views, and both string and React element returns
-  // When a layout is configured, produces a full HTML document and uses Turbo
-  // morphing to update the page (matching Rails/Turbo Drive behavior).
+  // Render content directly to the DOM (used when Turbo isn't handling the response)
+  // For validation re-renders, React elements, and no-layout fallback
   static async renderContent(context, content) {
-    // Await if content is a promise (async ERB or async React component)
     const resolved = await Promise.resolve(content);
 
-    // Check if content is a React element (has $$typeof Symbol)
     if (resolved && typeof resolved === 'object' && resolved.$$typeof) {
       // React element - use ReactDOM to render
       const container = document.getElementById('content');
       const wrappedContent = Application.wrapInLayout(context, resolved);
 
-      // Import ReactDOM dynamically and render
       const { createRoot } = await import('react-dom/client');
-      // Clear any existing React root
       if (container._reactRoot) {
         container._reactRoot.unmount();
       }
@@ -122,51 +166,38 @@ export class Router extends RouterBase {
       container._reactRoot = root;
       root.render(wrappedContent);
     } else if (Application.layoutFn) {
-      // HTML string with layout - produce full document, morph body via Turbo
+      // Has layout — render full document and morph body
       const fullHtml = Application.wrapInLayout(context, resolved);
       const parser = new DOMParser();
       const doc = parser.parseFromString(fullHtml, 'text/html');
-      // Update page title from layout (Turbo doesn't see the document
-      // because we intercept navigation via turbo:before-visit)
-      const newTitle = doc.querySelector('title');
-      if (newTitle) document.title = newTitle.textContent;
-      // Morph body to match layout output
       if (typeof Turbo !== 'undefined' && Turbo.morphBodyElements) {
         Turbo.morphBodyElements(document.body, doc.body);
       } else {
         document.body.innerHTML = doc.body.innerHTML;
       }
     } else {
-      // HTML string without layout - direct innerHTML on container
       const container = document.getElementById('content');
       container.innerHTML = resolved;
     }
 
-    // Clear flash cookie after rendering (consumed)
     context.flash.writeToCookie();
   }
 
-  // Navigate to a new path, optionally with flash messages
+  // Navigate to a new path via Turbo (or fallback to manual dispatch)
   static async navigate(path, options = {}) {
-    // Create fresh context for the new navigation
-    const context = createContext();
-
-    // Set flash messages if provided
-    if (options.notice) {
-      context.flash.set('notice', options.notice);
-    }
-    if (options.alert) {
-      context.flash.set('alert', options.alert);
-    }
-
-    // Write flash to cookie before navigation
-    if (context.flash.hasPending()) {
+    if (options.notice || options.alert) {
+      const context = createContext();
+      if (options.notice) context.flash.set('notice', options.notice);
+      if (options.alert) context.flash.set('alert', options.alert);
       context.flash.writeToCookie();
     }
 
-    history.pushState({}, '', path);
-    // Create new context for dispatch (will read flash from cookie)
-    await this.dispatch(path);
+    if (Application.layoutFn && typeof Turbo !== 'undefined') {
+      Turbo.visit(path);
+    } else {
+      history.pushState({}, '', path);
+      await this.dispatch(path);
+    }
   }
 
   // Client-side hydration entry point
@@ -530,28 +561,7 @@ export class Application extends ApplicationBase {
         document.getElementById('app').style.display = 'block';
       }
 
-      // Handle browser back/forward via Turbo
-      window.addEventListener('popstate', async () => {
-        await Router.dispatch(location.pathname);
-      });
-
-      // Intercept Turbo navigation for client-side routing
-      // Turbo handles link clicks, we handle the actual rendering
-      document.addEventListener('turbo:before-visit', async (event) => {
-        // Prevent Turbo from making a fetch request
-        event.preventDefault();
-
-        // Extract the URL from the event
-        const url = new URL(event.detail.url);
-        const path = url.pathname;
-
-        // Use our Router to handle the navigation
-        history.pushState({}, '', path);
-        await Router.dispatch(path);
-      });
-
-      // Intercept ALL Turbo fetch requests for client-side handling
-      // This is the only cancelable event for form submissions
+      // Intercept Turbo fetch requests for client-side handling
       document.addEventListener('turbo:before-fetch-request', async (event) => {
         const fetchOptions = event.detail.fetchOptions;
         let method = fetchOptions.method?.toUpperCase() || 'GET';
@@ -573,7 +583,6 @@ export class Application extends ApplicationBase {
         }
 
         // Strip format extension (.json, .html, .turbo_stream) for route matching
-        // Path helpers add .json by default, but routes are defined without extensions
         let path = url.pathname;
         let format = null;
         const formatMatch = path.match(/\.(json|html|turbo_stream)$/);
@@ -588,7 +597,29 @@ export class Application extends ApplicationBase {
           return; // No matching route, let Turbo handle it
         }
 
-        // Prevent Turbo from making a fetch request
+        // GET HTML requests: render page and provide synthetic Response to Turbo
+        // Turbo handles title, scroll, morph, cache, and lifecycle events
+        if (method === 'GET' && format !== 'json' && this.layoutFn) {
+          const rendered = await Router.renderPage(path);
+
+          // Handle route-level redirects
+          if (rendered && rendered.redirect) {
+            event.preventDefault();
+            Turbo.visit(rendered.redirect);
+            return;
+          }
+
+          const html = rendered || Application.wrapInLayout(createContext(), '<h1>Not Found</h1>');
+          event.detail.fetchRequest = {
+            response: Promise.resolve(new Response(html, {
+              status: 200,
+              headers: { 'Content-Type': 'text/html; charset=utf-8' }
+            }))
+          };
+          return;
+        }
+
+        // Prevent Turbo from making a real fetch for other request types
         event.preventDefault();
 
         // Capture the form element to dispatch turbo:submit-end later
@@ -598,30 +629,24 @@ export class Application extends ApplicationBase {
         const context = createContext();
 
         // Set Accept header to indicate Turbo Stream support for form submissions
-        // This allows controllers to check for turbo_stream format
         if (typeof Turbo !== 'undefined' && (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE')) {
           context.request.headers = { accept: 'text/vnd.turbo-stream.html, text/html, application/xhtml+xml' };
         }
 
         if (method === 'DELETE') {
           if (route.nested) {
-            // Nested resource: /articles/:article_id/comments/:id
             const parentId = parseInt(match[1]);
             const id = match[2] ? parseInt(match[2]) : null;
             const response = await route.controller.destroy(context, parentId, id);
-            // Use controller's redirect path (includes base path from path helpers)
             await FormHandler.handleResult(context, response, route.controllerName, 'destroy', route.controller, id);
           } else {
             const id = match[1] ? parseInt(match[1]) : null;
             const response = await route.controller.destroy(context, id);
-            // Use controller's redirect path (includes base path from path helpers)
             await FormHandler.handleResult(context, response, route.controllerName, 'destroy', route.controller, id);
           }
         } else if (method === 'POST' || method === 'PATCH' || method === 'PUT') {
-          // Extract form params from the fetch body (body already defined above)
           let params = {};
 
-          // Helper to set nested param: article[title]=value -> params.article.title = value
           const setNestedParam = (key, value) => {
             if (key === '_method') return;
             const match = key.match(/^([^\[]+)\[([^\]]+)\]$/);
@@ -643,7 +668,6 @@ export class Application extends ApplicationBase {
               setNestedParam(key, value);
             }
           } else if (typeof body === 'string') {
-            // URL-encoded string: article[title]=foo&article[body]=bar
             const searchParams = new URLSearchParams(body);
             for (const [key, value] of searchParams.entries()) {
               setNestedParam(key, value);
@@ -654,7 +678,6 @@ export class Application extends ApplicationBase {
 
           const controllerAction = route.controller[route.action];
           if (controllerAction) {
-            // Pass id for update actions (from route match, not key match)
             const id = match[1] ? parseInt(match[1]) : null;
             const response = id != null
               ? await controllerAction.call(route.controller, context, id, params)
@@ -662,8 +685,6 @@ export class Application extends ApplicationBase {
             await FormHandler.handleResult(context, response, route.controllerName, route.action, route.controller, id);
           }
         } else if (method === 'GET' && format === 'json') {
-          // JSON API request (e.g., notes_path().get() for React data fetching)
-          // Call the controller action and return JSON data
           const { controller, action } = route;
           const actionMethod = action === 'new' ? '$new' : action;
 
@@ -682,27 +703,20 @@ export class Application extends ApplicationBase {
                 : await controller[actionMethod](context);
             }
 
-            // If controller returns raw data (array/object), that's the JSON response
-            // If it returns { json: data }, extract the data
-            // If it returns rendered HTML, we can't convert that to JSON
             let jsonData = data;
             if (data && typeof data === 'object' && 'json' in data) {
               jsonData = data.json;
             }
 
-            // Create a mock Response object for PathHelperPromise
             const responseBody = JSON.stringify(jsonData);
             const mockResponse = new Response(responseBody, {
               status: 200,
               headers: { 'Content-Type': 'application/json' }
             });
 
-            // Resolve the fetch promise with our mock response
-            // This works because we prevented the default fetch
             event.detail.resume?.(mockResponse);
           } catch (e) {
             console.error(`[juntos] JSON API error for ${path}:`, e);
-            // Return error as JSON
             const errorResponse = new Response(JSON.stringify({ error: e.message }), {
               status: 500,
               headers: { 'Content-Type': 'application/json' }
@@ -712,8 +726,7 @@ export class Application extends ApplicationBase {
           return; // Don't dispatch turbo:submit-end for GET requests
         }
 
-        // Dispatch turbo:submit-end to maintain compatibility with Stimulus actions
-        // that depend on Turbo's form submission lifecycle events
+        // Dispatch turbo:submit-end for Stimulus compatibility
         if (formElement) {
           formElement.dispatchEvent(new CustomEvent('turbo:submit-end', {
             bubbles: true,
@@ -722,17 +735,37 @@ export class Application extends ApplicationBase {
         }
       });
 
+      if (!this.layoutFn) {
+        // No layout: use manual popstate + dispatch (legacy behavior)
+        window.addEventListener('popstate', async () => {
+          await Router.dispatch(location.pathname);
+        });
+
+        // Intercept Turbo link clicks for client-side routing
+        document.addEventListener('turbo:before-visit', async (event) => {
+          event.preventDefault();
+          const url = new URL(event.detail.url);
+          history.pushState({}, '', url.pathname);
+          await Router.dispatch(url.pathname);
+        });
+      }
+
       // Initial route - check for GitHub Pages SPA redirect first
-      // When 404.html redirects here, it stores the original path in sessionStorage
       let initialPath = location.pathname || '/';
       const redirectPath = sessionStorage.getItem('spa-redirect-path');
       if (redirectPath) {
         sessionStorage.removeItem('spa-redirect-path');
         initialPath = redirectPath;
-        // Update URL to show the correct path
         history.replaceState({}, '', initialPath);
       }
-      await Router.dispatch(initialPath);
+
+      if (this.layoutFn && typeof Turbo !== 'undefined') {
+        // Let Turbo handle the initial visit — triggers turbo:before-fetch-request
+        // which renders the page and provides a synthetic response
+        Turbo.visit(initialPath, { action: 'replace' });
+      } else {
+        await Router.dispatch(initialPath);
+      }
     } catch (e) {
       const loadingEl = document.getElementById('loading');
       if (loadingEl) {
@@ -824,7 +857,7 @@ export async function handleFormResult(context, result, rerenderFn = null) {
     context.flash.writeToCookie();
 
     console.log(`  Redirected to ${result.redirect}`);
-    Router.navigate(result.redirect);
+    await Router.navigate(result.redirect);
   } else if (result?.render) {
     console.log(`  Re-rendering form (validation failed)`);
     await Router.renderContent(context, result.render);
