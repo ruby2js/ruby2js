@@ -279,6 +279,25 @@ module Ruby2JS
             end
             @rails_private_method_params[method_name] = injected if injected.any?
           end
+
+          # Pre-compute which private methods return ivar objects.
+          # Must happen here (not in transform_private_method) because
+          # mark_private_method_calls runs during action transformation,
+          # before private methods are transformed.
+          @rails_private_methods_returning_ivars = {}
+          @rails_private_method_calls.each do |method_name|
+            injected = @rails_private_method_params[method_name]
+            next unless injected
+
+            method_node = @rails_private_methods[method_name]
+            next unless method_node
+            body = method_node.children[2]
+            next unless body
+
+            assigned_ivars = collect_ivar_assignments(body)
+            returned = injected.select { |name| assigned_ivars.include?(name) }
+            @rails_private_methods_returning_ivars[method_name] = returned if returned.any?
+          end
         end
 
         # Recursively find calls to known private methods in action bodies
@@ -659,6 +678,27 @@ module Ruby2JS
           end
 
           node.children.each { |child| collect_ivars_recursive(child, ivars) }
+        end
+
+        # Collect only ivar assignments (not reads) from an AST node
+        def collect_ivar_assignments(node)
+          assigns = []
+          collect_ivar_assignments_recursive(node, assigns)
+          assigns.uniq.sort
+        end
+
+        def collect_ivar_assignments_recursive(node, assigns)
+          return unless node.respond_to?(:type) && node.respond_to?(:children)
+
+          if node.type == :ivasgn
+            assigns.push(node.children[0].to_s.sub(/^@/, '').to_sym)
+          # Also catch ||= and &&= on ivars
+          elsif [:or_asgn, :and_asgn].include?(node.type) &&
+                node.children[0]&.type == :ivasgn
+            assigns.push(node.children[0].children[0].to_s.sub(/^@/, '').to_sym)
+          end
+
+          node.children.each { |child| collect_ivar_assignments_recursive(child, assigns) }
         end
 
         # Collect params[:key] accesses to determine method parameters
@@ -1512,22 +1552,43 @@ module Ruby2JS
               @rails_private_methods.key?(node.children[1])
             method_name = node.children[1]
             is_async = @rails_async_private_methods.include?(method_name)
+
+            # Check if this private method returns an ivar object
+            returned_ivars = @rails_private_methods_returning_ivars &&
+              @rails_private_methods_returning_ivars[method_name]
+
             # Check if this private method needs injected arguments
             injected = nil
             if defined?(@rails_private_method_params)
               injected = @rails_private_method_params[method_name]
             end
+
             result = node
             if injected && injected.any?
-              # Add injected variables as arguments to the call
-              extra_args = injected.map { |name| s(:lvar, name) }
-              new_children = [*node.children, *extra_args]
-              result = node.updated(:send!, new_children)
+              # Only pass read-only ivars as arguments (not assigned ones)
+              read_only = injected.select { |name| !returned_ivars&.include?(name) }
+              if read_only.any?
+                extra_args = read_only.map { |name| s(:lvar, name) }
+                new_children = [*node.children, *extra_args]
+                result = node.updated(:send!, new_children)
+              elsif node.children.length == 2
+                result = node.updated(:send!, node.children)
+              end
             elsif node.children.length == 2
               result = node.updated(:send!, node.children)
             end
+
             # Wrap with await if the private method is async
-            return is_async ? result.updated(:await!) : result
+            call_expr = is_async ? result.updated(:await!) : result
+
+            # For methods returning ivar objects, wrap in destructuring:
+            # let { avail, cost_override, ... } = await setup_form(studio)
+            if returned_ivars && returned_ivars.any?
+              match_vars = returned_ivars.map { |name| s(:match_var, name) }
+              return s(:match_pattern, call_expr, s(:hash_pattern, *match_vars))
+            end
+
+            return call_expr
           elsif [:if, :begin, :kwbegin, :while, :until, :for].include?(node.type)
             new_children = node.children.map { |c| mark_private_method_calls(c) }
             return node.updated(nil, new_children)
@@ -1577,6 +1638,11 @@ module Ruby2JS
         # Applies the same ivar→local and params transformations as action methods.
         # Uses pre-computed @rails_private_method_params to add injected parameters
         # for ivars and params that are free variables in the private method's scope.
+        #
+        # For methods that assign to injected ivars (like setup_form), the assigned
+        # ivars become local variables (not parameters) and the method returns an
+        # object of those values. Call sites destructure the result. This matches
+        # Rails' instance variable semantics where assignments propagate to the caller.
         def transform_private_method(node)
           method_name = node.children[0]
           args = node.children[1]
@@ -1593,11 +1659,28 @@ module Ruby2JS
           # Build function args from the Ruby method args
           param_args = args.children.map { |arg| s(:arg, arg.children[0]) }
 
-          # Add injected params (pre-computed in collect_controller_metadata)
+          # Use pre-computed data to split injected ivars into read-only params
+          # vs assigned ivars that get returned as an object
           injected = @rails_private_method_params[method_name]
+          returned_ivars = @rails_private_methods_returning_ivars[method_name] || []
+
           if injected
             injected.each do |name|
-              param_args.push(s(:arg, name))
+              unless returned_ivars.include?(name)
+                # Read-only ivars: inject as params (caller must provide)
+                param_args.push(s(:arg, name))
+              end
+            end
+          end
+
+          # Append return { ivar1, ivar2, ... } to the body for assigned ivars
+          if returned_ivars.any?
+            return_pairs = returned_ivars.map { |name| s(:pair, s(:sym, name), s(:lvar, name)) }
+            return_hash = s(:return, s(:hash, *return_pairs))
+            if transformed_body&.type == :begin
+              transformed_body = transformed_body.updated(nil, [*transformed_body.children, return_hash])
+            elsif transformed_body
+              transformed_body = s(:begin, transformed_body, return_hash)
             end
           end
 
@@ -1606,9 +1689,12 @@ module Ruby2JS
           # await nodes inside the send child of blocks like .map { ... }.
           node_type = contains_await_nodes?(transformed_body) ? :async : :def
 
-          # Wrap in autoreturn for implicit return behavior (same as action methods).
-          # Without this, a hash literal as the last expression becomes a block statement.
-          final_body = transformed_body ? s(:autoreturn, transformed_body) : nil
+          # Wrap body (skip autoreturn since we added explicit return for ivar objects)
+          final_body = if returned_ivars.any?
+                         transformed_body
+                       else
+                         transformed_body ? s(:autoreturn, transformed_body) : nil
+                       end
 
           process(s(node_type, method_name, s(:args, *param_args), final_body))
         end

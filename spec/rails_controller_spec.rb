@@ -635,9 +635,11 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      # Private method receives ivar-derived locals as arguments
-      _(result).must_include 'setup_heatlist_data(heats)'
-      _(result).must_include 'function setup_heatlist_data(heats)'
+      # Private method that assigns ivars returns them as an object;
+      # call site destructures the result
+      _(result).must_include 'let { heats } = await setup_heatlist_data()'
+      _(result).must_include 'function setup_heatlist_data()'
+      _(result).must_include 'return {heats}'
       _(result).wont_include 'let setup_heatlist_data'
     end
   end
@@ -884,8 +886,10 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      # Private method receives ivar-derived locals as arguments
-      _(result).must_include 'async function setup_form(options)'
+      # Private method that assigns ivars returns them; call site destructures
+      _(result).must_include 'async function setup_form()'
+      _(result).must_include 'let { options } = await setup_form()'
+      _(result).must_include 'return {options}'
     end
   end
 
@@ -1095,12 +1099,12 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      # Both action and private method should have parens on the call
-      # generate_agenda receives ivar-derived locals as arguments
-      _(result).must_include 'generate_agenda(agenda)'
-      _(result).must_include 'function generate_agenda(agenda)'
-      # In generate_scores, the bare call should also have parens with args
-      _(result).must_include 'if (!agenda) generate_agenda(agenda)'
+      # Private method that assigns ivars returns them; call site destructures
+      _(result).must_include 'generate_agenda()'
+      _(result).must_include 'function generate_agenda()'
+      _(result).must_include 'return {agenda}'
+      # In generate_scores, the bare call should also have parens
+      _(result).must_include 'if (!agenda) let { agenda } = generate_agenda()'
     end
   end
 
