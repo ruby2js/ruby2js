@@ -1324,6 +1324,10 @@ function parseCommonArgs(args) {
       options.database = arg.slice(2);
     } else if (arg.startsWith('--database=')) {
       options.database = arg.slice(11);
+    } else if (arg === '--database-name') {
+      options.dbName = args[++i];
+    } else if (arg.startsWith('--database-name=')) {
+      options.dbName = arg.slice(16);
     } else if (arg === '-e' || arg === '--environment') {
       options.environment = args[++i];
     } else if (arg.startsWith('-e')) {
@@ -1464,6 +1468,7 @@ function loadDatabaseConfig(options) {
 
 function applyEnvOptions(options) {
   if (options.database) process.env.JUNTOS_DATABASE = options.database;
+  if (options.dbName) process.env.JUNTOS_DB_NAME = options.dbName;
   if (options.target) process.env.JUNTOS_TARGET = options.target;
   if (options.base) process.env.JUNTOS_BASE = options.base;
   if (options.environment) {
@@ -5013,6 +5018,7 @@ Commands:
 
 Common Options:
   -d, --database ADAPTER   Database adapter (dexie, sqlite, d1, etc.)
+  --database-name NAME     Database name (default: appname_environment)
   -e, --environment ENV    Environment (development, production, test)
   -t, --target TARGET      Deploy target (browser, node, vercel, cloudflare)
   -p, --port PORT          Server port (default: 3000)

@@ -2637,6 +2637,7 @@ function createVirtualPlugin(config, appRoot) {
   // Load database config for injection
   const dbConfig = loadDatabaseConfig(appRoot, { quiet: true }) || {};
   if (config.database) dbConfig.adapter = config.database;
+  if (process.env.JUNTOS_DB_NAME) dbConfig.database = process.env.JUNTOS_DB_NAME;
 
   // Track which modules are part of the client bundle
   // This is needed because the client bundle needs browser runtime, not server runtime
