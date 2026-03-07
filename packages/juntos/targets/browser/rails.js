@@ -599,12 +599,15 @@ export class Application extends ApplicationBase {
 
         // GET HTML requests: render page and provide synthetic Response to Turbo
         // Turbo handles title, scroll, morph, cache, and lifecycle events
+        // We must preventDefault + resume because rendering is async and Turbo
+        // dispatches the event synchronously
         if (method === 'GET' && format !== 'json' && this.layoutFn) {
+          event.preventDefault();
+
           const rendered = await Router.renderPage(path);
 
           // Handle route-level redirects
           if (rendered && rendered.redirect) {
-            event.preventDefault();
             Turbo.visit(rendered.redirect);
             return;
           }
@@ -616,6 +619,7 @@ export class Application extends ApplicationBase {
               headers: { 'Content-Type': 'text/html; charset=utf-8' }
             }))
           };
+          event.detail.resume();
           return;
         }
 
