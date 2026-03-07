@@ -2846,7 +2846,7 @@ async function runEject(options) {
     writeFileSync(join(outDir, 'index.html'), generateBrowserIndexHtml(appName, './main.js', cssPath));
     fileCount++;
     const layoutFile = join(APP_ROOT, 'app/views/layouts/application.html.erb');
-    const layoutPath = existsSync(layoutFile) ? './app/views/layouts/application.html.erb' : null;
+    const layoutPath = existsSync(layoutFile) ? './app/views/layouts/application.js' : null;
     writeFileSync(join(outDir, 'main.js'), generateBrowserMainJs('./config/routes.js', './app/javascript/controllers/index.js', layoutPath));
     fileCount++;
   } else {
