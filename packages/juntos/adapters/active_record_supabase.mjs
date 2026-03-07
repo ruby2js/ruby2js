@@ -311,6 +311,11 @@ export class ActiveRecord extends ActiveRecordBase {
     return new Relation(this).pluck(...columns);
   }
 
+  // Return a single value
+  static async pick(...columns) {
+    return new Relation(this).pick(...columns);
+  }
+
   // --- Relation Execution (called by Relation class) ---
 
   // Execute a Relation and return model instances

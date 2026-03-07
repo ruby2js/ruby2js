@@ -218,6 +218,11 @@ export class ActiveRecord extends ActiveRecordBase {
     return new Relation(this).pluck(...columns);
   }
 
+  // Return a single value
+  static async pick(...columns) {
+    return new Relation(this).pick(...columns);
+  }
+
   static delete_all(conditions) { return this.deleteAll(conditions); }
   static destroy_all() { return this.destroyAll(); }
 
