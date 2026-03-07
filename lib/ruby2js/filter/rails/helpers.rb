@@ -2533,13 +2533,14 @@ module Ruby2JS
         # form_with(url: articles_path, class: "contents") do |form| ... end
         # form_with(url: "/photos", method: :post) do |form| ... end
         def process_form_with(helper_call, block_args, block_body)
-          # Extract model, url, method, class, and data from keyword arguments
+          # Extract model, url, method, class, id, and data from keyword arguments
           model_name = nil
           parent_model_name = nil  # Track parent for nested resources
           model_is_new = false  # Track if model is Model.new (no pre-fill values)
           url_node = nil  # Track url: option for form action
           http_method = :post  # Default HTTP method
           css_class = nil
+          form_id = nil
           data_attrs = {}  # Track data-* attributes for form tag
           options_node = helper_call.children[2]
 
@@ -2598,6 +2599,8 @@ module Ruby2JS
                   http_method = value.children[0] if value.type == :sym
                 when :class
                   css_class = extract_class_value(value)
+                when :id
+                  form_id = value.children[0] if value.type == :str
                 when :data
                   # Handle data: { key: value } -> data-key="value"
                   if value.type == :hash
@@ -2633,7 +2636,8 @@ module Ruby2JS
 
           statements = []
 
-          # Build class attribute string
+          # Build id and class attribute strings
+          id_attr = form_id ? " id=\"#{form_id}\"" : ""
           class_attr = css_class ? " class=\"#{css_class}\"" : ""
 
           # Build data attributes string
@@ -2668,13 +2672,13 @@ module Ruby2JS
                 parent_var = s(:lvar, parent_model_name.to_sym)
                 statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                   s(:dstr,
-                    s(:str, "<form#{class_attr}#{data_attr} action=\""),
+                    s(:str, "<form#{id_attr}#{class_attr}#{data_attr} action=\""),
                     s(:begin, s(:send, nil, nested_plural_path, parent_var)),
                     s(:str, "\" accept-charset=\"UTF-8\" method=\"post\">\n")))
               else
                 statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                   s(:dstr,
-                    s(:str, "<form#{class_attr}#{data_attr} action=\""),
+                    s(:str, "<form#{id_attr}#{class_attr}#{data_attr} action=\""),
                     s(:begin, s(:send, nil, plural_path)),
                     s(:str, "\" accept-charset=\"UTF-8\" method=\"post\">\n")))
               end
@@ -2683,7 +2687,7 @@ module Ruby2JS
               # <form action="<%= article.id ? article_path(article) : articles_path() %>" method="post">
               statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                 s(:dstr,
-                  s(:str, "<form#{class_attr}#{data_attr} action=\""),
+                  s(:str, "<form#{id_attr}#{class_attr}#{data_attr} action=\""),
                   s(:begin,
                     s(:if, s(:attr, model_var, :id),
                       s(:send, nil, singular_path, model_var),
@@ -2708,7 +2712,7 @@ module Ruby2JS
             if url_node.type == :str
               # Static URL string: url: "/photos"
               url_str = url_node.children[0]
-              form_tag = "<form#{class_attr}#{data_attr} action=\"#{url_str}\" method=\"#{actual_method}\">"
+              form_tag = "<form#{id_attr}#{class_attr}#{data_attr} action=\"#{url_str}\" method=\"#{actual_method}\">"
               if needs_method_field
                 form_tag += "\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\">"
               end
@@ -2719,13 +2723,13 @@ module Ruby2JS
               if needs_method_field
                 statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                   s(:dstr,
-                    s(:str, "<form#{class_attr}#{data_attr} action=\""),
+                    s(:str, "<form#{id_attr}#{class_attr}#{data_attr} action=\""),
                     s(:begin, url_expr),
                     s(:str, "\" method=\"#{actual_method}\">\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\">")))
               else
                 statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                   s(:dstr,
-                    s(:str, "<form#{class_attr}#{data_attr} action=\""),
+                    s(:str, "<form#{id_attr}#{class_attr}#{data_attr} action=\""),
                     s(:begin, url_expr),
                     s(:str, "\" method=\"#{actual_method}\">")))
               end
