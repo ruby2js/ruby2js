@@ -4,37 +4,243 @@
 
 The ballroom app (`test/ballroom`, pushed to `github.com:rubys/ballroom`) is a dance competition management system rebuilt from the original showcase app (`~/git/showcase`) using current Rails idioms. The goal is a single Ruby codebase deployable as both a Rails app and a JavaScript app via Juntos.
 
-## Current State (March 2025)
+## Current State (March 2026)
 
 ### What exists
 
-- **33 models** — most scaffold-level; Event, Person, Studio, Dance enriched with scopes, validations, associations
-- **29 controllers** — 27 standard CRUD scaffolds; EventsController has `root`, StudiosController has `unpair`
-- **217 Juntos tests passing** (29 controller test suites + 2 system tests + 32 model tests)
-- **5 collection routes defined but not implemented:** `students`, `backs`, `summary`, `publish`, `settings`
+- **35 models** — Event, Person, Studio, Dance enriched with scopes, validations, associations; Locale (non-AR service class with Intl.DateTimeFormat dual-runtime support)
+- **29 controllers** — 27 standard CRUD scaffolds; EventsController has enriched `root` action, StudiosController has `unpair`
+- **217 Juntos tests passing** (28 controller test suites + 2 system tests + 3 model tests)
+- **Ejected directory** — 348 JS files covering all models, controllers, views, tests, config
+- **Application helpers** — `localized_date` in `ApplicationHelper`, imported automatically by ERB filter via `@helpers/` virtual prefix
+- **Showcase route aliases** — `/event/summary`, `/event/publish`, `/event/settings` mapped to plural controller actions
 
 ### What renders via `juntos render`
 
-19 pages confirmed working:
+All standard pages render successfully:
 ```
-200 OK  /            (2.7KB)    200 OK  /studios       (4.3KB)
-200 OK  /studios/1   (2.1KB)   200 OK  /studios/1/edit (3.9KB)
-200 OK  /studios/new (2.7KB)   200 OK  /people        (489.0KB)
-200 OK  /people/1    (2.8KB)   200 OK  /people/new    (4.6KB)
-200 OK  /heats       (8362.5KB) 200 OK  /dances       (127.2KB)
-200 OK  /dances/1    (3.1KB)   200 OK  /dances/new    (5.6KB)
-200 OK  /categories  (31.8KB)  200 OK  /categories/1  (2.9KB)
-200 OK  /events/1    (6.6KB)   200 OK  /events/1/edit (16.3KB)
-200 OK  /levels      (8.5KB)   200 OK  /ages         (10.1KB)
-200 OK  /judges      (7.0KB)
+/            /studios      /studios/1    /studios/1/edit  /studios/new
+/people      /people/1     /people/new   /heats           /dances
+/dances/1    /dances/new   /categories   /categories/1    /events/1
+/events/1/edit  /levels    /ages         /judges
 ```
 
-5 collection action pages fail (controller actions not implemented):
+5 collection action pages not yet implemented:
 `/events/summary`, `/events/publish`, `/events/settings`, `/people/students`, `/people/backs`
 
 ### Test data
 
 544 real competition SQLite databases in `~/git/showcase/db/` (318 MB total). Any can be copied to `storage/development.sqlite3` for testing with diverse data.
+
+## Juntos CLI Reference
+
+All commands run from `test/ballroom/`.
+
+### Core Commands
+
+| Command | Description |
+|---------|-------------|
+| `npx juntos dev` | Start development server with hot reload |
+| `npx juntos build` | Build for deployment |
+| `npx juntos test` | Run tests with Vitest |
+| `npx juntos e2e` | Run end-to-end tests with Playwright (`--headed`, `--ui`) |
+| `npx juntos server` | Start production server (requires prior build) |
+| `npx juntos up` | Build and run locally (node, bun, browser) |
+| `npx juntos deploy` | Build and deploy to serverless platform |
+
+### Debugging & Inspection Commands
+
+#### `juntos render` — Render pages without a server
+
+Renders pages via Vite SSR, producing the same HTML the browser would see.
+
+```bash
+npx juntos render --html /                    # Output full HTML for root page
+npx juntos render --html /studios /people     # Render multiple pages
+npx juntos render --check / /studios /people  # Exit 0 if all succeed, 1 if any fail
+npx juntos render --search "Galaxy" /studios  # Grep rendered output
+npx juntos render -v /studios                 # Verbose (show timing, errors)
+```
+
+Global options work here too: `-d sqlite`, `-t node`, `-e development`.
+
+#### `juntos transform` — Show transpiled JavaScript
+
+Shows the JavaScript output for any Ruby source file. Essential for debugging transpilation.
+
+```bash
+npx juntos transform app/models/studio.rb              # Model → JS class
+npx juntos transform app/views/studios/_form.html.erb   # ERB → JS render function
+npx juntos transform app/controllers/studios_controller.rb  # Controller → JS
+npx juntos transform app/helpers/application_helper.rb  # Helper → JS module
+
+# Show intermediate Ruby (ERB → Ruby before JS transpilation)
+npx juntos transform --intermediate app/views/studios/edit.html.erb
+
+# Use Playwright filter for test files
+npx juntos transform --e2e test/system/studios_test.rb
+```
+
+#### `juntos eject` — Write all transpiled JS to disk
+
+Writes the complete JS application to `ejected/` (or custom dir). Useful for inspecting the full output, running without Vite, or debugging import resolution.
+
+```bash
+npx juntos eject                                # Full eject to ejected/
+npx juntos eject --out /tmp/ballroom-js         # Custom output dir
+npx juntos eject --include "app/models/*"       # Only models
+npx juntos eject --exclude "test/*"             # Skip tests
+DEBUG=1 npx juntos eject                        # Stack traces + JS syntax checking
+```
+
+The ejected directory is a standalone JS app with its own `package.json`, `vite.config.js`, and `vitest.config.js`.
+
+#### `juntos info` — Show current configuration
+
+```bash
+npx juntos info                    # Environment, database, project info
+npx juntos info --metadata         # Full pre-analyzed metadata as JSON
+npx juntos info --metadata | jq .helpers    # Inspect helper metadata
+npx juntos info --metadata | jq .models     # Inspect model metadata
+npx juntos info --metadata | jq .routes     # Inspect route metadata
+```
+
+#### `juntos lint` — Static analysis for transpilation issues
+
+```bash
+npx juntos lint                    # Scan all Ruby files
+npx juntos lint --strict           # Stricter rules
+npx juntos lint --summary          # Untyped variable summary
+npx juntos lint --suggest          # Auto-generate type hints
+npx juntos lint app/models/        # Scan specific directory
+```
+
+Checks for: `ambiguous_method`, `method_missing`, `eval_call`, `retry_statement`, and 7 other rule types.
+
+#### `juntos doctor` — Check environment and prerequisites
+
+```bash
+npx juntos doctor                  # Verify Ruby, Node, gems, npm packages
+```
+
+#### `juntos db` — Database management
+
+```bash
+npx juntos db create     # Create database
+npx juntos db migrate    # Run migrations
+npx juntos db seed       # Seed data
+npx juntos db prepare    # Create + migrate + seed
+npx juntos db drop       # Drop database
+npx juntos db reset      # Drop + prepare
+```
+
+## Ruby-Side Debugging Tools
+
+These are in the main `ruby2js` repo (run from repo root):
+
+```bash
+# Basic transpilation
+bin/ruby2js -e 'self.foo ||= 1'
+
+# Show AST before/after filters
+bin/ruby2js --ast -e 'self.foo ||= 1'
+bin/ruby2js --filtered-ast -e 'self.foo ||= 1'
+
+# Apply specific filters
+bin/ruby2js --filter functions --filter esm -e 'puts "hello"'
+bin/ruby2js --filter rails -e 'Location.pick(:locale)'
+
+# Compare Ruby vs JS transpiler output side-by-side
+bin/compare -e 'foo rescue nil'
+bin/compare --filter rails --es2022 demo/blog/app/models/comment.rb
+bin/compare --diff -e 'x ||= 1'
+```
+
+## Comparison & Testing Harnesses
+
+All scripts run from `test/ballroom/`.
+
+### 1. Rails render script
+
+Renders ballroom pages via Rails without starting a server.
+
+```bash
+ruby scripts/render.rb / /studios /people       # Status + size for each path
+ruby scripts/render.rb --html /studios          # Output full HTML
+ruby scripts/render.rb --test /studios          # Use test fixtures instead of dev DB
+ruby scripts/render.rb --search "Studios" /     # Grep rendered output
+ruby scripts/render.rb --check / /studios       # Exit 0/1 for CI
+ruby scripts/render.rb --verbose /studios       # Timing and debug info
+```
+
+### 2. Transpiler comparison harness — DONE
+
+`scripts/compare.rb` renders each path via both Rails and Juntos, normalizes HTML (strips CSRF tokens, asset fingerprints, importmaps, whitespace), and reports MATCH/DIFFER.
+
+```bash
+ruby scripts/compare.rb / /studios /people /heats /dances
+ruby scripts/compare.rb --diff /studios         # Show unified diff
+ruby scripts/compare.rb --test /studios         # Use test fixtures
+ruby scripts/compare.rb --verbose /studios      # Extra detail
+```
+
+**What it normalizes:**
+- CSRF meta tags and tokens
+- Asset fingerprint hashes in URLs
+- Importmap script blocks
+- Self-closing slash differences (`<br>` vs `<br/>`)
+- Trailing whitespace and blank lines
+
+### 3. Showcase comparison harness — DONE
+
+`scripts/compare-showcase.rb` compares the original showcase Rails app against ballroom's Juntos output, using the same database.
+
+```bash
+# Use a showcase database (name, relative, or absolute path)
+ruby scripts/compare-showcase.rb 2025-charlotte /
+ruby scripts/compare-showcase.rb 2025-charlotte / /studios /people /dances
+
+# Show unified diff instead of summary
+ruby scripts/compare-showcase.rb 2025-charlotte --diff /
+
+# Verbose output
+ruby scripts/compare-showcase.rb 2025-charlotte --verbose / /studios
+```
+
+**How it works:**
+1. Resolves the database path (checks `~/git/showcase/db/`, relative, absolute)
+2. Copies to ballroom's `storage/development.sqlite3`
+3. Renders via showcase's render script and ballroom's Juntos render
+4. Extracts `<main>` content for comparison (ignores layout/head)
+5. Handles route mapping (`/event/*` ↔ `/events/*`)
+6. Reports diffs or MATCH/DIFFER per page
+
+### Typical verification workflow
+
+```bash
+cd ~/git/ruby2js
+
+# 1. Run Ruby tests
+bundle exec rake test
+
+# 2. Rebuild and install tarballs
+bundle exec rake -f demo/selfhost/Rakefile release
+cd test/ballroom
+rm -rf node_modules/juntos node_modules/juntos-dev
+npm install ../../artifacts/tarballs/juntos-beta.tgz ../../artifacts/tarballs/juntos-dev-beta.tgz
+
+# 3. Run Juntos tests
+npx juntos test
+
+# 4. Re-eject and inspect
+npx juntos eject
+cat ejected/app/helpers/application_helper.js
+
+# 5. Render and compare
+npx juntos render --html /
+ruby scripts/compare.rb / /studios /people /dances
+ruby scripts/compare-showcase.rb 2025-charlotte --diff /
+```
 
 ## Three Testing Dimensions
 
@@ -42,84 +248,22 @@ The ballroom app (`test/ballroom`, pushed to `github.com:rubys/ballroom`) is a d
 
 System tests exercise user flows end-to-end: visit page, click link, fill form, assert result. They run under both Rails (`bin/rails test test/system`) and Juntos (`npx juntos test`). Differences reveal transpiler/runtime bugs.
 
-**Current:** 217/217 Juntos tests passing (2 system test files + 29 controller + 32 model).
+**Current:** 217/217 Juntos tests passing (28 controller + 3 model + 2 system test suites).
 
 ### 2. Transpiler fidelity (ballroom Rails vs ballroom Juntos)
 
-Both render the same ballroom app from the same database. Normalizing and diffing the HTML catches transpiler bugs: missing CSS classes, wrong links, absent associations, layout differences.
+Both render the same ballroom app from the same database. The `scripts/compare.rb` harness normalizes and diffs the HTML, catching transpiler bugs: missing CSS classes, wrong links, absent associations, layout differences.
 
-**Tools:**
-- `scripts/render.rb --html /path` — Rails render (done)
-- `npx juntos render --html /path` — Juntos render (done)
+### 3. Showcase parity (showcase Rails vs ballroom Juntos)
 
-### 3. Showcase parity (showcase Rails vs ballroom Rails)
+Comparing showcase's Rails output against ballroom's Juntos output for the same routes and database. The `scripts/compare-showcase.rb` harness drives Phase 3 work (enriching beyond scaffolds).
 
-Ballroom was rebuilt from showcase. Comparing their HTML output for the same routes and database verifies that the ballroom rebuild actually matches the original UI. This drives Phase 3 (enriching beyond scaffolds).
-
-**Tools:**
-- Showcase: `~/git/showcase/.claude/skills/render-page/scripts/render.rb DB --html /path`
-- Ballroom: `test/ballroom/scripts/render.rb --html /path`
-
-**Route differences to account for:**
+**Route differences handled automatically:**
 | Showcase route | Ballroom route | Notes |
 |---------------|---------------|-------|
-| `/event/settings` | `/events/settings` | Singular vs plural controller |
+| `/event/settings` | `/events/settings` | Singular vs plural; alias routes defined |
 | `/event/summary` | `/events/summary` | |
 | `/event/publish` | `/events/publish` | |
-| `/people/students` | `/people/students` | Same |
-| `/people/backs` | `/people/backs` | Same |
-| `/studios` | `/studios` | Same |
-| `/people` | `/people` | Same |
-| `/heats` | `/heats` | Same |
-| `/dances` | `/dances` | Same |
-| `/categories` | `/categories` | Same |
-
-## Tooling
-
-### 1. Rails render script — DONE
-
-`test/ballroom/scripts/render.rb` renders Rails pages without starting a server, bypassing HostAuthorization middleware.
-
-```bash
-cd test/ballroom
-ruby scripts/render.rb / /studios /people
-ruby scripts/render.rb --html /studios
-ruby scripts/render.rb --test /studios           # uses test fixtures
-ruby scripts/render.rb --search "Studios" /
-ruby scripts/render.rb --check / /studios /people
-```
-
-### 2. Transpiler comparison harness — TODO
-
-A script that:
-1. Renders a path via `scripts/render.rb --html` → Rails HTML
-2. Renders the same path via `npx juntos render --html` → Juntos HTML
-3. Normalizes both (strip CSRF tokens, asset fingerprints, whitespace)
-4. Reports meaningful differences
-
-```bash
-cd test/ballroom
-scripts/compare.rb /studios /people /heats /dances
-```
-
-### 3. Showcase comparison harness — TODO
-
-A script that:
-1. Copies a database to both showcase and ballroom `storage/development.sqlite3`
-2. Renders shared routes via both render scripts
-3. Normalizes both (strip layout chrome, asset paths, CSRF tokens)
-4. Reports content-level differences (the actual view body, ignoring layout/head)
-
-```bash
-scripts/compare-showcase.rb ~/git/showcase/db/2025-charlotte.sqlite3 / /studios /people /heats /dances
-```
-
-**Normalization challenges:**
-- Different layouts (showcase may have different nav, head tags)
-- Different asset fingerprints
-- Different Turbo/Stimulus attributes
-- Showcase views are mature; ballroom views are scaffolds → expect large diffs initially
-- Focus on **body content** within `<main>` or similar container, not full page
 
 ## Development Sequence
 
@@ -129,14 +273,14 @@ Work is driven by **what the root page links to**, fixing issues as encountered.
 - Clean transpiler comparison (no ballroom Rails vs Juntos drift)
 - Reduced showcase comparison diff (ballroom converging on showcase output)
 
-### Phase 1: Establish baselines — IN PROGRESS
+### Phase 1: Establish baselines — DONE
 
 1. ~~Fix Juntos test failures~~ — **DONE** (vitest.config.js fix, 217/217 passing)
 2. ~~Write Rails render script~~ — **DONE** (`scripts/render.rb`)
-3. **Build transpiler comparison harness** — compare ballroom Rails vs Juntos HTML
-4. **Run transpiler comparison on all 19 working pages** — fix any drift
-5. **Build showcase comparison harness** — compare showcase vs ballroom HTML
-6. **Run showcase comparison on root page** — understand the gap
+3. ~~Build transpiler comparison harness~~ — **DONE** (`scripts/compare.rb`)
+4. ~~Run transpiler comparison on all working pages~~ — **DONE** (iteratively refined)
+5. ~~Build showcase comparison harness~~ — **DONE** (`scripts/compare-showcase.rb`)
+6. ~~Run showcase comparison on root page~~ — **DONE** (root page rebuilt to match)
 
 ### Phase 2: Implement missing collection actions
 
@@ -150,20 +294,21 @@ Each follows the same pattern: study the showcase implementation, implement acti
 | 4 | `/events/summary` | `event#summary` | Competition summary |
 | 5 | `/events/publish` | `event#publish` | Publish controls |
 
-### Phase 3: Enrich beyond scaffolds
+### Phase 3: Enrich beyond scaffolds — IN PROGRESS
 
-Replace scaffold views with showcase-matching views, driven by showcase comparison diffs. Test each change against multiple databases. Work page by page, starting from the root:
+Replace scaffold views with showcase-matching views, driven by showcase comparison diffs. Test each change against multiple databases. Work page by page, starting from the root.
 
-| Area | Key changes | Showcase reference |
-|------|-------------|-------------------|
-| **Root (/)** | Event info, judge list, navigation grid | `event#root` |
-| **Studios** | Pair management UI, student counts | `studios_controller.rb` |
-| **People** | Role-based views, display_name formatting | `people_controller.rb` |
-| **Dances** | Category grouping, drag-drop reorder | `dances_controller.rb` |
-| **Heats** | Entry display, scheduling, multi-dance | `heats_controller.rb` |
-| **Categories** | Ordered list, lock toggle, extensions | `categories_controller.rb` |
-| **Entries** | Lead/follow/instructor associations | `entries_controller.rb` |
-| **Scores** | Scoring forms, judge assignment | `scores_controller.rb` |
+| Area | Status | Key changes |
+|------|--------|-------------|
+| **Root (/)** | **DONE** | Dashboard with event info, localized date, judge/DJ/emcee lists, 3x3 nav grid, info box, conditional backs link |
+| **Studios index** | **DONE** | Table with location/count columns, totals row, info box, back-to-event link |
+| **Studios show/edit** | Partial | Pair management UI exists (`unpair` action) |
+| **People** | Not started | Role-based views, display_name formatting |
+| **Dances** | Not started | Category grouping, drag-drop reorder |
+| **Heats** | Not started | Entry display, scheduling, multi-dance |
+| **Categories** | Not started | Ordered list, lock toggle, extensions |
+| **Entries** | Not started | Lead/follow/instructor associations |
+| **Scores** | Not started | Scoring forms, judge assignment |
 
 ### Phase 4: Advanced features
 
@@ -172,36 +317,33 @@ Replace scaffold views with showcase-matching views, driven by showcase comparis
 - **Active Storage:** Solo recordings, formations
 - **Authentication:** User model, session management
 
-## Verification Commands
+## Key Infrastructure Built
 
-```bash
-# Juntos tests (after tarball rebuild)
-cd ~/git/ruby2js
-bundle exec rake -f demo/selfhost/Rakefile release
-cd test/ballroom
-npm install ../../artifacts/tarballs/juntos-dev-beta.tgz
-npx juntos test                   # All tests (217 currently)
+### Application helper pipeline
 
-# Rails render
-cd test/ballroom
-ruby scripts/render.rb / /studios /people /heats /dances /categories
+The ERB filter detects calls to app helper methods (e.g., `localized_date`) via metadata and generates `@helpers/` virtual imports. The Vite plugin resolves these to `app/helpers/*.rb`, transpiles, and adds cross-model imports. The eject pipeline writes helpers to `ejected/app/helpers/` with `postProcessTestHelper()` converting module objects to named exports.
 
-# Juntos render
-npx juntos render / /studios /people /heats /dances /categories
+Key files:
+- `lib/ruby2js/filter/rails/helpers.rb` — ERB detection + import generation
+- `packages/juntos-dev/transform.mjs` — `extractHelperMethods()`, `buildAppManifest()` helper scanning
+- `packages/juntos-dev/vite.mjs` — `@helpers/` resolution, `addCrossModelImports()` for helpers
+- `packages/juntos-dev/cli.mjs` — eject helper file writing with cross-model imports
 
-# Render with specific database
-cp ~/git/showcase/db/2025-charlotte.sqlite3 storage/development.sqlite3
-ruby scripts/render.rb / /studios /people
-npx juntos render / /studios /people
+### Locale model with dual-runtime date formatting
 
-# Showcase render (same database)
-cd ~/git/showcase
-RAILS_APP_DB=2025-charlotte .claude/skills/render-page/scripts/render.rb --html /studios
-```
+`app/models/locale.rb` — 445-line non-AR service class supporting 13 locales. Uses `defined?(Intl)` guards:
+- **JS runtime:** Native `Intl.DateTimeFormat` for date/range formatting
+- **Ruby runtime:** Manual locale-specific formatting (month names, ordinals, separators)
+
+The `defined?(Intl)` pattern transpiles to `typeof Intl !== 'undefined'`, enabling clean runtime detection without changing callers.
+
+### Adapter `pick()` method
+
+`Model.pick(:column)` returns a single value (like `pluck` limited to 1 result). Static wrappers added to SQL, Dexie, and Supabase adapters. Instance method on `Relation`.
 
 ## Already Resolved
 
-Issues discovered and fixed while building the ballroom base:
+Issues discovered and fixed while building ballroom:
 
 - **Inflector integration** — filters use `Inflector.underscore`, `classify`, `pluralize`
 - **`classify()` helper** — added to transform.mjs/vite.mjs
@@ -214,3 +356,14 @@ Issues discovered and fixed while building the ballroom base:
 - **`juntos render` command** — renders pages via Vite SSR without starting a server
 - **Vite plugin log suppression** — `[juntos]` messages silenced when `logLevel: 'silent'`
 - **Vitest config** — ballroom needs `environment: 'jsdom'`, `pool: 'forks'`, `singleFork: true`
+- **STI disabled** — `self.inheritance_column = nil` for models with `type` column
+- **`pick` not awaited** — added to `AR_CLASS_METHODS` in `active_record.rb`
+- **`pick()` static wrapper missing** — added to SQL, Dexie, Supabase adapters
+- **`ArgumentError` mapping** — mapped to `TypeError` in functions filter
+- **Implicit returns in begin/rescue/end** — autoreturn handler in `return.rb` now handles `:rescue` and `:ensure` wrapping `:rescue`
+- **Helper cross-model imports** — `addCrossModelImports()` extended for `app/helpers/` files
+- **Helper method extraction ordering** — `extractHelperMethods()` must run before `addCrossModelImports()` (prepended imports break `^` anchored regex)
+- **Form cosmetic diffs** — newlines, value attributes, HTML escaping, select options
+- **belongs_to await** — async association getters, `action_name`, query params
+- **Falsy id=0** — `extract_id` path helper fix for falsy-but-valid IDs
+- **Heat number getter** — strips `.0` from whole-number floats
