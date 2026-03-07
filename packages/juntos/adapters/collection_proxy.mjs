@@ -163,8 +163,13 @@ export class CollectionProxy {
     return this.toRelation().select(...fields);
   }
 
-  // Convert to a scoped Relation for chaining
+  // Convert to a scoped Relation for chaining.
+  // For new records (no id), return an empty relation — matching Rails,
+  // where associations on unsaved records return empty collections.
   toRelation() {
+    if (this._owner.id == null) {
+      return this._model.none();
+    }
     return this._model.where(this._scopeConditions());
   }
 

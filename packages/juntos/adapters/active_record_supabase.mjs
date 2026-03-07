@@ -238,6 +238,10 @@ export class ActiveRecord extends ActiveRecordBase {
     return new Relation(this).where(conditionOrSql, ...values);
   }
 
+  static none() {
+    return new Relation(this).none();
+  }
+
   // Returns a Relation with ordering
   static order(options) {
     return new Relation(this).order(options);

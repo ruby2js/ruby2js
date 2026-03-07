@@ -24,6 +24,7 @@ export class Relation {
     this._joins = [];      // INNER JOIN associations
     this._missing = [];    // LEFT JOIN ... WHERE id IS NULL (where().missing())
     this._group = null;    // GROUP BY column(s)
+    this._none = false;    // When true, always returns empty results (like Rails .none)
 
     // Delegate model scopes (e.g., Person.where({type: "DJ"}).by_name)
     return new Proxy(this, {
@@ -60,6 +61,13 @@ export class Relation {
   }
 
   // --- Chainable methods (return new Relation) ---
+
+  // Returns an empty relation that never hits the database (like Rails .none)
+  none() {
+    const rel = this._clone();
+    rel._none = true;
+    return rel;
+  }
 
   // where({active: true}) - hash conditions
   // where('updated_at > ?', timestamp) - raw SQL with placeholder
@@ -180,6 +188,7 @@ export class Relation {
   }
 
   async count(column) {
+    if (this._none) return 0;
     let rel = this;
     if (column) {
       rel = this._clone();
@@ -193,6 +202,7 @@ export class Relation {
 
   // Aggregate: sum of a column. When grouped, returns {key: sum}.
   async sum(col) {
+    if (this._none) return 0;
     if (this._group) {
       return this.model._executeGroupAggregate(this, 'SUM', col);
     }
@@ -201,6 +211,7 @@ export class Relation {
 
   // Check if any records exist: User.where({admin: true}).exists()
   async exists() {
+    if (this._none) return false;
     return this.model._executeExists(this);
   }
 
@@ -211,6 +222,7 @@ export class Relation {
 
   // Return values instead of models: User.pluck('name') or User.pluck('id', 'name')
   async pluck(...columns) {
+    if (this._none) return [];
     return this.model._executePluck(this, columns);
   }
 
@@ -234,6 +246,7 @@ export class Relation {
   }
 
   async toArray() {
+    if (this._none) return [];
     return this.model._executeRelation(this);
   }
 
@@ -389,6 +402,7 @@ export class Relation {
     rel._joins = [...this._joins];
     rel._missing = [...this._missing];
     rel._group = this._group;
+    rel._none = this._none;
     return rel;
   }
 
