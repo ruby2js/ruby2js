@@ -1274,6 +1274,26 @@ module Ruby2JS
           end
           # Note: array and string use .length which functions filter handles
 
+        # .keys - Hash: Object.keys(hash)
+        when :keys
+          type = if pragma?(node, :hash) then :hash
+                 else var_type(target)
+                 end
+
+          if type == :hash && args.empty?
+            return process s(:send, s(:const, nil, :Object), :keys, target)
+          end
+
+        # .values - Hash: Object.values(hash)
+        when :values
+          type = if pragma?(node, :hash) then :hash
+                 else var_type(target)
+                 end
+
+          if type == :hash && args.empty?
+            return process s(:send, s(:const, nil, :Object), :values, target)
+          end
+
         # Array binary operators that differ between Ruby and JS
         # a + b → [...a, ...b]  (concat - JS + does string concat on arrays)
         when :+

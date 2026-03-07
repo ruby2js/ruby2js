@@ -706,6 +706,19 @@ module Ruby2JS
             ref_name = node.children[0].to_s.sub(/^@/, '').to_sym
             return s(:lvar, ref_name)
 
+          when :or_asgn, :and_asgn
+            # @studio ||= Studio.new -> let studio; studio ??= Studio.new
+            # Emit a bare lvasgn declaration before the compound assignment
+            # so the converter produces a `let` for first-use locals
+            asgn_target = node.children[0]
+            if asgn_target.type == :ivasgn
+              asgn_name = asgn_target.children[0].to_s.sub(/^@/, '').to_sym
+              asgn_value = transform_ivars_to_locals(node.children[1])
+              return s(:begin,
+                s(:lvasgn, asgn_name),
+                node.updated(nil, [s(:lvasgn, asgn_name), asgn_value]))
+            end
+
           when :send
             # Check for redirect_to, render, params, and strong params
             target, method, *args = node.children

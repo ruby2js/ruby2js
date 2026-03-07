@@ -766,7 +766,7 @@ describe Ruby2JS::Filter::Pragma do
       js = to_js(code)
       js.must_include 'Object.entries'
       js.must_include 'Object.fromEntries'
-      js.must_include '.keys()'
+      js.must_include 'Object.keys'
     end
 
     it "should apply nullish and method pragmas together" do
