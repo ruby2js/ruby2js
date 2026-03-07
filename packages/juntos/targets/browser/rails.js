@@ -382,8 +382,8 @@ export class Application extends ApplicationBase {
       Object.assign(adapter.modelRegistry, this.models);
     }
 
-    // Initialize with config
-    await adapter.initDatabase({ sqlJsPath: this.sqlJsPath });
+    // Initialize with config (DB_CONFIG is injected by the virtual module at build time)
+    await adapter.initDatabase({ ...adapter.DB_CONFIG, sqlJsPath: this.sqlJsPath });
 
     // For Dexie adapter: define schema and open database
     if (adapter.defineSchema) {
