@@ -123,6 +123,13 @@ module Ruby2JS
         []
       end
 
+      # Hook for subclasses to indicate rest forwarding is needed
+      # When true, adds ..._rest to the function signature so caller props
+      # flow through to partials (matching Rails' instance variable behavior)
+      def erb_needs_rest_forwarding?
+        false
+      end
+
       # Convert instance variable reads to local variable reads
       def on_ivar(node)
         return super unless @erb_bufvar  # Only transform when in ERB mode
@@ -374,6 +381,7 @@ module Ruby2JS
         undefined_locals.each do |local|
           next if all_params.include?(local)
           next if imported_names.include?(local)
+          next if local == :_rest  # Reserved for rest forwarding
           all_params << local
         end
 
@@ -394,6 +402,12 @@ module Ruby2JS
         all_params.each do |name|
           next if extra_kwarg_names.include?(name)
           all_kwargs << s(:kwarg, name)
+        end
+
+        # Add ..._rest for forwarding to partials (Rails idiom:
+        # instance variables are automatically available in partials)
+        if self.erb_needs_rest_forwarding?()
+          all_kwargs << s(:kwrestarg, :_rest)
         end
 
         if all_kwargs.empty?

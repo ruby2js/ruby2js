@@ -25,6 +25,7 @@ module Ruby2JS
           @erb_asset_imports = [] # Track asset imports (images, videos, etc.) for Vite
           @erb_needs_polymorphic_path = false # Track if polymorphic_path is needed
           @erb_app_helpers = [] # Track application helper usage for imports
+          @erb_needs_rest_forwarding = false # Track if ..._rest is needed for partial forwarding
         end
 
         # Mark render function as async - sets flag directly since filter chain
@@ -246,6 +247,11 @@ module Ruby2JS
         def erb_render_extra_args
           return [] if erb_layout_mode?()
           [s(:kwarg, :"$context")]
+        end
+
+        # Override hook: add ..._rest when this view renders partials
+        def erb_needs_rest_forwarding?
+          @erb_needs_rest_forwarding || false
         end
 
         # Helper to get the context reference for layout vs view mode
@@ -1881,6 +1887,15 @@ module Ruby2JS
           pairs << s(:pair, s(:sym, :action_name), s(:lvar, :action_name))
           locals.keys.each do |key|
             pairs << s(:pair, s(:sym, key), process(locals[key]))
+          end
+
+          # Auto-forward caller's remaining props to partials (Rails idiom:
+          # instance variables are automatically available in partials).
+          # Uses ...rest spread so controller props flow through to partials
+          # without the caller needing to know what the partial needs.
+          if @erb_ivars
+            @erb_needs_rest_forwarding = true
+            pairs << s(:kwsplat, s(:lvar, :_rest))
           end
 
           render_call = s(:send, s(:lvar, module_name), :render,
