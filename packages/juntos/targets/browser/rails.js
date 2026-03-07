@@ -597,22 +597,23 @@ export class Application extends ApplicationBase {
           return; // No matching route, let Turbo handle it
         }
 
-        // GET HTML requests: render page and provide synthetic Response to Turbo
-        // Turbo handles title, scroll, morph, cache, and lifecycle events
-        // We must preventDefault + resume because rendering is async and Turbo
-        // dispatches the event synchronously
-        if (method === 'GET' && format !== 'json' && this.layoutFn) {
-          event.preventDefault();
+        // All matched requests: preventDefault + async render + resume
+        // Turbo dispatches the event synchronously, so we must pause it
+        event.preventDefault();
 
+        const { route, match } = result;
+        const context = createContext();
+
+        // GET HTML: render page, return as synthetic Response
+        if (method === 'GET' && format !== 'json' && this.layoutFn) {
           const rendered = await Router.renderPage(path);
 
-          // Handle route-level redirects
           if (rendered && rendered.redirect) {
             Turbo.visit(rendered.redirect);
             return;
           }
 
-          const html = rendered || Application.wrapInLayout(createContext(), '<h1>Not Found</h1>');
+          const html = rendered || Application.wrapInLayout(context, '<h1>Not Found</h1>');
           event.detail.fetchRequest = {
             response: Promise.resolve(new Response(html, {
               status: 200,
@@ -623,72 +624,8 @@ export class Application extends ApplicationBase {
           return;
         }
 
-        // Prevent Turbo from making a real fetch for other request types
-        event.preventDefault();
-
-        // Capture the form element to dispatch turbo:submit-end later
-        const formElement = event.target;
-
-        const { route, match } = result;
-        const context = createContext();
-
-        // Set Accept header to indicate Turbo Stream support for form submissions
-        if (typeof Turbo !== 'undefined' && (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE')) {
-          context.request.headers = { accept: 'text/vnd.turbo-stream.html, text/html, application/xhtml+xml' };
-        }
-
-        if (method === 'DELETE') {
-          if (route.nested) {
-            const parentId = parseInt(match[1]);
-            const id = match[2] ? parseInt(match[2]) : null;
-            const response = await route.controller.destroy(context, parentId, id);
-            await FormHandler.handleResult(context, response, route.controllerName, 'destroy', route.controller, id);
-          } else {
-            const id = match[1] ? parseInt(match[1]) : null;
-            const response = await route.controller.destroy(context, id);
-            await FormHandler.handleResult(context, response, route.controllerName, 'destroy', route.controller, id);
-          }
-        } else if (method === 'POST' || method === 'PATCH' || method === 'PUT') {
-          let params = {};
-
-          const setNestedParam = (key, value) => {
-            if (key === '_method') return;
-            const match = key.match(/^([^\[]+)\[([^\]]+)\]$/);
-            if (match) {
-              const [, model, field] = match;
-              if (!params[model]) params[model] = {};
-              params[model][field] = value;
-            } else {
-              params[key] = value;
-            }
-          };
-
-          if (body instanceof FormData) {
-            for (const [key, value] of body.entries()) {
-              setNestedParam(key, value);
-            }
-          } else if (body instanceof URLSearchParams) {
-            for (const [key, value] of body.entries()) {
-              setNestedParam(key, value);
-            }
-          } else if (typeof body === 'string') {
-            const searchParams = new URLSearchParams(body);
-            for (const [key, value] of searchParams.entries()) {
-              setNestedParam(key, value);
-            }
-          }
-          context.params = params;
-          console.log('  Parameters:', params);
-
-          const controllerAction = route.controller[route.action];
-          if (controllerAction) {
-            const id = match[1] ? parseInt(match[1]) : null;
-            const response = id != null
-              ? await controllerAction.call(route.controller, context, id, params)
-              : await controllerAction.call(route.controller, context, params);
-            await FormHandler.handleResult(context, response, route.controllerName, route.action, route.controller, id);
-          }
-        } else if (method === 'GET' && format === 'json') {
+        // GET JSON: render data as JSON Response
+        if (method === 'GET' && format === 'json') {
           const { controller, action } = route;
           const actionMethod = action === 'new' ? '$new' : action;
 
@@ -712,30 +649,108 @@ export class Application extends ApplicationBase {
               jsonData = data.json;
             }
 
-            const responseBody = JSON.stringify(jsonData);
-            const mockResponse = new Response(responseBody, {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' }
-            });
-
-            event.detail.resume?.(mockResponse);
+            event.detail.fetchRequest = {
+              response: Promise.resolve(new Response(JSON.stringify(jsonData), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+              }))
+            };
           } catch (e) {
             console.error(`[juntos] JSON API error for ${path}:`, e);
-            const errorResponse = new Response(JSON.stringify({ error: e.message }), {
-              status: 500,
-              headers: { 'Content-Type': 'application/json' }
-            });
-            event.detail.resume?.(errorResponse);
+            event.detail.fetchRequest = {
+              response: Promise.resolve(new Response(JSON.stringify({ error: e.message }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+              }))
+            };
           }
-          return; // Don't dispatch turbo:submit-end for GET requests
+          event.detail.resume();
+          return;
         }
 
-        // Dispatch turbo:submit-end for Stimulus compatibility
-        if (formElement) {
-          formElement.dispatchEvent(new CustomEvent('turbo:submit-end', {
-            bubbles: true,
-            detail: { success: true }
-          }));
+        // Form submissions (POST/PATCH/PUT/DELETE): run controller, return Response
+        if (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE') {
+          context.request.headers = { accept: 'text/vnd.turbo-stream.html, text/html, application/xhtml+xml' };
+
+          // Extract params from request body
+          let params = {};
+          if (method !== 'DELETE') {
+            const setNestedParam = (key, value) => {
+              if (key === '_method') return;
+              const paramMatch = key.match(/^([^\[]+)\[([^\]]+)\]$/);
+              if (paramMatch) {
+                const [, model, field] = paramMatch;
+                if (!params[model]) params[model] = {};
+                params[model][field] = value;
+              } else {
+                params[key] = value;
+              }
+            };
+
+            if (body instanceof FormData) {
+              for (const [key, value] of body.entries()) setNestedParam(key, value);
+            } else if (body instanceof URLSearchParams) {
+              for (const [key, value] of body.entries()) setNestedParam(key, value);
+            } else if (typeof body === 'string') {
+              for (const [key, value] of new URLSearchParams(body).entries()) setNestedParam(key, value);
+            }
+            context.params = params;
+            console.log('  Parameters:', params);
+          }
+
+          // Run controller action
+          let controllerResult;
+          if (method === 'DELETE') {
+            if (route.nested) {
+              const parentId = parseInt(match[1]);
+              const id = match[2] ? parseInt(match[2]) : null;
+              controllerResult = await route.controller.destroy(context, parentId, id);
+            } else {
+              const id = match[1] ? parseInt(match[1]) : null;
+              controllerResult = await route.controller.destroy(context, id);
+            }
+          } else {
+            const controllerAction = route.controller[route.action];
+            if (controllerAction) {
+              const id = match[1] ? parseInt(match[1]) : null;
+              controllerResult = id != null
+                ? await controllerAction.call(route.controller, context, id, params)
+                : await controllerAction.call(route.controller, context, params);
+            }
+          }
+
+          // Translate controller result to HTTP Response for Turbo
+          if (controllerResult?.turbo_stream) {
+            console.log(`  Rendering turbo_stream response`);
+            event.detail.fetchRequest = {
+              response: Promise.resolve(new Response(controllerResult.turbo_stream, {
+                status: 200,
+                headers: { 'Content-Type': 'text/vnd.turbo-stream.html; charset=utf-8' }
+              }))
+            };
+            event.detail.resume();
+          } else if (controllerResult?.redirect) {
+            if (controllerResult.notice) context.flash.set('notice', controllerResult.notice);
+            if (controllerResult.alert) context.flash.set('alert', controllerResult.alert);
+            context.flash.writeToCookie();
+            console.log(`  Redirected to ${controllerResult.redirect}`);
+            // Use Turbo.visit for redirects — Response.redirect doesn't work
+            // with synthetic responses (response.redirected is false)
+            Turbo.visit(controllerResult.redirect);
+          } else if (controllerResult?.render) {
+            console.log(`  Rendering form (validation failed)`);
+            const html = this.layoutFn
+              ? Application.wrapInLayout(context, controllerResult.render)
+              : controllerResult.render;
+            event.detail.fetchRequest = {
+              response: Promise.resolve(new Response(html, {
+                status: 422,
+                headers: { 'Content-Type': 'text/html; charset=utf-8' }
+              }))
+            };
+            event.detail.resume();
+          }
+          return;
         }
       });
 
