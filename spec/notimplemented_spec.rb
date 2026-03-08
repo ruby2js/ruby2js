@@ -16,10 +16,7 @@ describe 'not implemented' do
   # class visibility modifiers are now implemented
   # see es2022_spec.rb and converter_spec.rb for tests
 
-  it "pattern matching" do
-    todo("case x; in {a:}; a; end")  # case_match
-    todo("x in [a, b]")              # match_pattern_p (in operator)
-  end
+  # pattern matching is now implemented - see case_match_spec.rb
 
   it "flip-flops" do
     todo("if a..b; end")

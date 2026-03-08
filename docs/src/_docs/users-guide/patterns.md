@@ -270,6 +270,73 @@ def process(item)
 end
 ```
 
+### Case/When
+
+`case`/`when` translates to JavaScript `switch` statements:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
+```ruby
+case status
+when :active
+  activate
+when :pending, :review
+  hold
+else
+  archive
+end
+```
+
+### Pattern Matching (case/in)
+
+Ruby 3.x pattern matching translates to `if`/`else if` chains with
+destructuring:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
+```ruby
+case response
+in {status: 200, body: String => body}
+  process(body)
+in {status: 404}
+  not_found
+in {status: Integer => code}
+  handle_error(code)
+end
+```
+
+Supported patterns include:
+
+- **Literals**: `in 1`, `in "hello"`, `in nil`, `in true`
+- **Variable capture**: `in x` binds the matched value to `x`
+- **Type checks**: `in Integer`, `in String => s`
+- **Arrays**: `in [a, b, *rest]` with destructuring and splat
+- **Hashes**: `in {name:}`, `in {name: String => n}`
+- **Alternation**: `in 1 | 2 | 3`
+- **Pin operator**: `in ^expected` tests equality against an existing variable
+- **Find pattern**: `in [*, 42, *]` checks if an array contains a value
+- **Guard clauses**: `in Integer => n if n > 0`
+- **Wildcard**: `in _` matches anything without binding
+
+The `in` operator also works standalone as a boolean test:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
+```ruby
+if data in {users: Array}
+  process(data)
+end
+```
+
 ## Blocks and Lambdas
 
 ### Blocks

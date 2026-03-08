@@ -110,13 +110,26 @@ module Ruby2JS
     def visit_hash_pattern_node(node)
       elements = node.elements.map do |assoc|
         if assoc.is_a?(Prism::AssocNode)
-          # The value is the pattern
-          value = assoc.value
+          # The original value before unwrapping
+          original_value = assoc.value
+          value = original_value
+
           # Handle ImplicitNode wrapping
           if value.is_a?(Prism::ImplicitNode)
             value = value.value
           end
-          visit_pattern(value)
+          visited_value = visit_pattern(value)
+
+          # For implicit patterns like {name:}, the match_var already
+          # carries the key name. For explicit patterns like {name: String},
+          # wrap in a pair node to preserve the key, matching whitequark format.
+          if original_value.is_a?(Prism::ImplicitNode) ||
+              value.is_a?(Prism::LocalVariableTargetNode)
+            visited_value
+          else
+            key = visit(assoc.key)
+            s(:pair, key, visited_value)
+          end
         else
           visit(assoc)
         end

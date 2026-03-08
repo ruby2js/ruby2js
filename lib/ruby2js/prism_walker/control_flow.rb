@@ -152,7 +152,7 @@ module Ruby2JS
     # Capture pattern: expr => var
     def visit_capture_pattern_node(node)
       value = visit(node.value)
-      target = visit(node.target)
+      target = visit_pattern(node.target)
       sl(node, :match_as, value, target)
     end
 
