@@ -113,7 +113,9 @@ describe Ruby2JS::Filter::Rails::Controller do
 
       result = to_js(source)
       _(result).must_include 'ArticleViews.index'
-      _(result).must_include '{$context: context, action_name: "index", articles}'
+      _(result).must_include '$context: context'
+      _(result).must_include 'cookies: context.cookies'
+      _(result).must_include 'action_name: "index"'
     end
   end
 
@@ -613,7 +615,9 @@ describe Ruby2JS::Filter::Rails::Controller do
       result = to_js(source)
       # The article ivar from set_article should be passed to view
       _(result).must_include 'ArticleViews.show'
-      _(result).must_include '{$context: context, action_name: "show", article}'
+      _(result).must_include '$context: context'
+      _(result).must_include 'cookies: context.cookies'
+      _(result).must_include 'action_name: "show"'
     end
   end
 
