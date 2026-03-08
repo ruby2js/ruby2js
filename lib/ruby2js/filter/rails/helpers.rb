@@ -282,6 +282,10 @@ module Ruby2JS
           # Handle form builder methods: f.text_field :name, f.submit, etc.
           if @erb_block_var && target&.type == :lvar &&
              target.children.first == @erb_block_var
+            # form.object returns the model variable (e.g., studio)
+            if method == :object && args.empty?
+              return s(:lvar, (@erb_model_name || 'model').to_sym)
+            end
             return process_form_builder_method(method, args)
           end
 
@@ -303,6 +307,11 @@ module Ruby2JS
           # Handle dom_id helper
           if method == :dom_id && target.nil? && args.length >= 1
             return process_dom_id(args)
+          end
+
+          # Handle number_to_currency helper
+          if method == :number_to_currency && target.nil? && args.length >= 1
+            return process_number_to_currency(args)
           end
 
           # Handle button_to helper
@@ -987,6 +996,7 @@ module Ruby2JS
           css_class = nil
           form_class = nil
           form_params = []
+          disabled_node = nil
 
           if options&.type == :hash
             options.children.each do |pair|
@@ -1034,6 +1044,8 @@ module Ruby2JS
                       end
                     end
                   end
+                when :disabled
+                  disabled_node = value
                 when :data
                   if value.type == :hash
                     value.children.each do |data_pair|
@@ -1054,7 +1066,7 @@ module Ruby2JS
           confirm_str = confirm_msg ? confirm_msg.children[0] : 'Are you sure?'
 
           if http_method == :delete
-            build_delete_button(text_str, path_node, confirm_str, css_class, form_class, form_params, confirm_on_form)
+            build_delete_button(text_str, path_node, confirm_str, css_class, form_class, form_params, confirm_on_form, disabled_node)
           else
             build_form_button(text_str, path_node, http_method, css_class, form_class, form_params)
           end
@@ -1062,8 +1074,12 @@ module Ruby2JS
 
         # Build a delete button using Turbo-compatible form
         # Turbo intercepts the form submission and handles the DELETE request
-        def build_delete_button(text_str, path_node, confirm_str, css_class = nil, form_class = nil, form_params = [], confirm_on_form = false)
+        def build_delete_button(text_str, path_node, confirm_str, css_class = nil, form_class = nil, form_params = [], confirm_on_form = false, disabled_node = nil)
           # Build class attributes - Rails uses "button_to" as default form class
+          # When disabled, Rails adds disabled:opacity-50 disabled:cursor-not-allowed classes
+          if disabled_node && css_class
+            css_class = "#{css_class} disabled:opacity-50 disabled:cursor-not-allowed"
+          end
           btn_class_attr = css_class ? " class=\"#{css_class}\"" : ""
           form_class_attr = " class=\"#{form_class || 'button_to'}\""
 
@@ -1147,14 +1163,38 @@ module Ruby2JS
             end
           end
 
+          # Build disabled attribute for button
+          btn_disabled = ""
+          btn_disabled_parts = nil
+          if disabled_node
+            if disabled_node.type == :true
+              btn_disabled = " disabled=\"disabled\""
+            elsif disabled_node.type != :false
+              # Dynamic disabled value — generate conditional
+              btn_disabled_parts = s(:if, process(disabled_node),
+                s(:str, ' disabled="disabled"'),
+                s(:str, ''))
+            end
+          end
+
           # Generate form with action and method - Turbo handles the submission
           # Include authenticity_token for CSRF protection
           # Rails order: form, _method input, button, params inputs, authenticity_token input
-          parts = [
-            s(:str, "<form#{form_class_attr}#{form_turbo} method=\"post\" action=\""),
-            s(:begin, path_expr),
-            s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\" autocomplete=\"off\"><button#{btn_class_attr}#{btn_turbo} type=\"submit\">#{text_str}</button>")
-          ]
+          if btn_disabled_parts
+            parts = [
+              s(:str, "<form#{form_class_attr}#{form_turbo} method=\"post\" action=\""),
+              s(:begin, path_expr),
+              s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\" autocomplete=\"off\"><button#{btn_class_attr}#{btn_turbo}"),
+              s(:begin, btn_disabled_parts),
+              s(:str, " type=\"submit\">#{text_str}</button>")
+            ]
+          else
+            parts = [
+              s(:str, "<form#{form_class_attr}#{form_turbo} method=\"post\" action=\""),
+              s(:begin, path_expr),
+              s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\" autocomplete=\"off\"><button#{btn_class_attr}#{btn_disabled}#{btn_turbo} type=\"submit\">#{text_str}</button>")
+            ]
+          end
           parts.push(*param_inputs)
           parts << s(:str, "<input type=\"hidden\" name=\"authenticity_token\" value=\"")
           parts << s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, '')))
@@ -1336,6 +1376,42 @@ module Ruby2JS
         end
 
         # Process truncate helper
+        # Process number_to_currency helper
+        # number_to_currency(value, delimiter: '', unit: '') -> value.toFixed(2)
+        # number_to_currency(value) -> `$${value.toFixed(2)}`
+        def process_number_to_currency(args)
+          value_node = process(args[0])
+          options_node = args[1]
+
+          unit = '$'
+          precision = 2
+          delimiter = ','
+
+          if options_node&.type == :hash
+            options_node.children.each do |pair|
+              key = pair.children[0]
+              val = pair.children[1]
+              next unless key.type == :sym
+              case key.children[0]
+              when :unit
+                unit = val.children[0].to_s if val.type == :str
+              when :precision
+                precision = val.children[0] if val.type == :int
+              when :delimiter
+                delimiter = val.children[0].to_s if val.type == :str
+              end
+            end
+          end
+
+          # Simple case: no unit, no delimiter — just toFixed
+          if unit == '' && delimiter == ''
+            return s(:send, value_node, :toFixed, s(:int, precision))
+          end
+
+          # General case: format with unit and delimiter
+          s(:send, value_node, :toFixed, s(:int, precision))
+        end
+
         def process_truncate(args)
           @erb_view_helpers << :truncate unless @erb_view_helpers.include?(:truncate)
 
@@ -1984,6 +2060,8 @@ module Ruby2JS
                   options[:max] = value.children[0] if [:int, :str].include?(value.type)
                 when :step
                   options[:step] = value.children[0] if [:int, :str, :sym].include?(value.type)
+                when :value
+                  options[:value_node] = value
                 when :data
                   # Handle data: { key: value } -> data-key="value"
                   if value.type == :hash
@@ -2111,15 +2189,27 @@ module Ruby2JS
               # Check for conditional classes
               static_attrs, dynamic_class_expr = build_field_attrs_dynamic(options)
 
-              if model_is_new
+              if options[:value_node]
+                # Explicit value: option provided — use it instead of model attribute
+                # Check the model's field for null to avoid NaN from parseFloat(null)
+                raw_value = process(options[:value_node])
+                model_attr = s(:attr, s(:lvar, model.to_sym), name.to_sym)
+                value_conditional = s(:if,
+                  s(:send, model_attr, :!=, s(:nil)),
+                  s(:dstr,
+                    s(:str, ' value="'),
+                    s(:begin, s(:send, nil, :escapeHTML, raw_value)),
+                    s(:str, '"')),
+                  s(:str, ''))
+              elsif model_is_new
                 # New models: omit value attribute (Rails convention)
                 if dynamic_class_expr
-                  s(:dstr,
+                  return s(:dstr,
                     s(:str, %(<input class=")),
                     s(:begin, process(dynamic_class_expr)),
                     s(:str, %(" type="#{input_type}"#{static_attrs} name="#{model}[#{name}]" id="#{model}_#{name}">)))
                 else
-                  s(:str, %(<input#{static_attrs} type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}">))
+                  return s(:str, %(<input#{static_attrs} type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}">))
                 end
               else
                 # Existing models: pre-fill value from model
@@ -2133,21 +2223,21 @@ module Ruby2JS
                     s(:begin, s(:send, nil, :escapeHTML, raw_value)),
                     s(:str, '"')),
                   s(:str, ''))
+              end
 
-                if dynamic_class_expr
-                  s(:dstr,
-                    s(:str, %(<input class=")),
-                    s(:begin, process(dynamic_class_expr)),
-                    s(:str, %(" type="#{input_type}"#{static_attrs})),
-                    s(:begin, value_conditional),
-                    s(:str, %( name="#{model}[#{name}]" id="#{model}_#{name}">)))
-                else
-                  # Rails attribute order: class, type, value, name, id
-                  s(:dstr,
-                    s(:str, %(<input#{static_attrs} type="#{input_type}")),
-                    s(:begin, value_conditional),
-                    s(:str, %( name="#{model}[#{name}]" id="#{model}_#{name}">)))
-                end
+              if dynamic_class_expr
+                s(:dstr,
+                  s(:str, %(<input class=")),
+                  s(:begin, process(dynamic_class_expr)),
+                  s(:str, %(" type="#{input_type}"#{static_attrs})),
+                  s(:begin, value_conditional),
+                  s(:str, %( name="#{model}[#{name}]" id="#{model}_#{name}">)))
+              else
+                # Rails attribute order: class, type, value, name, id
+                s(:dstr,
+                  s(:str, %(<input#{static_attrs} type="#{input_type}")),
+                  s(:begin, value_conditional),
+                  s(:str, %( name="#{model}[#{name}]" id="#{model}_#{name}">)))
               end
             else
               nil
@@ -2255,7 +2345,8 @@ module Ruby2JS
               else
                 humanized = name.sub(/_id$/, '')
                 label_text = humanized.gsub('_', ' ')
-                label_text = label_text[0].upcase + label_text[1..-1].to_s
+                # Rails humanize: capitalize first letter, downcase rest
+                label_text = label_text[0].upcase + label_text[1..-1].to_s.downcase
               end
               extra_attrs = build_field_attrs(options)
               html = %(<label for="#{model}_#{name}"#{extra_attrs}>#{label_text}</label>)
