@@ -210,7 +210,7 @@ module Ruby2JS
           await_type = self.classify_send(node, model_refs, metadata)
           return node unless await_type
 
-          if await_type == :await! && SEND_TYPES.include?(node.children[0]&.type)
+          if SEND_TYPES.include?(node.children[0]&.type)
             # Chain: strip inner awaits before wrapping
             stripped = self.strip_inner_awaits(node)
             return stripped.updated(await_type)
