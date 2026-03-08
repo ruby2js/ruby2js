@@ -28,10 +28,16 @@ module Ruby2JS
         branches.each_with_index do |branch, index|
           pattern, guard, body = branch.children
 
-          # Prism wraps guard in an :if node inside the pattern
+          # Prism wraps guard in an :if node inside the pattern;
+          # whitequark/translation uses :if_guard/:unless_guard as
+          # the second child of in_pattern
           if pattern.type == :if
             guard = pattern.children[0]
             pattern = pattern.children[1]
+          elsif guard&.type == :if_guard
+            guard = guard.children[0]
+          elsif guard&.type == :unless_guard
+            guard = s(:send, guard.children[0], :!)
           end
 
           put(index == 0 ? 'if (' : ' else if (')
@@ -223,7 +229,7 @@ module Ruby2JS
 
       when :match_alt, :pin, :const, :nil, :true, :false,
            :int, :float, :str, :sym, :irange, :erange, :regexp
-        # No bindings for these patterns
+        nil # No bindings for these patterns
       end
     end
 
