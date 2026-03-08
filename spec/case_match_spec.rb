@@ -181,6 +181,23 @@ describe "case/in pattern matching" do
       result.must_include 'let n = $case1'
       result.must_include 'if (n > 0)'
     end
+
+    it "should handle unless guard" do
+      result = to_js('case x; in Integer => n unless n < 0; "positive"; end')
+      result.must_include 'let n = $case1'
+      result.must_include 'Number.isInteger'
+      # unless n < 0 becomes if n >= 0
+      result.wont_include 'unless'
+    end
+  end
+
+  describe 'lambda patterns' do
+    it "should call lambda with target value" do
+      result = to_js('case x; in -> (v) { v > 0 }; "matched"; end')
+      result.must_include '($case1)'
+      result.must_include '=>'
+      result.wont_include '==='
+    end
   end
 
   describe 'else clause' do

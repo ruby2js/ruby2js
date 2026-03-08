@@ -31,9 +31,14 @@ module Ruby2JS
           # Prism wraps guard in an :if node inside the pattern;
           # whitequark/translation uses :if_guard/:unless_guard as
           # the second child of in_pattern
-          if pattern.type == :if
+          if pattern.type == :if && pattern.children[1]
+            # Prism if guard: s(:if, condition, pattern, nil)
             guard = pattern.children[0]
             pattern = pattern.children[1]
+          elsif pattern.type == :if && pattern.children[2]
+            # Prism unless guard: s(:if, condition, nil, pattern)
+            guard = s(:send, pattern.children[0], :!)
+            pattern = pattern.children[2]
           elsif guard&.type == :if_guard
             guard = guard.children[0]
           elsif guard&.type == :unless_guard
@@ -185,10 +190,11 @@ module Ruby2JS
         parse pattern
         put ".test(#{target})"
 
-      when :lambda, :send
-        # Proc/lambda patterns use === which calls the proc
+      when :lambda, :block
+        # Proc/lambda patterns — call the function with the target
+        put '('
         parse pattern
-        put "(#{target})"
+        put ")(#{target})"
 
       else
         # Fallback: use strict equality
