@@ -1983,7 +1983,7 @@ module Ruby2JS
                 when :max
                   options[:max] = value.children[0] if [:int, :str].include?(value.type)
                 when :step
-                  options[:step] = value.children[0] if [:int, :str].include?(value.type)
+                  options[:step] = value.children[0] if [:int, :str, :sym].include?(value.type)
                 when :data
                   # Handle data: { key: value } -> data-key="value"
                   if value.type == :hash
@@ -2248,10 +2248,15 @@ module Ruby2JS
             field_name = args.first
             if field_name&.type == :sym || field_name&.type == :str
               name = field_name.children.first.to_s
-              # Humanize: strip _id suffix, replace _ with space, capitalize
-              humanized = name.sub(/_id$/, '')
-              label_text = humanized.gsub('_', ' ')
-              label_text = label_text[0].upcase + label_text[1..-1].to_s
+              # Use custom label text if provided (2nd arg), otherwise humanize field name
+              custom_text = args[1] if args[1] && (args[1].type == :str || args[1].type == :sym)
+              if custom_text
+                label_text = custom_text.children.first.to_s
+              else
+                humanized = name.sub(/_id$/, '')
+                label_text = humanized.gsub('_', ' ')
+                label_text = label_text[0].upcase + label_text[1..-1].to_s
+              end
               extra_attrs = build_field_attrs(options)
               html = %(<label for="#{model}_#{name}"#{extra_attrs}>#{label_text}</label>)
               s(:str, html)
