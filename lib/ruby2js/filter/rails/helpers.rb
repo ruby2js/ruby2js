@@ -1153,7 +1153,7 @@ module Ruby2JS
           parts = [
             s(:str, "<form#{form_class_attr}#{form_turbo} method=\"post\" action=\""),
             s(:begin, path_expr),
-            s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button#{btn_class_attr}#{btn_turbo} type=\"submit\">#{text_str}</button>")
+            s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\" autocomplete=\"off\"><button#{btn_class_attr}#{btn_turbo} type=\"submit\">#{text_str}</button>")
           ]
           parts.push(*param_inputs)
           parts << s(:str, "<input type=\"hidden\" name=\"authenticity_token\" value=\"")
@@ -1284,13 +1284,13 @@ module Ruby2JS
             form_html = s(:dstr,
               s(:str, "<form#{form_class_attr}#{turbo_confirm} method=\"post\" action=\""),
               s(:begin, path_expr),
-              s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button#{btn_class_attr} type=\"submit\">#{block_content}</button><input type=\"hidden\" name=\"authenticity_token\" value=\""),
+              s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\" autocomplete=\"off\"><button#{btn_class_attr} type=\"submit\">#{block_content}</button><input type=\"hidden\" name=\"authenticity_token\" value=\""),
               s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
               s(:str, "\"></form>"))
           else
             actual_method = (http_method == :get || http_method == :post) ? http_method : :post
             needs_method_field = ![:get, :post].include?(http_method)
-            method_field = needs_method_field ? "<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\">" : ""
+            method_field = needs_method_field ? "<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\" autocomplete=\"off\">" : ""
 
             form_html = s(:dstr,
               s(:str, "<form#{form_class_attr}#{turbo_confirm} method=\"#{actual_method}\" action=\""),
@@ -2193,7 +2193,7 @@ module Ruby2JS
 
             if field_name&.type == :sym
               name = field_name.children.first.to_s
-              hidden = %(<input name="#{model}[#{name}]" type="hidden" value="0">)
+              hidden = %(<input name="#{model}[#{name}]" type="hidden" value="0" autocomplete="off">)
               html = %(<input#{extra_attrs} type="checkbox" value="1" name="#{model}[#{name}]" id="#{model}_#{name}">)
               s(:str, hidden + html)
             elsif field_name&.type == :str
@@ -2201,7 +2201,7 @@ module Ruby2JS
               name = field_name.children.first.to_s
               # Generate id by replacing brackets with underscores
               id_name = name.gsub(/[\[\]]/, '_').gsub(/_+/, '_').gsub(/^_|_$/, '')
-              hidden = %(<input name="#{model}[#{name}]" type="hidden" value="0">)
+              hidden = %(<input name="#{model}[#{name}]" type="hidden" value="0" autocomplete="off">)
               html = %(<input#{extra_attrs} type="checkbox" value="1" name="#{model}[#{name}]" id="#{model}_#{id_name}">)
               s(:str, hidden + html)
             elsif field_name&.type == :dstr
@@ -2704,7 +2704,7 @@ module Ruby2JS
               # Rails: <form ...>\n  (new record, just newline)
               statements << s(:if, s(:attr, model_var, :id),
                 s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
-                  s(:str, "<input type=\"hidden\" name=\"_method\" value=\"patch\">\n")),
+                  s(:str, "<input type=\"hidden\" name=\"_method\" value=\"patch\" autocomplete=\"off\">\n")),
                 s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                   s(:str, "\n")))
             end
@@ -2719,7 +2719,7 @@ module Ruby2JS
               url_str = url_node.children[0]
               form_tag = "<form#{id_attr}#{class_attr}#{data_attr} action=\"#{url_str}\" method=\"#{actual_method}\">"
               if needs_method_field
-                form_tag += "\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\">"
+                form_tag += "\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\" autocomplete=\"off\">"
               end
               statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, form_tag))
             else
@@ -2730,7 +2730,7 @@ module Ruby2JS
                   s(:dstr,
                     s(:str, "<form#{id_attr}#{class_attr}#{data_attr} action=\""),
                     s(:begin, url_expr),
-                    s(:str, "\" method=\"#{actual_method}\">\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\">")))
+                    s(:str, "\" method=\"#{actual_method}\">\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\" autocomplete=\"off\">")))
               else
                 statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                   s(:dstr,
@@ -2835,7 +2835,7 @@ module Ruby2JS
           if path_node.type == :str
             path_str = path_node.children[0]
             if needs_method_field
-              s(:str, "<form action=\"#{path_str}\" method=\"#{actual_method}\">\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\">\n")
+              s(:str, "<form action=\"#{path_str}\" method=\"#{actual_method}\">\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\" autocomplete=\"off\">\n")
             else
               s(:str, "<form action=\"#{path_str}\" method=\"#{actual_method}\">\n")
             end
@@ -2844,7 +2844,7 @@ module Ruby2JS
               s(:dstr,
                 s(:str, '<form action="'),
                 s(:begin, path_expr),
-                s(:str, "\" method=\"#{actual_method}\">\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\">\n"))
+                s(:str, "\" method=\"#{actual_method}\">\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\" autocomplete=\"off\">\n"))
             else
               s(:dstr,
                 s(:str, '<form action="'),
