@@ -3000,7 +3000,16 @@ async function runRender(options, paths) {
         url: `http://localhost${urlPath}`,
         headers: { accept: 'text/html', host: 'localhost' }
       };
-      const context = createContext(mockReq, {});
+      // Parse query parameters (Rails: params[:key] includes query string)
+      const queryParams = {};
+      const qIdx = urlPath.indexOf('?');
+      if (qIdx >= 0) {
+        const searchParams = new URLSearchParams(urlPath.substring(qIdx + 1));
+        for (const [key, value] of searchParams.entries()) {
+          queryParams[key] = value;
+        }
+      }
+      const context = createContext(mockReq, queryParams);
 
       const actionMethod = route.action === 'new' ? '$new' : route.action;
 

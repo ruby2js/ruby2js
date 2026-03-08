@@ -304,16 +304,21 @@ export class Router extends RouterBase {
     let method = this.normalizeMethod(req, url);
     let params = {};
 
+    // Merge query parameters into params (Rails: params[:key] includes query string)
+    for (const [key, value] of url.searchParams.entries()) {
+      params[key] = value;
+    }
+
     // Parse request body for POST requests (may contain _method override)
     if (req.method === 'POST') {
-      params = await this.parseBody(req);
+      Object.assign(params, await this.parseBody(req));
       // Check for _method override in body (Rails convention for PATCH/DELETE)
       if (params._method) {
         method = params._method.toUpperCase();
         delete params._method;
       }
     } else if (['PATCH', 'PUT', 'DELETE'].includes(method)) {
-      params = await this.parseBody(req);
+      Object.assign(params, await this.parseBody(req));
     }
 
     // Validate CSRF token for mutating requests

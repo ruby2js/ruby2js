@@ -89,9 +89,10 @@ module Ruby2JS
           @rails_controller = true
           @rails_controller_const = class_name.children.last
 
-          # First pass: collect model references, before_actions, private methods
+          # First pass: collect model references, before_actions, private methods, path helpers
           collect_model_references(body)
           collect_controller_metadata(body)
+          collect_path_helper_refs(body)
           record_controller_metadata
 
           # Second pass: transform methods
@@ -298,6 +299,37 @@ module Ruby2JS
             returned = injected.select { |name| assigned_ivars.include?(name) }
             @rails_private_methods_returning_ivars[method_name] = returned if returned.any?
           end
+        end
+
+        # Collect path helper references (*_path calls) from the controller body
+        # so they can be imported. This handles explicit path helper calls like
+        # studio_path(@person.studio_id) used in controller code outside redirect_to.
+        def collect_path_helper_refs(node)
+          return unless node.respond_to?(:type) && node.respond_to?(:children)
+
+          if node.type == :send && node.children[0].nil?
+            name = node.children[1].to_s
+            if name.end_with?('_path')
+              @rails_path_helpers.add(node.children[1])
+            end
+          end
+
+          node.children.each { |child| collect_path_helper_refs(child) }
+        end
+
+        # Return an array of private method names called within the given node
+        def find_private_method_calls(node, results = [])
+          return results unless node.respond_to?(:type) && node.respond_to?(:children)
+
+          if node.type == :send && node.children[0].nil?
+            method_name = node.children[1]
+            if @rails_private_methods.key?(method_name)
+              results.push(method_name)
+            end
+          end
+
+          node.children.each { |child| find_private_method_calls(child, results) }
+          results
         end
 
         # Recursively find calls to known private methods in action bodies
@@ -527,8 +559,19 @@ module Ruby2JS
 
           params_keys = params_keys.uniq
 
-          # Collect instance variables from body AND before_action methods
+          # Collect instance variables from body AND before_action methods AND called private methods
           ivars = collect_instance_variables(body)
+
+          # Also collect ivars from private methods called from the action body
+          # (e.g., setup_form sets @studios, @types, etc.)
+          called_methods = find_private_method_calls(body)
+          called_methods.each do |called_name|
+            method_node = @rails_private_methods[called_name]
+            if method_node
+              private_ivars = collect_instance_variables(method_node.children[2])
+              ivars.push(*private_ivars)
+            end
+          end
 
           # Also collect ivars from before_action methods that apply to this action
           @rails_before_actions.each do |ba|
@@ -623,11 +666,9 @@ module Ruby2JS
           standard_actions = [:index, :show, :new, :edit, :create, :update, :destroy]
 
           if standard_actions.include?(method_name)
-            # For standard actions, extract extra params as individual parameters
-            extra_params = params_keys.select { |k| !(k == :id && [:show, :edit, :destroy, :update].include?(method_name)) }
-            extra_params.sort.each do |key|
-              param_args.push(s(:arg, key))
-            end
+            # For standard actions, extra params (non-route) are read from context.params
+            # Only route params (:id, parent_id) become function arguments
+            # Query params like params[:studio] are accessed via context.params.studio
 
             # Add standard params based on action type
             case method_name
@@ -774,13 +815,19 @@ module Ruby2JS
                   target.children[0].nil? &&
                   target.children[1] == :params &&
                   method == :[]
-              # params[:key] -> key (method parameter) for standard actions
-              # For custom actions, only extract :id; leave other keys as params["key"]
+              # params[:key] -> transforms based on context:
+              # - :id for standard actions -> id (method parameter, from route)
+              # - other keys for standard actions -> context.params.key (query params)
+              # - :id for custom actions -> id (method parameter)
+              # - other keys for custom actions -> params["key"]
               standard_actions = [:index, :show, :new, :edit, :create, :update, :destroy]
               if args.first&.type == :sym
                 key = args.first.children[0]
-                if standard_actions.include?(@rails_current_action) || key == :id
+                if key == :id
                   return s(:lvar, key)
+                elsif standard_actions.include?(@rails_current_action)
+                  # Query param: context.params.key
+                  return s(:attr, s(:attr, s(:lvar, :context), :params), key)
                 else
                   # Custom action: params["key"] (keep as params access)
                   return s(:send, s(:lvar, :params), :[], s(:str, key.to_s))
@@ -805,6 +852,9 @@ module Ruby2JS
               else
                 return node
               end
+            elsif target.nil? && method.to_s.end_with?('_path') && args.empty?
+              # people_path -> people_path() (Ruby method call needs explicit parens in JS)
+              return s(:send!, nil, method)
             elsif target.nil? && method.to_s.end_with?('_params')
               # article_params -> only inline if it's a genuine strong params method
               result = transform_strong_params_call(method)

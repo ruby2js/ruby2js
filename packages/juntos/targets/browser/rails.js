@@ -71,6 +71,17 @@ export class Router extends RouterBase {
       context = createContext();
     }
 
+    // Parse query parameters into context.params (Rails: params[:key] includes query string)
+    try {
+      const url = new URL(path, 'http://localhost');
+      for (const [key, value] of url.searchParams.entries()) {
+        context.params[key] = value;
+      }
+      path = url.pathname;
+    } catch (e) {
+      // path doesn't contain query string, no-op
+    }
+
     const result = this.match(path, 'GET');
 
     if (!result) {
