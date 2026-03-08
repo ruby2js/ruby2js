@@ -147,13 +147,11 @@ export class SvelteComponentTransformer {
     // Parse just the Ruby code (before __END__)
     let rubyCode = this.#source.split(/^__END__\r?\n?/m, 2)[0];
 
-    {
-      try {
-        let [ast, _] = parse(rubyCode);
-        if (ast) this.#analyzeAst(ast)
-      } catch (e) {
-        this.#errors.push({type: "parseError", message: e.message})
-      }
+    try {
+      let [ast, _] = parse(rubyCode);
+      if (ast) return this.#analyzeAst(ast)
+    } catch (e) {
+      return this.#errors.push({type: "parseError", message: e.message})
     }
   };
 

@@ -2191,7 +2191,8 @@ module Ruby2JS
 
               if options[:value_node]
                 # Explicit value: option provided — use it instead of model attribute
-                # Check the model's field for null to avoid NaN from parseFloat(null)
+                # Guard with null check on model field to avoid evaluating value expression
+                # when model is a new record (the expression may reference unavailable context)
                 raw_value = process(options[:value_node])
                 model_attr = s(:attr, s(:lvar, model.to_sym), name.to_sym)
                 value_conditional = s(:if,

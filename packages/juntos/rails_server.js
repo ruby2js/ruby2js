@@ -221,12 +221,25 @@ export function createContext(req, params = {}) {
     headers.cookie = req.headers.cookie || '';
   }
 
+  // Parse cookies into a hash for view access (Rails: cookies[:key])
+  const cookies = {};
+  cookieHeader.split(';').forEach(c => {
+    const eq = c.indexOf('=');
+    if (eq > 0) {
+      const key = c.substring(0, eq).trim();
+      cookies[key] = decodeURIComponent(c.substring(eq + 1).trim());
+    }
+  });
+
   return {
     // Content for layout (like Rails content_for)
     contentFor: {},
 
     // Flash messages - parsed from request cookie
     flash: createFlash(cookieHeader),
+
+    // Parsed cookies hash (Rails: cookies[:key])
+    cookies: cookies,
 
     // Request parameters (from URL and body)
     params: params,

@@ -94,6 +94,7 @@ export function createContext() {
         return alert || '';
       }
     },
+    cookies: {},
     contentFor: {},
     request: {
       headers: {

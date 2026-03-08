@@ -57,9 +57,16 @@ export function installFetchInterceptor() {
     const cookieHeader = [..._cookieJar.entries()]
       .map(([k, v]) => `${k}=${v}`).join('; ');
 
+    // Parse cookies into a hash for view access (Rails: cookies[:key])
+    const cookies = {};
+    for (const [k, v] of _cookieJar.entries()) {
+      cookies[k] = v;
+    }
+
     const context = {
       params: {},
       flash: createFlash(cookieHeader),
+      cookies: cookies,
       contentFor: {},
       request: { headers: { accept: init.headers?.accept || 'text/html' } }
     };

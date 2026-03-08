@@ -3189,7 +3189,6 @@ const Ruby2JS = (() => {
       return this._line_offsets.findIndex(offset => offset > pos) ?? this._line_offsets.length
     };
 
-    // Return column number (0-based) for a character position
     column_for_position(pos) {
       let line_idx = (this._line_offsets.findIndex(offset => offset > pos) ?? this._line_offsets.length) - 1;
       return pos - this._line_offsets[line_idx]
@@ -3246,7 +3245,8 @@ const Ruby2JS = (() => {
       "!=": "==",
       ">": "<=",
       ">=": "<",
-      "===": "!=="
+      "===": "!==",
+      "!==": "==="
     };
 
     static GROUP_OPERATORS = [
@@ -3664,6 +3664,7 @@ const Ruby2JS = (() => {
       return typeof obj === "object" && obj != null && "type" in obj && typeof obj === "object" && obj != null && "children" in obj
     };
 
+    // Output trailing comment for a node (on same line)
     trailing_comment(ast) {
       let trailing_list = this._comments.get("_trailing");
       if (!trailing_list) return;
@@ -3676,6 +3677,8 @@ const Ruby2JS = (() => {
         let node_begin = this.node_begin_pos(node);
         if (node.type !== ast_type || node_begin !== ast_begin) continue;
         let text = typeof comment === "object" && comment != null && "text" in comment ? comment.text : (comment ?? "").toString();
+
+        // Skip pragma comments
         if (/#\s*Pragma:/i.test(text)) return;
         this.put(" " + text.replace(/^#/m, "//"))
       }
@@ -3967,6 +3970,11 @@ const Ruby2JS = (() => {
     };
 
     on_array(...items) {
+      if (items.length === 1 && items.first.type === "cast") {
+        this.parse(items.first);
+        return
+      };
+
       let splat = items.rindex(a => a.type === "splat");
 
       if (splat) {
@@ -4477,6 +4485,10 @@ const Ruby2JS = (() => {
       };
 
       return this.put("break")
+    };
+
+    on_cast(expr) {
+      return this.parse(expr)
     };
 
     on_case(expr, ...rest) {
@@ -7499,6 +7511,8 @@ const Ruby2JS = (() => {
             );
 
             if (proxied.children[1].children.length === 1) {
+              // method_missing to return instance attributes (getters) as well
+              // as bound functions (methods).
               forward = this.s(
                 "send",
                 this.s("lvar", "obj"),
@@ -12435,11 +12449,12 @@ const Ruby2JS = (() => {
       "await",
       "await!",
       "await_attr",
+      "instanceof",
       "jsraw"
     ];
 
     on_autoreturn(...statements) {
-      let try_body, ensure_body;
+      let try_body, ensure_body, rescue_children;
       if (statements.length === 1 && statements.first == null) return;
       let block = statements.slice();
 
@@ -12542,9 +12557,47 @@ const Ruby2JS = (() => {
           try_body = inner.children.first;
           ensure_body = inner.children.last;
 
+          if (try_body?.type === "rescue") {
+            rescue_children = try_body.children.dup();
+
+            if (rescue_children[0]) {
+              rescue_children[0] = this.s("autoreturn", rescue_children[0])
+            };
+
+            for (let i = 1; i < rescue_children.length; i++) {
+              if (rescue_children[i]?.type !== "resbody") continue;
+              let rc = rescue_children[i].children.dup();
+              if (rc[2]) rc[2] = this.s("autoreturn", rc[2]);
+              rescue_children[i] = rescue_children[i].updated(null, rc)
+            };
+
+            block.push(kwbegin.updated(null, [inner.updated(
+              null,
+              [try_body.updated(null, rescue_children), ensure_body]
+            )]))
+          } else {
+            block.push(kwbegin.updated(
+              null,
+              [inner.updated(null, [this.s("autoreturn", try_body), ensure_body])]
+            ))
+          }
+        } else if (inner?.type === "rescue") {
+          rescue_children = inner.children.dup();
+
+          if (rescue_children[0]) {
+            rescue_children[0] = this.s("autoreturn", rescue_children[0])
+          };
+
+          for (let i = 1; i < rescue_children.length; i++) {
+            if (rescue_children[i]?.type !== "resbody") continue;
+            let rc = rescue_children[i].children.dup();
+            if (rc[2]) rc[2] = this.s("autoreturn", rc[2]);
+            rescue_children[i] = rescue_children[i].updated(null, rc)
+          };
+
           block.push(kwbegin.updated(
             null,
-            [inner.updated(null, [this.s("autoreturn", try_body), ensure_body])]
+            [inner.updated(null, rescue_children)]
           ))
         } else {
           block.push(kwbegin.updated(
@@ -16947,7 +17000,13 @@ const Ruby2JS = (() => {
       };
 
       if (/\w[!?]$/m.test(method)) method = (method ?? "").toString().slice(0, -1);
-      this.parse(receiver);
+
+      if (receiver && Converter.GROUP_OPERATORS.includes(receiver.type)) {
+        this.group(receiver)
+      } else {
+        this.parse(receiver)
+      };
+
       this.put("?.");
 
       if (method === "[]") {
@@ -16975,6 +17034,7 @@ const Ruby2JS = (() => {
         this.parse_all(...args, {join: ", "});
         return this.put(")")
       } else {
+        // Fallback for pre-ES2020: receiver && receiver(args)
         this.parse(receiver);
         this.put(" && ");
         this.parse(receiver);
@@ -16999,7 +17059,6 @@ const Ruby2JS = (() => {
         left = this.collapse_strings(left)
       };
 
-      // recursively evaluate right hand side
       if (right.type === "send" && right.children.length === 3 && right.children[1] === "+") {
         right = this.collapse_strings(right)
       };
@@ -17033,6 +17092,7 @@ const Ruby2JS = (() => {
 
       if (start.type === "int" && start.children.first === 0) {
         if (finish.type === "int") {
+          // output cleaner code if we know the value already
           length = finish.children.first + (node.type === "irange" ? 1 : 0);
           return this.put(`[...Array(${length ?? ""}).keys()]`)
         } else {
@@ -18288,6 +18348,7 @@ const Ruby2JS = (() => {
   Converter._handlers.push("true");
   Converter._handlers.push("false");
   Converter._handlers.push("break");
+  Converter._handlers.push("cast");
   Converter._handlers.push("case");
   Converter._handlers.push("casgn");
   Converter._handlers.push("class");
@@ -19321,6 +19382,8 @@ const Ruby2JS = (() => {
     get handle_prepend_list() {
       if (!this._filter_instance) return;
       if (this._filter_instance.prepend_list.length === 0) return;
+
+      // Deduplicate imports (same node object added multiple times, e.g., from require filter)
       let prepend = this._filter_instance.prepend_list.uniq;
 
       prepend = prepend.slice().sort((node_a, node_b) => {
@@ -19524,352 +19587,350 @@ const Ruby2JS = (() => {
     };
 
     parse(state="text", wrap_value=true) {
-      {
-        try {
-          this._wrap_value = wrap_value;
-          this._state = state;
-          this._backtrace = "";
-          let prev = null;
+      try {
+        this._wrap_value = wrap_value;
+        this._state = state;
+        this._backtrace = "";
+        let prev = null;
 
-          while (true) {
-            let c = this._stream.next;
-            if (c == null) break;
+        while (true) {
+          let c = this._stream.next;
+          if (c == null) break;
 
-            if (c === "\n") {
-              this._backtrace = ""
-            } else {
-              this._backtrace += c
-            };
-
-            let tag_info;
-
-            switch (this._state) {
-            case "text":
-
-              if (c === "<") {
-                if (this._text.trim().length !== 0) {
-                  this._result.push(`plain "${this._text.trim() ?? ""}"`)
-                };
-
-                if (this._tag_stack.length === 0) {
-                  this._result.push(...new this.constructor(this._stream).parse("element"));
-                  this._state = "text";
-                  this._text = ""
-                } else {
-                  this._state = "element";
-                  this._element = "";
-                  this._element_original = "";
-                  this._attrs = {}
-                }
-              } else if (c === "\\") {
-                this._text += c + c
-              } else if (c === "{") {
-                if (this._text.length !== 0) this._result.push(`plain "${this._text ?? ""}"`);
-                this._result.push(...this.parse_expr);
-                this._text = ""
-              } else if (this._text.length !== 0 || !/\s/.test(c)) {
-                this._text += c
-              };
-
-              break;
-
-            case "element":
-
-              if (c === "/") {
-                if (this._element === "") {
-                  this._state = "close";
-                  this._element = "";
-                  this._element_original = ""
-                } else {
-                  this._state = "void"
-                }
-              } else if (c === ">") {
-                this._result.push(`${this.element_call(
-                  this._element,
-                  this._element_original
-                ) ?? ""} do`);
-
-                this._tag_stack.push([this._element, this._element_original]);
-                this._state = "text";
-                this._text = ""
-              } else if (c === " " || c === "\n") {
-                this._state = "attr_name";
-                this._attr_name = "";
-                this._attrs = {}
-              } else if (c === "-") {
-                this._element += "_";
-                this._element_original += "-"
-              } else if (c === ".") {
-                this._element += ".";
-                this._element_original += "."
-              } else if (/^\w$/m.test(c)) {
-                this._element += c;
-                this._element_original += c
-              } else {
-                throw new SyntaxError(`invalid character in element name: ${JSON.stringify(c) ?? ""}`)
-              };
-
-              break;
-
-            case "close":
-
-              if (c === ">") {
-                tag_info = this._tag_stack.last;
-
-                if (tag_info && this._element === tag_info[0]) {
-                  this._tag_stack.pop()
-                } else if (tag_info) {
-                  throw new SyntaxError(`missing close tag for: ${JSON.stringify(tag_info[0]) ?? ""}`)
-                } else {
-                  throw new SyntaxError(`close tag for element that is not open: ${this._element ?? ""}`)
-                };
-
-                this._result.push("end");
-                if (this._tag_stack.length === 0) return this._result;
-                this._state = "text";
-                this._text = ""
-              } else if (/^\w$/m.test(c)) {
-                this._element += c;
-                this._element_original += c
-              } else if (c === "-" && this._element.length !== 0) {
-                this._element += "_";
-                this._element_original += "-"
-              } else if (c === "." && this._element.length !== 0) {
-                this._element += ".";
-                this._element_original += "."
-              } else if (c !== " ") {
-                throw new SyntaxError(`invalid character in element: ${JSON.stringify(c) ?? ""}`)
-              };
-
-              break;
-
-            case "void":
-
-              if (c === ">") {
-                if (Object.keys(this._attrs).length === 0) {
-                  this._result.push(this.element_call(
-                    this._element,
-                    this._element_original
-                  ))
-                } else {
-                  this._result.push(this.element_call(
-                    this._element,
-                    this._element_original,
-                    this._attrs
-                  ))
-                };
-
-                if (this._tag_stack.length === 0) return this._result;
-                this._state = "text";
-                this._text = ""
-              } else if (c !== " ") {
-                throw new SyntaxError("invalid character in element: \"/\"")
-              };
-
-              break;
-
-            case "attr_name":
-
-              if (/^\w$/m.test(c)) {
-                this._attr_name += c
-              } else if (c === "-") {
-                this._attr_name += "_"
-              } else if (c === "=") {
-                this._state = "attr_value";
-                this._value = ""
-              } else if (c === "/" && this._attr_name === "") {
-                this._state = "void"
-              } else if (c === " " || c === "\n" || c === ">") {
-                if (this._attr_name.length !== 0) {
-                  this._attrs[this._attr_name] = "true";
-                  this._attr_name = ""
-                };
-
-                if (c === ">") {
-                  this._result.push(`${this.element_call(
-                    this._element,
-                    this._element_original,
-                    this._attrs
-                  ) ?? ""} do`);
-
-                  this._tag_stack.push([this._element, this._element_original]);
-                  this._state = "text";
-                  this._text = ""
-                }
-              } else {
-                throw new SyntaxError(`invalid character in attribute name: ${JSON.stringify(c) ?? ""}`)
-              };
-
-              break;
-
-            case "attr_value":
-
-              if (c === "\"") {
-                this._state = "dquote"
-              } else if (c === "'") {
-                this._state = "squote"
-              } else if (c === "{") {
-                this._attrs[this._attr_name] = this.parse_value;
-                this._state = "attr_name";
-                this._attr_name = ""
-              } else {
-                throw new SyntaxError(`invalid value for attribute ${JSON.stringify(this._attr_name) ?? ""} in element ${JSON.stringify(this._element) ?? ""}`)
-              };
-
-              break;
-
-            case "dquote":
-
-              if (c === "\"") {
-                this._attrs[this._attr_name] = "\"" + this._value + "\"";
-                this._state = "attr_name";
-                this._attr_name = ""
-              } else if (c === "\\") {
-                this._value += c + c
-              } else {
-                this._value += c
-              };
-
-              break;
-
-            case "squote":
-
-              if (c === "'") {
-                this._attrs[this._attr_name] = "'" + this._value + "'";
-                this._state = "attr_name";
-                this._attr_name = ""
-              } else if (c === "\\") {
-                this._value += c + c
-              } else {
-                this._value += c
-              };
-
-              break;
-
-            case "expr":
-
-              if (c === "}") {
-                if (this._expr_nesting > 0) {
-                  this._value += c;
-                  this._expr_nesting--
-                } else {
-                  this._result.push(this._wrap_value ? `plain(${this._value ?? ""})` : this._value);
-                  return this._result
-                }
-              } else if (c === "<") {
-                if (/[\w\)\]\}]/.test(prev)) {
-                  this._value += c // less than
-                } else if (prev === " ") {
-                  if (/[a-zA-Z]/.test(this._stream.peek)) {
-                    this._value += this.parse_element.join(";");
-                    this._wrap_value = false
-                  } else {
-                    this._value += c
-                  }
-                } else {
-                  this._value += this.parse_element.join(";");
-                  this._wrap_value = false
-                }
-              } else {
-                this._value += c;
-                if (c === "'") this._state = "expr_squote";
-                if (c === "\"") this._state = "expr_dquote";
-                if (c === "{") this._expr_nesting++
-              };
-
-              break;
-
-            case "expr_squote":
-              this._value += c;
-
-              if (c === "\\") {
-                this._state = "expr_squote_backslash"
-              } else if (c === "'") {
-                this._state = "expr"
-              };
-
-              break;
-
-            case "expr_squote_backslash":
-              this._value += c;
-              this._state = "expr_squote";
-              break;
-
-            case "expr_dquote":
-              this._value += c;
-
-              if (c === "\\") {
-                this._state = "expr_dquote_backslash"
-              } else if (c === "#") {
-                this._state = "expr_dquote_hash"
-              } else if (c === "\"") {
-                this._state = "expr"
-              };
-
-              break;
-
-            case "expr_dquote_backslash":
-              this._value += c;
-              this._state = "expr_dquote";
-              break;
-
-            case "expr_dquote_hash":
-              this._value += c;
-              if (c === "{") this._value += this.parse_value + "}";
-              this._state = "expr_dquote";
-              break;
-
-            default:
-              throw new RangeError(`internal state error in JSX: ${JSON.stringify(this._state) ?? ""}`)
-            };
-
-            prev = c
+          if (c === "\n") {
+            this._backtrace = ""
+          } else {
+            this._backtrace += c
           };
 
-          if (this._tag_stack.length !== 0) {
-            throw new SyntaxError(`missing close tag for: ${JSON.stringify(this._tag_stack.last[0]) ?? ""}`)
-          };
+          let tag_info;
 
           switch (this._state) {
           case "text":
 
-            if (this._text.trim().length !== 0) {
-              this._result.push(`plain "${this._text.trim() ?? ""}"`)
+            if (c === "<") {
+              if (this._text.trim().length !== 0) {
+                this._result.push(`plain "${this._text.trim() ?? ""}"`)
+              };
+
+              if (this._tag_stack.length === 0) {
+                this._result.push(...new this.constructor(this._stream).parse("element"));
+                this._state = "text";
+                this._text = ""
+              } else {
+                this._state = "element";
+                this._element = "";
+                this._element_original = "";
+                this._attrs = {}
+              }
+            } else if (c === "\\") {
+              this._text += c + c
+            } else if (c === "{") {
+              if (this._text.length !== 0) this._result.push(`plain "${this._text ?? ""}"`);
+              this._result.push(...this.parse_expr);
+              this._text = ""
+            } else if (this._text.length !== 0 || !/\s/.test(c)) {
+              this._text += c
             };
 
             break;
 
           case "element":
+
+            if (c === "/") {
+              if (this._element === "") {
+                this._state = "close";
+                this._element = "";
+                this._element_original = ""
+              } else {
+                this._state = "void"
+              }
+            } else if (c === ">") {
+              this._result.push(`${this.element_call(
+                this._element,
+                this._element_original
+              ) ?? ""} do`);
+
+              this._tag_stack.push([this._element, this._element_original]);
+              this._state = "text";
+              this._text = ""
+            } else if (c === " " || c === "\n") {
+              this._state = "attr_name";
+              this._attr_name = "";
+              this._attrs = {}
+            } else if (c === "-") {
+              this._element += "_";
+              this._element_original += "-"
+            } else if (c === ".") {
+              this._element += ".";
+              this._element_original += "."
+            } else if (/^\w$/m.test(c)) {
+              this._element += c;
+              this._element_original += c
+            } else {
+              throw new SyntaxError(`invalid character in element name: ${JSON.stringify(c) ?? ""}`)
+            };
+
+            break;
+
+          case "close":
+
+            if (c === ">") {
+              tag_info = this._tag_stack.last;
+
+              if (tag_info && this._element === tag_info[0]) {
+                this._tag_stack.pop()
+              } else if (tag_info) {
+                throw new SyntaxError(`missing close tag for: ${JSON.stringify(tag_info[0]) ?? ""}`)
+              } else {
+                throw new SyntaxError(`close tag for element that is not open: ${this._element ?? ""}`)
+              };
+
+              this._result.push("end");
+              if (this._tag_stack.length === 0) return this._result;
+              this._state = "text";
+              this._text = ""
+            } else if (/^\w$/m.test(c)) {
+              this._element += c;
+              this._element_original += c
+            } else if (c === "-" && this._element.length !== 0) {
+              this._element += "_";
+              this._element_original += "-"
+            } else if (c === "." && this._element.length !== 0) {
+              this._element += ".";
+              this._element_original += "."
+            } else if (c !== " ") {
+              throw new SyntaxError(`invalid character in element: ${JSON.stringify(c) ?? ""}`)
+            };
+
+            break;
+
+          case "void":
+
+            if (c === ">") {
+              if (Object.keys(this._attrs).length === 0) {
+                this._result.push(this.element_call(
+                  this._element,
+                  this._element_original
+                ))
+              } else {
+                this._result.push(this.element_call(
+                  this._element,
+                  this._element_original,
+                  this._attrs
+                ))
+              };
+
+              if (this._tag_stack.length === 0) return this._result;
+              this._state = "text";
+              this._text = ""
+            } else if (c !== " ") {
+              throw new SyntaxError("invalid character in element: \"/\"")
+            };
+
+            break;
+
           case "attr_name":
+
+            if (/^\w$/m.test(c)) {
+              this._attr_name += c
+            } else if (c === "-") {
+              this._attr_name += "_"
+            } else if (c === "=") {
+              this._state = "attr_value";
+              this._value = ""
+            } else if (c === "/" && this._attr_name === "") {
+              this._state = "void"
+            } else if (c === " " || c === "\n" || c === ">") {
+              if (this._attr_name.length !== 0) {
+                this._attrs[this._attr_name] = "true";
+                this._attr_name = ""
+              };
+
+              if (c === ">") {
+                this._result.push(`${this.element_call(
+                  this._element,
+                  this._element_original,
+                  this._attrs
+                ) ?? ""} do`);
+
+                this._tag_stack.push([this._element, this._element_original]);
+                this._state = "text";
+                this._text = ""
+              }
+            } else {
+              throw new SyntaxError(`invalid character in attribute name: ${JSON.stringify(c) ?? ""}`)
+            };
+
+            break;
+
           case "attr_value":
-            throw new SyntaxError(`unclosed element ${JSON.stringify(this._element) ?? ""}`);
+
+            if (c === "\"") {
+              this._state = "dquote"
+            } else if (c === "'") {
+              this._state = "squote"
+            } else if (c === "{") {
+              this._attrs[this._attr_name] = this.parse_value;
+              this._state = "attr_name";
+              this._attr_name = ""
+            } else {
+              throw new SyntaxError(`invalid value for attribute ${JSON.stringify(this._attr_name) ?? ""} in element ${JSON.stringify(this._element) ?? ""}`)
+            };
+
             break;
 
           case "dquote":
+
+            if (c === "\"") {
+              this._attrs[this._attr_name] = "\"" + this._value + "\"";
+              this._state = "attr_name";
+              this._attr_name = ""
+            } else if (c === "\\") {
+              this._value += c + c
+            } else {
+              this._value += c
+            };
+
+            break;
+
           case "squote":
-          case "expr_dquote":
-          case "expr_dquote_backslash":
-          case "expr_squote":
-          case "expr_squote_backslash":
-            throw new SyntaxError("unclosed quote");
+
+            if (c === "'") {
+              this._attrs[this._attr_name] = "'" + this._value + "'";
+              this._state = "attr_name";
+              this._attr_name = ""
+            } else if (c === "\\") {
+              this._value += c + c
+            } else {
+              this._value += c
+            };
+
             break;
 
           case "expr":
-            throw new SyntaxError("unclosed value");
+
+            if (c === "}") {
+              if (this._expr_nesting > 0) {
+                this._value += c;
+                this._expr_nesting--
+              } else {
+                this._result.push(this._wrap_value ? `plain(${this._value ?? ""})` : this._value);
+                return this._result
+              }
+            } else if (c === "<") {
+              if (/[\w\)\]\}]/.test(prev)) {
+                this._value += c // less than
+              } else if (prev === " ") {
+                if (/[a-zA-Z]/.test(this._stream.peek)) {
+                  this._value += this.parse_element.join(";");
+                  this._wrap_value = false
+                } else {
+                  this._value += c
+                }
+              } else {
+                this._value += this.parse_element.join(";");
+                this._wrap_value = false
+              }
+            } else {
+              this._value += c;
+              if (c === "'") this._state = "expr_squote";
+              if (c === "\"") this._state = "expr_dquote";
+              if (c === "{") this._expr_nesting++
+            };
+
+            break;
+
+          case "expr_squote":
+            this._value += c;
+
+            if (c === "\\") {
+              this._state = "expr_squote_backslash"
+            } else if (c === "'") {
+              this._state = "expr"
+            };
+
+            break;
+
+          case "expr_squote_backslash":
+            this._value += c;
+            this._state = "expr_squote";
+            break;
+
+          case "expr_dquote":
+            this._value += c;
+
+            if (c === "\\") {
+              this._state = "expr_dquote_backslash"
+            } else if (c === "#") {
+              this._state = "expr_dquote_hash"
+            } else if (c === "\"") {
+              this._state = "expr"
+            };
+
+            break;
+
+          case "expr_dquote_backslash":
+            this._value += c;
+            this._state = "expr_dquote";
+            break;
+
+          case "expr_dquote_hash":
+            this._value += c;
+            if (c === "{") this._value += this.parse_value + "}";
+            this._state = "expr_dquote";
             break;
 
           default:
             throw new RangeError(`internal state error in JSX: ${JSON.stringify(this._state) ?? ""}`)
           };
 
-          return this._result
-        } catch (e) {
-          if (e instanceof SyntaxError) {
-            e.set_backtrace(this._backtrace);
-            throw e
-          } else {
-            throw e
-          }
+          prev = c
+        };
+
+        if (this._tag_stack.length !== 0) {
+          throw new SyntaxError(`missing close tag for: ${JSON.stringify(this._tag_stack.last[0]) ?? ""}`)
+        };
+
+        switch (this._state) {
+        case "text":
+
+          if (this._text.trim().length !== 0) {
+            this._result.push(`plain "${this._text.trim() ?? ""}"`)
+          };
+
+          break;
+
+        case "element":
+        case "attr_name":
+        case "attr_value":
+          throw new SyntaxError(`unclosed element ${JSON.stringify(this._element) ?? ""}`);
+          break;
+
+        case "dquote":
+        case "squote":
+        case "expr_dquote":
+        case "expr_dquote_backslash":
+        case "expr_squote":
+        case "expr_squote_backslash":
+          throw new SyntaxError("unclosed quote");
+          break;
+
+        case "expr":
+          throw new SyntaxError("unclosed value");
+          break;
+
+        default:
+          throw new RangeError(`internal state error in JSX: ${JSON.stringify(this._state) ?? ""}`)
+        };
+
+        return this._result
+      } catch (e) {
+        if (e instanceof SyntaxError) {
+          e.set_backtrace(this._backtrace);
+          return (() => { throw e })()
+        } else {
+          throw e
         }
       }
     };

@@ -194,14 +194,11 @@ export class SvelteTemplateCompiler {
     } else if (/^@const\s+(\w+)\s*=\s*(.+)$/m.test(content)) {
       return `@const ${RegExp.$1} = ${this.#convertExpression(RegExp.$2)}`
     } else {
-      {
-        // Plain expression - use begin/rescue with explicit returns for JS compatibility
-        try {
-          return this.#convertExpression(content)
-        } catch (e) {
-          this.#errors.push({type: "expression", content, error: e.message});
-          return content
-        }
+      try {
+        return this.#convertExpression(content)
+      } catch (e) {
+        this.#errors.push({type: "expression", content, error: e.message});
+        return content
       }
     }
   };

@@ -1171,7 +1171,7 @@ module Ruby2JS
           view_module = "#{@rails_controller_name}TurboStreams"
           action = @rails_current_action
 
-          # Build view call: MessageTurboStreams.create({$context: context, message})
+          # Build view call: MessageTurboStreams.create({$context: context, cookies: context.cookies, message})
           s(:hash,
             s(:pair, s(:sym, :turbo_stream),
               s(:send,
@@ -1179,6 +1179,7 @@ module Ruby2JS
                 action,
                 s(:hash,
                   s(:pair, s(:sym, :"$context"), s(:lvar, :context)),
+                  s(:pair, s(:sym, :cookies), s(:attr, s(:lvar, :context), :cookies)),
                   s(:pair, s(:sym, model_name), s(:lvar, model_name))))))
         end
 
@@ -1388,8 +1389,9 @@ module Ruby2JS
                         else action_name
                         end
 
-          # Build props hash for view: { $context: context, action_name: "show", articles }
+          # Build props hash for view: { $context: context, cookies: context.cookies, action_name: "show", articles }
           pairs = [s(:pair, s(:sym, :"$context"), s(:lvar, :context))]
+          pairs << s(:pair, s(:sym, :cookies), s(:attr, s(:lvar, :context), :cookies))
           pairs << s(:pair, s(:sym, :action_name), s(:str, action_name.to_s))
           ivars.each do |ivar|
             pairs << s(:pair, s(:sym, ivar), s(:lvar, ivar))
