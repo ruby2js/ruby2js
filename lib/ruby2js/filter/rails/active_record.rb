@@ -152,47 +152,47 @@ module Ruby2JS
           target, method, *args = node.children
 
           # 1. Model.class_method (e.g., Article.find, User.where)
-          const_name = model_const_name(target)
-          if model_ref?(const_name, model_refs)
+          const_name = self.model_const_name(target)
+          if self.model_ref?(const_name, model_refs)
             return :await! if AR_CLASS_METHODS.include?(method)
 
             # Zero-arg: scope (getter) or custom class method (parens)
             if args.empty?
-              return known_scope?(method, const_name, metadata) ? :await_attr : :await!
+              return self.known_scope?(method, const_name, metadata) ? :await_attr : :await!
             end
           end
 
           # 2. Chained call ending with AR class method (e.g., Article.includes(:x).all)
           if target && SEND_TYPES.include?(target.type) && AR_CLASS_METHODS.include?(method)
-            root = chain_root(target)
-            root_name = model_const_name(root)
-            return :await! if model_ref?(root_name, model_refs)
+            root = self.chain_root(target)
+            root_name = self.model_const_name(root)
+            return :await! if self.model_ref?(root_name, model_refs)
           end
 
           # 3. Scope chained after an awaited call (e.g., Article.where(...).by_name)
           if target&.type == :await!
-            root = chain_root(target)
-            root_name = model_const_name(root)
-            if model_ref?(root_name, model_refs) && known_scope?(method, root_name, metadata)
+            root = self.chain_root(target)
+            root_name = self.model_const_name(root)
+            if self.model_ref?(root_name, model_refs) && self.known_scope?(method, root_name, metadata)
               return :await_attr
             end
           end
 
           # 4. Instance method on variable (e.g., article.save, @article.update)
-          if variable_target?(target)
+          if self.variable_target?(target)
             return :await! if AR_INSTANCE_METHODS.include?(method)
 
             # Custom async instance method (e.g., @studio.pairs)
             models = metadata ? metadata['models'] : nil
             models = metadata if metadata && !models  # wrap_ar_operations passes model_metadata directly
-            return :await! if models && custom_instance_method?(method, models)
+            return :await! if models && self.custom_instance_method?(method, models)
           end
 
           # 5. Association chain (e.g., article.comments.create!)
           if target&.type == :send && AR_ASSOCIATION_METHODS.include?(method)
             assoc_target, assoc_method = target.children
             # Must start from variable, not [] (hash/array access)
-            if (variable_target?(assoc_target) || assoc_target&.type == :self) && assoc_method != :[]
+            if (self.variable_target?(assoc_target) || assoc_target&.type == :self) && assoc_method != :[]
               return :await!
             end
           end
@@ -207,12 +207,12 @@ module Ruby2JS
         def self.wrap_with_await_if_needed(node, model_refs, metadata=nil)
           return node unless node.respond_to?(:type) && node.type == :send
 
-          await_type = classify_send(node, model_refs, metadata)
+          await_type = self.classify_send(node, model_refs, metadata)
           return node unless await_type
 
           if await_type == :await! && SEND_TYPES.include?(node.children[0]&.type)
             # Chain: strip inner awaits before wrapping
-            stripped = strip_inner_awaits(node)
+            stripped = self.strip_inner_awaits(node)
             return stripped.updated(await_type)
           end
 
@@ -236,7 +236,7 @@ module Ruby2JS
             if target&.type == :send
               chain_receiver = target.children[0]
               chain_method = target.children[1]
-              if variable_target?(chain_receiver) && AR_INSTANCE_METHODS.include?(chain_method)
+              if self.variable_target?(chain_receiver) && AR_INSTANCE_METHODS.include?(chain_method)
                 wrapped_target = target.updated(:await!)
                 new_args = args.map { |a| self.wrap_ar_operations(a, model_refs, model_metadata) }
                 return node.updated(nil, [wrapped_target, method, *new_args])
@@ -247,8 +247,8 @@ module Ruby2JS
             if target&.type == :send && AR_ASSOCIATION_METHODS.include?(method)
               assoc_target = target.children[0]
               assoc_method = target.children[1]
-              if variable_target?(assoc_target) && assoc_method != :[] &&
-                 model_metadata && custom_instance_method?(assoc_method, model_metadata)
+              if self.variable_target?(assoc_target) && assoc_method != :[] &&
+                 model_metadata && self.custom_instance_method?(assoc_method, model_metadata)
                 wrapped_target = target.updated(:await!)
                 new_args = args.map { |a| self.wrap_ar_operations(a, model_refs, model_metadata) }
                 new_node = node.updated(nil, [wrapped_target, method, *new_args])
@@ -256,7 +256,7 @@ module Ruby2JS
               end
             end
 
-            await_type = classify_send(node, model_refs, model_metadata)
+            await_type = self.classify_send(node, model_refs, model_metadata)
             if await_type
               new_args = args.map { |a| self.wrap_ar_operations(a, model_refs, model_metadata) }
               new_node = node.updated(nil, [target, method, *new_args])
