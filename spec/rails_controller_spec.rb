@@ -52,8 +52,8 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'async function show(context, id)'
-      _(result).must_include 'let article = await Article.find(id)'
+      _(result).must_include 'async function show(context)'
+      _(result).must_include 'let article = await Article.find(context.params.id)'
     end
 
     it "renames new action to $new (reserved word)" do
@@ -80,10 +80,10 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'function show(context, id)'
-      _(result).must_include 'function edit(context, id)'
-      _(result).must_include 'function update(context, id, params)'
-      _(result).must_include 'function destroy(context, id)'
+      _(result).must_include 'function show(context)'
+      _(result).must_include 'function edit(context)'
+      _(result).must_include 'function update(context, params)'
+      _(result).must_include 'function destroy(context)'
     end
   end
 
@@ -130,7 +130,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'Article.find(id)'
+      _(result).must_include 'Article.find(context.params.id)'
       _(result).wont_include 'params['
     end
 
@@ -287,8 +287,8 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'function update(context, id, params)'
-      _(result).must_include 'Article.find(id)'
+      _(result).must_include 'function update(context, params)'
+      _(result).must_include 'Article.find(context.params.id)'
       _(result).must_include 'article.update(article_params(params))'
     end
   end
@@ -565,8 +565,8 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'async function show(context, id)'
-      _(result).must_include 'let article = await Article.find(id)'
+      _(result).must_include 'async function show(context)'
+      _(result).must_include 'let article = await Article.find(context.params.id)'
     end
 
     it "respects only: constraint" do
@@ -593,7 +593,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       # index should NOT have set_article code
       _(result).must_match(/async function index\(context\).*?let articles = await Article\.all\(\)/m)
       # show SHOULD have set_article code
-      _(result).must_match(/async function show\(context, id\).*?let article = await Article\.find\(id\)/m)
+      _(result).must_match(/async function show\(context\).*?let article = await Article\.find\(context\.params\.id\)/m)
     end
 
     it "collects ivars from before_action methods" do

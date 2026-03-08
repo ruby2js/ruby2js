@@ -1361,18 +1361,36 @@ module Ruby2JS
             action_args = [s(:send!, nil, :context)]
           end
 
-          # For nested resources, pass parent id first
+          standard_actions = [:index, :show, :$new, :edit, :create, :update, :destroy]
+          is_standard = standard_actions.include?(action)
+
+          # For nested resources, add parent_id to context params
           if is_nested && !url_args.empty?
             parent_arg = url_args.shift
             processed_parent = process(parent_arg)
-            action_args << s(:attr, processed_parent, :id)
+            if is_standard
+              parent_singular = url_info[:action_or_parent] || 'parent'
+              parent_param_name = :"#{parent_singular}_id"
+              context_params << s(:pair, s(:sym, parent_param_name), s(:attr, processed_parent, :id))
+            else
+              action_args << s(:attr, processed_parent, :id)
+            end
           end
 
-          # For member actions (show, edit, update, destroy), pass id
+          # For member actions, add id to context params (standard) or function args (custom)
           if url_info[:singular] && !url_args.empty?
             id_arg = url_args.first
             processed_id = process(id_arg)
-            action_args << s(:attr, processed_id, :id)
+            if is_standard
+              context_params << s(:pair, s(:sym, :id), s(:attr, processed_id, :id))
+            else
+              action_args << s(:attr, processed_id, :id)
+            end
+          end
+
+          # Rebuild action_args with updated context_params
+          if context_params.any?
+            action_args = [s(:send!, nil, :context, process(s(:hash, *context_params)))] + action_args[1..]
           end
 
           # For create/update, pass params

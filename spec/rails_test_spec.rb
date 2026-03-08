@@ -599,7 +599,7 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'ArticlesController.show(context(), article.id)'
+      assert_includes result, 'ArticlesController.show(context({id: article.id}))'
     end
 
     it "converts get new_singular_url to Controller.$new" do
@@ -621,7 +621,7 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'ArticlesController.edit(context(), article.id)'
+      assert_includes result, 'ArticlesController.edit(context({id: article.id}))'
     end
 
     it "converts post plural_url with params to Controller.create" do
@@ -646,8 +646,7 @@ describe Ruby2JS::Filter::Rails::Test do
         end
       RUBY
       assert_includes result, 'ArticlesController.update('
-      assert_includes result, 'context()'
-      assert_includes result, 'article.id'
+      assert_includes result, 'context({id: article.id})'
       assert_includes result, '{article: {title: "New"}}'
     end
 
@@ -659,9 +658,7 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'ArticlesController.destroy('
-      assert_includes result, 'context()'
-      assert_includes result, 'article.id'
+      assert_includes result, 'ArticlesController.destroy(context({id: article.id}))'
     end
   end
 
@@ -1108,7 +1105,7 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'PaymentsController.index(context(), person.id)'
+      assert_includes result, 'PaymentsController.index(context({person_id: person.id}))'
     end
 
     it "converts nested singular URL (person_payment_url)" do
@@ -1119,9 +1116,9 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'PaymentsController.show('
-      assert_includes result, 'person.id'
-      assert_includes result, 'payment.id'
+      assert_includes result, 'PaymentsController.show(context({'
+      assert_includes result, 'person_id: person.id'
+      assert_includes result, 'id: payment.id'
     end
 
     it "converts nested new URL (new_person_payment_url)" do
@@ -1132,7 +1129,7 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'PaymentsController.$new(context(), person.id)'
+      assert_includes result, 'PaymentsController.$new(context({person_id: person.id}))'
     end
 
     it "converts nested edit URL (edit_person_payment_url)" do
@@ -1143,9 +1140,9 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'PaymentsController.edit('
-      assert_includes result, 'person.id'
-      assert_includes result, 'payment.id'
+      assert_includes result, 'PaymentsController.edit(context({'
+      assert_includes result, 'person_id: person.id'
+      assert_includes result, 'id: payment.id'
     end
   end
 

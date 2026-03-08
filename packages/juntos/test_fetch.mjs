@@ -74,11 +74,19 @@ export function installFetchInterceptor() {
     // Extract params from request body
     const params = extractParams(init.body);
 
-    // Build action args: context, [parentId], [id], [params]
+    // Merge route params into context.params
+    if (route.nested) {
+      if (match[1]) {
+        const parentParamName = route.parentName.replace(/s$/, '') + '_id';
+        context.params[parentParamName] = parseInt(match[1]);
+      }
+      if (match[2]) context.params.id = parseInt(match[2]);
+    } else if (match[1]) {
+      context.params.id = parseInt(match[1]);
+    }
+
+    // Build action args: context, [params]
     const args = [context];
-    if (route.nested && match[1]) args.push(parseInt(match[1]));
-    const idIndex = route.nested ? 2 : 1;
-    if (match[idIndex]) args.push(parseInt(match[idIndex]));
     if (params && method !== 'GET') args.push(params);
 
     const actionName = route.action === 'new' ? '$new' : route.action;

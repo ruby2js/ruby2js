@@ -183,43 +183,42 @@ export class Router extends RouterServer {
     try {
       let html;
 
+      // Merge route params into context.params (like Rails params hash)
       if (route.nested) {
         const parentId = parseInt(match[1]);
-        const id = match[2] ? parseInt(match[2]) : null;
+        const parentParamName = route.parentName.replace(/s$/, '') + '_id';
+        context.params[parentParamName] = parentId;
+        if (match[2]) context.params.id = parseInt(match[2]);
+      } else if (match[1]) {
+        context.params.id = parseInt(match[1]);
+      }
 
-        if (method === 'POST') {
-          const result = await controller.create(context, parentId, params);
-          return this.handleResultNode(context, res, result, `/${route.parentName}/${parentId}`);
-        } else if (method === 'PATCH') {
-          const result = await controller.update(context, parentId, id, params);
-          return this.handleResultNode(context, res, result, `/${route.parentName}/${parentId}`);
-        } else if (method === 'DELETE') {
-          const result = await controller.destroy(context, parentId, id);
-          return this.handleResultNode(context, res, result, `/${route.parentName}/${parentId}`);
-        } else {
-          html = id != null ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
-        }
+      if (method === 'POST' && action === 'create') {
+        const result = await controller.create(context, params);
+        const fallback = route.nested
+          ? `/${route.parentName}/${context.params[route.parentName.replace(/s$/, '') + '_id']}`
+          : `/${controllerName}`;
+        return this.handleResultNode(context, res, result, fallback);
+      } else if ((method === 'PATCH' || method === 'PUT') && action === 'update') {
+        const result = await controller.update(context, params);
+        const fallback = route.nested
+          ? `/${route.parentName}/${context.params[route.parentName.replace(/s$/, '') + '_id']}`
+          : `/${controllerName}/${context.params.id}`;
+        return this.handleResultNode(context, res, result, fallback);
+      } else if (method === 'DELETE' && action === 'destroy') {
+        const result = await controller.destroy(context);
+        const fallback = route.nested
+          ? `/${route.parentName}/${context.params[route.parentName.replace(/s$/, '') + '_id']}`
+          : `/${controllerName}`;
+        return this.handleResultNode(context, res, result, fallback);
+      } else if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
+        // Custom member/collection route (e.g., POST /studios/:id/unpair)
+        const result = context.params.id != null
+          ? await controller[actionMethod](context, context.params.id, params)
+          : await controller[actionMethod](context, params);
+        return this.handleResultNode(context, res, result, `/${controllerName}${context.params.id != null ? '/' + context.params.id : ''}`);
       } else {
-        const id = match[1] ? parseInt(match[1]) : null;
-
-        if (method === 'POST' && action === 'create') {
-          const result = await controller.create(context, params);
-          return this.handleResultNode(context, res, result, `/${controllerName}`);
-        } else if ((method === 'PATCH' || method === 'PUT') && action === 'update') {
-          const result = await controller.update(context, id, params);
-          return this.handleResultNode(context, res, result, `/${controllerName}/${id}`);
-        } else if (method === 'DELETE' && action === 'destroy') {
-          const result = await controller.destroy(context, id);
-          return this.handleResultNode(context, res, result, `/${controllerName}`);
-        } else if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
-          // Custom member/collection route (e.g., POST /studios/:id/unpair)
-          const result = id != null
-            ? await controller[actionMethod](context, id, params)
-            : await controller[actionMethod](context, params);
-          return this.handleResultNode(context, res, result, `/${controllerName}${id != null ? '/' + id : ''}`);
-        } else {
-          html = id != null ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
-        }
+        html = await controller[actionMethod](context);
       }
 
       // Check if result is a JSON response (not a React element)

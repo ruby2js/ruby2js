@@ -56,6 +56,17 @@ export function createContext(params = {}) {
   };
 }
 
+// Merge route match params (id, parent_id) into context.params
+function mergeRouteParams(context, route, match) {
+  if (route.nested) {
+    const parentParamName = route.parentName.replace(/s$/, '') + '_id';
+    context.params[parentParamName] = parseInt(match[1]);
+    if (match[2]) context.params.id = parseInt(match[2]);
+  } else if (match[1]) {
+    context.params.id = parseInt(match[1]);
+  }
+}
+
 // Browser Router with DOM-based dispatch
 export class Router extends RouterBase {
   // Render a route to a full HTML document string (for Turbo to process)
@@ -102,15 +113,8 @@ export class Router extends RouterBase {
     console.log(`Processing ${controller.name || controllerName}#${action}`);
 
     try {
-      let html;
-      if (route.nested) {
-        const parentId = parseInt(match[1]);
-        const id = match[2] ? parseInt(match[2]) : null;
-        html = id != null ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
-      } else {
-        const id = match[1] ? parseInt(match[1]) : null;
-        html = id != null ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
-      }
+      mergeRouteParams(context, route, match);
+      let html = await controller[actionMethod](context);
 
       console.log(`  Rendering ${controllerName}/${action}`);
       context.flash.writeToCookie();
@@ -154,15 +158,8 @@ export class Router extends RouterBase {
     console.log(`Processing ${controller.name || controllerName}#${action}`);
 
     try {
-      let html;
-      if (route.nested) {
-        const parentId = parseInt(match[1]);
-        const id = match[2] ? parseInt(match[2]) : null;
-        html = id != null ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
-      } else {
-        const id = match[1] ? parseInt(match[1]) : null;
-        html = id != null ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
-      }
+      mergeRouteParams(context, route, match);
+      let html = await controller[actionMethod](context);
 
       console.log(`  Rendering ${controllerName}/${action}`);
       await this.renderContent(context, html);
@@ -248,19 +245,8 @@ export class Router extends RouterBase {
     console.log(`[juntos] Hydrating ${controllerName}#${action}`);
 
     try {
-      let content;
-      if (route.nested) {
-        const parentId = parseInt(match[1]);
-        const id = match[2] ? parseInt(match[2]) : null;
-        content = id != null
-          ? await controller[actionMethod](context, parentId, id)
-          : await controller[actionMethod](context, parentId);
-      } else {
-        const id = match[1] ? parseInt(match[1]) : null;
-        content = id != null
-          ? await controller[actionMethod](context, id)
-          : await controller[actionMethod](context);
-      }
+      mergeRouteParams(context, route, match);
+      let content = await controller[actionMethod](context);
 
       // Await if content is a promise
       const resolved = await Promise.resolve(content);
@@ -357,13 +343,15 @@ export class FormHandler {
     const form = event.target;
     const params = this.extractParams(form);
 
-    // Create context with form params
+    // Create context with form params and route params
     const context = createContext(params);
+    const parentParamName = parentName.replace(/s$/, '') + '_id';
+    context.params[parentParamName] = parentId;
 
-    console.log(`Processing ${controller.name}#create (${parentName}_id: ${parentId})`);
+    console.log(`Processing ${controller.name}#create (${parentParamName}: ${parentId})`);
     console.log('  Parameters:', params);
 
-    const response = await controller.create(context, parentId, params);
+    const response = await controller.create(context, params);
     // Use controller's redirect path (includes base path from path helpers)
     await this.handleResult(context, response, controllerName, 'create', controller);
     return false;
@@ -375,10 +363,13 @@ export class FormHandler {
 
     const controller = Router.controllers[controllerName];
     const context = createContext();
+    const parentParamName = parentName.replace(/s$/, '') + '_id';
+    context.params[parentParamName] = parentId;
+    context.params.id = id;
 
-    console.log(`Processing ${controller.name}#destroy (${parentName}_id: ${parentId}, id: ${id})`);
+    console.log(`Processing ${controller.name}#destroy (${parentParamName}: ${parentId}, id: ${id})`);
 
-    const response = await controller.destroy(context, parentId, id);
+    const response = await controller.destroy(context);
     // Use controller's redirect path (includes base path from path helpers)
     await this.handleResult(context, response, controllerName, 'destroy', controller, id);
   }
@@ -654,19 +645,8 @@ export class Application extends ApplicationBase {
           const actionMethod = action === 'new' ? '$new' : action;
 
           try {
-            let data;
-            if (route.nested) {
-              const parentId = parseInt(match[1]);
-              const id = match[2] ? parseInt(match[2]) : null;
-              data = id != null
-                ? await controller[actionMethod](context, parentId, id)
-                : await controller[actionMethod](context, parentId);
-            } else {
-              const id = match[1] ? parseInt(match[1]) : null;
-              data = id != null
-                ? await controller[actionMethod](context, id)
-                : await controller[actionMethod](context);
-            }
+            mergeRouteParams(context, route, match);
+            let data = await controller[actionMethod](context);
 
             let jsonData = data;
             if (data && typeof data === 'object' && 'json' in data) {
@@ -722,24 +702,17 @@ export class Application extends ApplicationBase {
             console.log('  Parameters:', params);
           }
 
+          // Merge route params into context
+          mergeRouteParams(context, route, match);
+
           // Run controller action
           let controllerResult;
           if (method === 'DELETE') {
-            if (route.nested) {
-              const parentId = parseInt(match[1]);
-              const id = match[2] ? parseInt(match[2]) : null;
-              controllerResult = await route.controller.destroy(context, parentId, id);
-            } else {
-              const id = match[1] ? parseInt(match[1]) : null;
-              controllerResult = await route.controller.destroy(context, id);
-            }
+            controllerResult = await route.controller.destroy(context);
           } else {
             const controllerAction = route.controller[route.action];
             if (controllerAction) {
-              const id = match[1] ? parseInt(match[1]) : null;
-              controllerResult = id != null
-                ? await controllerAction.call(route.controller, context, id, params)
-                : await controllerAction.call(route.controller, context, params);
+              controllerResult = await controllerAction.call(route.controller, context, params);
             }
           }
 

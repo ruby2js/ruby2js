@@ -666,16 +666,10 @@ module Ruby2JS
           standard_actions = [:index, :show, :new, :edit, :create, :update, :destroy]
 
           if standard_actions.include?(method_name)
-            # For standard actions, extra params (non-route) are read from context.params
-            # Only route params (:id, parent_id) become function arguments
-            # Query params like params[:studio] are accessed via context.params.studio
-
-            # Add standard params based on action type
+            # For standard actions, all params (route and query) are read from context.params
+            # Only form body params become function arguments
             case method_name
-            when :show, :edit, :destroy
-              param_args.push(s(:arg, :id))
             when :update
-              param_args.push(s(:arg, :id))
               param_args.push(s(:arg, :params))
             when :create
               param_args.push(s(:arg, :params))
@@ -823,11 +817,11 @@ module Ruby2JS
               standard_actions = [:index, :show, :new, :edit, :create, :update, :destroy]
               if args.first&.type == :sym
                 key = args.first.children[0]
-                if key == :id
-                  return s(:lvar, key)
-                elsif standard_actions.include?(@rails_current_action)
-                  # Query param: context.params.key
+                if standard_actions.include?(@rails_current_action)
+                  # All params (route and query): context.params.key
                   return s(:attr, s(:attr, s(:lvar, :context), :params), key)
+                elsif key == :id
+                  return s(:lvar, key)
                 else
                   # Custom action: params["key"] (keep as params access)
                   return s(:send, s(:lvar, :params), :[], s(:str, key.to_s))
@@ -843,8 +837,12 @@ module Ruby2JS
               # params.expect("id") or params.expect(:id) -> id (use method parameter)
               # params.expect({article: ["title", "body"]}) -> params (strong params)
               arg = args.first
-              if arg&.type == :str || arg&.type == :sym
-                # params.expect("id") -> id
+              standard_expect_actions = [:index, :show, :new, :edit, :create, :update, :destroy]
+              if (arg&.type == :str || arg&.type == :sym) && standard_expect_actions.include?(@rails_current_action)
+                # params.expect(:id) -> context.params.id (route param)
+                return s(:attr, s(:attr, s(:lvar, :context), :params), arg.children[0].to_sym)
+              elsif arg&.type == :str || arg&.type == :sym
+                # Custom action: params.expect("id") -> id
                 return s(:lvar, arg.children[0].to_sym)
               elsif arg&.type == :hash
                 # params.expect({article: [...]}) -> params

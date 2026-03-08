@@ -368,38 +368,40 @@ export class Router extends RouterBase {
     try {
       let html;
 
-      // Handle different HTTP methods
+      // Merge route params into context.params (like Rails params hash)
       if (route.nested) {
         const parentId = parseInt(match[1]);
-        const id = match[2] ? parseInt(match[2]) : null;
+        const parentParamName = route.parentName.replace(/s$/, '') + '_id';
+        context.params[parentParamName] = parentId;
+        if (match[2]) context.params.id = parseInt(match[2]);
+      } else if (match[1]) {
+        context.params.id = parseInt(match[1]);
+      }
 
-        if (method === 'POST') {
-          const result = await controller.create(context, parentId, params);
-          return this.handleResult(context, result, `/${route.parentName}/${parentId}`);
-        } else if (method === 'PATCH') {
-          const result = await controller.update(context, parentId, id, params);
-          return this.handleResult(context, result, `/${route.parentName}/${parentId}`);
-        } else if (method === 'DELETE') {
-          await controller.destroy(context, parentId, id);
-          return this.redirect(context, `/${route.parentName}/${parentId}`);
-        } else {
-          html = id != null ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
+      // Handle different HTTP methods
+      if (method === 'POST') {
+        const result = await controller.create(context, params);
+        const fallback = route.nested
+          ? `/${route.parentName}/${context.params[route.parentName.replace(/s$/, '') + '_id']}`
+          : `/${controllerName}`;
+        return this.handleResult(context, result, fallback);
+      } else if (method === 'PATCH') {
+        const result = await controller.update(context, params);
+        const fallback = route.nested
+          ? `/${route.parentName}/${context.params[route.parentName.replace(/s$/, '') + '_id']}`
+          : `/${controllerName}/${context.params.id}`;
+        return this.handleResult(context, result, fallback);
+      } else if (method === 'DELETE') {
+        const result = await controller.destroy(context);
+        const fallback = route.nested
+          ? `/${route.parentName}/${context.params[route.parentName.replace(/s$/, '') + '_id']}`
+          : `/${controllerName}`;
+        if (result && result.redirect) {
+          return this.redirect(context, result.redirect);
         }
+        return this.redirect(context, fallback);
       } else {
-        const id = match[1] ? parseInt(match[1]) : null;
-
-        if (method === 'POST') {
-          const result = await controller.create(context, params);
-          return this.handleResult(context, result, `/${controllerName}`);
-        } else if (method === 'PATCH') {
-          const result = await controller.update(context, id, params);
-          return this.handleResult(context, result, `/${controllerName}/${id}`);
-        } else if (method === 'DELETE') {
-          await controller.destroy(context, id);
-          return this.redirect(context, `/${controllerName}`);
-        } else {
-          html = id != null ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
-        }
+        html = await controller[actionMethod](context);
       }
 
       console.log(`  Rendering ${controllerName}/${action}`);
