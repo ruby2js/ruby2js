@@ -325,6 +325,31 @@ export class ActiveRecord extends ActiveRecordBase {
     return records.length;
   }
 
+  // Execute a grouped COUNT query: returns {key: count}
+  static async _executeGroupCount(rel) {
+    const records = await this._executeRelation(rel);
+    const groupCols = Array.isArray(rel._group) ? rel._group : [rel._group];
+    const countCol = Array.isArray(rel._select) ? rel._select[0] : null;
+    const hash = {};
+    for (const row of records) {
+      const key = groupCols.length === 1 ? row[groupCols[0]] : groupCols.map(c => row[c]);
+      if (rel._distinct && countCol) {
+        // Count distinct values of the column per group
+        if (!hash[key]) hash[key] = new Set();
+        hash[key].add(row[countCol]);
+      } else {
+        hash[key] = (hash[key] || 0) + 1;
+      }
+    }
+    // Convert Sets to counts for distinct mode
+    if (rel._distinct && countCol) {
+      for (const key of Object.keys(hash)) {
+        hash[key] = hash[key].size;
+      }
+    }
+    return hash;
+  }
+
   // Execute a DELETE for a Relation (delete matching records, no callbacks)
   static async _executeDelete(rel) {
     const records = await this._executeRelation(rel);
