@@ -71,8 +71,10 @@ export function installFetchInterceptor() {
       request: { headers: { accept: init.headers?.accept || 'text/html' } }
     };
 
-    // Extract params from request body
+    // Extract params from request body and merge into context.params
+    // (mirrors Rails' unified params: route + query + form data)
     const params = extractParams(init.body);
+    if (params && method !== 'GET') Object.assign(context.params, params);
 
     // Merge route params into context.params
     if (route.nested) {
@@ -80,12 +82,12 @@ export function installFetchInterceptor() {
         const parentParamName = route.parentName.replace(/s$/, '') + '_id';
         context.params[parentParamName] = parseInt(match[1]);
       }
-      if (match[2]) context.params.id = parseInt(match[2]);
+      if (match[2]) {
+        context.params.id = parseInt(match[2]);
+      }
     } else if (match[1]) {
       context.params.id = parseInt(match[1]);
     }
-
-    // Build action args: context, [params]
     const args = [context];
     if (params && method !== 'GET') args.push(params);
 

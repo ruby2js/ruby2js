@@ -274,9 +274,14 @@ module Ruby2JS
               local_name = ivar_name.to_s.sub('@', '').to_sym
               injected.push(local_name) unless existing_args.include?(local_name)
             end
-            # Check for params references (skip if already a method argument)
-            if references_params?(body) && !existing_args.include?(:params)
-              injected.push(:params)
+            # Check for params references — private methods may need:
+            # - params: for strong params (params.expect, bare params usage)
+            # - context: for params[:key] which becomes context.params.key
+            if references_params?(body)
+              injected.push(:params) unless existing_args.include?(:params)
+            end
+            if references_params_bracket?(body)
+              injected.push(:context) unless existing_args.include?(:context)
             end
             @rails_private_method_params[method_name] = injected if injected.any?
           end
@@ -640,13 +645,6 @@ module Ruby2JS
             body_statements[i] = wrap_redirect_hashes(stmt)
           end
 
-          # Wrap in autoreturn for implicit return behavior
-          final_body = if body_statements.empty?
-                         s(:autoreturn, s(:nil))
-                       else
-                         s(:autoreturn, *body_statements.compact)
-                       end
-
           # Rename actions to avoid conflicts:
           # - 'new' is a JS reserved word -> 'new!' (converter handles via jsvar -> $new)
           # - 'index' conflicts with Functions filter (index -> indexOf) -> 'index!' (bang stripped by converter)
@@ -662,30 +660,26 @@ module Ruby2JS
           # 2. Standard RESTful params (id for show/edit/destroy, params for create/update)
           param_args = [s(:arg, :context)]
 
-          # Standard RESTful actions have well-defined parameter patterns
-          standard_actions = [:index, :show, :new, :edit, :create, :update, :destroy]
-
-          if standard_actions.include?(method_name)
-            # For standard actions, all params (route and query) are read from context.params
-            # Only form body params become function arguments
-            case method_name
-            when :update
-              param_args.push(s(:arg, :params))
-            when :create
-              param_args.push(s(:arg, :params))
-            end
-          else
-            # Custom actions: extract :id if present, pass remaining params as object
-            has_id = params_keys.include?(:id)
-            has_other_params = params_keys.any? { |k| k != :id }
-
-            if has_id
-              param_args.push(s(:arg, :id))
-            end
-            if has_other_params
-              param_args.push(s(:arg, :params))
-            end
+          # All route/query params are read from context.params
+          # Only form body params (for create/update/custom POST) become function arguments
+          has_body_params = params_keys.any? { |k| k != :id }
+          if has_body_params || [:create, :update].include?(method_name)
+            param_args.push(s(:arg, :params))
+            # Merge form data into context.params so params[:key] resolves uniformly
+            # (mirrors Rails' unified params hash: route + query + form data)
+            merge_stmt = s(:send,
+              s(:const, nil, :Object), :assign,
+              s(:attr, s(:lvar, :context), :params),
+              s(:lvar, :params))
+            body_statements.unshift(merge_stmt)
           end
+
+          # Wrap in autoreturn for implicit return behavior
+          final_body = if body_statements.empty?
+                         s(:autoreturn, s(:nil))
+                       else
+                         s(:autoreturn, *body_statements.compact)
+                       end
 
           output_args = s(:args, *param_args)
 
@@ -809,23 +803,12 @@ module Ruby2JS
                   target.children[0].nil? &&
                   target.children[1] == :params &&
                   method == :[]
-              # params[:key] -> transforms based on context:
-              # - :id for standard actions -> id (method parameter, from route)
-              # - other keys for standard actions -> context.params.key (query params)
-              # - :id for custom actions -> id (method parameter)
-              # - other keys for custom actions -> params["key"]
-              standard_actions = [:index, :show, :new, :edit, :create, :update, :destroy]
+              # params[:key] -> context.params.key
+              # All params (route, query, form data) unified in context.params,
+              # mirroring Rails' unified params hash
               if args.first&.type == :sym
                 key = args.first.children[0]
-                if standard_actions.include?(@rails_current_action)
-                  # All params (route and query): context.params.key
-                  return s(:attr, s(:attr, s(:lvar, :context), :params), key)
-                elsif key == :id
-                  return s(:lvar, key)
-                else
-                  # Custom action: params["key"] (keep as params access)
-                  return s(:send, s(:lvar, :params), :[], s(:str, key.to_s))
-                end
+                return s(:attr, s(:attr, s(:lvar, :context), :params), key)
               else
                 return node
               end
@@ -837,13 +820,9 @@ module Ruby2JS
               # params.expect("id") or params.expect(:id) -> id (use method parameter)
               # params.expect({article: ["title", "body"]}) -> params (strong params)
               arg = args.first
-              standard_expect_actions = [:index, :show, :new, :edit, :create, :update, :destroy]
-              if (arg&.type == :str || arg&.type == :sym) && standard_expect_actions.include?(@rails_current_action)
-                # params.expect(:id) -> context.params.id (route param)
+              if arg&.type == :str || arg&.type == :sym
+                # params.expect(:id) -> context.params.id
                 return s(:attr, s(:attr, s(:lvar, :context), :params), arg.children[0].to_sym)
-              elsif arg&.type == :str || arg&.type == :sym
-                # Custom action: params.expect("id") -> id
-                return s(:lvar, arg.children[0].to_sym)
               elsif arg&.type == :hash
                 # params.expect({article: [...]}) -> params
                 return s(:lvar, :params)
@@ -1767,6 +1746,22 @@ module Ruby2JS
           end
           return false unless node.respond_to?(:children)
           node.children.any? { |c| c.respond_to?(:type) && references_params?(c) }
+        end
+
+        # Check if an AST node contains params[:key] (bracket access), which becomes
+        # context.params.key and thus needs context in scope.
+        def references_params_bracket?(node)
+          return false unless node.respond_to?(:type)
+          if node.type == :send
+            target = node.children[0]
+            method = node.children[1]
+            if method == :[] && target.respond_to?(:type) && target.type == :send &&
+               target.children[0].nil? && target.children[1] == :params
+              return true
+            end
+          end
+          return false unless node.respond_to?(:children)
+          node.children.any? { |c| c.respond_to?(:type) && references_params_bracket?(c) }
         end
 
         # Check if an AST subtree contains ActiveRecord operations
