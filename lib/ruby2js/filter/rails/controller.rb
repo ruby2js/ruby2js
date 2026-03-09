@@ -281,6 +281,36 @@ module Ruby2JS
             @rails_private_method_params[method_name] = injected if injected.any?
           end
 
+          # Propagate transitive dependencies: if method A calls method B, and B
+          # needs :params or :context, then A also needs them (unless A already has them).
+          changed = true
+          while changed
+            changed = false
+            @rails_private_method_calls.each do |method_name|
+              method_node = @rails_private_methods[method_name]
+              next unless method_node
+              method_body = method_node.children[2]
+              next unless method_body
+
+              meta = cached_body_metadata(method_name, method_body)
+              current = @rails_private_method_params[method_name] || []
+
+              meta[:private_method_calls].each do |called|
+                called_params = @rails_private_method_params[called]
+                next unless called_params
+                called_params.each do |dep|
+                  next if dep != :params && dep != :context
+                  unless current.include?(dep)
+                    current = current.dup if current.frozen?
+                    current.push(dep)
+                    @rails_private_method_params[method_name] = current
+                    changed = true
+                  end
+                end
+              end
+            end
+          end
+
           # Pre-compute which private methods return ivar objects.
           # Must happen here (not in transform_private_method) because
           # mark_private_method_calls runs during action transformation,
@@ -702,21 +732,29 @@ module Ruby2JS
               meta[:private_method_calls].push(method)
             end
 
-            # Bare params reference: params alone or params.something
-            if target.nil? && method == :params
-              meta[:references_params] = true
-            end
-
-            # params[:key], params.expect(:key), params.require(:key), etc.
+            # Params reference detection — distinguish between:
+            # - params[:key] / params.expect(:sym) -> only needs context (bracket access)
+            # - params.expect({hash}) / params.require(...) -> needs form body params
+            # - bare params -> needs form body params
+            # When we handle params access at this level, we skip recursing into the
+            # params target node to avoid the inner s(:send, nil, :params) from
+            # triggering the bare params check.
             if target.respond_to?(:type) && target.type == :send &&
                target.children[0].nil? && target.children[1] == :params
-              meta[:references_params] = true
+              skip_child = target  # don't recurse into inner params node
               if method == :[]
                 meta[:references_params_bracket] = true
-              end
-              if (method == :[] || method == :expect) && first_arg&.type == :sym
+                meta[:params_keys].push(first_arg.children[0]) if first_arg&.type == :sym
+              elsif method == :expect && first_arg&.type == :sym
+                meta[:references_params_bracket] = true
                 meta[:params_keys].push(first_arg.children[0])
+              else
+                # params.expect({hash}), params.require(...), etc. -> needs form body
+                meta[:references_params] = true
               end
+            elsif target.nil? && method == :params
+              # Bare params reference (standalone or as argument to another call)
+              meta[:references_params] = true
             end
 
             # ActiveRecord class method detection (e.g., Article.find, Studio.where)
@@ -739,9 +777,12 @@ module Ruby2JS
             end
           end
 
-          # Recurse into children, tracking nested def boundaries for AR detection
+          # Recurse into children, tracking nested def boundaries for AR detection.
+          # skip_child is set when we've already handled a params access at the outer
+          # level and need to avoid the inner params node triggering bare params detection.
           entering_def = [:def, :defs].include?(node.type)
           node.children.each do |child|
+            next if defined?(skip_child) && child == skip_child
             walk_body_metadata(child, meta, in_nested_def || entering_def)
           end
         end
