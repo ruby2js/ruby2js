@@ -89,10 +89,9 @@ module Ruby2JS
           @rails_controller = true
           @rails_controller_const = class_name.children.last
 
-          # First pass: collect model references, before_actions, private methods, path helpers
-          collect_model_references(body)
+          # First pass: collect model references, path helpers, before_actions, private methods
+          collect_class_refs(body)
           collect_controller_metadata(body)
-          collect_path_helper_refs(body)
           record_controller_metadata
 
           # Second pass: transform methods
@@ -139,6 +138,7 @@ module Ruby2JS
           @rails_class_accessors = Set.new
           @rails_model_refs = Set.new
           @rails_path_helpers = Set.new
+          @rails_body_metadata_cache = {}
           @rails_needs_views = false
           @rails_needs_turbo_stream_views = false
           @rails_needs_react = false
@@ -224,9 +224,10 @@ module Ruby2JS
             end
           end
 
-          # Second pass: find which private methods are called from action bodies
+          # Find which private methods are called from action bodies
           action_bodies.each do |action_body|
-            collect_private_method_calls(action_body)
+            meta = collect_body_metadata(action_body)
+            meta[:private_method_calls].each { |name| @rails_private_method_calls.add(name) }
           end
 
           # Compute class accessor pairs (getter + setter)
@@ -236,27 +237,22 @@ module Ruby2JS
             @rails_class_accessors.add(base) if @rails_class_methods.include?(base)
           end
 
-          # Pre-compute injected params for private methods called from actions.
-          # Private methods that reference ivars or params need those passed as args.
-          # Pre-compute which private methods will be async (contain AR operations).
-          # Used by mark_private_method_calls to wrap calls with await.
+          # Pre-compute injected params and async status for private methods.
+          # Uses cached metadata to walk each method body only once.
           # Note: use Array for JS compatibility (Set.include? doesn't transpile correctly)
           @rails_async_private_methods = []
-          @rails_private_method_calls.each do |method_name|
-            method_node = @rails_private_methods[method_name]
-            next unless method_node
-            body = method_node.children[2]
-            if body && contains_ar_operations?(body)
-              @rails_async_private_methods.push(method_name)
-            end
-          end
-
           @rails_private_method_params = {}
           @rails_private_method_calls.each do |method_name|
             method_node = @rails_private_methods[method_name]
             next unless method_node
-            body = method_node.children[2]
-            next unless body
+            method_body = method_node.children[2]
+            next unless method_body
+
+            meta = cached_body_metadata(method_name, method_body)
+
+            if meta[:contains_ar_operations]
+              @rails_async_private_methods.push(method_name)
+            end
 
             # Get existing method argument names to avoid duplicates
             args_node = method_node.children[1]
@@ -269,18 +265,17 @@ module Ruby2JS
 
             injected = []
             # Check for ivar references (will become locals after transformation)
-            ivars = collect_instance_variables(body)
-            ivars.each do |ivar_name|
+            meta[:ivars].each do |ivar_name|
               local_name = ivar_name.to_s.sub('@', '').to_sym
               injected.push(local_name) unless existing_args.include?(local_name)
             end
             # Check for params references — private methods may need:
             # - params: for strong params (params.expect, bare params usage)
-            # - context: for params[:key] which becomes context.params.key
-            if references_params?(body)
+            # - context: for params[:key] which becomes context.params["key"]
+            if meta[:references_params]
               injected.push(:params) unless existing_args.include?(:params)
             end
-            if references_params_bracket?(body)
+            if meta[:references_params_bracket]
               injected.push(:context) unless existing_args.include?(:context)
             end
             @rails_private_method_params[method_name] = injected if injected.any?
@@ -297,20 +292,28 @@ module Ruby2JS
 
             method_node = @rails_private_methods[method_name]
             next unless method_node
-            body = method_node.children[2]
-            next unless body
+            method_body = method_node.children[2]
+            next unless method_body
 
-            assigned_ivars = collect_ivar_assignments(body)
-            returned = injected.select { |name| assigned_ivars.include?(name) }
+            meta = cached_body_metadata(method_name, method_body)
+            returned = injected.select { |name| meta[:ivar_assignments].include?(name) }
             @rails_private_methods_returning_ivars[method_name] = returned if returned.any?
           end
         end
 
-        # Collect path helper references (*_path calls) from the controller body
-        # so they can be imported. This handles explicit path helper calls like
-        # studio_path(@person.studio_id) used in controller code outside redirect_to.
-        def collect_path_helper_refs(node)
+        # Walk the full class body once to collect model references and path helpers.
+        # Replaces separate collect_model_references and collect_path_helper_refs walks.
+        def collect_class_refs(node)
           return unless node.respond_to?(:type) && node.respond_to?(:children)
+
+          if node.type == :const
+            const_name = resolve_const_name(node)
+            # Skip known non-model constants and Ruby/Node globals
+            unless %w[ApplicationController ENV ARGV STDIN STDOUT STDERR].include?(const_name) || const_name.end_with?('Controller', 'Views')
+              @rails_model_refs.add(const_name)
+              return  # don't recurse into children of this const node (already resolved)
+            end
+          end
 
           if node.type == :send && node.children[0].nil?
             name = node.children[1].to_s
@@ -319,36 +322,33 @@ module Ruby2JS
             end
           end
 
-          node.children.each { |child| collect_path_helper_refs(child) }
+          node.children.each { |child| collect_class_refs(child) }
         end
 
-        # Return an array of private method names called within the given node
-        def find_private_method_calls(node, results = [])
-          return results unless node.respond_to?(:type) && node.respond_to?(:children)
-
-          if node.type == :send && node.children[0].nil?
-            method_name = node.children[1]
-            if @rails_private_methods.key?(method_name)
-              results.push(method_name)
-            end
-          end
-
-          node.children.each { |child| find_private_method_calls(child, results) }
-          results
+        # Walk an AST subtree once to collect all metadata needed for transformation.
+        # Returns a hash with ivars, ivar_assignments, params_keys, references_params,
+        # references_params_bracket, contains_ar_operations, and private_method_calls.
+        # Replaces 8 separate recursive walks with a single pass.
+        def collect_body_metadata(node)
+          meta = {
+            ivars: [],
+            ivar_assignments: [],
+            params_keys: [],
+            references_params: false,
+            references_params_bracket: false,
+            contains_ar_operations: false,
+            private_method_calls: [],
+          }
+          walk_body_metadata(node, meta, false)
+          meta[:ivars] = meta[:ivars].uniq.sort
+          meta[:ivar_assignments] = meta[:ivar_assignments].uniq.sort
+          meta
         end
 
-        # Recursively find calls to known private methods in action bodies
-        def collect_private_method_calls(node)
-          return unless node.respond_to?(:type) && node.respond_to?(:children)
-
-          if node.type == :send && node.children[0].nil?
-            method_name = node.children[1]
-            if @rails_private_methods.key?(method_name)
-              @rails_private_method_calls.add(method_name)
-            end
-          end
-
-          node.children.each { |child| collect_private_method_calls(child) }
+        # Return cached metadata for a named method body (avoids re-walking)
+        def cached_body_metadata(method_name, body)
+          @rails_body_metadata_cache = {} unless defined?(@rails_body_metadata_cache)
+          @rails_body_metadata_cache[method_name] ||= collect_body_metadata(body)
         end
 
         def collect_before_action(node)
@@ -540,10 +540,12 @@ module Ruby2JS
           args = node.children[1]
           body = node.children[2]
 
-          # Collect params keys accessed in the method body (e.g., params[:article_id])
-          params_keys = collect_params_keys(body)
+          # Collect metadata from action body in a single walk
+          action_meta = collect_body_metadata(body)
+          params_keys = action_meta[:params_keys].dup
+          ivars = action_meta[:ivars].dup
 
-          # Also collect params keys from before_action methods
+          # Also collect from before_action methods that apply to this action
           @rails_before_actions.each do |ba|
             should_run = if ba[:only]
                            ba[:only].include?(method_name)
@@ -556,48 +558,25 @@ module Ruby2JS
             if should_run
               method_node = @rails_private_methods[ba[:method]]
               if method_node
+                ba_meta = cached_body_metadata(ba[:method], method_node.children[2])
                 # Note: use push(*arr) for JS compatibility (concat returns new array in JS)
-                params_keys.push(*collect_params_keys(method_node.children[2]))
+                params_keys.push(*ba_meta[:params_keys])
+                ivars.push(*ba_meta[:ivars])
               end
+            end
+          end
+
+          # Also collect ivars from private methods called from the action body
+          # (e.g., setup_form sets @studios, @types, etc.)
+          action_meta[:private_method_calls].each do |called_name|
+            method_node = @rails_private_methods[called_name]
+            if method_node
+              pm_meta = cached_body_metadata(called_name, method_node.children[2])
+              ivars.push(*pm_meta[:ivars])
             end
           end
 
           params_keys = params_keys.uniq
-
-          # Collect instance variables from body AND before_action methods AND called private methods
-          ivars = collect_instance_variables(body)
-
-          # Also collect ivars from private methods called from the action body
-          # (e.g., setup_form sets @studios, @types, etc.)
-          called_methods = find_private_method_calls(body)
-          called_methods.each do |called_name|
-            method_node = @rails_private_methods[called_name]
-            if method_node
-              private_ivars = collect_instance_variables(method_node.children[2])
-              ivars.push(*private_ivars)
-            end
-          end
-
-          # Also collect ivars from before_action methods that apply to this action
-          @rails_before_actions.each do |ba|
-            should_run = if ba[:only]
-                           ba[:only].include?(method_name)
-                         elsif ba[:except]
-                           !ba[:except].include?(method_name)
-                         else
-                           true
-                         end
-
-            if should_run
-              method_node = @rails_private_methods[ba[:method]]
-              if method_node
-                before_ivars = collect_instance_variables(method_node.children[2])
-                # Note: use push(*arr) for JS compatibility (concat returns new array in JS)
-                ivars.push(*before_ivars)
-              end
-            end
-          end
-
           ivars = ivars.uniq.sort
 
           # Transform body: @@cvar -> cvar (closure-scoped), @ivar -> ivar (local variable)
@@ -689,73 +668,82 @@ module Ruby2JS
           result
         end
 
-        def collect_instance_variables(node)
-          # Note: use Array instead of Set for JS compatibility (Set.to_a polyfill doesn't work for Sets)
-          ivars = []
-          collect_ivars_recursive(node, ivars)
-          ivars.uniq.sort
-        end
-
-        def collect_ivars_recursive(node, ivars)
+        # Single recursive walk that collects all per-body metadata.
+        # Called by collect_body_metadata; populates the meta hash in one pass.
+        # Note: uses .push() and args[0] for JS compatibility (selfhost transpilation).
+        def walk_body_metadata(node, meta, in_nested_def)
           return unless node.respond_to?(:type) && node.respond_to?(:children)
 
-          # Note: use .push() for JS compatibility
-          if node.type == :ivasgn
-            ivars.push(node.children[0].to_s.sub(/^@/, '').to_sym)
-          elsif node.type == :ivar
-            ivars.push(node.children[0].to_s.sub(/^@/, '').to_sym)
-          end
+          case node.type
+          when :ivasgn
+            name = node.children[0].to_s.sub(/^@/, '').to_sym
+            meta[:ivars].push(name)
+            meta[:ivar_assignments].push(name)
 
-          node.children.each { |child| collect_ivars_recursive(child, ivars) }
-        end
+          when :ivar
+            name = node.children[0].to_s.sub(/^@/, '').to_sym
+            meta[:ivars].push(name)
 
-        # Collect only ivar assignments (not reads) from an AST node
-        def collect_ivar_assignments(node)
-          assigns = []
-          collect_ivar_assignments_recursive(node, assigns)
-          assigns.uniq.sort
-        end
+          when :or_asgn, :and_asgn
+            if node.children[0]&.type == :ivasgn
+              name = node.children[0].children[0].to_s.sub(/^@/, '').to_sym
+              meta[:ivars].push(name)
+              meta[:ivar_assignments].push(name)
+            end
 
-        def collect_ivar_assignments_recursive(node, assigns)
-          return unless node.respond_to?(:type) && node.respond_to?(:children)
-
-          if node.type == :ivasgn
-            assigns.push(node.children[0].to_s.sub(/^@/, '').to_sym)
-          # Also catch ||= and &&= on ivars
-          elsif [:or_asgn, :and_asgn].include?(node.type) &&
-                node.children[0]&.type == :ivasgn
-            assigns.push(node.children[0].children[0].to_s.sub(/^@/, '').to_sym)
-          end
-
-          node.children.each { |child| collect_ivar_assignments_recursive(child, assigns) }
-        end
-
-        # Collect params[:key] accesses to determine method parameters
-        def collect_params_keys(node)
-          keys = []
-          collect_params_keys_recursive(node, keys)
-          keys
-        end
-
-        def collect_params_keys_recursive(node, keys)
-          return unless node.respond_to?(:type) && node.respond_to?(:children)
-
-          # Match params[:key] and params.expect(:key) patterns
-          if node.type == :send
-            target, method, *args = node.children
-            # Note: use args[0] instead of args.first for JS compatibility
+          when :send
+            target = node.children[0]
+            method = node.children[1]
+            args = node.children[2..-1]
             first_arg = args[0]
 
-            if target&.type == :send &&
-               target.children[0].nil? &&
-               target.children[1] == :params &&
-               (method == :[] || method == :expect) &&
-               first_arg&.type == :sym
-              keys << first_arg.children[0]
+            # Private method call detection: bare call to a known private method
+            if target.nil? && defined?(@rails_private_methods) && @rails_private_methods.key?(method)
+              meta[:private_method_calls].push(method)
+            end
+
+            # Bare params reference: params alone or params.something
+            if target.nil? && method == :params
+              meta[:references_params] = true
+            end
+
+            # params[:key], params.expect(:key), params.require(:key), etc.
+            if target.respond_to?(:type) && target.type == :send &&
+               target.children[0].nil? && target.children[1] == :params
+              meta[:references_params] = true
+              if method == :[]
+                meta[:references_params_bracket] = true
+              end
+              if (method == :[] || method == :expect) && first_arg&.type == :sym
+                meta[:params_keys].push(first_arg.children[0])
+              end
+            end
+
+            # ActiveRecord class method detection (e.g., Article.find, Studio.where)
+            # Skip if inside a nested def (matches original contains_ar_operations? behavior)
+            if !in_nested_def && target&.type == :const && target.children[0].nil?
+              const_name = target.children[1].to_s
+              if @rails_model_refs.include?(const_name) &&
+                  ActiveRecordHelpers::AR_CLASS_METHODS.include?(method)
+                meta[:contains_ar_operations] = true
+              end
+            end
+            # ActiveRecord instance methods (save, destroy, update, etc.)
+            if !in_nested_def && target && ActiveRecordHelpers::AR_INSTANCE_METHODS.include?(method)
+              meta[:contains_ar_operations] = true
+            end
+
+          when :lvar
+            if node.children[0] == :params
+              meta[:references_params] = true
             end
           end
 
-          node.children.each { |child| collect_params_keys_recursive(child, keys) }
+          # Recurse into children, tracking nested def boundaries for AR detection
+          entering_def = [:def, :defs].include?(node.type)
+          node.children.each do |child|
+            walk_body_metadata(child, meta, in_nested_def || entering_def)
+          end
         end
 
         def transform_ivars_to_locals(node)
@@ -1445,27 +1433,6 @@ module Ruby2JS
           ]
         end
 
-        def collect_model_references(node)
-          return unless node.respond_to?(:type) && node.respond_to?(:children)
-
-          if node.type == :const
-            # Build the full constant name by walking the namespace chain
-            # e.g., s(:const, s(:const, nil, :Identity), :AccessToken) -> "Identity::AccessToken"
-            const_name = resolve_const_name(node)
-
-            # Skip known non-model constants
-            # Note: use .add() for JS Set compatibility (Ruby Set supports both << and add)
-            # Skip Ruby/Node globals that other filters transform (e.g., ENV -> process.env)
-            unless %w[ApplicationController ENV ARGV STDIN STDOUT STDERR].include?(const_name) || const_name.end_with?('Controller', 'Views')
-              @rails_model_refs.add(const_name)
-              # Don't recurse into children of this const node (already resolved)
-              return
-            end
-          end
-
-          node.children.each { |child| collect_model_references(child) }
-        end
-
         # Resolve a :const node to its full name, e.g., "Identity::AccessToken"
         def resolve_const_name(node)
           return node.children[1].to_s if node.children[0].nil?
@@ -1596,6 +1563,11 @@ module Ruby2JS
             if injected && injected.any?
               # Only pass read-only ivars as arguments (not assigned ones)
               read_only = injected.select { |name| !returned_ivars&.include?(name) }
+              # Skip args already present in the call (avoids article_params(params, params))
+              existing_args = node.children[2..-1].select { |c|
+                c.respond_to?(:type) && c.type == :lvar
+              }.map { |c| c.children[0] }
+              read_only = read_only.reject { |name| existing_args.include?(name) }
               if read_only.any?
                 extra_args = read_only.map { |name| s(:lvar, name) }
                 new_children = [*node.children, *extra_args]
@@ -1618,9 +1590,13 @@ module Ruby2JS
             end
 
             return call_expr
-          elsif [:if, :begin, :kwbegin, :while, :until, :for].include?(node.type)
+          end
+
+          # Recurse into all node types to find private method calls
+          # nested anywhere (inside assignments, send arguments, control flow, etc.)
+          if node.respond_to?(:children)
             new_children = node.children.map { |c| mark_private_method_calls(c) }
-            return node.updated(nil, new_children)
+            return node.updated(nil, new_children) if new_children != node.children
           end
 
           node
@@ -1726,66 +1702,6 @@ module Ruby2JS
                        end
 
           process(s(node_type, method_name, s(:args, *param_args), final_body))
-        end
-
-        # Check if an AST node references params (params[:key], params.require, params.expect, etc.)
-        def references_params?(node)
-          return false unless node.respond_to?(:type)
-          if node.type == :send
-            target = node.children[0]
-            if target.respond_to?(:type) && target.type == :send &&
-               target.children[0].nil? && target.children[1] == :params
-              return true
-            end
-            if target.nil? && node.children[1] == :params
-              return true
-            end
-          end
-          if node.type == :lvar && node.children[0] == :params
-            return true
-          end
-          return false unless node.respond_to?(:children)
-          node.children.any? { |c| c.respond_to?(:type) && references_params?(c) }
-        end
-
-        # Check if an AST node contains params[:key] (bracket access), which becomes
-        # context.params.key and thus needs context in scope.
-        def references_params_bracket?(node)
-          return false unless node.respond_to?(:type)
-          if node.type == :send
-            target = node.children[0]
-            method = node.children[1]
-            if method == :[] && target.respond_to?(:type) && target.type == :send &&
-               target.children[0].nil? && target.children[1] == :params
-              return true
-            end
-          end
-          return false unless node.respond_to?(:children)
-          node.children.any? { |c| c.respond_to?(:type) && references_params_bracket?(c) }
-        end
-
-        # Check if an AST subtree contains ActiveRecord operations
-        # (model class method calls like Studio.find_by, StudioPair.find_or_create_by).
-        # Used to pre-compute which private methods will be async.
-        def contains_ar_operations?(node)
-          return false unless node.respond_to?(:type)
-          if node.type == :send
-            target = node.children[0]
-            method = node.children[1]
-            if target&.type == :const && target.children[0].nil?
-              const_name = target.children[1].to_s
-              if @rails_model_refs.include?(const_name) &&
-                  ActiveRecordHelpers::AR_CLASS_METHODS.include?(method)
-                return true
-              end
-            end
-            # Instance methods like save, destroy, update on any target
-            if target && ActiveRecordHelpers::AR_INSTANCE_METHODS.include?(method)
-              return true
-            end
-          end
-          return false if [:def, :defs].include?(node.type)
-          node.children.any? { |child| contains_ar_operations?(child) }
         end
 
         # Check if an AST node contains any :await or :await! nodes.
