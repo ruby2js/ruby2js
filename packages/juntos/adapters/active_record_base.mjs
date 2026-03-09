@@ -239,8 +239,8 @@ export class ActiveRecordBase {
 
   // --- Instance Methods ---
 
-  async save() {
-    if (!await this.isValid()) return false;
+  async save(options) {
+    if (!(options && options.validate === false) && !await this.isValid()) return false;
 
     // Set timestamps centrally - adapters don't need to handle this
     const now = new Date().toISOString();
@@ -428,9 +428,9 @@ export class ActiveRecordBase {
 
   // --- Class Methods ---
 
-  static async create(attributes) {
+  static async create(attributes, options) {
     const record = new this(attributes);
-    await record.save();
+    await record.save(options);
     return record;
   }
 

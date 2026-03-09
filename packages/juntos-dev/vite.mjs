@@ -500,7 +500,7 @@ function createErbPlugin(config) {
     const options = {
       filters: ['Rails_Helpers', 'ActiveSupport', 'Erb', 'Functions', 'Return'],
       eslevel: config.eslevel,
-      include: ['class', 'call'],
+      include: ['class', 'call', 'keys', 'values'],
       database: config.database,
       target: config.target,
       file: id

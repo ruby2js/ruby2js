@@ -171,7 +171,7 @@ export { singularize, pluralize, underscore };
 export function getBuildOptions(section, target, sectionConfig = null) {
   const baseOptions = {
     eslevel: sectionConfig?.eslevel || 2022,
-    include: sectionConfig?.include || ['class', 'call']
+    include: sectionConfig?.include || ['class', 'call', 'keys', 'values']
   };
 
   // Default filter sets for each section
@@ -2537,7 +2537,7 @@ export async function transformErb(code, id, isLayout, config, metadata = null) 
   const options = {
     filters: ['Rails_Helpers', 'Erb', ...nodeFilter, 'Functions', 'Return'],
     eslevel: config.eslevel || 2022,
-    include: ['class', 'call'],
+    include: ['class', 'call', 'keys', 'values'],
     database: config.database,
     target: config.target,
     file: id

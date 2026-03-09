@@ -285,7 +285,7 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     const aliasName = func.toLowerCase();
     // Build a modified relation with aggregate select
     const aggRel = Object.create(rel);
-    aggRel._select = [`${func}(${col}) as ${aliasName}`];
+    aggRel._select = [`${func}(${quoteId(col)}) as ${aliasName}`];
     const { sql, values } = this._buildRelationSQL(aggRel);
     const result = await this._execute(sql, values);
     const rows = this._getRows(result);

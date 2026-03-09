@@ -643,7 +643,7 @@ function buildFixturePlan(rubySource, fixtures, associationMap, { loadAll = fals
         attrs.push(`${col}: ${JSON.stringify(value)}`);
       }
 
-      createLines.push(`  _fixtures.${key} = await ${modelName}.create({${attrs.join(', ')}});`);
+      createLines.push(`  _fixtures.${key} = await ${modelName}.create({${attrs.join(', ')}}, {validate: false});`);
     }
   }
 
@@ -940,7 +940,7 @@ function generateFixturesModule(fixtures, associationMap, currentAttributes, mod
         attrs.push(`${col}: ${JSON.stringify(value)}`);
       }
 
-      createLines.push(`  fixtures.${key} = await ${modelName}.create({${attrs.join(', ')}});`);
+      createLines.push(`  fixtures.${key} = await ${modelName}.create({${attrs.join(', ')}}, {validate: false});`);
     }
   }
 
