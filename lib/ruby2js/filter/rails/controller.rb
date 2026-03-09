@@ -803,12 +803,12 @@ module Ruby2JS
                   target.children[0].nil? &&
                   target.children[1] == :params &&
                   method == :[]
-              # params[:key] -> context.params.key
-              # All params (route, query, form data) unified in context.params,
-              # mirroring Rails' unified params hash
+              # params[:key] -> context.params["key"]
+              # Uses bracket notation to avoid the functions filter treating
+              # property names like "sort" as Array method calls.
               if args.first&.type == :sym
                 key = args.first.children[0]
-                return s(:attr, s(:attr, s(:lvar, :context), :params), key)
+                return s(:send, s(:attr, s(:lvar, :context), :params), :[], s(:str, key.to_s))
               else
                 return node
               end
@@ -821,8 +821,8 @@ module Ruby2JS
               # params.expect({article: ["title", "body"]}) -> params (strong params)
               arg = args.first
               if arg&.type == :str || arg&.type == :sym
-                # params.expect(:id) -> context.params.id
-                return s(:attr, s(:attr, s(:lvar, :context), :params), arg.children[0].to_sym)
+                # params.expect(:id) -> context.params["id"]
+                return s(:send, s(:attr, s(:lvar, :context), :params), :[], s(:str, arg.children[0].to_s))
               elsif arg&.type == :hash
                 # params.expect({article: [...]}) -> params
                 return s(:lvar, :params)
