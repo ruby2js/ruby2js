@@ -8,10 +8,12 @@ The ballroom app (`test/ballroom`, pushed to `github.com:rubys/ballroom`) is a d
 
 ### What exists
 
-- **35 models** — Event, Person, Studio, Dance enriched with scopes, validations, associations; Locale (non-AR service class with Intl.DateTimeFormat dual-runtime support)
-- **29 controllers** — 27 standard CRUD scaffolds; EventsController has enriched `root` action, StudiosController has `unpair`
-- **217 Juntos tests passing** (28 controller test suites + 2 system tests + 3 model tests)
-- **Ejected directory** — 348 JS files covering all models, controllers, views, tests, config
+- **34 models** — Event, Person, Studio, Dance enriched with scopes, validations, associations; Locale (non-AR service class with Intl.DateTimeFormat dual-runtime support)
+- **29 controllers** — 27 standard CRUD scaffolds; EventsController has enriched `root` action, StudiosController has `unpair` and enriched views with pair management, PeopleController has sortable columns and search
+- **224 Juntos tests passing** (28 controller test suites + 2 system tests + 3 model tests)
+- **221 Rails tests passing** (matching controller and system test coverage)
+- **Ejected directory** — JS files covering all models, controllers, views, tests, config
+- **Stimulus controllers** — info_box, person (dynamic form fields), people_search (client-side filtering), studio_price_override
 - **Application helpers** — `localized_date` in `ApplicationHelper`, imported automatically by ERB filter via `@helpers/` virtual prefix
 - **Showcase route aliases** — `/event/summary`, `/event/publish`, `/event/settings` mapped to plural controller actions
 
@@ -248,7 +250,7 @@ ruby scripts/compare-showcase.rb 2025-charlotte --diff /
 
 System tests exercise user flows end-to-end: visit page, click link, fill form, assert result. They run under both Rails (`bin/rails test test/system`) and Juntos (`npx juntos test`). Differences reveal transpiler/runtime bugs.
 
-**Current:** 217/217 Juntos tests passing (28 controller + 3 model + 2 system test suites).
+**Current:** 224/224 Juntos tests passing (28 controller + 3 model + 2 system test suites). 221/221 Rails tests passing.
 
 ### 2. Transpiler fidelity (ballroom Rails vs ballroom Juntos)
 
@@ -302,8 +304,11 @@ Replace scaffold views with showcase-matching views, driven by showcase comparis
 |------|--------|-------------|
 | **Root (/)** | **DONE** | Dashboard with event info, localized date, judge/DJ/emcee lists, 3x3 nav grid, info box, conditional backs link |
 | **Studios index** | **DONE** | Table with location/count columns, totals row, info box, back-to-event link |
-| **Studios show/edit** | Partial | Pair management UI exists (`unpair` action) |
-| **People** | Not started | Role-based views, display_name formatting |
+| **Studios show/edit** | **DONE** | Pair management UI, cost override Stimulus controller, polymorphic links, locked event handling |
+| **Studios new** | **DONE** | Idiomatic form with studio_price_override Stimulus controller |
+| **People index** | **DONE** | Sortable columns (name/type/role/level/age/studio), client-side search, info box, conditional role/level/age columns |
+| **People show/edit/new** | **DONE** | Person Stimulus controller (dynamic type/role fields), polymorphic studio links, locked event delete protection |
+| **People model** | **DONE** | display_name, exclude associations, all showcase fields |
 | **Dances** | Not started | Category grouping, drag-drop reorder |
 | **Heats** | Not started | Entry display, scheduling, multi-dance |
 | **Categories** | Not started | Ordered list, lock toggle, extensions |
@@ -367,3 +372,6 @@ Issues discovered and fixed while building ballroom:
 - **belongs_to await** — async association getters, `action_name`, query params
 - **Falsy id=0** — `extract_id` path helper fix for falsy-but-valid IDs
 - **Heat number getter** — strips `.0` from whole-number floats
+- **params[:key] bracket notation** — `s(:attr, ...)` changed to `s(:send, ..., :[], s(:str, ...))` to avoid functions filter treating property names like "sort" as method calls
+- **Unified metadata collection** — consolidated 11 recursive AST walkers into 2 unified methods (`collect_class_refs`, `collect_body_metadata`), fixing `mark_private_method_calls` to recurse into all node types
+- **Params injection precision** — `params[:key]` only injects `context` (not `params` form body arg); transitive dependency propagation for private methods calling other private methods
