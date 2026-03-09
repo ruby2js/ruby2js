@@ -175,6 +175,10 @@ export class ActiveRecord extends ActiveRecordBase {
     return new Relation(this).includes(...associations);
   }
 
+  static group(...columns) {
+    return new Relation(this).group(...columns);
+  }
+
   // --- Class Methods (terminal - execute immediately) ---
 
   static async find(id) {
