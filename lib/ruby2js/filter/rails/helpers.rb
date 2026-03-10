@@ -812,6 +812,10 @@ module Ruby2JS
             parent_arg = parent.type == :ivar ? s(:lvar, parent.children.first.to_s.sub(/^@/, '').to_sym) : parent
             child_arg = child.type == :ivar ? s(:lvar, child.children.first.to_s.sub(/^@/, '').to_sym) : child
             path_expr = s(:send, nil, path_helper, parent_arg, child_arg)
+          elsif path_node.type == :send && path_node.children[0] && path_node.children.length == 2
+            # Attribute access on object: person.studio -> polymorphic_path(person.studio)
+            @erb_needs_polymorphic_path = true
+            path_expr = s(:send, nil, :polymorphic_path, process(path_node))
           else
             path_expr = process(path_node)
 
