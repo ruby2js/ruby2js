@@ -258,7 +258,40 @@ module Ruby2JS
                 s(:send!, locator, :hover))
             end
 
+            # .drag_to(target) → dispatch HTML5 drag events via page.evaluate()
+            # Playwright's dragTo() uses mouse simulation which doesn't trigger
+            # HTML5 drag events with DataTransfer. This is the standard workaround.
+            if target && method == :drag_to && args.length == 1
+              return playwright_drag_to(process(target), process(args.first))
+            end
+
+            # .text on a locator chain → await locator.textContent()
+            if target && method == :text && args.empty?
+              locator = playwright_locator_chain(target)
+              if locator
+                return s(:send, nil, :await, s(:send!, locator, :textContent))
+              end
+            end
+
+            # .find("css") on a locator → locator.locator("css")
+            if target && method == :find && args.length >= 1
+              locator = playwright_locator_chain(target)
+              if locator
+                return s(:send, locator, :locator, process(args.first))
+              end
+            end
+
+            # rows[0] → rows.nth(0) (indexing a locator)
+            if target && method == :[] && args.length == 1 && args.first.type == :int
+              return s(:send, process(target), :nth, process(args.first))
+            end
+
             if target.nil?
+              # all("selector") → page.locator("selector")
+              if method == :all && args.length == 1
+                return s(:send, s(:lvar, :page), :locator, process(args.first))
+              end
+
               result = transform_capybara_to_playwright(method, args)
               return result if result
 
@@ -294,6 +327,79 @@ module Ruby2JS
           parent = node.children[0]
           name = node.children[1].to_s
           parent ? "#{playwright_const_name(parent)}::#{name}" : name
+        end
+
+        # Detect and convert locator chains: rows[0].find("css") → rows.nth(0).locator("css")
+        # Returns processed locator AST if the target is a locator chain, nil otherwise.
+        def playwright_locator_chain(node)
+          return nil unless node.type == :send
+
+          target, method, *args = node.children
+
+          # rows[0] → rows.nth(0)
+          if method == :[] && args.length == 1 && args.first.type == :int
+            return s(:send, process(target), :nth, process(args.first))
+          end
+
+          # .find("css") → .locator("css")
+          if method == :find && args.length >= 1
+            parent = target ? playwright_locator_chain(target) || process(target) : nil
+            return s(:send, parent, :locator, process(args.first)) if parent
+          end
+
+          nil
+        end
+
+        # Generate HTML5 drag-and-drop via page.evaluate().
+        # Playwright's dragTo() uses mouse events which don't reliably trigger
+        # HTML5 DragEvents with a shared DataTransfer object. This dispatches
+        # the four standard drag events (dragstart, dragover, drop, dragend)
+        # with a shared DataTransfer, matching what the browser does natively.
+        #
+        # Generated code:
+        #   await source.evaluate((src, tgt) => {
+        #     const dt = new DataTransfer();
+        #     src.dispatchEvent(new DragEvent('dragstart', {bubbles: true, cancelable: true, dataTransfer: dt}));
+        #     tgt.dispatchEvent(new DragEvent('dragover', {bubbles: true, cancelable: true, dataTransfer: dt}));
+        #     tgt.dispatchEvent(new DragEvent('drop', {bubbles: true, cancelable: true, dataTransfer: dt}));
+        #     src.dispatchEvent(new DragEvent('dragend', {bubbles: true, cancelable: true, dataTransfer: dt}));
+        #   }, await target.elementHandle());
+        def playwright_drag_to(source, target)
+          # Build the event options hash: {bubbles: true, cancelable: true, dataTransfer: dt}
+          event_opts = s(:hash,
+            s(:pair, s(:sym, :bubbles), s(:true)),
+            s(:pair, s(:sym, :cancelable), s(:true)),
+            s(:pair, s(:sym, :dataTransfer), s(:lvar, :dt)))
+
+          # Helper: src.dispatchEvent(new DragEvent(type, opts))
+          mk_dispatch = ->(receiver, type) {
+            s(:send, s(:lvar, receiver), :dispatchEvent,
+              s(:send, s(:const, nil, :DragEvent), :new, s(:str, type), event_opts))
+          }
+
+          # const dt = new DataTransfer()
+          dt_decl = s(:lvasgn, :dt, s(:send!, s(:const, nil, :DataTransfer), :new))
+
+          # Function body: const dt = ...; src.dispatchEvent(...) x4
+          body = s(:begin,
+            dt_decl,
+            mk_dispatch.call(:src, 'dragstart'),
+            mk_dispatch.call(:tgt, 'dragover'),
+            mk_dispatch.call(:tgt, 'drop'),
+            mk_dispatch.call(:src, 'dragend'))
+
+          # Arrow function: (src, tgt) => { ... }
+          fn = s(:block,
+            s(:send, nil, :proc),
+            s(:args, s(:arg, :src), s(:arg, :tgt)),
+            body)
+
+          # await source.evaluate(fn, await target.elementHandle())
+          evaluate_call = s(:send, source, :evaluate,
+            fn,
+            s(:send, nil, :await, s(:send!, target, :elementHandle)))
+
+          s(:send, nil, :await, evaluate_call)
         end
 
         def transform_url_to_path_playwright(method, args)
