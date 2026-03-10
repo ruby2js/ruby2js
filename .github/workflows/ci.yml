@@ -299,6 +299,26 @@ jobs:
           path: artifacts/demo-ssg-blog.tar.gz
           retention-days: 7
 
+  package-ballroom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Package ballroom demo
+        run: |
+          mkdir -p artifacts
+          cp -r test/ballroom artifacts/ballroom
+          tar --exclude='node_modules' --exclude='.git' -czf artifacts/demo-ballroom.tar.gz -C artifacts ballroom
+
+      - name: Upload ballroom demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-ballroom
+          path: artifacts/demo-ballroom.tar.gz
+          retention-days: 7
+
   # ===========================================================================
   # Stage 2: Tests (some run immediately, others depend on Stage 1 artifacts)
   # ===========================================================================
@@ -526,12 +546,10 @@ jobs:
   # ===========================================================================
 
   build-site:
-    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-dictaphone, create-workflow, create-notes, create-astro-blog, create-ssg-blog]
+    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-dictaphone, create-workflow, create-notes, create-astro-blog, create-ssg-blog, package-ballroom]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -548,9 +566,6 @@ jobs:
           for tarball in artifacts/demo-*/demo-*.tar.gz; do
             tar -xzf "$tarball" -C artifacts
           done
-
-      - name: Copy ballroom submodule
-        run: cp -r test/ballroom artifacts/ballroom
 
       - name: Extract CLI for init
         run: |
@@ -668,6 +683,7 @@ jobs:
                 <li><a href="demo-photo-gallery.tar.gz">demo-photo-gallery.tar.gz</a> - Photo gallery demo (Camera, Capacitor, Electron)</li>
                 <li><a href="demo-dictaphone.tar.gz">demo-dictaphone.tar.gz</a> - Dictaphone demo (Active Storage, Whisper)</li>
                 <li><a href="demo-workflow.tar.gz">demo-workflow.tar.gz</a> - Workflow builder demo (React Flow, RPC)</li>
+                <li><a href="demo-ballroom.tar.gz">demo-ballroom.tar.gz</a> - Ballroom demo (component showcase)</li>
               </ul>
             </div>
             <div class="section">
@@ -843,7 +859,8 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=ballroom">Editor</a>
-                  <a href="https://github.com/ruby2js/ballroom">GitHub</a>
+                  <a href="https://github.com/rubys/ballroom">GitHub</a>
+                  <a href="releases/demo-ballroom.tar.gz">Tarball</a>
                 </div>
               </div>
             </div>
