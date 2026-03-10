@@ -849,7 +849,7 @@ module Ruby2JS
               s(:begin, path_expr),
               s(:str, "\">#{text_str}</a>"))
           else
-            text_expr = process(text_node)
+            text_expr = s(:send, nil, :escapeHTML, process(text_node))
             s(:dstr,
               s(:str, "<a #{class_attr}href=\""),
               s(:begin, path_expr),
