@@ -28,6 +28,7 @@ import {
   resolveContent,
   getCSRF,
   stylesheetLinkTag,
+  javascriptImportmapTags,
   getAssetPath
 } from 'juntos/rails_server.js';
 
@@ -37,7 +38,7 @@ import { createRPCHandler, getRegistry, csrfMetaTag } from 'juntos/rpc/server.mj
 let rpcHandler = null;
 
 // Re-export everything from server module
-export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from, stylesheetLinkTag, getAssetPath };
+export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from, stylesheetLinkTag, javascriptImportmapTags, getAssetPath };
 
 // Re-export RPC utilities for layout integration
 export { csrfMetaTag, getRegistry as getRPCRegistry };

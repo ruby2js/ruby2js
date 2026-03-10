@@ -87,6 +87,14 @@ export function stylesheetLinkTag(name = 'tailwind.css') {
   return `<link rel="stylesheet" href="${href}" data-turbo-track="reload">`;
 }
 
+// Generate script tag to load the application JavaScript entry point.
+// In Vite context, no importmap JSON is needed — Vite resolves modules.
+// The entry point (app/javascript/application.js) imports Turbo, boots
+// Stimulus, and eagerly loads controllers.
+export function javascriptImportmapTags() {
+  return '<script type="module" src="/app/javascript/application.js"></script>';
+}
+
 // Lazy-loaded ReactDOMServer for rendering React elements
 // Only imported when needed (apps with RBX/JSX views)
 let ReactDOMServer = null;

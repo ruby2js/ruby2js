@@ -20,11 +20,12 @@ import {
   TurboBroadcast,
   turbo_stream_from,
   stylesheetLinkTag,
+  javascriptImportmapTags,
   getAssetPath
 } from 'juntos/rails_server.js';
 
 // Re-export everything from server module
-export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from, stylesheetLinkTag, getAssetPath };
+export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from, stylesheetLinkTag, javascriptImportmapTags, getAssetPath };
 
 // Re-export TurboBroadcast and alias as BroadcastChannel for model compatibility
 export { TurboBroadcast, TurboBroadcast as BroadcastChannel };

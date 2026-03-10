@@ -14,8 +14,9 @@ import {
 // Note: createContext is defined in this file with browser-specific logic
 export { createFlash, truncate, pluralize, dom_id };
 
-// Browser no-ops for layout helpers (CSS is handled by Vite, no CSRF needed)
+// Browser no-ops for layout helpers (CSS/JS handled by Vite, no CSRF needed)
 export function stylesheetLinkTag() { return ''; }
+export function javascriptImportmapTags() { return ''; }
 export function getAssetPath(name) { return `/assets/${name}`; }
 
 // Create a fresh request context for browser navigation

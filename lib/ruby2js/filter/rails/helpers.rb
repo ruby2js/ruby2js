@@ -393,9 +393,13 @@ module Ruby2JS
             return process_asset_tag(:favicon_link_tag, args)
           end
 
-          # Handle javascript_importmap_tags - stub for demo
+          # Handle javascript_importmap_tags - generate module script tag
+          # In Vite context, no importmap JSON is needed (Vite resolves modules).
+          # We just need a <script type="module"> that loads the application entry
+          # point, which imports Turbo, Stimulus, and registers controllers.
           if method == :javascript_importmap_tags && target.nil?
-            return s(:str, '')
+            @rails_helpers_needed << :javascriptImportmapTags
+            return s(:send, nil, :javascriptImportmapTags)
           end
 
           # Handle render partial calls
