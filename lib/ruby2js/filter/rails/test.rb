@@ -608,7 +608,7 @@ module Ruby2JS
 
           # System test imports don't depend on metadata
           if @rails_test_has_system_test
-            system_helpers = [:visit, :fillIn, :clickButton, :clickOn, :acceptConfirm, :findField, :findButton, :cleanup, :select, :find, :within]
+            system_helpers = [:visit, :fillIn, :clickButton, :clickOn, :acceptConfirm, :findField, :findButton, :cleanup, :select, :find, :within, :all]
             system_consts = system_helpers.map { |name| s(:const, nil, name) }
             imports.push(s(:import, ['juntos/system_test.mjs'], system_consts))
           end

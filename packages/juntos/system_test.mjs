@@ -25,6 +25,39 @@ if (typeof window !== 'undefined' && typeof window.Element !== 'undefined') {
   }
 }
 
+// Stub Turbo so Stimulus controllers that call Turbo.visit() or
+// Turbo.renderStreamMessage() work in jsdom without the full Turbo library.
+// _pendingVisit tracks in-flight Turbo.visit() calls so drag_to can await them.
+let _pendingVisit = null;
+if (typeof globalThis !== 'undefined' && !globalThis.Turbo) {
+  globalThis.Turbo = {
+    visit(url) {
+      // Re-render the page using the system test visit() helper.
+      // Imported lazily to avoid circular dependency at module load time.
+      _pendingVisit = import('juntos/system_test.mjs').then(m => m.visit(url));
+      return _pendingVisit;
+    },
+    renderStreamMessage(html) {
+      // Process turbo stream actions (replace, update, append, etc.)
+      const template = document.createElement('template');
+      template.innerHTML = html;
+      for (const stream of template.content.querySelectorAll('turbo-stream')) {
+        const action = stream.getAttribute('action');
+        const target = document.getElementById(stream.getAttribute('target'));
+        const content = stream.querySelector('template')?.content;
+        if (!target) continue;
+        switch (action) {
+          case 'replace': target.replaceWith(content.cloneNode(true)); break;
+          case 'update': target.innerHTML = ''; target.appendChild(content.cloneNode(true)); break;
+          case 'append': target.appendChild(content.cloneNode(true)); break;
+          case 'prepend': target.prepend(content.cloneNode(true)); break;
+          case 'remove': target.remove(); break;
+        }
+      }
+    }
+  };
+}
+
 // Controller registry — populated by test setup
 let _controllers = {};
 let _stimulusApp = null;
@@ -42,6 +75,13 @@ export function registerController(name, klass) {
  */
 export async function visit(path) {
   const url = path.toString();
+
+  // Update window.location so controllers that read window.location.href
+  // (e.g., drop_controller calling Turbo.visit(window.location.href)) see the current page.
+  try {
+    const fullUrl = new URL(url, window.location.origin).href;
+    window.history.pushState({}, '', fullUrl);
+  } catch (e) { /* ignore if pushState unavailable */ }
 
   const response = await fetch(url, {
     method: 'GET',
@@ -242,26 +282,88 @@ export async function select(value, { from }) {
 }
 
 /**
+ * Wrap a DOM element with Capybara-like methods (.find(), .hover(), .text, .drag_to()).
+ * @param {HTMLElement} el - The DOM element to wrap
+ * @returns {object} Element wrapper
+ */
+function wrapElement(el) {
+  return {
+    element: el,
+    get text() { return el.textContent; },
+
+    find(selector, options = {}) {
+      const match = options.match === 'first'
+        ? el.querySelector(selector)
+        : el.querySelector(selector);
+      if (!match) {
+        throw new Error(`find: could not find "${selector}" within element`);
+      }
+      return wrapElement(match);
+    },
+
+    async hover() {
+      el.dispatchEvent(new Event('mouseenter', { bubbles: true }));
+      el.dispatchEvent(new Event('mouseover', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 0));
+    },
+
+    async drag_to(targetWrapper) {
+      const target = targetWrapper.element || targetWrapper;
+
+      // jsdom lacks DragEvent/DataTransfer; simulate with a shared data store
+      const data = {};
+      const dataTransfer = {
+        data,
+        setData(type, val) { data[type] = val; },
+        getData(type) { return data[type] || ''; },
+        effectAllowed: 'move',
+        dropEffect: 'move'
+      };
+
+      const mkEvent = (type) => {
+        const e = new Event(type, { bubbles: true, cancelable: true });
+        e.dataTransfer = dataTransfer;
+        return e;
+      };
+
+      el.dispatchEvent(mkEvent('dragstart'));
+      target.dispatchEvent(mkEvent('dragover'));
+      target.dispatchEvent(mkEvent('drop'));
+      el.dispatchEvent(mkEvent('dragend'));
+
+      // Wait for any fetch + Turbo.visit chain triggered by the drop handler
+      await new Promise(r => setTimeout(r, 0));
+      if (_pendingVisit) {
+        await _pendingVisit;
+        _pendingVisit = null;
+      }
+    }
+  };
+}
+
+/**
  * Find an element by CSS selector — equivalent to Capybara's find.
- * Returns a wrapper with .hover() for chaining.
+ * Returns a wrapper with .find(), .hover(), .text, .drag_to().
  * @param {string} selector - CSS selector
  * @param {object} options - Options hash (e.g., {match: "first"})
- * @returns {object} Element wrapper with hover() method
+ * @returns {object} Element wrapper
  */
 export function find(selector, options = {}) {
   const el = document.querySelector(selector);
   if (!el) {
     throw new Error(`find: could not find element matching "${selector}"`);
   }
+  return wrapElement(el);
+}
 
-  return {
-    element: el,
-    async hover() {
-      el.dispatchEvent(new Event('mouseenter', { bubbles: true }));
-      el.dispatchEvent(new Event('mouseover', { bubbles: true }));
-      await new Promise(r => setTimeout(r, 0));
-    }
-  };
+/**
+ * Find all elements matching a CSS selector — equivalent to Capybara's all.
+ * Returns an array of element wrappers with .find(), .hover(), .text, .drag_to().
+ * @param {string} selector - CSS selector
+ * @returns {object[]} Array of element wrappers
+ */
+export function all(selector) {
+  return [...document.querySelectorAll(selector)].map(wrapElement);
 }
 
 /**
