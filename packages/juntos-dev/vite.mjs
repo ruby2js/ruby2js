@@ -1212,6 +1212,12 @@ function createConfigPlugin(config, appRoot) {
         // Alias for Rails importmap-style imports in Stimulus controllers
         'controllers/application': path.join(appRoot, 'app/javascript/controllers/application.js'),
 
+        // Rails importmap uses @hotwired/turbo-rails (gem); npm has @hotwired/turbo
+        '@hotwired/turbo-rails': '@hotwired/turbo',
+
+        // Rails importmap uses bare "controllers" for app/javascript/controllers
+        'controllers': path.join(appRoot, 'app/javascript/controllers'),
+
         // node_modules is now at appRoot (standard Vite structure)
         // No aliases needed - Vite resolves these automatically
 
