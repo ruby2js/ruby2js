@@ -295,7 +295,11 @@ export class ActiveRecordSQL extends ActiveRecordBase {
   // Execute a grouped COUNT query: returns {key: count} or {[k1,k2]: count}
   static async _executeGroupCount(rel) {
     const groupCols = Array.isArray(rel._group) ? rel._group : [rel._group];
-    const selectCols = [...groupCols, 'COUNT(*) as count'].join(', ');
+    const countCol = Array.isArray(rel._select) ? rel._select[0] : null;
+    const countExpr = rel._distinct && countCol
+      ? `COUNT(DISTINCT ${quoteId(countCol)}) as count`
+      : 'COUNT(*) as count';
+    const selectCols = [...groupCols, countExpr].join(', ');
     const aggRel = Object.create(rel);
     aggRel._select = [selectCols];
     const { sql, values } = this._buildRelationSQL(aggRel);

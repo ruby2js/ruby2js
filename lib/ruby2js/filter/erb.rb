@@ -216,6 +216,15 @@ module Ruby2JS
               false
             end
 
+            # Handle trailing if/unless modifiers: (expr if cond).to_s
+            # In Ruby, nil.to_s returns ""; in JS, String(null) returns "null".
+            # Fix by supplying "" as the else branch before processing.
+            if inner&.type == :if && inner.children[2].nil?
+              inner = inner.updated(nil, [inner.children[0], inner.children[1], s(:str, "")])
+            elsif inner&.type == :if && inner.children[1].nil?
+              inner = inner.updated(nil, [inner.children[0], s(:str, ""), inner.children[2]])
+            end
+
             arg = process(inner)
             # Skip wrapper if already a string literal or template literal
             unless arg&.type == :str || arg&.type == :dstr
