@@ -673,7 +673,11 @@ module Ruby2JS
           # All route/query params are read from context.params
           # Only form body params (for create/update/custom POST) become function arguments
           has_body_params = params_keys.any? { |k| k != :id }
-          if has_body_params || [:create, :update].include?(method_name)
+          # Also inject params if a called private method needs it (e.g., event_params)
+          calls_params_method = action_meta[:private_method_calls].any? do |called|
+            (@rails_private_method_params[called] || []).include?(:params)
+          end
+          if has_body_params || [:create, :update].include?(method_name) || calls_params_method
             param_args.push(s(:arg, :params))
             # Merge form data into context.params so params[:key] resolves uniformly
             # (mirrors Rails' unified params hash: route + query + form data)

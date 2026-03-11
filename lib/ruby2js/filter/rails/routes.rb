@@ -235,6 +235,8 @@ module Ruby2JS
                   end
                 when :as
                   as_name = value.children[0].to_s if value.type == :sym || value.type == :str
+                when :action
+                  action = value.children[0].to_s if value.type == :sym || value.type == :str
                 when :on
                   if value.type == :sym
                     on_collection = true if value.children[0] == :collection
@@ -303,7 +305,7 @@ module Ruby2JS
             # Track member/collection routes on the current resource
             if @rails_current_resource && raw_path
               route_entry = {
-                action: raw_path.to_s,
+                action: (action || raw_path).to_s,
                 method: http_method.to_s.upcase
               }
               if on_member
