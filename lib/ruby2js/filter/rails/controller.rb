@@ -1018,7 +1018,14 @@ module Ruby2JS
                   end
                 end
               end
-              other_statements.push(transform_ivars_to_locals(child)) unless is_format
+              unless is_format
+                # For :if nodes inside respond_to, recurse via transform_respond_to_block
+                # so that format.html/json/turbo_stream blocks inside the conditional are
+                # properly extracted (e.g., if params[:from_settings]; format.html {...}; end)
+                other_statements.push(
+                  child.type == :if ? transform_respond_to_block(child) : transform_ivars_to_locals(child)
+                )
+              end
             end
 
             # Build the format result
@@ -1042,9 +1049,15 @@ module Ruby2JS
             end
 
             if format_result
-              # Prepend non-format statements before the format conditional
               if other_statements.any?
-                return s(:begin, *other_statements, format_result)
+                # When json_block exists without an explicit html_block, the JSON check
+                # is an early-return guard that must come BEFORE the HTML conditionals
+                # (which themselves contain returns). Otherwise the JSON path is unreachable.
+                if json_block && !html_block
+                  return s(:begin, format_result, *other_statements)
+                else
+                  return s(:begin, *other_statements, format_result)
+                end
               end
               return format_result
             end
