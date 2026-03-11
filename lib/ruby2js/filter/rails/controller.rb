@@ -1310,9 +1310,11 @@ module Ruby2JS
             action = target.children[0]
 
             # render :index (or other action) from a different action:
-            # Store the target action name so generate_view_call uses that template
-            # instead of generating a separate early return
-            if @rails_current_action && action != @rails_current_action
+            # For actions with a trailing generate_view_call (show, edit, index, etc.),
+            # store the target and let generate_view_call use that template.
+            # For create/update/destroy (no trailing view call), generate inline.
+            if @rails_current_action && action != @rails_current_action &&
+               !%i[create update destroy].include?(@rails_current_action)
               @rails_render_action = action
               return s(:nil)
             end
