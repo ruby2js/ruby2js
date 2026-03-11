@@ -608,7 +608,7 @@ module Ruby2JS
 
           # System test imports don't depend on metadata
           if @rails_test_has_system_test
-            system_helpers = [:visit, :fillIn, :clickButton, :clickOn, :acceptConfirm, :findField, :findButton, :cleanup, :select, :find, :within, :all]
+            system_helpers = [:visit, :fillIn, :clickButton, :clickOn, :acceptConfirm, :findField, :findButton, :cleanup, :select, :check, :uncheck, :choose, :find, :within, :all]
             system_consts = system_helpers.map { |name| s(:const, nil, name) }
             imports.push(s(:import, ['juntos/system_test.mjs'], system_consts))
           end
@@ -1552,6 +1552,24 @@ module Ruby2JS
             return nil unless from_node
             s(:send, nil, :await,
               s(:send!, nil, :select, value, s(:hash, s(:pair, s(:sym, :from), from_node))))
+
+          when :check
+            # check "Use back numbers?" -> await check("Use back numbers?")
+            return nil if args.empty?
+            label = process(args.first)
+            s(:send, nil, :await, s(:send!, nil, :check, label))
+
+          when :uncheck
+            # uncheck "Include pro heats?" -> await uncheck("Include pro heats?")
+            return nil if args.empty?
+            label = process(args.first)
+            s(:send, nil, :await, s(:send!, nil, :uncheck, label))
+
+          when :choose
+            # choose "Two ballrooms (split)" -> await choose("Two ballrooms (split)")
+            return nil if args.empty?
+            label = process(args.first)
+            s(:send, nil, :await, s(:send!, nil, :choose, label))
 
           when :assert_field
             # assert_field "locator", with: "value" -> expect(findField("locator").value).toBe("value")

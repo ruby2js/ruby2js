@@ -20,6 +20,9 @@
 #   assert_no_selector "css"          → await expect(page.locator("css")).not.toBeVisible()
 #   assert_no_text "T"                → await expect(page.locator("body")).not.toContainText("T")
 #   select "X", from: "Y"            → await page.getByLabel("Y").selectOption("X")
+#   check "Label"                     → await page.getByLabel("Label").check()
+#   uncheck "Label"                   → await page.getByLabel("Label").uncheck()
+#   choose "Label"                    → await page.getByLabel("Label").check()
 #   find("css", match: :first).hover → await page.locator("css").first().hover()
 #   within("css") { ... }            → const _el = page.locator("css"); <scoped assertions>
 #   defined? Playwright               → true
@@ -485,6 +488,34 @@ module Ruby2JS
               s(:send,
                 s(:send, s(:lvar, :page), :getByLabel, from_node),
                 :selectOption, value))
+
+          when :check
+            # check "Label" → await page.getByLabel("Label").check()
+            return nil if args.empty?
+            label = process(args.first)
+            s(:send, nil, :await,
+              s(:send!,
+                s(:send, s(:lvar, :page), :getByLabel, label),
+                :check))
+
+          when :uncheck
+            # uncheck "Label" → await page.getByLabel("Label").uncheck()
+            return nil if args.empty?
+            label = process(args.first)
+            s(:send, nil, :await,
+              s(:send!,
+                s(:send, s(:lvar, :page), :getByLabel, label),
+                :uncheck))
+
+          when :choose
+            # choose "Label" → await page.getByLabel("Label").check()
+            # Radio buttons use check() in Playwright
+            return nil if args.empty?
+            label = process(args.first)
+            s(:send, nil, :await,
+              s(:send!,
+                s(:send, s(:lvar, :page), :getByLabel, label),
+                :check))
 
           when :assert_field
             # assert_field "X", with: "Y" → await expect(page.getByLabel("X")).toHaveValue("Y")

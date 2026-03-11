@@ -262,6 +262,49 @@ export async function clickOn(text) {
 }
 
 /**
+ * Check a checkbox by its label text — equivalent to Capybara's check.
+ * @param {string} locator - Label text, name, or id of the checkbox
+ */
+export async function check(locator) {
+  const field = findField(locator);
+  if (!field) {
+    throw new Error(`check: could not find checkbox "${locator}"`);
+  }
+  if (!field.checked) {
+    field.checked = true;
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+
+/**
+ * Uncheck a checkbox by its label text — equivalent to Capybara's uncheck.
+ * @param {string} locator - Label text, name, or id of the checkbox
+ */
+export async function uncheck(locator) {
+  const field = findField(locator);
+  if (!field) {
+    throw new Error(`uncheck: could not find checkbox "${locator}"`);
+  }
+  if (field.checked) {
+    field.checked = false;
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+
+/**
+ * Select a radio button by its label text — equivalent to Capybara's choose.
+ * @param {string} locator - Label text of the radio button
+ */
+export async function choose(locator) {
+  const field = findField(locator);
+  if (!field) {
+    throw new Error(`choose: could not find radio button "${locator}"`);
+  }
+  field.checked = true;
+  field.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/**
  * Select an option from a <select> dropdown by its visible text.
  * @param {string} value - The visible text of the option to select
  * @param {object} options - Options hash with `from` key (field locator)
