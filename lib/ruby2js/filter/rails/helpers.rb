@@ -2763,7 +2763,41 @@ module Ruby2JS
           data_attrs.each_pair { |k, v| data_attr += " data-#{k}=\"#{v}\"" }
 
           # Build form tag with action and method - Turbo intercepts form submissions automatically
-          if model_name
+          if model_name && url_node
+            # Form with both model: and url: — use url for action, model for field names
+            # form_with(model: @event, url: settings_events_path)
+            actual_method = (http_method == :get || http_method == :post) ? http_method : :post
+            needs_method_field = ![:get, :post].include?(http_method)
+
+            if url_node.type == :str
+              url_str = url_node.children[0]
+              form_tag = "<form#{id_attr}#{class_attr}#{data_attr} action=\"#{url_str}\" accept-charset=\"UTF-8\" method=\"#{actual_method}\">"
+              if needs_method_field
+                form_tag += "\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\" autocomplete=\"off\">"
+              end
+              statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, form_tag))
+            else
+              url_expr = process(url_node)
+              method_suffix = needs_method_field ?
+                "\" accept-charset=\"UTF-8\" method=\"#{actual_method}\">\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\" autocomplete=\"off\">" :
+                "\" accept-charset=\"UTF-8\" method=\"#{actual_method}\">"
+              statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                s(:dstr,
+                  s(:str, "<form#{id_attr}#{class_attr}#{data_attr} action=\""),
+                  s(:begin, url_expr),
+                  s(:str, method_suffix)))
+            end
+
+            # For existing models, add PATCH method override
+            unless model_is_new
+              model_var = s(:lvar, model_name.to_sym)
+              statements << s(:if, s(:attr, model_var, :id),
+                s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                  s(:str, "<input type=\"hidden\" name=\"_method\" value=\"patch\" autocomplete=\"off\">\n")),
+                s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                  s(:str, "\n")))
+            end
+          elsif model_name
             # Form with action and method using path helpers
             plural_name = Ruby2JS::Inflector.pluralize(model_name)
             singular_path = :"#{model_name}_path"   # :article_path
