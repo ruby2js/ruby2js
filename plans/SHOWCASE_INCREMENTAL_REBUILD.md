@@ -9,9 +9,9 @@ The ballroom app (`test/ballroom`, pushed to `github.com:rubys/ballroom`) is a d
 ### What exists
 
 - **34 models** — Event, Person, Studio, Dance enriched with scopes, validations, associations; Locale (non-AR service class with Intl.DateTimeFormat dual-runtime support)
-- **29 controllers** — 27 standard CRUD scaffolds; EventsController has enriched `root` action, StudiosController has `unpair` and enriched views with pair management, PeopleController has sortable columns and search
-- **224 Juntos tests passing** (28 controller test suites + 2 system tests + 3 model tests)
-- **221 Rails tests passing** (matching controller and system test coverage)
+- **29 controllers** — 27 standard CRUD scaffolds; EventsController has enriched `root` + `settings` actions, StudiosController has `unpair` and enriched views with pair management, PeopleController has sortable columns, search, `students`, and `backs` actions, DancesController and CategoriesController have drag-drop reorder
+- **227 Juntos tests passing** (28 controller + 5 system + 32 model test suites)
+- **227 Rails tests passing** (matching test coverage)
 - **Ejected directory** — JS files covering all models, controllers, views, tests, config
 - **Stimulus controllers** — info_box, person (dynamic form fields), people_search (client-side filtering), studio_price_override
 - **Application helpers** — `localized_date` in `ApplicationHelper`, imported automatically by ERB filter via `@helpers/` virtual prefix
@@ -22,13 +22,14 @@ The ballroom app (`test/ballroom`, pushed to `github.com:rubys/ballroom`) is a d
 All standard pages render successfully:
 ```
 /            /studios      /studios/1    /studios/1/edit  /studios/new
-/people      /people/1     /people/new   /heats           /dances
-/dances/1    /dances/new   /categories   /categories/1    /events/1
-/events/1/edit  /levels    /ages         /judges
+/people      /people/1     /people/new   /people/students /people/backs
+/heats       /dances       /dances/1     /dances/new
+/categories  /categories/1 /events/1     /events/1/edit
+/events/settings  /levels  /ages         /judges
 ```
 
-5 collection action pages not yet implemented:
-`/events/summary`, `/events/publish`, `/events/settings`, `/people/students`, `/people/backs`
+2 collection action pages not yet implemented:
+`/events/summary`, `/events/publish`
 
 ### Test data
 
@@ -250,7 +251,7 @@ ruby scripts/compare-showcase.rb 2025-charlotte --diff /
 
 System tests exercise user flows end-to-end: visit page, click link, fill form, assert result. They run under both Rails (`bin/rails test test/system`) and Juntos (`npx juntos test`). Differences reveal transpiler/runtime bugs.
 
-**Current:** 224/224 Juntos tests passing (28 controller + 3 model + 2 system test suites). 221/221 Rails tests passing.
+**Current:** 227/227 Juntos tests passing (28 controller + 32 model + 5 system test suites). 227/227 Rails tests passing.
 
 ### 2. Transpiler fidelity (ballroom Rails vs ballroom Juntos)
 
@@ -284,17 +285,17 @@ Work is driven by **what the root page links to**, fixing issues as encountered.
 5. ~~Build showcase comparison harness~~ — **DONE** (`scripts/compare-showcase.rb`)
 6. ~~Run showcase comparison on root page~~ — **DONE** (root page rebuilt to match)
 
-### Phase 2: Implement missing collection actions
+### Phase 2: Implement missing collection actions — DONE (3/5), 2 remaining
 
-Each follows the same pattern: study the showcase implementation, implement action + view in ballroom, verify Juntos, compare both ways.
+Each follows the same pattern: write idiomatic Rails, fix the transpiler to support it, verify Juntos, compare both ways.
 
-| Priority | Route | Showcase controller | Notes |
-|----------|-------|-------------------|-------|
-| 1 | `/events/settings` | `event#settings` | Event config form |
-| 2 | `/people/students` | `people#students` | Filtered people list |
-| 3 | `/people/backs` | `people#backs` | Back number assignment |
-| 4 | `/events/summary` | `event#summary` | Competition summary |
-| 5 | `/events/publish` | `event#publish` | Publish controls |
+| Priority | Route | Showcase controller | Status |
+|----------|-------|-------------------|--------|
+| 1 | `/events/settings` | `event#settings` | **DONE** — Event config form with radio/checkbox/text fields |
+| 2 | `/people/students` | `people#students` | **DONE** — Filtered people list |
+| 3 | `/people/backs` | `people#backs` | **DONE** — Back number assignment form |
+| 4 | `/events/summary` | `event#summary` | Not started |
+| 5 | `/events/publish` | `event#publish` | Not started |
 
 ### Phase 3: Enrich beyond scaffolds — IN PROGRESS
 
@@ -309,9 +310,9 @@ Replace scaffold views with showcase-matching views, driven by showcase comparis
 | **People index** | **DONE** | Sortable columns (name/type/role/level/age/studio), client-side search, info box, conditional role/level/age columns |
 | **People show/edit/new** | **DONE** | Person Stimulus controller (dynamic type/role fields), polymorphic studio links, locked event delete protection |
 | **People model** | **DONE** | display_name, exclude associations, all showcase fields |
-| **Dances** | Not started | Category grouping, drag-drop reorder |
+| **Dances** | **DONE** | Category grouping, drag-drop reorder, CRUD system test |
+| **Categories** | **DONE** | Ordered list, drag-drop reorder, CRUD system test |
 | **Heats** | Not started | Entry display, scheduling, multi-dance |
-| **Categories** | Not started | Ordered list, lock toggle, extensions |
 | **Entries** | Not started | Lead/follow/instructor associations |
 | **Scores** | Not started | Scoring forms, judge assignment |
 
@@ -346,6 +347,18 @@ The `defined?(Intl)` pattern transpiles to `typeof Intl !== 'undefined'`, enabli
 
 `Model.pick(:column)` returns a single value (like `pluck` limited to 1 result). Static wrappers added to SQL, Dexie, and Supabase adapters. Instance method on `Relation`.
 
+## Guiding Principle
+
+**Write idiomatic Rails first, fix the transpiler to support it.** Don't work around transpiler limitations with non-standard Rails code. If the transpiler can't handle a standard Rails pattern, that's a transpiler bug to fix.
+
+The juntos transform uses the **selfhost npm package**, not the Ruby gem. Changes to `lib/ruby2js/filter/rails/*.rb` require a full selfhost rebuild to take effect in Juntos:
+```bash
+bundle exec rake -f demo/selfhost/Rakefile release
+cd test/ballroom
+npm cache clean --force && rm package-lock.json
+npm install ../../artifacts/tarballs/juntos-beta.tgz ../../artifacts/tarballs/juntos-dev-beta.tgz
+```
+
 ## Already Resolved
 
 Issues discovered and fixed while building ballroom:
@@ -375,3 +388,11 @@ Issues discovered and fixed while building ballroom:
 - **params[:key] bracket notation** — `s(:attr, ...)` changed to `s(:send, ..., :[], s(:str, ...))` to avoid functions filter treating property names like "sort" as method calls
 - **Unified metadata collection** — consolidated 11 recursive AST walkers into 2 unified methods (`collect_class_refs`, `collect_body_metadata`), fixing `mark_private_method_calls` to recurse into all node types
 - **Params injection precision** — `params[:key]` only injects `context` (not `params` form body arg); transitive dependency propagation for private methods calling other private methods
+- **`form_with(url:)` field names** — URL-based forms now use bare field names (`name="field"`) not model-prefixed (`name="model[field]"`)
+- **`render :action` in create/update/destroy** — only defer cross-action renders for actions with trailing view calls; create/update/destroy generate inline renders
+- **Route `action:` option** — custom routes with explicit `action:` now parsed and used in route entries
+- **Private method params injection** — actions calling private methods that access `params` (e.g., `event_params`) get `params` injected into their function signature
+- **`respond_to` with nested conditionals** — format blocks inside `if/else` within `respond_to` now properly extracted; JSON early-return guard placed before HTML conditionals to avoid unreachable code
+- **`form_with(model:, url:)` together** — both options can be used simultaneously (url for form action, model for field name prefixing)
+- **`check`/`uncheck`/`choose` system test helpers** — checkbox and radio button helpers for both vitest/jsdom and Playwright transpilers
+- **Radio button labels** — wrapping `<label>` tags needed for accessibility and system test helper compatibility (`findField` and `getByLabel` require label association)
