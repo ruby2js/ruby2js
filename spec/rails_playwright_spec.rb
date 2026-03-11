@@ -407,6 +407,41 @@ describe Ruby2JS::Filter::Rails::Playwright do
     end
   end
 
+  describe "check/uncheck/choose" do
+    it "converts check to page.getByLabel().check()" do
+      result = to_js(<<~RUBY)
+        class StudiosSystemTest < ApplicationSystemTestCase
+          test "checks box" do
+            check "Use back numbers?"
+          end
+        end
+      RUBY
+      assert_includes result, 'page.getByLabel("Use back numbers?").check()'
+    end
+
+    it "converts uncheck to page.getByLabel().uncheck()" do
+      result = to_js(<<~RUBY)
+        class StudiosSystemTest < ApplicationSystemTestCase
+          test "unchecks box" do
+            uncheck "Include pro heats?"
+          end
+        end
+      RUBY
+      assert_includes result, 'page.getByLabel("Include pro heats?").uncheck()'
+    end
+
+    it "converts choose to page.getByLabel().check()" do
+      result = to_js(<<~RUBY)
+        class StudiosSystemTest < ApplicationSystemTestCase
+          test "chooses radio" do
+            choose "Two ballrooms (split)"
+          end
+        end
+      RUBY
+      assert_includes result, 'page.getByLabel("Two ballrooms (split)").check()'
+    end
+  end
+
   describe "find().hover()" do
     it "converts find with match: :first and hover to locator().first().hover()" do
       result = to_js(<<~RUBY)

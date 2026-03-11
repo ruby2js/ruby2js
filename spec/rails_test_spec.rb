@@ -1669,6 +1669,41 @@ describe Ruby2JS::Filter::Rails::Test do
     end
   end
 
+  describe "Capybara check/uncheck/choose" do
+    it "converts check to await check" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "checks box" do
+            check "Use back numbers?"
+          end
+        end
+      RUBY
+      assert_includes result, 'await(check("Use back numbers?"))'
+    end
+
+    it "converts uncheck to await uncheck" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "unchecks box" do
+            uncheck "Include pro heats?"
+          end
+        end
+      RUBY
+      assert_includes result, 'await(uncheck("Include pro heats?"))'
+    end
+
+    it "converts choose to await choose" do
+      result = to_system_js(<<~RUBY)
+        class ChatSystemTest < ApplicationSystemTestCase
+          test "chooses radio" do
+            choose "Two ballrooms (split)"
+          end
+        end
+      RUBY
+      assert_includes result, 'await(choose("Two ballrooms (split)"))'
+    end
+  end
+
   describe "Capybara accept_confirm" do
     it "converts accept_confirm block to await acceptConfirm" do
       result = to_system_js(<<~RUBY)
