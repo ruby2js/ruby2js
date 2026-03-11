@@ -567,6 +567,7 @@ module Ruby2JS
         def transform_action_method(node)
           method_name = node.children[0]
           @rails_current_action = method_name
+          @rails_render_action = nil
           args = node.children[1]
           body = node.children[2]
 
@@ -1306,9 +1307,18 @@ module Ruby2JS
           target = args.first
 
           if target.type == :sym
+            action = target.children[0]
+
+            # render :index (or other action) from a different action:
+            # Store the target action name so generate_view_call uses that template
+            # instead of generating a separate early return
+            if @rails_current_action && action != @rails_current_action
+              @rails_render_action = action
+              return s(:nil)
+            end
+
             # render :new -> ArticleViews.$new({$context: context, article})
             # Call the view directly with the model (including validation errors)
-            action = target.children[0]
             model_name = @rails_controller_name.downcase.to_sym
             view_module = "#{@rails_controller_name}Views"
 
@@ -1437,12 +1447,14 @@ module Ruby2JS
           return nil if %i[create update destroy].include?(action_name)
 
           view_module = "#{@rails_controller_name}Views"
+          # If render :other_action was called, use that template instead
+          template_name = @rails_render_action || action_name
           # Use $new for reserved word (matches view module export)
           # Use index! to avoid Functions filter collision (bang stripped)
-          view_action = case action_name
+          view_action = case template_name
                         when :new then :$new
                         when :index then :index!
-                        else action_name
+                        else template_name
                         end
 
           # Build props hash for view: { $context: context, cookies: context.cookies, action_name: "show", articles }

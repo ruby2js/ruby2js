@@ -231,6 +231,26 @@ export class ActiveRecord extends ActiveRecordBase {
     return new Relation(this).pick(...columns);
   }
 
+  static async minimum(col) {
+    return new Relation(this).minimum(col);
+  }
+
+  static async maximum(col) {
+    return new Relation(this).maximum(col);
+  }
+
+  static async exists() {
+    return new Relation(this).exists();
+  }
+
+  static joins(...associations) {
+    return new Relation(this).joins(...associations);
+  }
+
+  static distinct() {
+    return new Relation(this).distinct();
+  }
+
   static delete_all(conditions) { return this.deleteAll(conditions); }
   static destroy_all() { return this.destroyAll(); }
 
@@ -287,14 +307,116 @@ export class ActiveRecord extends ActiveRecordBase {
       rows = rows.filter(filterFn);
     }
 
+    // Separate NOT conditions into join-table conditions and direct conditions
+    const directNotConditions = [];
+    const joinNotConditions = {};  // assocName -> [{col: val}]
+    if (rel._notConditions && rel._notConditions.length > 0) {
+      for (const notCond of rel._notConditions) {
+        for (const [key, value] of Object.entries(notCond)) {
+          if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            // Nested hash: { heats: { category: 'Solo' } } → join condition
+            if (!joinNotConditions[key]) joinNotConditions[key] = [];
+            joinNotConditions[key].push(value);
+          } else {
+            directNotConditions.push({ [key]: value });
+          }
+        }
+      }
+    }
+
+    // Apply direct NOT conditions
+    for (const notCond of directNotConditions) {
+      rows = rows.filter(row => {
+        for (const [key, value] of Object.entries(notCond)) {
+          if (value === null) {
+            if (row[key] == null) return false;
+          } else if (Array.isArray(value)) {
+            if (value.includes(row[key])) return false;
+          } else {
+            if (row[key] === value) return false;
+          }
+        }
+        return true;
+      });
+    }
+
+    // Apply OR conditions
+    if (rel._orConditions && rel._orConditions.length > 0) {
+      // Get all rows from the table (OR needs to match against full table)
+      let allRows = await this.table.toArray();
+      const baseIds = new Set(rows.map(r => r.id));
+      for (const orCondGroup of rel._orConditions) {
+        for (const orCond of orCondGroup) {
+          for (const row of allRows) {
+            if (baseIds.has(row.id)) continue;
+            let matches = true;
+            for (const [key, value] of Object.entries(orCond)) {
+              if (Array.isArray(value)) {
+                if (!value.includes(row[key])) { matches = false; break; }
+              } else {
+                if (row[key] !== value) { matches = false; break; }
+              }
+            }
+            if (matches) {
+              rows.push(row);
+              baseIds.add(row.id);
+            }
+          }
+        }
+      }
+    }
+
+    // Apply JOINS filtering (in-memory: filter to records that have matching associations)
+    if (rel._joins && rel._joins.length > 0) {
+      for (const joinAssoc of rel._joins) {
+        const assocName = typeof joinAssoc === 'string' ? joinAssoc : Object.keys(joinAssoc)[0];
+        const associations = this.associations || {};
+        const assoc = associations[assocName];
+        if (assoc && assoc.type === 'has_many') {
+          const AssocModel = this._resolveModel(assoc.model);
+          if (AssocModel) {
+            const foreignKey = assoc.foreignKey || `${this._singularize(this.table_name)}_id`;
+            let relatedRows = await AssocModel.table.toArray();
+            // Apply NOT conditions targeting this join table
+            const assocTable = AssocModel.tableName || this._pluralize(assocName);
+            const notConds = joinNotConditions[assocTable] || joinNotConditions[assocName] || [];
+            for (const notCond of notConds) {
+              relatedRows = relatedRows.filter(r => {
+                for (const [k, v] of Object.entries(notCond)) {
+                  if (r[k] === v) return false;
+                }
+                return true;
+              });
+            }
+            const parentIds = new Set(relatedRows.map(r => r[foreignKey]));
+            rows = rows.filter(r => parentIds.has(r.id));
+          }
+        }
+      }
+    }
+
+    // Apply DISTINCT
+    if (rel._distinct) {
+      const seen = new Set();
+      rows = rows.filter(row => {
+        if (seen.has(row.id)) return false;
+        seen.add(row.id);
+        return true;
+      });
+    }
+
     // Apply ordering (in-memory for now)
     if (rel._order) {
-      const [col, dir] = this._parseOrder(rel._order);
+      const orders = this._parseOrders(rel._order);
       rows.sort((a, b) => {
-        const aVal = a[col];
-        const bVal = b[col];
-        if (aVal < bVal) return dir === 'asc' ? -1 : 1;
-        if (aVal > bVal) return dir === 'asc' ? 1 : -1;
+        for (const [col, dir] of orders) {
+          const aVal = a[col];
+          const bVal = b[col];
+          if (aVal == null && bVal != null) return 1;
+          if (aVal != null && bVal == null) return -1;
+          if (aVal < bVal) return dir === 'asc' ? -1 : 1;
+          if (aVal > bVal) return dir === 'asc' ? 1 : -1;
+        }
         return 0;
       });
     }
@@ -376,8 +498,63 @@ export class ActiveRecord extends ActiveRecordBase {
     return records.map(r => columns.map(col => r[col]));
   }
 
-  // Parse order option into [column, direction]
-  static _parseOrder(order) {
+  // Execute an aggregate query (MAX, MIN, SUM) for a Relation
+  static async _executeAggregate(rel, func, col) {
+    const records = await this._executeRelation(rel);
+    if (records.length === 0) return null;
+    const values = records.map(r => r[col]).filter(v => v != null);
+    if (values.length === 0) return null;
+    if (func === 'MAX') return Math.max(...values);
+    if (func === 'MIN') return Math.min(...values);
+    if (func === 'SUM') return values.reduce((a, b) => a + b, 0);
+    return null;
+  }
+
+  // Execute a grouped aggregate (SUM, MAX, MIN): returns {key: value}
+  static async _executeGroupAggregate(rel, func, col) {
+    const records = await this._executeRelation(rel);
+    const groupCols = Array.isArray(rel._group) ? rel._group : [rel._group];
+    const hash = {};
+    for (const row of records) {
+      const key = groupCols.length === 1 ? row[groupCols[0]] : groupCols.map(c => row[c]);
+      const val = row[col];
+      if (val == null) continue;
+      if (!(key in hash)) {
+        hash[key] = func === 'SUM' ? 0 : val;
+      }
+      if (func === 'SUM') hash[key] += val;
+      else if (func === 'MAX' && val > hash[key]) hash[key] = val;
+      else if (func === 'MIN' && val < hash[key]) hash[key] = val;
+    }
+    return hash;
+  }
+
+  // Execute a bulk UPDATE for a Relation (no callbacks)
+  static async _executeUpdateAll(rel, attrs) {
+    const records = await this._executeRelation(rel);
+    for (const record of records) {
+      const updated = { ...record.attributes, ...attrs };
+      await this.table.put(updated);
+    }
+    return { changes: records.length };
+  }
+
+  // Execute EXISTS check for a Relation
+  static async _executeExists(rel) {
+    const results = await this._executeRelation(Object.assign(Object.create(rel), { _limit: 1 }));
+    return results.length > 0;
+  }
+
+  // Parse order option into [[column, direction], ...]
+  static _parseOrders(order) {
+    if (Array.isArray(order)) {
+      return order.map(o => this._parseOneOrder(o));
+    }
+    return [this._parseOneOrder(order)];
+  }
+
+  // Parse a single order spec into [column, direction]
+  static _parseOneOrder(order) {
     if (typeof order === 'string') {
       return [order, 'asc'];
     }
@@ -551,6 +728,13 @@ export class ActiveRecord extends ActiveRecordBase {
     if (name.endsWith('ies')) return name.slice(0, -3) + 'y';
     if (name.endsWith('s')) return name.slice(0, -1);
     return name;
+  }
+
+  // Simple pluralize (entry -> entries, heat -> heats)
+  static _pluralize(name) {
+    if (name.endsWith('y') && !name.endsWith('ey')) return name.slice(0, -1) + 'ies';
+    if (name.endsWith('s') || name.endsWith('x') || name.endsWith('sh') || name.endsWith('ch')) return name + 'es';
+    return name + 's';
   }
 
   // --- Instance Methods ---

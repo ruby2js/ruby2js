@@ -1677,7 +1677,7 @@ const Ruby2JS = (() => {
 
     visitCapturePatternNode(node) {
       let value = this.visit(node.value);
-      let target = this.visit(node.target);
+      let target = this.visit_pattern(node.target);
       return this.sl(node, "match_as", value, target)
     };
 
@@ -2371,12 +2371,20 @@ const Ruby2JS = (() => {
 
     visitHashPatternNode(node) {
       let elements = node.elements.map((assoc) => {
-        let value;
+        let original_value, value, visited_value, key;
 
         if (assoc instanceof Prism.AssocNode) {
-          value = assoc.value;
+          original_value = assoc.value;
+          value = original_value;
           if (value instanceof Prism.ImplicitNode) value = value.value;
-          return this.visit_pattern(value)
+          visited_value = this.visit_pattern(value);
+
+          if (original_value instanceof Prism.ImplicitNode || value instanceof Prism.LocalVariableTargetNode) {
+            return visited_value
+          } else {
+            key = this.visit(assoc.key);
+            return this.s("pair", key, visited_value)
+          }
         } else {
           return this.visit(assoc)
         }
@@ -4685,6 +4693,451 @@ const Ruby2JS = (() => {
 
       for (let child of node.children) {
         this.find_lvasgns_in_ast(child, names)
+      }
+    };
+
+    on_case_match(expr, ...rest) {
+      if (this._state === "expression") {
+        this.parse(this.s("kwbegin", this._ast), this._state);
+        return
+      };
+
+      {
+        let inner;
+
+        try {
+          let else_body;
+          [inner, this._inner] = [this._inner, this._ast];
+          let branches = rest;
+          if (branches.last?.type !== "in_pattern") else_body = branches.pop();
+          let case_var = this.gensym("$case");
+          this.put(`let ${case_var ?? ""} = `);
+          this.parse(expr);
+          this.put(this._sep);
+
+          for (let index = 0; index < branches.length; index++) {
+            let branch = branches[index];
+            let [pattern, guard, body] = branch.children;
+
+            if (pattern.type === "if" && pattern.children[1]) {
+              guard = pattern.children[0];
+              pattern = pattern.children[1]
+            } else if (pattern.type === "if" && pattern.children[2]) {
+              guard = this.s("send", pattern.children[0], "!");
+              pattern = pattern.children[2]
+            } else if (guard?.type === "if_guard") {
+              guard = guard.children[0]
+            } else if (guard?.type === "unless_guard") {
+              guard = this.s("send", guard.children[0], "!")
+            };
+
+            this.put(index === 0 ? "if (" : " else if (");
+            this.emit_pattern_condition(pattern, case_var);
+            this.puts(") {");
+            this.emit_pattern_bindings(pattern, case_var);
+
+            if (guard) {
+              this.put("if (");
+              this.parse(guard);
+              this.puts(") {");
+              this.parse(body, "statement");
+              this.sput("}")
+            } else {
+              this.parse(body, "statement")
+            };
+
+            this.sput("}")
+          };
+
+          if (else_body) {
+            this.puts(" else {");
+            this.parse(else_body, "statement");
+            return this.sput("}")
+          }
+        } finally {
+          this._inner = inner
+        }
+      }
+    };
+
+    on_match_pattern_p(expr, pattern) {
+      let case_var = this.gensym("$case");
+      this.put(`(() => { let ${case_var ?? ""} = `);
+      this.parse(expr);
+      this.put("; return ");
+      this.emit_pattern_condition(pattern, case_var);
+      return this.put(" })()")
+    };
+
+    gensym(prefix) {
+      this._gensym_counter ??= 0;
+      this._gensym_counter++;
+      return `${prefix ?? ""}${this._gensym_counter ?? ""}`
+    };
+
+    static TYPE_CHECKS = {
+      Integer(v) {
+        return `typeof ${v ?? ""} === "number" && Number.isInteger(${v ?? ""})`
+      },
+
+      Float(v) {
+        return `typeof ${v ?? ""} === "number"`
+      },
+
+      Numeric(v) {
+        return `typeof ${v ?? ""} === "number"`
+      },
+
+      String(v) {
+        return `typeof ${v ?? ""} === "string"`
+      },
+
+      Symbol(v) {
+        return `typeof ${v ?? ""} === "symbol"`
+      },
+
+      Array(v) {
+        return `Array.isArray(${v ?? ""})`
+      },
+
+      Hash(v) {
+        return `typeof ${v ?? ""} === "object" && ${v ?? ""} !== null && !Array.isArray(${v ?? ""})`
+      },
+
+      Regexp(v) {
+        return `${v ?? ""} instanceof RegExp`
+      },
+
+      NilClass(v) {
+        return `${v ?? ""} === null || ${v ?? ""} === undefined`
+      },
+
+      TrueClass(v) {
+        return `${v ?? ""} === true`
+      },
+
+      FalseClass(v) {
+        return `${v ?? ""} === false`
+      }
+    };
+
+    emit_pattern_condition(pattern, target) {
+      let inner_pattern, const_name, check;
+
+      switch (pattern.type) {
+      case "match_var":
+      case "lvasgn":
+        return this.put("true");
+
+      case "pin":
+        this.put(`${target ?? ""} === `);
+        return this.parse(pattern.children[0]);
+        break;
+
+      case "match_as":
+        inner_pattern = pattern.children[0];
+        return this.emit_pattern_condition(inner_pattern, target);
+        break;
+
+      case "match_alt":
+        this.put("(");
+        this.emit_pattern_condition(pattern.children[0], target);
+        this.put(" || ");
+        this.emit_pattern_condition(pattern.children[1], target);
+        return this.put(")");
+        break;
+
+      case "const":
+        const_name = pattern.children[1];
+        check = Converter.TYPE_CHECKS[const_name];
+
+        if (check) {
+          return this.put(check(target))
+        } else {
+          this.put(`${target ?? ""} instanceof `);
+          return this.parse(pattern)
+        };
+
+        break;
+
+      case "array_pattern":
+        return this.emit_array_pattern_condition(pattern, target);
+
+      case "hash_pattern":
+        return this.emit_hash_pattern_condition(pattern, target);
+
+      case "find_pattern":
+        return this.emit_find_pattern_condition(pattern, target);
+
+      case "if":
+        this.emit_pattern_condition(pattern.children[1], target);
+        this.put(" && (");
+        this.parse(pattern.children[0]);
+        return this.put(")");
+        break;
+
+      case "nil":
+        return this.put(`${target ?? ""} == null`);
+
+      case "true":
+      case "false":
+        this.put(`${target ?? ""} === `);
+        return this.parse(pattern);
+        break;
+
+      case "int":
+      case "float":
+      case "str":
+      case "sym":
+      case "rational":
+      case "complex":
+        this.put(`${target ?? ""} === `);
+        return this.parse(pattern);
+        break;
+
+      case "irange":
+        this.put(`${target ?? ""} >= `);
+        this.parse(pattern.children[0]);
+        this.put(` && ${target ?? ""} <= `);
+        return this.parse(pattern.children[1]);
+        break;
+
+      case "erange":
+        this.put(`${target ?? ""} >= `);
+        this.parse(pattern.children[0]);
+        this.put(` && ${target ?? ""} < `);
+        return this.parse(pattern.children[1]);
+        break;
+
+      case "regexp":
+        this.parse(pattern);
+        return this.put(`.test(${target ?? ""})`);
+        break;
+
+      case "lambda":
+      case "block":
+        this.put("(");
+        this.parse(pattern);
+        return this.put(`)(${target ?? ""})`);
+        break;
+
+      default:
+        this.put(`${target ?? ""} === `);
+        return this.parse(pattern)
+      }
+    };
+
+    emit_pattern_bindings(pattern, target) {
+      let name, inner_pattern, var_node;
+
+      switch (pattern.type) {
+      case "match_var":
+      case "lvasgn":
+        name = pattern.children[0];
+        this._vars[name] = true;
+
+        if (name !== "_") {
+          return this.put(`let ${name ?? ""} = ${target ?? ""}${this._sep ?? ""}`)
+        };
+
+        break;
+
+      case "match_as":
+        inner_pattern = pattern.children[0];
+        var_node = pattern.children[1];
+        this.emit_pattern_bindings(inner_pattern, target);
+
+        if (var_node.type === "match_var" || var_node.type === "lvasgn") {
+          name = var_node.children[0];
+          this._vars[name] = true;
+
+          if (name !== "_") {
+            return this.put(`let ${name ?? ""} = ${target ?? ""}${this._sep ?? ""}`)
+          }
+        };
+
+        break;
+
+      case "array_pattern":
+        return this.emit_array_pattern_bindings(pattern, target);
+
+      case "hash_pattern":
+        return this.emit_hash_pattern_bindings(pattern, target);
+
+      case "if":
+        return this.emit_pattern_bindings(pattern.children[1], target);
+
+      case "match_alt":
+      case "pin":
+      case "const":
+      case "nil":
+      case "true":
+      case "false":
+      case "int":
+      case "float":
+      case "str":
+      case "sym":
+      case "irange":
+      case "erange":
+      case "regexp":
+        return null
+      }
+    };
+
+    emit_array_pattern_condition(pattern, target) {
+      let elements = pattern.children;
+
+      let has_splat = elements.some(e => (
+        e.type === "splat" || e.type === "match_rest"
+      ));
+
+      let non_splat = elements.filter(e => (
+        !(e.type === "splat" || e.type === "match_rest")
+      ));
+
+      this.put(`Array.isArray(${target ?? ""})`);
+
+      if (has_splat) {
+        this.put(` && ${target ?? ""}.length >= ${non_splat.length ?? ""}`)
+      } else {
+        this.put(` && ${target ?? ""}.length === ${elements.length ?? ""}`)
+      };
+
+      let splat_index = elements.findIndex(e => (
+        e.type === "splat" || e.type === "match_rest"
+      ));
+
+      let after_splat = splat_index ? elements.length - splat_index - 1 : 0;
+
+      for (let i = 0; i < elements.length; i++) {
+        let element_target;
+        let element = elements[i];
+        if (element.type === "splat" || element.type === "match_rest") continue;
+        if (element.type === "match_var" || element.type === "lvasgn") continue;
+
+        if (splat_index && i > splat_index) {
+          let offset = elements.length - i;
+          element_target = `${target ?? ""}[${target ?? ""}.length - ${offset ?? ""}]`
+        } else {
+          element_target = `${target ?? ""}[${i ?? ""}]`
+        };
+
+        this.put(" && ");
+        this.emit_pattern_condition(element, element_target)
+      }
+    };
+
+    emit_array_pattern_bindings(pattern, target) {
+      let elements = pattern.children;
+
+      let splat_index = elements.findIndex(e => (
+        e.type === "splat" || e.type === "match_rest"
+      ));
+
+      let after_splat = splat_index ? elements.length - splat_index - 1 : 0;
+
+      for (let i = 0; i < elements.length; i++) {
+        let element_target;
+        let element = elements[i];
+
+        if (element.type === "splat" || element.type === "match_rest") {
+          let inner = element.children[0];
+
+          if (inner) {
+            let var_node = inner.type === "lvasgn" ? inner : inner;
+            let name = var_node.children[0];
+
+            if (name && name !== "_") {
+              this._vars[name] = true;
+
+              if (after_splat > 0) {
+                this.put(`let ${name ?? ""} = ${target ?? ""}.slice(${i ?? ""}, ${target ?? ""}.length - ${after_splat ?? ""})${this._sep ?? ""}`)
+              } else {
+                this.put(`let ${name ?? ""} = ${target ?? ""}.slice(${i ?? ""})${this._sep ?? ""}`)
+              }
+            }
+          }
+        } else {
+          if (splat_index && i > splat_index) {
+            let offset = elements.length - i;
+            element_target = `${target ?? ""}[${target ?? ""}.length - ${offset ?? ""}]`
+          } else {
+            element_target = `${target ?? ""}[${i ?? ""}]`
+          };
+
+          this.emit_pattern_bindings(element, element_target)
+        }
+      }
+    };
+
+    emit_hash_pattern_condition(pattern, target) {
+      this.put(`typeof ${target ?? ""} === "object" && ${target ?? ""} !== null`);
+
+      for (let element of pattern.children) {
+        if (element.type === "pair") {
+          let key = element.children[0].children[0] // sym node -> name;
+          this.put(` && "${key ?? ""}" in ${target ?? ""}`);
+          let value_pattern = element.children[1];
+
+          if (value_pattern.type !== "match_var") {
+            this.put(" && ");
+
+            this.emit_pattern_condition(
+              value_pattern,
+              `${target ?? ""}.${key ?? ""}`
+            )
+          }
+        } else if (element.type === "match_var") {
+          let key = element.children[0];
+          this.put(` && "${key ?? ""}" in ${target ?? ""}`)
+        } else if (element.type === "kwnilarg") {
+          let other_keys = pattern.children.filter(e => (
+            e.type === "pair" || e.type === "match_var"
+          )).map(e => e.type === "pair" ? e.children[0].children[0] : e.children[0]);
+
+          this.put(` && Object.keys(${target ?? ""}).length === ${other_keys.length ?? ""}`)
+        }
+      }
+    };
+
+    emit_hash_pattern_bindings(pattern, target) {
+      for (let element of pattern.children) {
+        if (element.type === "pair") {
+          let key = element.children[0].children[0];
+          let value_pattern = element.children[1];
+
+          this.emit_pattern_bindings(
+            value_pattern,
+            `${target ?? ""}.${key ?? ""}`
+          )
+        } else if (element.type === "match_var") {
+          let key = element.children[0];
+          this._vars[key] = true;
+          this.put(`let ${key ?? ""} = ${target ?? ""}.${key ?? ""}${this._sep ?? ""}`)
+        }
+      }
+    };
+
+    emit_find_pattern_condition(pattern, target) {
+      let needle, find_var;
+      let elements = pattern.children;
+
+      let needles = elements.filter(e => (
+        !(e.type === "splat" || e.type === "match_rest")
+      ));
+
+      this.put(`Array.isArray(${target ?? ""})`);
+
+      if (needles.length === 1 && ["int", "float", "str", "sym"].includes(needles[0].type)) {
+        this.put(` && ${target ?? ""}.includes(`);
+        this.parse(needles[0]);
+        return this.put(")")
+      } else {
+        needle = needles[0];
+        find_var = this.gensym("$find");
+        this.put(` && ${target ?? ""}.some(${find_var ?? ""} => `);
+        this.emit_pattern_condition(needle, find_var);
+        return this.put(")")
       }
     };
 
@@ -18350,6 +18803,9 @@ const Ruby2JS = (() => {
   Converter._handlers.push("break");
   Converter._handlers.push("cast");
   Converter._handlers.push("case");
+  Converter._handlers.push("case_match");
+  Converter._handlers.push("match_pattern_p");
+  ;
   Converter._handlers.push("casgn");
   Converter._handlers.push("class");
   Converter._handlers.push("class_hash");

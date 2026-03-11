@@ -101,6 +101,7 @@ export function installFetchInterceptor() {
       const controllerResult = await action(...args);
       return buildResponse(controllerResult, context);
     } catch (error) {
+      console.error(`[juntos] Controller error in ${route.action}:`, error.stack || error.message);
       return new Response(error.message, { status: 500 });
     }
   };

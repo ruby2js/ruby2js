@@ -738,8 +738,8 @@ export class ActiveRecordSQL extends ActiveRecordBase {
 
     // ORDER BY (skip for count queries)
     if (!options.count && rel._order) {
-      const [col, dir] = this._parseOrder(rel._order);
-      sql += ` ORDER BY ${col} ${dir}`;
+      const orders = this._parseOrders(rel._order);
+      sql += ` ORDER BY ${orders.map(([col, dir]) => `${col} ${dir}`).join(', ')}`;
     }
 
     // LIMIT (skip for count queries)
@@ -951,13 +951,25 @@ export class ActiveRecordSQL extends ActiveRecordBase {
   }
 
   // Parse order option into [column, direction]
-  static _parseOrder(order) {
+  static _parseOrders(order) {
+    if (Array.isArray(order)) {
+      return order.map(o => this._parseOneOrder(o));
+    }
+    return [this._parseOneOrder(order)];
+  }
+
+  static _parseOneOrder(order) {
     if (typeof order === 'string') {
       return [quoteId(order), 'ASC'];
     }
     const col = Object.keys(order)[0];
     const dir = (order[col] === 'desc' || order[col] === ':desc') ? 'DESC' : 'ASC';
     return [quoteId(col), dir];
+  }
+
+  // Keep for backward compat
+  static _parseOrder(order) {
+    return this._parseOneOrder(order);
   }
 
   // --- Instance Methods ---

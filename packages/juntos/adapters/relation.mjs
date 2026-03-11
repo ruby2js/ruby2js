@@ -88,9 +88,15 @@ export class Relation {
     return rel;
   }
 
-  order(options) {
+  order(...args) {
     const rel = this._clone();
-    rel._order = options;
+    // Support multiple columns: order('back', 'type', 'name')
+    // or single column: order('name') or order({name: 'desc'})
+    if (args.length > 1) {
+      rel._order = args;
+    } else {
+      rel._order = args[0];
+    }
     return rel;
   }
 

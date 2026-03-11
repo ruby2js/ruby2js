@@ -2199,17 +2199,24 @@ module Ruby2JS
 
               if options[:value_node]
                 # Explicit value: option provided — use it instead of model attribute
-                # Guard with null check on model field to avoid evaluating value expression
-                # when model is a new record (the expression may reference unavailable context)
                 raw_value = process(options[:value_node])
-                model_attr = s(:attr, s(:lvar, model.to_sym), name.to_sym)
-                value_conditional = s(:if,
-                  s(:send, model_attr, :!=, s(:nil)),
-                  s(:dstr,
+                if @erb_model_name
+                  # Model-backed form: guard with null check on model field
+                  model_attr = s(:attr, s(:lvar, model.to_sym), name.to_sym)
+                  value_conditional = s(:if,
+                    s(:send, model_attr, :!=, s(:nil)),
+                    s(:dstr,
+                      s(:str, ' value="'),
+                      s(:begin, s(:send, nil, :escapeHTML, raw_value)),
+                      s(:str, '"')),
+                    s(:str, ''))
+                else
+                  # URL-based form (no model): always emit the value
+                  value_conditional = s(:dstr,
                     s(:str, ' value="'),
                     s(:begin, s(:send, nil, :escapeHTML, raw_value)),
-                    s(:str, '"')),
-                  s(:str, ''))
+                    s(:str, '"'))
+                end
               elsif model_is_new
                 # New models: omit value attribute (Rails convention)
                 if dynamic_class_expr
@@ -2234,19 +2241,23 @@ module Ruby2JS
                   s(:str, ''))
               end
 
+              # URL-based forms use bare field names; model-backed use model[field]
+              field_name_attr = @erb_model_name ? "#{model}[#{name}]" : name
+              field_id_attr = @erb_model_name ? "#{model}_#{name}" : name
+
               if dynamic_class_expr
                 s(:dstr,
                   s(:str, %(<input class=")),
                   s(:begin, process(dynamic_class_expr)),
                   s(:str, %(" type="#{input_type}"#{static_attrs})),
                   s(:begin, value_conditional),
-                  s(:str, %( name="#{model}[#{name}]" id="#{model}_#{name}">)))
+                  s(:str, %( name="#{field_name_attr}" id="#{field_id_attr}">)))
               else
                 # Rails attribute order: class, type, value, name, id
                 s(:dstr,
                   s(:str, %(<input#{static_attrs} type="#{input_type}")),
                   s(:begin, value_conditional),
-                  s(:str, %( name="#{model}[#{name}]" id="#{model}_#{name}">)))
+                  s(:str, %( name="#{field_name_attr}" id="#{field_id_attr}">)))
               end
             else
               nil
@@ -2358,7 +2369,8 @@ module Ruby2JS
                 label_text = label_text[0].upcase + label_text[1..-1].to_s.downcase
               end
               extra_attrs = build_field_attrs(options)
-              html = %(<label for="#{model}_#{name}"#{extra_attrs}>#{label_text}</label>)
+              label_for = @erb_model_name ? "#{model}_#{name}" : name
+              html = %(<label for="#{label_for}"#{extra_attrs}>#{label_text}</label>)
               s(:str, html)
             elsif field_name
               # Dynamic label - generate <label> with expression as text
