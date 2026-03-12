@@ -180,9 +180,7 @@ module Ruby2JS
           ivar_types = {}
 
           # Types from the action body itself
-          if action_meta[:ivar_types]
-            action_meta[:ivar_types].each { |k, v| ivar_types[k] = v }
-          end
+          ivar_types.merge!(action_meta[:ivar_types]) if action_meta[:ivar_types]
 
           # Types from before_action methods
           @rails_before_actions.each do |ba|
@@ -198,9 +196,7 @@ module Ruby2JS
               method_node = @rails_private_methods[ba[:method]]
               if method_node
                 ba_meta = cached_body_metadata(ba[:method], method_node.children[2])
-                if ba_meta[:ivar_types]
-                  ba_meta[:ivar_types].each { |k, v| ivar_types[k] = v }
-                end
+                ivar_types.merge!(ba_meta[:ivar_types]) if ba_meta[:ivar_types]
               end
             end
           end
@@ -210,9 +206,7 @@ module Ruby2JS
             method_node = @rails_private_methods[called_name]
             if method_node
               pm_meta = cached_body_metadata(called_name, method_node.children[2])
-              if pm_meta[:ivar_types]
-                pm_meta[:ivar_types].each { |k, v| ivar_types[k] = v }
-              end
+              ivar_types.merge!(pm_meta[:ivar_types]) if pm_meta[:ivar_types]
             end
           end
 
@@ -223,7 +217,7 @@ module Ruby2JS
           view_key = "#{@rails_controller_plural}/#{action_name}"
           # Convert to string keys for JS compatibility
           types = {}
-          ivar_types.each { |k, v| types[k.to_s] = v.to_s }
+          ivar_types.each_pair { |k, v| types[k.to_s] = v.to_s }
           meta['view_types'][view_key] = types
         end
 
