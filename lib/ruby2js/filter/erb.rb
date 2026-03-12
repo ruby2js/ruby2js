@@ -349,6 +349,20 @@ module Ruby2JS
         # can apply type-aware transformations like Object.entries() wrapping.
         seed_view_types
 
+        # Step 1.9: Rewrite _buf << expr to _buf.append= expr so that
+        # Pragma's << disambiguation (Array push / String +=) doesn't
+        # intercept ERB buffer operations before this filter can handle them.
+        children = children.map do |child|
+          if child.respond_to?(:type) && child.type == :send &&
+             child.children[0]&.type == :lvar &&
+             child.children[0].children[0] == bufvar &&
+             child.children[1] == :<<
+            child.updated(nil, [child.children[0], :append=, *child.children[2..]])
+          else
+            child
+          end
+        end
+
         # Step 2: Transform the body (this triggers all filters including helpers)
         transformed_children = children.map { |child| process(child) }
 

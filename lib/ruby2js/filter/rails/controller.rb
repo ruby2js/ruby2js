@@ -419,6 +419,7 @@ module Ruby2JS
           meta = {
             ivars: [],
             ivar_assignments: [],
+            ivar_types: {},
             params_keys: [],
             references_params: false,
             references_params_bracket: false,
