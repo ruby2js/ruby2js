@@ -7,6 +7,13 @@ module Ruby2JS
     #     (str "value")))
 
     handle :hash do |*pairs|
+      # Sentinel: s(:hash, s(:cast, expr)) marks expr as hash-typed
+      # without adding literal braces — just emit the inner expression.
+      if pairs.length == 1 && pairs.first.type == :cast
+        parse pairs.first
+        next
+      end
+
       self._compact do
         singleton = pairs.length <= 1
 

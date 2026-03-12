@@ -29,6 +29,19 @@ module Ruby2JS
         @options[:include_all] || @options[:include]&.include?(method)
       end
 
+      # Check if an AST node is known to produce a hash (plain JS object).
+      # Detects: literal hashes, hash cast sentinels, group_by blocks, to_h calls.
+      def hash_node?(node)
+        return false unless node.respond_to?(:type)
+        return true if node.type == :hash
+        # group_by { } block produces a hash
+        if node.type == :block
+          call = node.children[0]
+          return call.type == :send && call.children[1] == :group_by
+        end
+        false
+      end
+
       VAR_TO_ASSIGN = {
         lvar: :lvasgn,
         ivar: :ivasgn,
@@ -1363,13 +1376,33 @@ module Ruby2JS
             *process_all(node.children[2..-1])]
 
         elsif [:select, :find_all].include?(method) and call.children.length == 2
-          call = call.updated nil, [call.children.first, :filter]
-          node.updated nil, [process(call), process(node.children[1]),
+          # Hash receiver with 2+ args: Object.entries(hash).filter(([k, v]) => ...)
+          receiver = call.children[0]
+          args = node.children[1]
+          if args && args.children.length > 1 && hash_node?(receiver)
+            entries_call = s(:send, s(:const, nil, :Object), :entries, receiver)
+            call = call.updated nil, [entries_call, :filter]
+            processed_args = s(:args, s(:mlhs, *args.children))
+          else
+            call = call.updated nil, [call.children.first, :filter]
+            processed_args = process(node.children[1])
+          end
+          node.updated nil, [process(call), processed_args,
             s(:autoreturn, *process_all(node.children[2..-1]))]
 
         elsif method == :reject and call.children.length == 2
           # arr.reject { |x| cond } => arr.filter(x => !(cond))
-          call = call.updated nil, [call.children.first, :filter]
+          # Hash receiver with 2+ args: Object.entries(hash).filter(([k, v]) => !(cond))
+          receiver = call.children[0]
+          args = node.children[1]
+          is_hash = args && args.children.length > 1 && hash_node?(receiver)
+          if is_hash
+            entries_call = s(:send, s(:const, nil, :Object), :entries, receiver)
+            call = call.updated nil, [entries_call, :filter]
+          else
+            call = call.updated nil, [call.children.first, :filter]
+          end
+          processed_args = is_hash ? s(:args, s(:mlhs, *args.children)) : process(node.children[1])
           body = node.children[2]
 
           if body&.type == :begin && body.children.length > 1
@@ -1382,13 +1415,13 @@ module Ruby2JS
             processed_last = process(last_stmt)
             negated_last = s(:send, s(:begin, processed_last), :!)
             new_body = s(:begin, *processed_setup, negated_last)
-            node.updated nil, [process(call), process(node.children[1]),
+            node.updated nil, [process(call), processed_args,
               s(:autoreturn, new_body)]
           else
             # Single-statement block: negate the whole thing
             processed_body = process_all(node.children[2..-1])
             negated_body = s(:send, s(:begin, *processed_body), :!)
-            node.updated nil, [process(call), process(node.children[1]),
+            node.updated nil, [process(call), processed_args,
               s(:autoreturn, negated_body)]
           end
 
@@ -1454,7 +1487,8 @@ module Ruby2JS
             end
             callback = s(:block, s(:send, nil, :proc), callback_args,
               s(:autoreturn, *node.children[2..-1]))
-            process s(:send, s(:const, nil, :Object), :groupBy, target, callback)
+            process s(:hash, s(:cast,
+              s(:send, s(:const, nil, :Object), :groupBy, target, callback)))
           else
             # Pre-ES2024: array.reduce((acc, x) => { const key = ...; (acc[key] = acc[key] || []).push(x); return acc }, {})
             # Build: (acc[key] = acc[key] || []).push(item)
@@ -1475,7 +1509,8 @@ module Ruby2JS
               reduce_arg,
               reduce_body)
 
-            process s(:send, target, :reduce, reduce_block, s(:hash))
+            process s(:hash, s(:cast,
+              s(:send, target, :reduce, reduce_block, s(:hash))))
           end
 
         elsif method == :sort_by and call.children.length == 2
@@ -1484,6 +1519,11 @@ module Ruby2JS
           target = call.children.first
           args = node.children[1]
           return super unless args  # Ruby 3.4 it blocks handled by converter
+
+          # Hash receiver with 2+ args: Object.entries(hash).sort_by(...)
+          if (args.children.length > 1 || args.children.first.type == :mlhs) && hash_node?(target)
+            target = s(:send, s(:const, nil, :Object), :entries, target)
+          end
           block_body = node.children[2]
           # Unwrap :return node from &:symbol syntax (processor.rb wraps in return)
           block_body = block_body.children.first if block_body&.type == :return
@@ -1685,6 +1725,14 @@ module Ruby2JS
           # For destructuring (multiple args), wrap in mlhs: ([a, b]) => ...
           args = node.children[1]
           return super unless args  # Ruby 3.4 it blocks handled by converter
+
+          # Hash receiver with 2+ args: Object.entries(hash).map(([k, v]) => ...)
+          receiver = call.children[0]
+          if args.children.length > 1 && hash_node?(receiver)
+            entries_call = s(:send, s(:const, nil, :Object), :entries, receiver)
+            call = call.updated(nil, [entries_call, :map])
+          end
+
           processed_args = if args.children.length > 1
             s(:args, s(:mlhs, *args.children))
           else
@@ -1816,7 +1864,7 @@ module Ruby2JS
               node.children[0].children[0], node.children[2]])
           elsif node.children[1].children.length > 1
             receiver = node.children[0].children[0]
-            if receiver.type == :hash
+            if hash_node?(receiver)
               receiver = s(:send, s(:const, nil, :Object), :entries, receiver)
             end
             process node.updated(:for_of,
@@ -1825,7 +1873,7 @@ module Ruby2JS
               receiver, node.children[2]])
           elsif node.children[1].children[0].type == :mlhs
             receiver = node.children[0].children[0]
-            if receiver.type == :hash
+            if hash_node?(receiver)
               receiver = s(:send, s(:const, nil, :Object), :entries, receiver)
             end
             process node.updated(:for_of,

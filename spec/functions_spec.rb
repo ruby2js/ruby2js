@@ -1201,6 +1201,58 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
+  describe "hash iteration via Object.entries" do
+    it "should wrap literal hash .each with Object.entries" do
+      to_js( '{a: 1, b: 2}.each { |k, v| puts k }' ).
+        must_equal 'for (let [k, v] of Object.entries({a: 1, b: 2})) {console.log(k)}'
+    end
+
+    it "should wrap literal hash .map with Object.entries" do
+      to_js( '{a: 1, b: 2}.map { |k, v| [k, v * 2] }' ).
+        must_equal 'Object.entries({a: 1, b: 2}).map(([k, v]) => ([k, v * 2]))'
+    end
+
+    it "should wrap literal hash .select with Object.entries" do
+      to_js( '{a: 1, b: 2}.select { |k, v| v > 1 }' ).
+        must_equal 'Object.entries({a: 1, b: 2}).filter(([k, v]) => v > 1)'
+    end
+
+    it "should wrap literal hash .reject with Object.entries" do
+      to_js( '{a: 1, b: 2}.reject { |k, v| v > 1 }' ).
+        must_equal 'Object.entries({a: 1, b: 2}).filter(([k, v]) => !(v > 1))'
+    end
+
+    it "should wrap literal hash .sort_by with Object.entries" do
+      to_js( '{a: 1, b: 2}.sort_by { |k, v| v }' ).
+        must_include 'Object.entries({a: 1, b: 2})'
+    end
+
+    it "should wrap group_by result .each with Object.entries" do
+      to_js_2020( 'items.group_by { |i| i.type }.each { |k, v| puts k }' ).
+        must_include 'Object.entries(items.reduce('
+    end
+
+    it "should wrap group_by result .map with Object.entries" do
+      to_js_2020( 'items.group_by { |i| i.type }.map { |k, v| [k, v.length] }' ).
+        must_include 'Object.entries(items.reduce('
+    end
+
+    it "should wrap group_by result .select with Object.entries" do
+      to_js_2020( 'items.group_by { |i| i.type }.select { |k, v| v.length > 1 }' ).
+        must_include 'Object.entries(items.reduce('
+    end
+
+    it "should not wrap non-hash .each with Object.entries" do
+      to_js( 'items.each { |k, v| puts k }' ).
+        wont_include 'Object.entries'
+    end
+
+    it "should not wrap single-arg .each with Object.entries" do
+      to_js( '{a: 1}.each { |item| puts item }' ).
+        wont_include 'Object.entries'
+    end
+  end
+
   describe "math functions" do
     it "should handle abs" do
       to_js( 'a.abs' ).must_equal 'Math.abs(a)'
