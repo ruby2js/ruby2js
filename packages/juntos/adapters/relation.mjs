@@ -323,6 +323,7 @@ export class Relation {
   find_or_create_by(attrs) { return this.findOrCreateBy(attrs); }
   find_by_bang(conditions) { return this.findByBang(conditions); }
   destroy_by(conditions) { return this.destroyBy(conditions); }
+  to_a() { return this.toArray(); }
 
   // Alias for Rails compatibility: Article.includes(:comments).all
   all() {

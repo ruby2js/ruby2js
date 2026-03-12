@@ -33,6 +33,7 @@ module Ruby2JS
           distinct pluck pick ids exists?
           find_each find_in_batches
           update_all destroy_all delete_all
+          to_a
         ].freeze
 
         # Instance methods that return promises (need await)
