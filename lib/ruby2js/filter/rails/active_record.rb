@@ -56,7 +56,7 @@ module Ruby2JS
           destroy_all delete_all
         ].freeze
 
-        SEND_TYPES = [:send, :send!, :await!].freeze
+        SEND_TYPES = [:send, :send!, :await!, :await_attr].freeze
 
         VARIABLE_TYPES = [:lvar, :ivar, :attr].freeze
 
@@ -138,6 +138,9 @@ module Ruby2JS
             # AR methods like where() need parens even when zero-arg; plain :send
             # would produce property access (e.g., Heat.where instead of Heat.where()).
             return self.strip_inner_awaits(node.updated(:send!))
+          elsif node.type == :await_attr
+            # Unwrap scope property access: convert to plain :send (no parens).
+            return self.strip_inner_awaits(node.updated(:send))
           end
 
           new_children = node.children.map do |c|
