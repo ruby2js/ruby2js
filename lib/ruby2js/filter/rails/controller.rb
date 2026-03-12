@@ -820,6 +820,12 @@ module Ruby2JS
               return s(:begin,
                 s(:lvasgn, asgn_name),
                 node.updated(nil, [s(:lvasgn, asgn_name), asgn_value]))
+            else
+              # Non-ivar target (e.g., hash[key] ||= value) — process children
+              new_children = node.children.map do |c|
+                c.respond_to?(:type) ? transform_ivars_to_locals(c) : c
+              end
+              return node.updated(nil, new_children)
             end
 
           when :send
