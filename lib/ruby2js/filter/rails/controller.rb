@@ -858,11 +858,6 @@ module Ruby2JS
 
         # Infer the type of an ivar assignment's RHS expression.
         # Returns :hash, :array, :string, :number, or nil if unknown.
-        IVAR_TYPE_LITERALS = {
-          hash: :hash, array: :array, str: :string, dstr: :string,
-          int: :number, float: :number
-        }.freeze
-
         IVAR_TYPE_METHODS_ARRAY = %i[
           to_a pluck ids keys values split chars
           sort reverse uniq compact flatten shuffle
@@ -881,9 +876,14 @@ module Ruby2JS
         def infer_ivar_type(node)
           return nil unless node.respond_to?(:type)
 
-          # Literal types
-          result = IVAR_TYPE_LITERALS[node.type]
-          return result if result
+          # Literal types — use case/when to avoid JS Object.prototype
+          # property leakage (e.g. 'send' on a plain object lookup)
+          case node.type
+          when :hash then return :hash
+          when :array then return :array
+          when :str, :dstr then return :string
+          when :int, :float then return :number
+          end
 
           # Method return types
           if node.type == :send
