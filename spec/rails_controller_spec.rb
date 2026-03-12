@@ -1131,4 +1131,91 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).wont_include '!(person_option = '
     end
   end
+
+  describe 'view type metadata' do
+    def to_js_with_metadata(source)
+      metadata = {}
+      Ruby2JS.convert(source, filters: [
+        Ruby2JS::Filter::Rails::Controller,
+        Ruby2JS::Filter::Functions
+      ], metadata: metadata)
+      metadata
+    end
+
+    it "records hash type for group_by result" do
+      metadata = to_js_with_metadata(<<~RUBY)
+        class EventsController < ApplicationController
+          def summary
+            @people = Person.all.to_a.group_by(&:type)
+          end
+        end
+      RUBY
+
+      types = metadata.dig('view_types', 'events/summary')
+      _(types).wont_be_nil
+      _(types['people']).must_equal 'hash'
+    end
+
+    it "records array type for to_a result" do
+      metadata = to_js_with_metadata(<<~RUBY)
+        class EventsController < ApplicationController
+          def index
+            @items = Billable.where(type: "Option").to_a
+          end
+        end
+      RUBY
+
+      types = metadata.dig('view_types', 'events/index')
+      _(types).wont_be_nil
+      _(types['items']).must_equal 'array'
+    end
+
+    it "records number type for count" do
+      metadata = to_js_with_metadata(<<~RUBY)
+        class EventsController < ApplicationController
+          def summary
+            @total = Person.count
+          end
+        end
+      RUBY
+
+      types = metadata.dig('view_types', 'events/summary')
+      _(types['total']).must_equal 'number'
+    end
+
+    it "records hash type for hash literal" do
+      metadata = to_js_with_metadata(<<~RUBY)
+        class EventsController < ApplicationController
+          def summary
+            @counts = {}
+          end
+        end
+      RUBY
+
+      types = metadata.dig('view_types', 'events/summary')
+      _(types['counts']).must_equal 'hash'
+    end
+
+    it "merges types from before_action methods" do
+      metadata = to_js_with_metadata(<<~RUBY)
+        class EventsController < ApplicationController
+          before_action :load_data, only: [:summary]
+
+          def summary
+            @total = Person.count
+          end
+
+          private
+
+          def load_data
+            @people = Person.all.to_a.group_by(&:type)
+          end
+        end
+      RUBY
+
+      types = metadata.dig('view_types', 'events/summary')
+      _(types['people']).must_equal 'hash'
+      _(types['total']).must_equal 'number'
+    end
+  end
 end

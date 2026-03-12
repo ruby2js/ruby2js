@@ -343,6 +343,12 @@ module Ruby2JS
         @erb_ivars = Set.new
         children.each { |child| collect_ivars(child) }
 
+        # Step 1.5: Seed variable types from controller metadata.
+        # When the controller records ivar types (e.g., @people is a hash),
+        # the ERB filter seeds @var_types so downstream filters (pragma, functions)
+        # can apply type-aware transformations like Object.entries() wrapping.
+        seed_view_types
+
         # Step 2: Transform the body (this triggers all filters including helpers)
         transformed_children = children.map { |child| process(child) }
 
@@ -431,6 +437,32 @@ module Ruby2JS
           s(:async, :render, args, body)
         else
           s(:def, :render, args, body)
+        end
+      end
+
+      # Seed @var_types from controller metadata for this view.
+      # Extracts controller/action from @options[:file] and looks up
+      # metadata['view_types'] to find ivar types recorded by the controller filter.
+      def seed_view_types
+        return unless @options[:metadata] && @options[:file]
+        view_types = @options[:metadata]['view_types']
+        return unless view_types
+
+        # Extract view key from file path: app/views/events/summary.html.erb -> events/summary
+        file = @options[:file].to_s
+        match = file.match(%r{app/views/(.+?)\.html\.erb$})
+        return unless match
+        view_key = match[1]
+
+        types = view_types[view_key]
+        return unless types
+
+        # Seed @var_types (from pragma filter) with the controller's type info.
+        # Only seed if @var_types is available (pragma filter is in the chain).
+        if defined?(@var_types)
+          types.each do |name, type_str|
+            @var_types[name.to_sym] = type_str.to_sym
+          end
         end
       end
 

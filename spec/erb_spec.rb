@@ -230,6 +230,46 @@ describe Ruby2JS::Filter::Erb do
     end
   end
 
+  describe 'view type metadata seeding' do
+    it "should wrap hash-typed ivar .each with Object.entries" do
+      require 'ruby2js/filter/pragma'
+      metadata = {
+        'view_types' => {
+          'events/summary' => { 'people' => 'hash' }
+        }
+      }
+
+      erb_src = '_buf = String.new; @people.each { |type, members| _buf << type }; _buf'
+
+      result = _(Ruby2JS.convert(erb_src,
+        filters: [Ruby2JS::Filter::Pragma, Ruby2JS::Filter::Erb, Ruby2JS::Filter::Functions],
+        metadata: metadata,
+        file: 'app/views/events/summary.html.erb'
+      ).to_s)
+
+      result.must_include 'Object.entries(people)'
+    end
+
+    it "should not wrap non-hash ivar .each with Object.entries" do
+      require 'ruby2js/filter/pragma'
+      metadata = {
+        'view_types' => {
+          'events/summary' => { 'items' => 'array' }
+        }
+      }
+
+      erb_src = '_buf = String.new; @items.each { |k, v| _buf << k }; _buf'
+
+      result = _(Ruby2JS.convert(erb_src,
+        filters: [Ruby2JS::Filter::Pragma, Ruby2JS::Filter::Erb, Ruby2JS::Filter::Functions],
+        metadata: metadata,
+        file: 'app/views/events/summary.html.erb'
+      ).to_s)
+
+      result.wont_include 'Object.entries'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Erb" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Erb

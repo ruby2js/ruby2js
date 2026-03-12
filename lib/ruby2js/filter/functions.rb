@@ -30,7 +30,8 @@ module Ruby2JS
       end
 
       # Check if an AST node is known to produce a hash (plain JS object).
-      # Detects: literal hashes, hash cast sentinels, group_by blocks, to_h calls.
+      # Detects: literal hashes, hash cast sentinels, group_by blocks,
+      # and variables with inferred hash type (from pragma filter's @var_types).
       def hash_node?(node)
         return false unless node.respond_to?(:type)
         return true if node.type == :hash
@@ -38,6 +39,12 @@ module Ruby2JS
         if node.type == :block
           call = node.children[0]
           return call.type == :send && call.children[1] == :group_by
+        end
+        # Check pragma filter's type inference for local/instance variables
+        if defined?(@var_types) && [:lvar, :ivar].include?(node.type)
+          var_name = node.children[0]
+          var_name = var_name.to_s.sub(/^@/, '').to_sym if node.type == :ivar
+          return @var_types[var_name] == :hash
         end
         false
       end

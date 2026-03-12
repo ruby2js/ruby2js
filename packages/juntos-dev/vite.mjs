@@ -498,7 +498,7 @@ function createErbPlugin(config) {
     // Note: Rails_Helpers must come before Erb for method overrides
     // ActiveSupport provides .present?, .blank?, etc. for Rails idioms
     const options = {
-      filters: ['Rails_Helpers', 'ActiveSupport', 'Erb', 'Functions', 'Return'],
+      filters: ['Pragma', 'Rails_Helpers', 'ActiveSupport', 'Erb', 'Functions', 'Return'],
       eslevel: config.eslevel,
       include: ['class', 'call', 'keys', 'values'],
       database: config.database,

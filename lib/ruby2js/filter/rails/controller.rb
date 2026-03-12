@@ -171,6 +171,62 @@ module Ruby2JS
           end
         end
 
+        # Record ivar types for the current action's view in metadata.
+        # Merges types from the action body, before_actions, and private methods.
+        def record_view_types(action_name, action_meta)
+          return unless @options[:metadata] && @rails_controller_plural
+
+          # Merge ivar types from all sources
+          ivar_types = {}
+
+          # Types from the action body itself
+          if action_meta[:ivar_types]
+            action_meta[:ivar_types].each { |k, v| ivar_types[k] = v }
+          end
+
+          # Types from before_action methods
+          @rails_before_actions.each do |ba|
+            should_run = if ba[:only]
+                           ba[:only].include?(action_name)
+                         elsif ba[:except]
+                           !ba[:except].include?(action_name)
+                         else
+                           true
+                         end
+
+            if should_run
+              method_node = @rails_private_methods[ba[:method]]
+              if method_node
+                ba_meta = cached_body_metadata(ba[:method], method_node.children[2])
+                if ba_meta[:ivar_types]
+                  ba_meta[:ivar_types].each { |k, v| ivar_types[k] = v }
+                end
+              end
+            end
+          end
+
+          # Types from called private methods
+          action_meta[:private_method_calls].each do |called_name|
+            method_node = @rails_private_methods[called_name]
+            if method_node
+              pm_meta = cached_body_metadata(called_name, method_node.children[2])
+              if pm_meta[:ivar_types]
+                pm_meta[:ivar_types].each { |k, v| ivar_types[k] = v }
+              end
+            end
+          end
+
+          return if ivar_types.empty?
+
+          meta = @options[:metadata]
+          meta['view_types'] = {} unless meta['view_types']
+          view_key = "#{@rails_controller_plural}/#{action_name}"
+          # Convert to string keys for JS compatibility
+          types = {}
+          ivar_types.each { |k, v| types[k.to_s] = v.to_s }
+          meta['view_types'][view_key] = types
+        end
+
         def controller_class?(class_name, superclass)
           return false unless class_name&.type == :const
           return false unless superclass&.type == :const
@@ -610,6 +666,10 @@ module Ruby2JS
           params_keys = params_keys.uniq
           ivars = ivars.uniq.sort
 
+          # Record ivar types in metadata for view type inference.
+          # Merge types from action body, before_actions, and called private methods.
+          record_view_types(method_name, action_meta)
+
           # Transform body: @@cvar -> cvar (closure-scoped), @ivar -> ivar (local variable)
           transformed_body = transform_ivars_to_locals(replace_cvars(body))
 
@@ -714,6 +774,15 @@ module Ruby2JS
             name = node.children[0].to_s.sub(/^@/, '').to_sym
             meta[:ivars].push(name)
             meta[:ivar_assignments].push(name)
+            # Infer type from RHS for view type metadata
+            rhs = node.children[1]
+            if rhs
+              inferred = infer_ivar_type(rhs)
+              if inferred
+                meta[:ivar_types] = {} unless meta[:ivar_types]
+                meta[:ivar_types][name] = inferred
+              end
+            end
 
           when :ivar
             name = node.children[0].to_s.sub(/^@/, '').to_sym
@@ -790,6 +859,62 @@ module Ruby2JS
             next if defined?(skip_child) && child == skip_child
             walk_body_metadata(child, meta, in_nested_def || entering_def)
           end
+        end
+
+        # Infer the type of an ivar assignment's RHS expression.
+        # Returns :hash, :array, :string, :number, or nil if unknown.
+        IVAR_TYPE_LITERALS = {
+          hash: :hash, array: :array, str: :string, dstr: :string,
+          int: :number, float: :number
+        }.freeze
+
+        IVAR_TYPE_METHODS_ARRAY = %i[
+          to_a pluck ids keys values split chars
+          sort reverse uniq compact flatten shuffle
+        ].freeze
+
+        IVAR_TYPE_METHODS_HASH = %i[to_h].freeze
+
+        IVAR_TYPE_METHODS_NUMBER = %i[
+          count sum average minimum maximum length size
+        ].freeze
+
+        IVAR_TYPE_METHODS_STRING = %i[
+          to_s name title
+        ].freeze
+
+        def infer_ivar_type(node)
+          return nil unless node.respond_to?(:type)
+
+          # Literal types
+          result = IVAR_TYPE_LITERALS[node.type]
+          return result if result
+
+          # Method return types
+          if node.type == :send
+            method = node.children[1]
+            return :array if IVAR_TYPE_METHODS_ARRAY.include?(method)
+            return :hash if IVAR_TYPE_METHODS_HASH.include?(method)
+            return :number if IVAR_TYPE_METHODS_NUMBER.include?(method)
+            return :string if IVAR_TYPE_METHODS_STRING.include?(method)
+            # group_by with block_pass: items.group_by(&:type)
+            return :hash if method == :group_by
+            # exists? returns boolean — skip
+          end
+
+          # group_by block returns a hash
+          if node.type == :block
+            call = node.children[0]
+            if call.respond_to?(:type) && call.type == :send
+              return :hash if call.children[1] == :group_by
+              if [:map, :select, :reject, :flat_map, :sort_by, :collect,
+                  :filter_map].include?(call.children[1])
+                return :array
+              end
+            end
+          end
+
+          nil
         end
 
         def transform_ivars_to_locals(node)

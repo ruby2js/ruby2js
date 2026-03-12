@@ -495,6 +495,35 @@ export async function buildAppManifest(appRoot, config, { mode = 'vite' } = {}) 
     }
   }
 
+  // Pre-analyze Rails controllers to populate metadata.view_types.
+  // Controllers record ivar types per action so ERB views can infer
+  // variable types for hash iteration support, etc.
+  const controllersDir = path.join(appRoot, 'app/controllers');
+  if (fs.existsSync(controllersDir)) {
+    // Collect controller concern names for import resolution
+    const ctrlConcernsDir = path.join(controllersDir, 'concerns');
+    if (fs.existsSync(ctrlConcernsDir)) {
+      config.controllerConcerns = new Set(
+        fs.readdirSync(ctrlConcernsDir)
+          .filter(f => f.endsWith('.rb') && !f.startsWith('._'))
+          .map(f => f.replace(/\.rb$/, ''))
+      );
+    }
+
+    const controllerFiles = fs.readdirSync(controllersDir)
+      .filter(f => f.endsWith('_controller.rb') && !f.startsWith('._'));
+
+    for (const file of controllerFiles) {
+      const filePath = path.join(controllersDir, file);
+      try {
+        const source = fs.readFileSync(filePath, 'utf-8');
+        await transformRuby(source, filePath, 'controllers', config, appRoot, metadata);
+      } catch (err) {
+        // Controller pre-analysis is best-effort; skip failures
+      }
+    }
+  }
+
   return { metadata, modelCache };
 }
 
@@ -2535,7 +2564,7 @@ export async function transformErb(code, id, isLayout, config, metadata = null) 
   const nodeTargets = ['node', 'bun', 'deno', 'fly', 'electron'];
   const nodeFilter = config.target && nodeTargets.includes(config.target) ? ['Node'] : [];
   const options = {
-    filters: ['Rails_Helpers', 'Erb', ...nodeFilter, 'Functions', 'Return'],
+    filters: ['Pragma', 'Rails_Helpers', 'Erb', ...nodeFilter, 'ActiveSupport', 'Functions', 'Return'],
     eslevel: config.eslevel || 2022,
     include: ['class', 'call', 'keys', 'values'],
     database: config.database,

@@ -2384,6 +2384,78 @@ async function runEject(options) {
     }
   }
 
+  // Transform Rails controllers (before views, so controller metadata
+  // like ivar types is available when views are transpiled)
+  const appControllersDir = join(APP_ROOT, 'app/controllers');
+  if (existsSync(appControllersDir)) {
+    // Collect controller concern names for import resolution
+    const ctrlConcernsDir = join(appControllersDir, 'concerns');
+    if (existsSync(ctrlConcernsDir)) {
+      config.controllerConcerns = new Set(
+        findRubyModelFiles(ctrlConcernsDir).map(f => f.replace(/\.rb$/, ''))
+      );
+    }
+
+    const controllerFiles = findRubyModelFiles(appControllersDir)
+      .filter(f => shouldInclude(`app/controllers/${f}`));
+
+    if (controllerFiles.length > 0) {
+      console.log('  Transforming Rails controllers...');
+      for (const file of controllerFiles) {
+        const relativePath = `app/controllers/${file}`;
+        try {
+          const source = readFileSync(join(appControllersDir, file), 'utf-8');
+          const result = await transformRuby(source, join(appControllersDir, file), 'controllers', config, APP_ROOT, metadata);
+          // Pass relative output path for correct import resolution
+          const relativeOutPath = `app/controllers/${file.replace('.rb', '.js')}`;
+          let code = fixImportsForEject(result.code, relativeOutPath, config);
+          const outFile = join(outDir, 'app/controllers', file.replace('.rb', '.js'));
+          const outParentDir = dirname(outFile);
+          if (!existsSync(outParentDir)) {
+            mkdirSync(outParentDir, { recursive: true });
+          }
+          writeFileSync(outFile, code);
+          fileCount++;
+        } catch (err) {
+          errors.push({ file: relativePath, error: err.message, stack: err.stack });
+          console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+        }
+      }
+    }
+
+    // Transform controller concerns (app/controllers/concerns/*.rb)
+    const concernsDir = join(appControllersDir, 'concerns');
+    if (existsSync(concernsDir)) {
+      const concernFiles = findRubyModelFiles(concernsDir)  // Reuse recursive finder
+        .filter(f => shouldInclude(`app/controllers/concerns/${f}`));
+
+      if (concernFiles.length > 0) {
+        console.log('  Transforming controller concerns...');
+        for (const file of concernFiles) {
+          const relativePath = `app/controllers/concerns/${file}`;
+          try {
+            const source = readFileSync(join(concernsDir, file), 'utf-8');
+            // Use 'model' type for concerns (they're module-like)
+            const result = await transformRuby(source, join(concernsDir, file), null, config, APP_ROOT, metadata);
+            const relativeOutPath = `app/controllers/concerns/${file.replace('.rb', '.js')}`;
+            let code = fixImportsForEject(result.code, relativeOutPath, config);
+            const outFile = join(outDir, 'app/controllers/concerns', file.replace('.rb', '.js'));
+            // Ensure parent directory exists for nested concerns
+            const outParentDir = dirname(outFile);
+            if (!existsSync(outParentDir)) {
+              mkdirSync(outParentDir, { recursive: true });
+            }
+            writeFileSync(outFile, code);
+            fileCount++;
+          } catch (err) {
+            errors.push({ file: relativePath, error: err.message, stack: err.stack });
+            console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
+          }
+        }
+      }
+    }
+  }
+
   // Transform views
   const viewsDir = join(APP_ROOT, 'app/views');
   if (existsSync(viewsDir)) {
@@ -2547,76 +2619,7 @@ async function runEject(options) {
     }
   }
 
-  // Transform Rails controllers
-  const appControllersDir = join(APP_ROOT, 'app/controllers');
-  if (existsSync(appControllersDir)) {
-    // Collect controller concern names for import resolution
-    const ctrlConcernsDir = join(appControllersDir, 'concerns');
-    if (existsSync(ctrlConcernsDir)) {
-      config.controllerConcerns = new Set(
-        findRubyModelFiles(ctrlConcernsDir).map(f => f.replace(/\.rb$/, ''))
-      );
-    }
-
-    const controllerFiles = findRubyModelFiles(appControllersDir)
-      .filter(f => shouldInclude(`app/controllers/${f}`));
-
-    if (controllerFiles.length > 0) {
-      console.log('  Transforming Rails controllers...');
-      for (const file of controllerFiles) {
-        const relativePath = `app/controllers/${file}`;
-        try {
-          const source = readFileSync(join(appControllersDir, file), 'utf-8');
-          const result = await transformRuby(source, join(appControllersDir, file), 'controllers', config, APP_ROOT, metadata);
-          // Pass relative output path for correct import resolution
-          const relativeOutPath = `app/controllers/${file.replace('.rb', '.js')}`;
-          let code = fixImportsForEject(result.code, relativeOutPath, config);
-          const outFile = join(outDir, 'app/controllers', file.replace('.rb', '.js'));
-          const outParentDir = dirname(outFile);
-          if (!existsSync(outParentDir)) {
-            mkdirSync(outParentDir, { recursive: true });
-          }
-          writeFileSync(outFile, code);
-          fileCount++;
-        } catch (err) {
-          errors.push({ file: relativePath, error: err.message, stack: err.stack });
-          console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
-        }
-      }
-    }
-
-    // Transform controller concerns (app/controllers/concerns/*.rb)
-    const concernsDir = join(appControllersDir, 'concerns');
-    if (existsSync(concernsDir)) {
-      const concernFiles = findRubyModelFiles(concernsDir)  // Reuse recursive finder
-        .filter(f => shouldInclude(`app/controllers/concerns/${f}`));
-
-      if (concernFiles.length > 0) {
-        console.log('  Transforming controller concerns...');
-        for (const file of concernFiles) {
-          const relativePath = `app/controllers/concerns/${file}`;
-          try {
-            const source = readFileSync(join(concernsDir, file), 'utf-8');
-            // Use 'model' type for concerns (they're module-like)
-            const result = await transformRuby(source, join(concernsDir, file), null, config, APP_ROOT, metadata);
-            const relativeOutPath = `app/controllers/concerns/${file.replace('.rb', '.js')}`;
-            let code = fixImportsForEject(result.code, relativeOutPath, config);
-            const outFile = join(outDir, 'app/controllers/concerns', file.replace('.rb', '.js'));
-            // Ensure parent directory exists for nested concerns
-            const outParentDir = dirname(outFile);
-            if (!existsSync(outParentDir)) {
-              mkdirSync(outParentDir, { recursive: true });
-            }
-            writeFileSync(outFile, code);
-            fileCount++;
-          } catch (err) {
-            errors.push({ file: relativePath, error: err.message, stack: err.stack });
-            console.warn(`    Skipped ${relativePath}: ${formatError(err)}`);
-          }
-        }
-      }
-    }
-  }
+  // (Rails controllers were already transformed above, before views)
 
   // Copy and transform test files
   const testDir = join(APP_ROOT, 'test');
