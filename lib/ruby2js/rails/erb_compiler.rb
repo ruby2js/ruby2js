@@ -23,7 +23,7 @@ class ErbCompiler
   end
 
   # Compile ERB template to Ruby code
-  # Format: _buf = ::String.new; _buf << 'literal'.freeze; _buf << ( expr ).to_s; ... _buf.to_s
+  # Format: _buf = ::String.new; _buf << 'literal'.freeze; _buf.append= ( expr ).to_s; ... _buf.to_s
   # Key: buffer operations use semicolons, code blocks use newlines
   def src
     ruby_code = "def render\n_buf = ::String.new;"
@@ -90,8 +90,8 @@ class ErbCompiler
           ruby_expr_end = ruby_code.length - 1  # exclude newline
           @position_map << [ruby_expr_start, ruby_expr_end, erb_expr_start, erb_expr_end]
         else
-          ruby_expr_start = ruby_code.length + " _buf << ( ".length
-          ruby_code += " _buf << ( #{expr} ).to_s;"
+          ruby_expr_start = ruby_code.length + " _buf.append= ( ".length
+          ruby_code += " _buf.append= ( #{expr} ).to_s;"
           ruby_expr_end = ruby_expr_start + expr.length
           @position_map << [ruby_expr_start, ruby_expr_end, erb_expr_start, erb_expr_end]
           is_output_expr = true
@@ -102,8 +102,8 @@ class ErbCompiler
         erb_expr_start = erb_start + 2 + 1 + (tag.length - 1 - expr.length)
         erb_expr_end = erb_expr_start + expr.length
 
-        ruby_expr_start = ruby_code.length + " _buf << ( ".length
-        ruby_code += " _buf << ( #{expr} ).to_s;"
+        ruby_expr_start = ruby_code.length + " _buf.append= ( ".length
+        ruby_code += " _buf.append= ( #{expr} ).to_s;"
         ruby_expr_end = ruby_expr_start + expr.length
         @position_map << [ruby_expr_start, ruby_expr_end, erb_expr_start, erb_expr_end]
         is_output_expr = true

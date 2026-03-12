@@ -10274,6 +10274,11 @@ const Ruby2JS = (() => {
     };
 
     on_hash(...pairs) {
+      if (pairs.length === 1 && pairs.first.type === "cast") {
+        this.parse(pairs.first);
+        return
+      };
+
       return this._compact(() => {
         let singleton = pairs.length <= 1;
 
