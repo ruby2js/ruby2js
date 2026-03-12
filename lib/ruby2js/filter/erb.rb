@@ -474,7 +474,7 @@ module Ruby2JS
         # Seed @var_types (from pragma filter) with the controller's type info.
         # Only seed if @var_types is available (pragma filter is in the chain).
         if defined?(@var_types)
-          types.each do |name, type_str|
+          types.each_pair do |name, type_str|
             @var_types[name.to_sym] = type_str.to_sym
           end
         end
