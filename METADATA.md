@@ -86,4 +86,4 @@ The ERB filter's `seed_view_types()` maps controller metadata to pragma's `@var_
 2. If the type needs special JS handling, add cases in `pragma.rb`'s `on_send`/`on_block`
 3. Add a test in `spec/rails_controller_spec.rb` for metadata recording
 4. Add a test in `spec/pragma_spec.rb` for the JS transformation
-5. Update `docs/src/_docs/juntos/type-inference.md` (user-facing)
+5. Update `docs/src/_docs/juntos/metadata.md` (user-facing)

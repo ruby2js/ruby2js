@@ -627,7 +627,7 @@ Types assigned in other methods are not propagated class-wide.
 
 **Rails controllers:** When using Juntos, instance variable types set in
 controller actions are automatically propagated to corresponding ERB views.
-See [Cross-File Metadata](/docs/juntos/type-inference) for details.
+See [Cross-File Metadata](/docs/juntos/metadata) for details.
 
 ### Pragma Override
 

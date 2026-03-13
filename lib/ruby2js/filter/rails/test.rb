@@ -853,12 +853,14 @@ module Ruby2JS
 
         # Wrap AR operations with await - delegates to shared helper.
         # Pre-resolves fixture refs so that AR wrapping sees :attr nodes.
+        # Also marks calls to known model instance methods with send! for parens.
         def wrap_test_ar_operations(node)
           resolved = resolve_fixture_refs_in_tree(node)
           # Pass model metadata so wrap_ar_operations can detect custom instance methods
           metadata = @options ? @options[:metadata] : nil
           model_meta = metadata ? metadata['models'] : nil
-          ActiveRecordHelpers.wrap_ar_operations(resolved, @rails_test_models, model_meta)
+          wrapped = ActiveRecordHelpers.wrap_ar_operations(resolved, @rails_test_models, model_meta)
+          mark_model_method_calls(wrapped)
         end
 
         # Convert sends with receivers in statement position to await!
@@ -889,6 +891,98 @@ module Ruby2JS
             else
               child
             end
+          end
+          node.updated(nil, new_children)
+        end
+
+        # Mark calls to known model instance methods with send! to force parens.
+        # In Ruby, `entry.subject_category` calls the method even without parens.
+        # In JS, methods with parameters (even all-optional) are regular methods,
+        # not getters, so they need () to be invoked. This walks the AST before
+        # process() and forces send! on sends to known instance methods.
+        def mark_model_method_calls(node)
+          return node unless node.respond_to?(:type)
+          models_meta = @options[:metadata] && @options[:metadata]['models']
+          return node unless models_meta
+
+          # First pass: collect lvar types from fixture assignments
+          lvar_types = {}
+          collect_lvar_types(node, lvar_types, models_meta)
+
+          # Second pass: mark sends on typed lvars
+          return node if lvar_types.empty?
+          mark_instance_methods(node, lvar_types, models_meta)
+        end
+
+        # Collect local variable types from assignments in the body.
+        # Recognizes fixture refs: entry = _fixtures.entries_one → Entry
+        # and setup ivars: @entry = _fixtures.entries_one → entry is Entry
+        def collect_lvar_types(node, lvar_types, models_meta)
+          return unless node.respond_to?(:type)
+
+          if node.type == :lvasgn && node.children.length == 2
+            name = node.children[0]
+            rhs = node.children[1]
+            model = infer_model_from_rhs(rhs, models_meta)
+            lvar_types[name] = model if model
+          end
+
+          node.children.each do |child|
+            collect_lvar_types(child, lvar_types, models_meta) if child.respond_to?(:type)
+          end
+        end
+
+        # Infer model name from a fixture reference or constructor.
+        # _fixtures.entries_one → "Entry", _fixtures.scores_two → "Score"
+        def infer_model_from_rhs(node, models_meta)
+          return nil unless node.respond_to?(:type)
+          return nil unless models_meta
+
+          # _fixtures.entries_one → table name is "entries"
+          if node.type == :attr && node.children[0].respond_to?(:type) &&
+             node.children[0].type == :lvar && node.children[0].children[0] == :_fixtures
+            fixture_var = node.children[1].to_s  # e.g., "entries_student_pro"
+            # Extract table name (everything before the first _key part)
+            # Try matching against known model names
+            models_meta.each_pair do |model_name, _meta|
+              table = Ruby2JS::Inflector.pluralize(
+                Ruby2JS::Inflector.underscore(model_name)
+              )
+              if fixture_var.start_with?(table + '_')
+                return model_name
+              end
+            end
+          end
+
+          nil
+        end
+
+        # Recursively mark sends on typed lvars as send! when the method
+        # is a known instance method (has parameters, not a getter).
+        def mark_instance_methods(node, lvar_types, models_meta)
+          return node unless node.respond_to?(:type)
+
+          if node.type == :send && node.children[0].respond_to?(:type) &&
+             node.children[0].type == :lvar
+            lvar_name = node.children[0].children[0]
+            model_name = lvar_types[lvar_name]
+            if model_name
+              method_name = node.children[1].to_s
+              model_meta = models_meta[model_name]
+              # Check both parameterized_methods (sync) and instance_methods (async)
+              param_methods = model_meta && model_meta['parameterized_methods']
+              async_methods = model_meta && model_meta['instance_methods']
+              is_known = (param_methods && param_methods.include?(method_name)) ||
+                         (async_methods && async_methods.include?(method_name))
+              if is_known && node.children.length == 2
+                # Zero-arg call to a known instance method — force parens
+                return node.updated(:send!)
+              end
+            end
+          end
+
+          new_children = node.children.map do |child|
+            child.respond_to?(:type) ? mark_instance_methods(child, lvar_types, models_meta) : child
           end
           node.updated(nil, new_children)
         end

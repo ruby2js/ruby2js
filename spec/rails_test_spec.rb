@@ -473,6 +473,34 @@ describe Ruby2JS::Filter::Rails::Test do
       assert_includes result, 'expect(x).toBeInstanceOf(MyClass)'
     end
 
+    it "forces parens on known model instance methods" do
+      metadata = {
+        'models' => {
+          'Entry' => {
+            'associations' => [],
+            'scopes' => [],
+            'enum_predicates' => [],
+            'enum_bangs' => [],
+            'parameterized_methods' => ['subject_category', 'partner']
+          }
+        },
+        'fixture_plan' => {
+          'replacements' => { 'entries:one' => 'entries_one' },
+          'fixtureModels' => ['Entry']
+        },
+        'import_mode' => 'virtual'
+      }
+      result = to_js(<<~RUBY, metadata: metadata)
+        class EntryTest < ActiveSupport::TestCase
+          test "category" do
+            entry = entries(:one)
+            assert_equal "L", entry.subject_category
+          end
+        end
+      RUBY
+      assert_includes result, 'entry.subject_category()'
+    end
+
     it "converts assert_includes to expect().toContain()" do
       result = to_js(<<~RUBY)
         class FooTest < ActiveSupport::TestCase

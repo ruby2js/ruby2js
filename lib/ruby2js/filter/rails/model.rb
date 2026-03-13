@@ -84,6 +84,7 @@ module Ruby2JS
           @rails_primary_abstract_class = false  # primary_abstract_class declaration
           @rails_model_private_methods = {}
           @rails_model_instance_methods = []
+          @rails_model_parameterized_methods = []
           @rails_model_refs = Set.new
           @in_callback_block = false  # Track when processing callback body
           @uses_broadcast = false  # Track if model uses broadcast methods
@@ -351,6 +352,7 @@ module Ruby2JS
           @rails_primary_abstract_class = false
           @rails_model_private_methods = {}
           @rails_model_instance_methods = []
+          @rails_model_parameterized_methods = []
           @rails_model_refs = Set.new
           @rails_includes = []
           @has_concern_includes = false
@@ -429,6 +431,7 @@ module Ruby2JS
           @rails_primary_abstract_class = false
           @rails_model_private_methods = {}
           @rails_model_instance_methods = []
+          @rails_model_parameterized_methods = []
           @rails_model_refs = Set.new
           @rails_includes = []
           @has_concern_includes = false
@@ -1071,8 +1074,11 @@ module Ruby2JS
           end
           model_meta['enum_bangs'] = bangs
 
-          # Custom instance method names (for test filter to distinguish from associations)
+          # Custom async instance method names (for AR wrapping to add await+parens)
           model_meta['instance_methods'] = @rails_model_instance_methods if @rails_model_instance_methods.any?
+
+          # Sync methods with parameters (need parens but not await)
+          model_meta['parameterized_methods'] = @rails_model_parameterized_methods if @rails_model_parameterized_methods&.any?
 
           # File path for import generation in test filter
           model_meta['file'] = @options[:file] if @options[:file]
@@ -1554,6 +1560,13 @@ module Ruby2JS
                 ])
                 transformed << process(async_rewritten.updated(:async, async_rewritten.children))
               else
+                # Track methods with parameters so callers can force parens.
+                # Zero-arg methods become getters (accessed as properties),
+                # but methods with params (even all-optional) stay as regular
+                # JS methods and callers need () to invoke them.
+                if child.children[1].children.any?
+                  @rails_model_parameterized_methods.push(child.children[0].to_s)
+                end
                 transformed << process(rewritten)
               end
             elsif child.type == :defs && !in_private

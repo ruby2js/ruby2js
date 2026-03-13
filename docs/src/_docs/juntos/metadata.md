@@ -16,12 +16,14 @@ Juntos analyzes controllers, models, and concerns during transpilation and share
 When `juntos build` or `juntos transform` processes your application, each filter captures metadata about the file it transpiles. Downstream filters use this metadata to make better decisions:
 
 ```
-Models          → associations, scopes, enums
+Models          → associations, scopes, enums, instance methods, parameterized methods
 Concerns        → method names
 Controllers     → instance variable types, file paths
                      ↓
+Controllers     ← uses model metadata for async/sync decisions
 Views (ERB)     ← uses controller types for Map/Array/Hash disambiguation
-Tests           ← uses model metadata for async/sync, fixtures, imports
+Tests           ← uses model metadata for async/sync, fixtures, method call syntax
+                ← uses controller metadata for imports
 ```
 
 ## Controller → View Type Inference
@@ -175,6 +177,34 @@ The test filter knows `article.draft?` and `article.published!` don't need `awai
 
 Named scopes are recorded so the test filter can generate correct query chains.
 
+### Instance Methods
+
+Methods defined in the model that contain async operations (database queries, association access) are recorded in the `instance_methods` list. The test filter uses this to wrap calls with `await`:
+
+```ruby
+class Dance < ApplicationRecord
+  def name_unique
+    Dance.where(name: name).count == 1
+  end
+end
+```
+
+In tests, `dance.name_unique` is awaited because the metadata identifies it as an async instance method.
+
+### Parameterized Methods
+
+Methods with parameters (including default parameters) are recorded in the `parameterized_methods` list. This solves a transpilation ambiguity: in JavaScript, zero-argument method calls on class instances become property access (getters) rather than method calls. When the test filter sees a call like `entry.subject_category` (no arguments passed, but the method accepts optional parameters), it uses this metadata to force method-call syntax with parentheses:
+
+```ruby
+class Entry < ApplicationRecord
+  def subject_category(ages = true)
+    # ...
+  end
+end
+```
+
+Without this metadata, `entry.subject_category` in a test would transpile to property access (`entry.subject_category`). With it, the transpiler correctly generates `entry.subject_category()`.
+
 ## Concern Metadata
 
 Concerns record which methods they define:
@@ -226,6 +256,14 @@ If a variable is reassigned to a different type, the last assignment wins:
 ```
 
 ## Debugging Metadata
+
+### Full Metadata Dump
+
+Use `juntos info --metadata` to see all metadata Juntos has collected about your application, including model associations, scopes, enums, instance methods, and parameterized methods:
+
+```bash
+npx juntos info --metadata
+```
 
 ### View Controller Metadata
 
