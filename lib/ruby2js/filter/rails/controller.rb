@@ -893,15 +893,15 @@ module Ruby2JS
             return :number if IVAR_TYPE_METHODS_NUMBER.include?(method)
             return :string if IVAR_TYPE_METHODS_STRING.include?(method)
             # group_by with block_pass: items.group_by(&:type)
-            return :hash if method == :group_by
+            return :map if method == :group_by
             # exists? returns boolean — skip
           end
 
-          # group_by block returns a hash
+          # group_by block returns a Map
           if node.type == :block
             call = node.children[0]
             if call.respond_to?(:type) && call.type == :send
-              return :hash if call.children[1] == :group_by
+              return :map if call.children[1] == :group_by
               if [:map, :select, :reject, :flat_map, :sort_by, :collect,
                   :filter_map].include?(call.children[1])
                 return :array

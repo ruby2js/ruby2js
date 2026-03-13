@@ -856,22 +856,22 @@ describe Ruby2JS::Filter::Pragma do
     end
 
     describe "from group_by" do
-      it "should infer hash type from group_by result" do
+      it "should infer map type from group_by result and use Array.from for .map" do
         to_js_with_functions(
           'scores.group_by { |s| s.heat_id }.map { |k, v| [k, v.length] }'
-        ).must_include 'Object.entries('
+        ).must_include 'Array.from('
       end
 
-      it "should wrap group_by + select in Object.entries and fromEntries" do
+      it "should wrap group_by + select in new Map with spread and filter" do
         to_js_with_functions(
           'scores.group_by { |s| s.heat_id }.select { |k, v| v.length > 1 }'
-        ).must_include 'Object.fromEntries(Object.entries('
+        ).must_include 'new Map([...'
       end
 
-      it "should wrap group_by + each in Object.entries" do
+      it "should use for..of on group_by + each" do
         to_js_with_functions(
           'scores.group_by { |s| s.id }.each { |k, v| puts k }'
-        ).must_include 'Object.entries('
+        ).must_include 'for (let [k, v] of'
       end
     end
 

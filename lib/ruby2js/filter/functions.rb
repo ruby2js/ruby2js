@@ -30,16 +30,11 @@ module Ruby2JS
       end
 
       # Check if an AST node is known to produce a hash (plain JS object).
-      # Detects: literal hashes, hash cast sentinels, group_by blocks,
+      # Detects: literal hashes, hash cast sentinels,
       # and variables with inferred hash type (from pragma filter's @var_types).
       def hash_node?(node)
         return false unless node.respond_to?(:type)
         return true if node.type == :hash
-        # group_by { } block produces a hash
-        if node.type == :block
-          call = node.children[0]
-          return call.type == :send && call.children[1] == :group_by
-        end
         # Check pragma filter's type inference for local/instance variables
         if defined?(@var_types) && [:lvar, :ivar].include?(node.type)
           var_name = node.children[0]
@@ -1485,7 +1480,7 @@ module Ruby2JS
           end
 
           if es2024
-            # ES2024+: Object.groupBy(array, x => x.category)
+            # ES2024+: Map.groupBy(array, x => x.category)
             # For destructuring, wrap args in mlhs: ([a, b]) => ...
             callback_args = if args.children.length > 1
               s(:args, s(:mlhs, *args.children))
@@ -1494,21 +1489,28 @@ module Ruby2JS
             end
             callback = s(:block, s(:send, nil, :proc), callback_args,
               s(:autoreturn, *node.children[2..-1]))
-            process s(:hash, s(:cast,
-              s(:send, s(:const, nil, :Object), :groupBy, target, callback)))
+            process s(:send, s(:const, nil, :Map), :groupBy, target, callback)
           else
-            # Pre-ES2024: array.reduce((acc, x) => { const key = ...; (acc[key] = acc[key] || []).push(x); return acc }, {})
-            # Build: (acc[key] = acc[key] || []).push(item)
-            acc_key = s(:send, s(:lvar, :$acc), :[], s(:lvar, :$key))
-            acc_key_or_empty = s(:or, acc_key, s(:array))
-            assign_and_push = s(:send,
-              s(:send, s(:lvar, :$acc), :[]=, s(:lvar, :$key), acc_key_or_empty),
+            # Pre-ES2024: array.reduce into a new Map
+            # Build: acc.set(key, [...(acc.get(key) || []), item])
+            acc_get = s(:send, s(:lvar, :$acc), :get, s(:lvar, :$key))
+            acc_get_or_empty = s(:or, acc_get, s(:array))
+            get_and_push = s(:send,
+              acc_get_or_empty,
               :push, item_to_push)
+            set_call = s(:send, s(:lvar, :$acc), :set, s(:lvar, :$key),
+              acc_get_or_empty)
 
             # Build the reduce block body
             reduce_body = s(:begin,
               s(:lvasgn, :$key, block_body),
-              assign_and_push,
+              s(:send, s(:lvar, :$acc), :set, s(:lvar, :$key),
+                s(:send,
+                  s(:or,
+                    s(:send, s(:lvar, :$acc), :get, s(:lvar, :$key)),
+                    s(:array)),
+                  :concat,
+                  s(:array, item_to_push))),
               s(:return, s(:lvar, :$acc)))
 
             reduce_block = s(:block,
@@ -1516,8 +1518,8 @@ module Ruby2JS
               reduce_arg,
               reduce_body)
 
-            process s(:hash, s(:cast,
-              s(:send, target, :reduce, reduce_block, s(:hash))))
+            process s(:send, target, :reduce, reduce_block,
+              s(:send, s(:const, nil, :Map), :new))
           end
 
         elsif method == :sort_by and call.children.length == 2

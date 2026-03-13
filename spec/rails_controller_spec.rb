@@ -1142,7 +1142,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       metadata
     end
 
-    it "records hash type for group_by result" do
+    it "records map type for group_by result" do
       metadata = to_js_with_metadata(<<~RUBY)
         class EventsController < ApplicationController
           def summary
@@ -1153,7 +1153,7 @@ describe Ruby2JS::Filter::Rails::Controller do
 
       types = metadata.dig('view_types', 'events/summary')
       _(types).wont_be_nil
-      _(types['people']).must_equal 'hash'
+      _(types['people']).must_equal 'map'
     end
 
     it "records array type for to_a result" do
@@ -1214,7 +1214,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       types = metadata.dig('view_types', 'events/summary')
-      _(types['people']).must_equal 'hash'
+      _(types['people']).must_equal 'map'
       _(types['total']).must_equal 'number'
     end
   end

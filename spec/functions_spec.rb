@@ -659,12 +659,12 @@ describe Ruby2JS::Filter::Functions do
 
     it "should handle group_by with destructuring" do
       to_js( 'a.group_by {|k, v| k.to_s}' ).
-        must_equal 'a.reduce(($acc, [k, v]) => {let $key = k.toString(); ($acc[$key] = $acc[$key] ?? []).push([k, v]); return $acc}, {})'
+        must_equal 'a.reduce(($acc, [k, v]) => {let $key = k.toString(); $acc.set($key, ($acc.get($key) ?? []).concat([[k, v]])); return $acc}, new Map())'
     end
 
     it "should handle group_by with nested destructuring" do
       to_js( 'a.group_by {|(value, dance), count| dance}' ).
-        must_equal 'a.reduce(($acc, [[value, dance], count]) => {let $key = dance; ($acc[$key] = $acc[$key] ?? []).push([[value, dance], count]); return $acc}, {})'
+        must_equal 'a.reduce(($acc, [[value, dance], count]) => {let $key = dance; $acc.set($key, ($acc.get($key) ?? []).concat([[[value, dance], count]])); return $acc}, new Map())'
     end
 
     it "should handle map with destructuring" do
@@ -1182,22 +1182,22 @@ describe Ruby2JS::Filter::Functions do
   describe "group_by" do
     it "should handle group_by with simple key" do
       to_js_2020( 'users.group_by { |u| u.role }' ).
-        must_equal 'users.reduce(($acc, u) => {let $key = u.role; ($acc[$key] = $acc[$key] ?? []).push(u); return $acc}, {})'
+        must_equal 'users.reduce(($acc, u) => {let $key = u.role; $acc.set($key, ($acc.get($key) ?? []).concat([u])); return $acc}, new Map())'
     end
 
     it "should handle group_by with method call" do
       to_js_2020( 'words.group_by { |w| w.length }' ).
-        must_equal 'words.reduce(($acc, w) => {let $key = w.length; ($acc[$key] = $acc[$key] ?? []).push(w); return $acc}, {})'
+        must_equal 'words.reduce(($acc, w) => {let $key = w.length; $acc.set($key, ($acc.get($key) ?? []).concat([w])); return $acc}, new Map())'
     end
 
     it "should handle group_by with ternary expression" do
       to_js_2020( 'nums.group_by { |n| n > 0 ? "positive" : "non_positive" }' ).
-        must_equal 'nums.reduce(($acc, n) => {let $key = n > 0 ? "positive" : "non_positive"; ($acc[$key] = $acc[$key] ?? []).push(n); return $acc}, {})'
+        must_equal 'nums.reduce(($acc, n) => {let $key = n > 0 ? "positive" : "non_positive"; $acc.set($key, ($acc.get($key) ?? []).concat([n])); return $acc}, new Map())'
     end
 
     it "should handle group_by with arithmetic expression" do
       to_js_2020( 'items.group_by { |i| i.price / 10 }' ).
-        must_equal 'items.reduce(($acc, i) => {let $key = i.price / 10; ($acc[$key] = $acc[$key] ?? []).push(i); return $acc}, {})'
+        must_equal 'items.reduce(($acc, i) => {let $key = i.price / 10; $acc.set($key, ($acc.get($key) ?? []).concat([i])); return $acc}, new Map())'
     end
   end
 
@@ -1227,20 +1227,8 @@ describe Ruby2JS::Filter::Functions do
         must_include 'Object.entries({a: 1, b: 2})'
     end
 
-    it "should wrap group_by result .each with Object.entries" do
-      to_js_2020( 'items.group_by { |i| i.type }.each { |k, v| puts k }' ).
-        must_include 'Object.entries(items.reduce('
-    end
-
-    it "should wrap group_by result .map with Object.entries" do
-      to_js_2020( 'items.group_by { |i| i.type }.map { |k, v| [k, v.length] }' ).
-        must_include 'Object.entries(items.reduce('
-    end
-
-    it "should wrap group_by result .select with Object.entries" do
-      to_js_2020( 'items.group_by { |i| i.type }.select { |k, v| v.length > 1 }' ).
-        must_include 'Object.entries(items.reduce('
-    end
+    # group_by chaining tests moved to pragma_spec.rb (Map iteration
+    # requires pragma filter for type-aware .each/.map/.select handling)
 
     it "should not wrap non-hash .each with Object.entries" do
       to_js( 'items.each { |k, v| puts k }' ).

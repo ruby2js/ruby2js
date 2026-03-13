@@ -222,10 +222,10 @@ module Ruby2JS
             if receiver.nil? && [:proc, :lambda].include?(method)
               return :proc
             end
-            # group_by { } returns a hash (Object in JS)
+            # group_by { } returns a Map (Map.groupBy in JS)
             # map/select/reject/flat_map/sort_by with block return arrays
             if method == :group_by
-              return :hash
+              return :map
             elsif [:map, :select, :reject, :flat_map, :sort_by, :collect,
                    :filter_map, :each_with_object].include?(method)
               return :array
@@ -1274,24 +1274,32 @@ module Ruby2JS
           end
           # Note: array and string use .length which functions filter handles
 
-        # .keys - Hash: Object.keys(hash)
+        # .keys - Hash: Object.keys(hash), Map: Array.from(map.keys())
         when :keys
           type = if pragma?(node, :hash) then :hash
+                 elsif pragma?(node, :map) then :map
                  else var_type(target)
                  end
 
           if type == :hash && args.empty?
             return process s(:send, s(:const, nil, :Object), :keys, target)
+          elsif type == :map && args.empty?
+            return process s(:send, s(:const, nil, :Array), :from,
+              s(:send, target, :keys))
           end
 
-        # .values - Hash: Object.values(hash)
+        # .values - Hash: Object.values(hash), Map: Array.from(map.values())
         when :values
           type = if pragma?(node, :hash) then :hash
+                 elsif pragma?(node, :map) then :map
                  else var_type(target)
                  end
 
           if type == :hash && args.empty?
             return process s(:send, s(:const, nil, :Object), :values, target)
+          elsif type == :map && args.empty?
+            return process s(:send, s(:const, nil, :Array), :from,
+              s(:send, target, :values))
           end
 
         # Array binary operators that differ between Ruby and JS
@@ -1614,6 +1622,64 @@ module Ruby2JS
 
             return s(:send,
               s(:const, nil, :Object), :fromEntries, processed_filter)
+          end
+        end
+
+        # Handle Map iteration (from group_by results)
+        # Maps support for...of directly with [key, value] pairs
+        if call.type == :send
+          type = var_type(call.children[0]) || infer_type(call.children[0])
+          if type == :map
+            target, method = call.children[0], call.children[1]
+
+            if [:each, :each_pair].include?(method) && target
+              # map.each { |k,v| body } → for (let [k,v] of map) { body }
+              new_args = if args.children.length > 1
+                s(:args, s(:mlhs, *args.children))
+              else
+                args
+              end
+
+              # Always use for...of for Map iteration (natural fit, avoids
+              # forEach's reversed (value, key) argument order)
+              lvasgn = if args.children.length > 1
+                s(:mlhs, *args.children.map { |a| s(:lvasgn, a.children.first) })
+              elsif args.children.length == 1
+                s(:lvasgn, args.children.first.children.first)
+              else
+                s(:lvasgn, :_)
+              end
+              return process node.updated(:for_of, [lvasgn, target, body])
+
+            elsif [:map, :collect].include?(method) && target
+              # map.map { |k,v| expr } → Array.from(map, ([k,v]) => expr)
+              new_args = if args.children.length > 1
+                s(:args, s(:mlhs, *args.children))
+              else
+                args
+              end
+
+              callback = s(:block, s(:send, nil, :proc), new_args,
+                s(:autoreturn, body))
+              return process s(:send, s(:const, nil, :Array), :from, target, callback)
+
+            elsif method == :select && target
+              # map.select { |k,v| expr } → new Map([...map].filter(([k,v]) => expr))
+              new_args = if args.children.length > 1
+                s(:args, s(:mlhs, *args.children))
+              else
+                args
+              end
+
+              spread_array = s(:array, s(:splat, target))
+              filter_block = s(:block,
+                s(:send, spread_array, :filter),
+                new_args,
+                body)
+
+              processed_filter = process filter_block
+              return s(:send, s(:const, nil, :Map), :new, processed_filter)
+            end
           end
         end
 
