@@ -1893,12 +1893,28 @@ module Ruby2JS
 
         # Build: expect(base.querySelector(sel).textContent).toContain/toMatch(value)
         def build_text_check(base, sel_node, matcher, value_node)
-          text = s(:attr,
-            s(:send, base, :querySelector, sel_node),
-            :textContent)
+          query_all = s(:send, base, :querySelectorAll, sel_node)
+          spread_array = s(:array, s(:splat, query_all))
+
+          if matcher == :toMatch
+            # [...querySelectorAll(sel)].some(el => /pat/.test(el.textContent))
+            body = s(:send, value_node, :test,
+              s(:attr, s(:lvar, :_el), :textContent))
+          else
+            # [...querySelectorAll(sel)].some(el => el.textContent.includes(text))
+            body = s(:send,
+              s(:attr, s(:lvar, :_el), :textContent),
+              :includes, value_node)
+          end
+
+          some_expr = s(:block,
+            s(:send, spread_array, :some),
+            s(:args, s(:arg, :_el)),
+            body)
+
           s(:send,
-            s(:send, nil, :expect, text),
-            matcher, value_node)
+            s(:send, nil, :expect, some_expr),
+            :toBeTruthy)
         end
 
         # Build checks from hash options (count:, minimum:, maximum:, text:)

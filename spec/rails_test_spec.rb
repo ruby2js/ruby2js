@@ -894,7 +894,9 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(document.body.querySelector("h1").textContent).toContain("Welcome")'
+      assert_includes result, 'querySelectorAll("h1")].some(_el =>'
+      assert_includes result, '_el.textContent.includes("Welcome")'
+      assert_includes result, '.toBeTruthy()'
     end
 
     it "converts text match with regex" do
@@ -906,7 +908,9 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(document.body.querySelector("h1").textContent).toMatch(/Welcome/)'
+      assert_includes result, 'querySelectorAll("h1")].some(_el =>'
+      assert_includes result, '/Welcome/.test(_el.textContent)'
+      assert_includes result, '.toBeTruthy()'
     end
 
     it "converts text match with dynamic expression" do
@@ -921,7 +925,8 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(document.body.querySelector("h1").textContent).toContain(article.title)'
+      assert_includes result, 'querySelectorAll("h1")].some(_el =>'
+      assert_includes result, '_el.textContent.includes(article.title)'
     end
 
     it "converts non-existence check with false" do
@@ -993,7 +998,8 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(document.body.querySelector("h1").textContent).toContain("Hello")'
+      assert_includes result, 'querySelectorAll("h1")].some(_el =>'
+      assert_includes result, '_el.textContent.includes("Hello")'
     end
 
     it "converts combined count and text options" do
@@ -1006,7 +1012,8 @@ describe Ruby2JS::Filter::Rails::Test do
         end
       RUBY
       assert_includes result, 'expect(document.body.querySelectorAll("li")).toHaveLength(2)'
-      assert_includes result, 'expect(document.body.querySelector("li").textContent).toContain("Item")'
+      assert_includes result, 'querySelectorAll("li")].some(_el =>'
+      assert_includes result, '_el.textContent.includes("Item")'
     end
 
     it "converts ? substitution in selector" do
