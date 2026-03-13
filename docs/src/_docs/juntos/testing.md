@@ -7,7 +7,7 @@ category: juntos
 
 # Testing Juntos Applications
 
-Write tests in Ruby or JavaScript for your transpiled Juntos applications using Vitest and in-memory databases.
+Write tests in Ruby or JavaScript for your transpiled Juntos applications using Vitest and in-memory databases. Select a database adapter to run tests in Node.js (jsdom) or a real browser.
 
 {% toc %}
 
@@ -29,8 +29,11 @@ The recommended approach is to write standard Rails tests that run under both `r
 ### Running Tests
 
 ```bash
-# Run transpiled tests with Vitest
+# Run transpiled tests with Vitest (Node.js + jsdom)
 npx juntos test -d sqlite
+
+# Run in a real browser (Vitest browser mode)
+npx juntos test -d dexie
 
 # Same tests work with Rails
 bundle exec rails test
@@ -113,7 +116,7 @@ class StudiosSystemTest < ApplicationSystemTestCase
 end
 ```
 
-Place system tests in `test/system/`. They work under both `rails test:system` (Selenium) and `juntos test` (jsdom + fetch interceptor).
+Place system tests in `test/system/`. They work under `rails test:system` (Selenium), `juntos test -d sqlite` (jsdom + fetch interceptor), or `juntos test -d dexie` (real browser + fetch interceptor).
 
 **How it works:**
 
@@ -194,9 +197,32 @@ The same `test/system/*.rb` files can also run as Playwright tests against a rea
 | Tier | Command | Runtime | Speed | Purpose |
 |------|---------|---------|-------|---------|
 | Fast | `juntos test` | Vitest + jsdom | Seconds | Functional correctness (every commit) |
+| Browser | `juntos test -d dexie` | Vitest + Chromium | Seconds | Real browser APIs (IndexedDB, Web Components, etc.) |
 | Thorough | `juntos e2e` | Playwright + Chromium | Minutes | Visual/experiential correctness (periodic) |
 
-Same source files, two transpilation targets.
+Same source files, different transpilation targets.
+
+### Browser Mode
+
+When you select a browser database (`dexie`, `sqljs`, or `pglite`), `juntos test` automatically runs in Vitest browser mode — tests execute in a real Chromium browser instead of jsdom:
+
+```bash
+# Node.js + jsdom (default)
+npx juntos test -d sqlite
+
+# Real browser + IndexedDB via Dexie
+npx juntos test -d dexie
+
+# Real browser + SQLite WASM
+npx juntos test -d sqljs
+
+# Real browser + PGlite
+npx juntos test -d pglite
+```
+
+On first run, `juntos test` auto-installs `@vitest/browser-playwright` and Chromium. The same test files work in both modes — only the database adapter and runtime environment change.
+
+Browser mode is useful when your tests depend on real browser APIs that jsdom doesn't support (IndexedDB, Web Components, CSS queries, `IntersectionObserver`, etc.), or when you want to test with the same database adapter your production browser target uses.
 
 ### Running E2E Tests
 

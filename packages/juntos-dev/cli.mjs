@@ -1176,6 +1176,46 @@ async function transpileTestFiles(appRoot, config) {
   // Generate test/__fixtures.mjs — shared fixture creation module
   generateFixturesFile(testDir, fullPlan);
 
+  // Generate vitest.config.js — always regenerate to match database/environment
+  const isBrowserTest = DEFAULT_TARGETS[config.database] === 'browser';
+  const vitestConfigPath = join(appRoot, 'vitest.config.js');
+  if (isBrowserTest) {
+    writeFileSync(vitestConfigPath, `import { defineConfig, mergeConfig } from 'vitest/config';
+import { playwright } from '@vitest/browser-playwright';
+import viteConfig from './vite.config.js';
+
+export default mergeConfig(viteConfig, defineConfig({
+  test: {
+    globals: true,
+    browser: {
+      enabled: true,
+      provider: playwright(),
+      instances: [
+        { browser: 'chromium' }
+      ]
+    },
+    include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
+    setupFiles: ['./test/setup.mjs']
+  }
+}));
+`);
+  } else {
+    writeFileSync(vitestConfigPath, `import { defineConfig, mergeConfig } from 'vitest/config';
+import viteConfig from './vite.config.js';
+
+export default mergeConfig(viteConfig, defineConfig({
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
+    setupFiles: ['./test/setup.mjs'],
+    pool: 'forks',
+    poolOptions: { forks: { singleFork: true } }
+  }
+}));
+`);
+  }
+
   // Generate test/setup.mjs — always regenerate to match current juntos version
   let stimSection = '';
   const stimDir = join(appRoot, 'app/javascript/controllers');
@@ -4421,14 +4461,42 @@ async function runTest(options, testArgs) {
     }
   }
 
-  // Ensure jsdom is installed (default test environment)
-  if (!isPackageInstalled('jsdom')) {
-    console.log('Installing jsdom (required by test environment)...');
-    try {
-      execSync('npm install jsdom', { cwd: APP_ROOT, stdio: 'inherit' });
-    } catch (e) {
-      console.error('Failed to install jsdom.');
-      process.exit(1);
+  // Install test environment packages based on database target
+  const isBrowserTest = DEFAULT_TARGETS[options.database] === 'browser';
+  if (isBrowserTest) {
+    if (!isPackageInstalled('@vitest/browser-playwright')) {
+      console.log('Installing @vitest/browser-playwright...');
+      try {
+        execSync('npm install @vitest/browser-playwright', {
+          cwd: APP_ROOT,
+          stdio: 'inherit'
+        });
+      } catch (e) {
+        console.error('Failed to install @vitest/browser-playwright.');
+        process.exit(1);
+      }
+
+      console.log('Installing Playwright browsers...');
+      try {
+        execSync('npx playwright install --with-deps chromium', {
+          cwd: APP_ROOT,
+          stdio: 'inherit'
+        });
+      } catch (e) {
+        console.error('Failed to install Playwright browsers.');
+        process.exit(1);
+      }
+    }
+  } else {
+    // Node/server databases use jsdom
+    if (!isPackageInstalled('jsdom')) {
+      console.log('Installing jsdom (required by test environment)...');
+      try {
+        execSync('npm install jsdom', { cwd: APP_ROOT, stdio: 'inherit' });
+      } catch (e) {
+        console.error('Failed to install jsdom.');
+        process.exit(1);
+      }
     }
   }
 
