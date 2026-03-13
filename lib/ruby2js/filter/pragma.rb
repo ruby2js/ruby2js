@@ -198,7 +198,9 @@ module Ruby2JS
           end
 
           # Methods with known return types
-          if METHODS_RETURNING_ARRAY.include?(method)
+          if method == :group_by
+            return :map
+          elsif METHODS_RETURNING_ARRAY.include?(method)
             return :array
           elsif METHODS_RETURNING_NUMBER.include?(method)
             return :number
@@ -1284,8 +1286,10 @@ module Ruby2JS
           if type == :hash && args.empty?
             return process s(:send, s(:const, nil, :Object), :keys, target)
           elsif type == :map && args.empty?
-            return process s(:send, s(:const, nil, :Array), :from,
-              s(:send, target, :keys))
+            # Emit Array.from(target.keys()) — process target but not the
+            # outer .keys call to avoid infinite recursion
+            return s(:send, s(:const, nil, :Array), :from,
+              s(:send, process(target), :keys))
           end
 
         # .values - Hash: Object.values(hash), Map: Array.from(map.values())
@@ -1298,8 +1302,10 @@ module Ruby2JS
           if type == :hash && args.empty?
             return process s(:send, s(:const, nil, :Object), :values, target)
           elsif type == :map && args.empty?
-            return process s(:send, s(:const, nil, :Array), :from,
-              s(:send, target, :values))
+            # Emit Array.from(target.values()) — process target but not the
+            # outer .values call to avoid infinite recursion
+            return s(:send, s(:const, nil, :Array), :from,
+              s(:send, process(target), :values))
           end
 
         # Array binary operators that differ between Ruby and JS

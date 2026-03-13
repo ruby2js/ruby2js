@@ -765,6 +765,17 @@ module Ruby2JS
           return unless node.respond_to?(:type) && node.respond_to?(:children)
 
           case node.type
+          when :lvasgn
+            # Track local variable types for resolving @ivar = lvar assignments
+            rhs = node.children[1]
+            if rhs
+              inferred = infer_ivar_type(rhs)
+              if inferred
+                meta[:lvar_types] = {} unless meta[:lvar_types]
+                meta[:lvar_types][node.children[0]] = inferred
+              end
+            end
+
           when :ivasgn
             name = node.children[0].to_s.sub(/^@/, '').to_sym
             meta[:ivars].push(name)
@@ -773,6 +784,10 @@ module Ruby2JS
             rhs = node.children[1]
             if rhs
               inferred = infer_ivar_type(rhs)
+              # If RHS is a local variable, look up its tracked type
+              if inferred.nil? && rhs.type == :lvar && meta[:lvar_types]
+                inferred = meta[:lvar_types][rhs.children[0]]
+              end
               if inferred
                 meta[:ivar_types] = {} unless meta[:ivar_types]
                 meta[:ivar_types][name] = inferred

@@ -462,6 +462,7 @@ module Ruby2JS
         if defined?(@var_types)
           types.each_pair do |name, type_str|
             @var_types[name.to_sym] = type_str.to_sym
+            @var_types[:"@#{name}"] = type_str.to_sym
           end
         end
       end

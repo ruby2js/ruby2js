@@ -1156,6 +1156,22 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(types['people']).must_equal 'map'
     end
 
+    it "records map type for group_by via local variable" do
+      metadata = to_js_with_metadata(<<~RUBY)
+        class EventsController < ApplicationController
+          def summary
+            people = Person.all.to_a
+            people_by_type = people.group_by(&:type)
+            @people_by_type = people_by_type
+          end
+        end
+      RUBY
+
+      types = metadata.dig('view_types', 'events/summary')
+      _(types).wont_be_nil
+      _(types['people_by_type']).must_equal 'map'
+    end
+
     it "records array type for to_a result" do
       metadata = to_js_with_metadata(<<~RUBY)
         class EventsController < ApplicationController
