@@ -339,7 +339,7 @@ module Ruby2JS
               params: params
             }
 
-            if controller
+            if controller && standalone
               store_route_mapping("#{as_name}_path", controller, false, nesting_prefix, action: action)
             end
           end
