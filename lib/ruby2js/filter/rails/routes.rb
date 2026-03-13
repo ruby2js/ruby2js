@@ -294,12 +294,16 @@ module Ruby2JS
           }.join
           full_path = "#{base_path}#{path_prefix}/#{raw_path}" if raw_path
 
+          standalone = !@rails_current_resource || (!on_collection && !on_member)
+
           if full_path && controller && action
             @rails_routes_list << {
               path: full_path,
               controller: controller,
               action: transform_action_name(action.to_sym).to_s,
-              method: http_method.to_s.upcase
+              method: http_method.to_s.upcase,
+              standalone: standalone,
+              as_name: as_name
             }
 
             # Track member/collection routes on the current resource
@@ -861,6 +865,18 @@ module Ruby2JS
             statements << build_router_resources_call(resource)
           end
 
+          # Generate Router.addRoute() calls for standalone routes
+          # Skip namespaced controllers (e.g., Rails::HealthController) that aren't app controllers
+          standalone_routes = @rails_routes_list.select { |r| r[:standalone] && !r[:controller].include?('::') }
+          standalone_routes.each do |route|
+            statements << s(:send,
+              s(:const, nil, :Router), :addRoute,
+              s(:str, route[:method]),
+              s(:str, route[:path].sub(%r{^/}, '')),
+              s(:const, nil, route[:controller].to_sym),
+              s(:str, route[:action]))
+          end
+
           # Generate routes dispatch object
           statements << build_routes_dispatch_object
 
@@ -957,6 +973,33 @@ module Ruby2JS
           pairs = []
 
           collect_routes_entries(@rails_resources, nil, pairs)
+
+          # Add standalone routes (those not part of a resources block)
+          standalone_routes = @rails_routes_list.select { |r| r[:standalone] && r[:as_name] && !r[:controller].include?('::') }
+          standalone_routes.each do |route|
+            controller = s(:const, nil, route[:controller].to_sym)
+            http_method = route[:method].downcase.to_sym
+            custom_action = route[:action].to_sym
+
+            if http_method == :get
+              handler = s(:pair, s(:sym, http_method),
+                s(:block,
+                  s(:send, nil, :proc),
+                  s(:args),
+                  s(:send, controller, custom_action, s(:send, nil, :createContext))))
+            else
+              controller_call = s(:send, controller, custom_action,
+                s(:lvar, :context),
+                s(:lvar, :params))
+              handler = s(:pair, s(:sym, http_method),
+                s(:block,
+                  s(:send, nil, :async),
+                  s(:args, s(:arg, :event)),
+                  wrap_with_result_handler(controller_call)))
+            end
+
+            pairs << s(:pair, s(:sym, route[:as_name].to_sym), s(:hash, handler))
+          end
 
           s(:casgn, nil, :routes, s(:hash, *pairs))
         end

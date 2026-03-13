@@ -131,6 +131,20 @@ export class RouterBase {
     });
   }
 
+  // Register a standalone route (e.g., get "event/settings", to: "events#settings")
+  static addRoute(method, path, controller, action) {
+    const base = this.basePath;
+    const fullPath = `${base}/${path}`;
+    const pattern = new RegExp('^' + fullPath.replace(/:(\w+)/g, '([^/]+)') + '$');
+    this.routes.push({
+      method: method.toUpperCase(),
+      pattern,
+      controller,
+      controllerName: path.replace(/\//g, '_'),
+      action
+    });
+  }
+
   // Find matching route for a path
   static match(path, method = 'GET') {
     // Handle URL objects or other non-string paths
