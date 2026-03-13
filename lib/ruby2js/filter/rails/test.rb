@@ -1090,12 +1090,17 @@ module Ruby2JS
             s(:send, s(:attr, s(:send, nil, :expect, process(actual)), :not), :toBe, process(expected))
 
           when :assert_nil
-            # assert_nil x -> expect(x).toBeNull()
-            s(:send!, s(:send, nil, :expect, process(args.first)), :toBeNull)
+            # assert_nil x -> expect(x).toBeOneOf([null, undefined])
+            # Ruby nil maps to JS undefined, but some JS APIs return null;
+            # toBeOneOf handles both without fragile null/undefined distinction.
+            s(:send, s(:send, nil, :expect, process(args.first)),
+              :toBeOneOf, s(:array, s(:nil), s(:lvar, :undefined)))
 
           when :assert_not_nil, :refute_nil
-            # assert_not_nil x -> expect(x).not.toBeNull()
-            s(:send!, s(:attr, s(:send, nil, :expect, process(args.first)), :not), :toBeNull)
+            # assert_not_nil x -> expect(x).toBeDefined()
+            # toBeDefined rejects undefined; null is still "defined" and truthy
+            # enough for assert_not_nil semantics (value exists).
+            s(:send!, s(:send, nil, :expect, process(args.first)), :toBeDefined)
 
           when :assert_includes
             # assert_includes collection, item -> expect(await collection).toContain(item)

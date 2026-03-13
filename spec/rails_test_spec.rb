@@ -418,7 +418,7 @@ describe Ruby2JS::Filter::Rails::Test do
       assert_includes result, 'toEqual'
     end
 
-    it "converts assert_nil to expect().toBeNull()" do
+    it "converts assert_nil to expect().toBeOneOf([null, undefined])" do
       result = to_js(<<~RUBY)
         class FooTest < ActiveSupport::TestCase
           test "nil" do
@@ -426,10 +426,10 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(x).toBeNull()'
+      assert_includes result, 'expect(x).toBeOneOf([null, undefined])'
     end
 
-    it "converts assert_not_nil to expect().not.toBeNull()" do
+    it "converts assert_not_nil to expect().toBeDefined()" do
       result = to_js(<<~RUBY)
         class FooTest < ActiveSupport::TestCase
           test "not nil" do
@@ -437,7 +437,7 @@ describe Ruby2JS::Filter::Rails::Test do
           end
         end
       RUBY
-      assert_includes result, 'expect(x).not.toBeNull()'
+      assert_includes result, 'expect(x).toBeDefined()'
     end
 
     it "converts assert_kind_of Integer to Number.isInteger" do
