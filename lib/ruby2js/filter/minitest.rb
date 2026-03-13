@@ -162,8 +162,28 @@ module Ruby2JS
 
         when :assert_kind_of
           # assert_kind_of klass, obj -> expect(obj).toBeInstanceOf(klass)
+          # Special cases for Ruby types without JS class equivalents
           klass, obj = args[0], args[1]
-          s(:send, s(:send, nil, :expect, process(obj)), :toBeInstanceOf, process(klass))
+          klass_name = klass.type == :const ? klass.children.last : nil
+
+          if klass_name == :Integer
+            # assert_kind_of Integer, x -> expect(Number.isInteger(x)).toBeTruthy()
+            s(:send, s(:send, nil, :expect,
+              s(:send, s(:const, nil, :Number), :isInteger, process(obj))),
+              :toBeTruthy)
+          elsif klass_name == :Float || klass_name == :Numeric
+            # assert_kind_of Float, x -> expect(typeof x).toBe("number")
+            s(:send, s(:send, nil, :expect,
+              s(:send, nil, :typeof, process(obj))),
+              :toBe, s(:str, "number"))
+          elsif klass_name == :String
+            # assert_kind_of String, x -> expect(typeof x).toBe("string")
+            s(:send, s(:send, nil, :expect,
+              s(:send, nil, :typeof, process(obj))),
+              :toBe, s(:str, "string"))
+          else
+            s(:send, s(:send, nil, :expect, process(obj)), :toBeInstanceOf, process(klass))
+          end
 
         when :assert_respond_to
           # assert_respond_to obj, method -> expect(typeof obj.method).toBe('function')

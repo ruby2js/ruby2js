@@ -1037,6 +1037,27 @@ module Ruby2JS
             klass, obj = args[0], args[1]
             s(:send, s(:send, nil, :expect, process(obj)), :toBeInstanceOf, process(klass))
 
+          when :assert_kind_of
+            # assert_kind_of klass, obj -> type-appropriate check
+            klass, obj = args[0], args[1]
+            klass_name = klass.type == :const ? klass.children.last : nil
+
+            if klass_name == :Integer
+              s(:send, s(:send, nil, :expect,
+                s(:send, s(:const, nil, :Number), :isInteger, process(obj))),
+                :toBeTruthy)
+            elsif klass_name == :Float || klass_name == :Numeric
+              s(:send, s(:send, nil, :expect,
+                s(:send, nil, :typeof, process(obj))),
+                :toBe, s(:str, "number"))
+            elsif klass_name == :String
+              s(:send, s(:send, nil, :expect,
+                s(:send, nil, :typeof, process(obj))),
+                :toBe, s(:str, "string"))
+            else
+              s(:send, s(:send, nil, :expect, process(obj)), :toBeInstanceOf, process(klass))
+            end
+
           when :assert_predicate
             # assert_predicate obj, :predicate? -> expect(obj.predicate()).toBeTruthy()
             obj, pred = args[0], args[1]

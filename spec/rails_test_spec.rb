@@ -440,6 +440,39 @@ describe Ruby2JS::Filter::Rails::Test do
       assert_includes result, 'expect(x).not.toBeNull()'
     end
 
+    it "converts assert_kind_of Integer to Number.isInteger" do
+      result = to_js(<<~RUBY)
+        class FooTest < ActiveSupport::TestCase
+          test "integer" do
+            assert_kind_of Integer, x
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(Number.isInteger(x)).toBeTruthy()'
+    end
+
+    it "converts assert_kind_of String to typeof check" do
+      result = to_js(<<~RUBY)
+        class FooTest < ActiveSupport::TestCase
+          test "string" do
+            assert_kind_of String, x
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(typeof x).toBe("string")'
+    end
+
+    it "converts assert_kind_of with class to toBeInstanceOf" do
+      result = to_js(<<~RUBY)
+        class FooTest < ActiveSupport::TestCase
+          test "instance" do
+            assert_kind_of MyClass, x
+          end
+        end
+      RUBY
+      assert_includes result, 'expect(x).toBeInstanceOf(MyClass)'
+    end
+
     it "converts assert_includes to expect().toContain()" do
       result = to_js(<<~RUBY)
         class FooTest < ActiveSupport::TestCase
