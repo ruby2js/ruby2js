@@ -692,6 +692,9 @@ module Ruby2JS
                 meta['controller_files'].each do |cname, cfile| # Pragma: entries
                   ctrl_file = cfile if cname == name
                 end
+                # Skip controllers not found in metadata — they may be
+                # phantom controllers inferred from standalone route helpers
+                next unless ctrl_file
               end
               if ctrl_file
                 ctrl_rb = ctrl_file.sub(/\.js$/, '.rb')
@@ -1318,6 +1321,8 @@ module Ruby2JS
               next if prefix_candidate.empty?
 
               # Resource must be a plausible name (at least 2 chars)
+              # Skip RESTful action names that aren't resource names
+              next if %w[index show new edit create update destroy].include?(resource_candidate)
               if resource_candidate.length > 1
                 action_or_parent = prefix_candidate
                 rc_plural = Ruby2JS::Inflector.pluralize(resource_candidate)

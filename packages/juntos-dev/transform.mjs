@@ -524,6 +524,30 @@ export async function buildAppManifest(appRoot, config, { mode = 'vite' } = {}) 
     }
   }
 
+  // Pre-analyze routes to populate routes_mapping metadata.
+  // This lets the test filter correctly resolve standalone route helpers
+  // (e.g., settings_event_index_path) to the right controller.
+  const routesFile = path.join(appRoot, 'config/routes.rb');
+  if (fs.existsSync(routesFile)) {
+    try {
+      const source = fs.readFileSync(routesFile, 'utf-8');
+      const { convert } = await ensureRuby2jsReady();
+      const routesSectionConfig = config.sections?.routes || null;
+      const routesOptions = {
+        ...getBuildOptions(null, config.target, routesSectionConfig),
+        file: 'config/routes.rb',
+        database: config.database,
+        target: config.target,
+        paths_only: true,
+        base: config.base || '/',
+        metadata
+      };
+      convert(source, routesOptions);
+    } catch (err) {
+      // Routes pre-analysis is best-effort; skip failures
+    }
+  }
+
   return { metadata, modelCache };
 }
 

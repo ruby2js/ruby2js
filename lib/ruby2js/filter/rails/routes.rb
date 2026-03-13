@@ -340,7 +340,7 @@ module Ruby2JS
             }
 
             if controller
-              store_route_mapping("#{as_name}_path", controller, false, nesting_prefix)
+              store_route_mapping("#{as_name}_path", controller, false, nesting_prefix, action: action)
             end
           end
 
@@ -755,17 +755,26 @@ module Ruby2JS
           prefix.empty? ? '' : "#{prefix}_"
         end
 
-        def store_route_mapping(helper_name, resource_name, is_singular, prefix_str)
+        def store_route_mapping(helper_name, resource_name, is_singular, prefix_str, action: nil)
           return unless @options[:metadata]
           mapping = (@options[:metadata][:routes_mapping] ||= {})
-          ctrl = "#{resource_name.to_s.split('_').map(&:capitalize).join}Controller"
+          rname = resource_name.to_s
+          if rname.end_with?('Controller')
+            ctrl = rname
+            base = Ruby2JS::Inflector.underscore(rname.sub(/Controller$/, ''))
+          else
+            ctrl = "#{rname.split('_').map(&:capitalize).join}Controller"
+            base = rname
+          end
           parent = prefix_str.chomp('_')
-          mapping[helper_name.to_s] = {
+          entry = {
             controller: ctrl,
-            base: resource_name.to_s,
+            base: base,
             singular: is_singular,
             action_or_parent: parent.empty? ? nil : parent
           }
+          entry[:action] = action if action
+          mapping[helper_name.to_s] = entry
         end
 
         def build_routes_module
