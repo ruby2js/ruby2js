@@ -1523,7 +1523,7 @@ function runInit(options) {
       existing.devDependencies['vite'] = '^7.0.0';
     }
     if (!existing.devDependencies['vitest']) {
-      existing.devDependencies['vitest'] = '^2.0.0';
+      existing.devDependencies['vitest'] = '^4.0.0';
     }
     if (!existing.devDependencies['jsdom']) {
       existing.devDependencies['jsdom'] = '^28.1.0';
@@ -1555,7 +1555,7 @@ function runInit(options) {
       },
       devDependencies: {
         vite: '^7.0.0',
-        vitest: '^2.0.0',
+        vitest: '^4.0.0',
         jsdom: '^28.1.0'
       }
     };

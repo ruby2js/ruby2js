@@ -1152,7 +1152,7 @@ export function generatePackageJsonForEject(appName, config = {}) {
     },
     devDependencies: {
       'vite': '^7.0.0',
-      'vitest': '^2.0.0'
+      'vitest': '^4.0.0'
     }
   };
 
