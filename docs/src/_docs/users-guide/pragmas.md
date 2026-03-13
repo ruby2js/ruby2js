@@ -43,6 +43,7 @@ This is the key insight: pragmas let you fine-tune JavaScript output without aff
 | `array`                  | Treat as Array        | `items << x # Pragma: array`      |
 | `hash`                   | Treat as Hash         | `data.dup # Pragma: hash`         |
 | `set`                    | Treat as Set          | `s << x # Pragma: set`            |
+| `map`                    | Treat as Map          | `m[k] # Pragma: map`             |
 | `entries`                | Use Object.entries()  | `h.each {...} # Pragma: entries`  |
 | `method`                 | Direct invocation     | `fn.call(x) # Pragma: method`     |
 | `logical` or `\|\|`      | Force `\|\|`          | `x \|\|= y # Pragma: logical`     |
@@ -124,6 +125,36 @@ items << "new_item" # Pragma: array
 
 # .dup behaves differently for Array vs Hash
 backup = config.dup # Pragma: hash
+```
+
+### Maps and group_by
+
+`group_by` returns a Map (not a plain object), preserving non-string keys.
+The type is inferred automatically — no pragma needed:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2024,
+  "filters": ["pragma", "functions"]
+}'></div>
+
+```ruby
+groups = items.group_by(&:category)
+groups.keys.sort.each { |k| puts groups[k].length }
+```
+
+For Maps from other sources, use the `map` pragma:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["pragma", "functions"]
+}'></div>
+
+```ruby
+cache = Map.new
+cache[:key] = value     # No pragma — type inferred from Map.new
+puts cache[:key]
+
+data[field] # Pragma: map
 ```
 
 ### Hash Iteration
@@ -350,7 +381,7 @@ alias :kind_of? :is_a? # Pragma: skip
 | -------------- | -------------------------------- | ------------------------------- |
 | **Exclusion**  | `skip`                           | Ruby-only code                  |
 | **Classes**    | `extend`                         | Monkey patching built-ins       |
-| **Type hints** | `array`, `hash`, `set`, `string` | Ambiguous operations            |
+| **Type hints** | `array`, `hash`, `set`, `map`, `string` | Ambiguous operations            |
 | **Iteration**  | `entries`                        | Hash `.each`, `.select`, `.map` |
 | **Functions**  | `method`, `function`             | Callables, DOM handlers         |
 | **Operators**  | `??`, `logical`, `guard`         | OR semantics, splat safety      |

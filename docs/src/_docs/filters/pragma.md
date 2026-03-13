@@ -319,6 +319,9 @@ m[key] = value # Pragma: map
 m.key?(key) # Pragma: map
 # => m.has(key)
 
+m.include?(key) # Pragma: map
+# => m.has(key)
+
 m.delete(key) # Pragma: map
 # => m.delete(key)
 
@@ -330,6 +333,28 @@ m.size # Pragma: map
 
 m.empty? # Pragma: map
 # => m.size == 0
+
+m.keys # Pragma: map
+# => Array.from(m.keys())
+
+m.values # Pragma: map
+# => Array.from(m.values())
+```
+
+**Map iteration** works with standard Ruby methods:
+
+```ruby
+# .each / .each_pair — iterates key-value pairs
+m.each { |k, v| process(k, v) } # Pragma: map
+# => for (let [k, v] of m) { process(k, v) }
+
+# .map / .collect — transforms entries to array
+m.map { |k, v| "#{k}: #{v}" } # Pragma: map
+# => Array.from(m, ([k, v]) => `${k}: ${v}`)
+
+# .select — filters entries into a new Map
+m.select { |k, v| v > 0 } # Pragma: map
+# => new Map([...m].filter(([k, v]) => v > 0))
 ```
 
 **When to use:** When working with JavaScript `Map` objects. By default:
@@ -342,7 +367,11 @@ m.empty? # Pragma: map
 - `.empty?` becomes `.length == 0` (array/string behavior)
 
 Use this pragma to get the correct Map methods: `.get()`, `.set()`, `.has()`,
-`.delete()`, `.clear()`, `.size`, and `.empty?`.
+`.delete()`, `.clear()`, `.size`, `.empty?`, `.keys`, and `.values`.
+
+**Note:** `group_by` results are automatically typed as Map (see
+[Type Inference](#type-inference)), so pragmas are rarely needed for Maps in
+practice.
 
 ### `string`
 
@@ -395,7 +424,11 @@ Types are inferred from:
   `strip`, `chomp`, `chop`, `gsub`, `sub`, `tr`, `squeeze`
 - Hash-returning: `to_h`
 - Block methods: `map`, `select`, `reject`, `flat_map`, `sort_by`, `collect`,
-  `filter_map` → array; `group_by` → hash
+  `filter_map` → array; `group_by` → map
+
+**Grouping:**
+- `group_by { }` → map (uses `Map.groupBy` in ES2024+)
+- `group_by(&:field)` → map
 
 **Callable types:**
 - `proc { }` → proc (callable with `[]`)
@@ -437,6 +470,14 @@ words << "end"
 results = data.select { |x| x > 0 }
 results += extra
 # => let results = data.filter(x => x > 0); results.push(...extra)
+
+# Type inferred from group_by — Map operations used automatically
+groups = items.group_by(&:category)
+groups.keys.each { |k| puts groups[k].length }
+# => let groups = Map.groupBy(items, item => item.category)
+# => for (let k of Array.from(groups.keys())) {
+# =>   console.log(groups.get(k).length)
+# => }
 
 pairs = entries.to_h
 pairs.delete(:key)
@@ -583,6 +624,10 @@ class Counter {
 
 **Note:** Instance variable types are only tracked when assigned in `initialize`.
 Types assigned in other methods are not propagated class-wide.
+
+**Rails controllers:** When using Juntos, instance variable types set in
+controller actions are automatically propagated to corresponding ERB views.
+See [Cross-File Metadata](/docs/juntos/type-inference) for details.
 
 ### Pragma Override
 

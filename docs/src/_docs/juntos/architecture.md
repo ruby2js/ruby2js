@@ -369,8 +369,8 @@ The original `.rb` files are copied alongside for debugger access. In browser De
 1. **Load configuration** — Read `config/database.yml`, determine target
 2. **Copy runtime** — Copy target-specific `rails.js` and database adapter
 3. **Transpile models** — Apply rails/model filter
-4. **Transpile controllers** — Apply rails/controller filter
-5. **Transpile views** — Compile ERB to Ruby, apply rails/helpers filter
+4. **Transpile controllers** — Apply rails/controller filter, [infer instance variable types](/docs/juntos/type-inference#controller--view-type-inference)
+5. **Transpile views** — Compile ERB to Ruby, apply rails/helpers filter (uses [controller type metadata](/docs/juntos/type-inference))
 6. **Transpile routes** — Generate route definitions and path helpers
 7. **Transpile migrations** — Generate async migration functions
 8. **Generate entry point** — Create index.html or serverless handler

@@ -9,19 +9,6 @@ Ruby2JS is a Ruby to JavaScript transpiler. It parses Ruby source code and gener
 **Website:** https://www.ruby2js.com/
 **Documentation:** https://www.ruby2js.com/docs/
 
-## IMPORTANT: Read VISION.md First
-
-Before making implementation choices, read **[VISION.md](./VISION.md)**. It contains the foundational principles that guide this project:
-
-1. **Ruby → JavaScript** - A useful subset transpiles cleanly
-2. **ERB → JSX** - Well-formed templates transpile to JSX
-3. **MVC ≅ SFC** - Same concepts, different packaging
-
-**Key guidance from VISION.md:**
-- Use existing infrastructure (adapters, targets) - don't hard-code what should be pluggable
-- Fix bugs in the existing approach before pivoting to a "simpler" solution
-- Preserve deployment optionality - same source should build for browser, Node, and edge
-
 ## Architecture
 
 ```
@@ -94,9 +81,6 @@ bundle exec rake test
 
 # Run specific spec file
 bundle exec rake spec SPEC=spec/converter_spec.rb
-
-# Run with specific Ruby version
-RUBY_VERSION=3.3 bundle exec rake test
 ```
 
 ### Demo Integration and System Tests
@@ -105,16 +89,10 @@ The `test/Rakefile` provides tasks for testing demo applications (blog, chat, no
 
 ```bash
 # Integration tests (automated, uses vitest)
-# Builds tarballs, creates demo, runs its test suite
 bundle exec rake -f test/Rakefile integration[blog]
 
 # System tests (manual browser testing with Docker)
-# Builds and runs demo in container, open http://localhost:3000
 bundle exec rake -f test/Rakefile system[blog,sqlite,node]
-bundle exec rake -f test/Rakefile system[blog,dexie,browser]
-
-# Stop system test container
-bundle exec rake -f test/Rakefile system_stop[blog]
 
 # List available demos
 bundle exec rake -f test/Rakefile list
@@ -159,65 +137,25 @@ Several CLI tools are available for debugging transpilation issues:
 
 **Ruby CLI (`bin/ruby2js`)** - The main Ruby-based converter:
 ```bash
-# Basic conversion
-bin/ruby2js -e 'self.foo ||= 1'
-
-# Show AST before filters
-bin/ruby2js --ast -e 'self.foo ||= 1'
-
-# Show AST after filters (what converter sees)
-bin/ruby2js --filtered-ast -e 'self.foo ||= 1'
-
-# Apply specific filters
-bin/ruby2js --filter functions --filter esm -e 'puts "hello"'
+bin/ruby2js -e 'self.foo ||= 1'              # Basic conversion
+bin/ruby2js --ast -e 'self.foo ||= 1'         # Show AST before filters
+bin/ruby2js --filtered-ast -e 'self.foo ||= 1' # Show AST after filters
+bin/ruby2js --filter functions -e 'puts "hello"' # Apply specific filters
 ```
 
 **JavaScript CLI (`demo/selfhost/ruby2js-cli.js`)** - The self-hosted JS converter:
 ```bash
 cd demo/selfhost
-
-# Basic conversion (inline code or stdin)
-node ruby2js-cli.js -e 'self.foo ||= 1'
-echo 'self.foo ||= 1' | node ruby2js-cli.js
-
-# Show AST (s-expression format, like Ruby CLI)
-node ruby2js-cli.js --ast -e 'self.foo'
-
-# Show raw Prism AST (JavaScript objects)
-node ruby2js-cli.js --prism-ast -e 'self.foo'
-
-# Find nodes matching a pattern in Prism AST
-node ruby2js-cli.js --find=OrAssign -e 'self.foo ||= 1'
-
-# Inspect specific property paths
-node ruby2js-cli.js --inspect=root.statements.body[0] -e 'self.foo ||= 1'
-
-# ES level and comparison options (aligned with Ruby CLI)
-node ruby2js-cli.js --es2022 --identity -e 'x == y'
+node ruby2js-cli.js -e 'self.foo ||= 1'       # Basic conversion
+node ruby2js-cli.js --ast -e 'self.foo'        # Show AST (s-expression)
+node ruby2js-cli.js --find=OrAssign -e 'x ||= 1' # Find Prism AST nodes
 ```
 
-**Comparison Tool (`bin/compare`)** - Compare Ruby vs JS transpiler output side-by-side:
+**Comparison Tool (`bin/compare`)** - Compare Ruby vs JS transpiler output:
 ```bash
-# Compare inline code
-bin/compare -e 'foo rescue nil'
-
-# Compare file with filters
-bin/compare --filter rails --es2022 demo/blog/app/models/comment.rb
-
-# Show unified diff instead of side-by-side
-bin/compare --diff -e 'x ||= 1'
+bin/compare -e 'foo rescue nil'                # Side-by-side comparison
+bin/compare --diff -e 'x ||= 1'               # Unified diff
 ```
-
-**Comment Debugger (`bin/debug-comments`)** - Debug comment associations after filtering:
-```bash
-# Show how comments are associated with AST nodes
-bin/debug-comments demo/blog/app/models/comment.rb
-
-# With specific filters
-bin/debug-comments --filter rails file.rb
-```
-
-These tools help debug differences between Ruby and JS converters, especially for self-hosting work.
 
 ## Documentation
 
@@ -228,123 +166,10 @@ The documentation source is in `docs/src/_docs/` and includes:
 
 When trying to understand how a feature is intended to work, review the relevant documentation pages. Each page has live demos showing expected input/output.
 
-## Online Demo
+## Specialized Reference Files
 
-Two demos are available at ruby2js.com:
+These files contain detailed guidance for specific subsystems. Read them when working in those areas:
 
-- **[Opal-based demo](https://www.ruby2js.com/demo/)** - Full filter support, uses Opal (Ruby compiled to JavaScript), ~5MB
-- **[Self-hosted demo](https://www.ruby2js.com/demo/selfhost/)** - Basic transliteration, uses transpiled Ruby2JS, ~200KB + Prism WASM
-
-The demo code is in `docs/src/demo/`. The self-hosted version uses the unified `ruby2js.mjs` bundle from `demo/selfhost/`.
-
-## Selfhost Testing
-
-The selfhost project (`demo/selfhost/`) transpiles Ruby2JS itself to JavaScript, enabling the converter to run in browsers. Ruby specs are also transpiled and run against the JS converter.
-
-### Spec Manifest Categories
-
-The `demo/selfhost/spec_manifest.json` tracks which specs work with the selfhost converter:
-
-- **ready**: Specs that must pass (CI fails if they don't)
-- **partial**: Specs being worked on (failures are informational)
-- **blocked**: Specs waiting on dependencies (e.g., filters not yet transpiled)
-
-### Building Selfhost
-
-Run from the repository root:
-
-```bash
-# Build everything for local development
-bundle exec rake -f demo/selfhost/Rakefile local
-
-# Build everything for npm release (tarballs in artifacts/tarballs/)
-bundle exec rake -f demo/selfhost/Rakefile release
-
-# Clean all generated files
-bundle exec rake -f demo/selfhost/Rakefile clean
-```
-
-The `local` build uses relative paths for development. The `release` build converts to npm package imports and creates tarballs.
-
-### Running Selfhost Tests
-
-```bash
-cd demo/selfhost
-
-# Run all specs
-node run_all_specs.mjs
-
-# Run with failure details for partial specs
-node run_all_specs.mjs --verbose
-
-# Run only ready specs (for CI)
-node run_all_specs.mjs --ready-only
-
-# Run only partial specs (for development)
-node run_all_specs.mjs --partial-only
-
-# Skip transpilation (use pre-built files)
-node run_all_specs.mjs --skip-transpile
-```
-
-### Debugging a Specific Spec
-
-To debug a failing spec with full details:
-
-```bash
-# Rebuild everything (from repository root)
-bundle exec rake -f demo/selfhost/Rakefile local
-
-cd demo/selfhost
-
-# Transpile just one spec
-bundle exec ruby scripts/transpile_spec.rb ../../spec/serializer_spec.rb > dist/serializer_spec.mjs
-
-# Run it directly to see all failures
-node -e "
-import('./test_harness.mjs').then(async h => {
-  await h.initPrism();
-  await import('./dist/serializer_spec.mjs');
-  h.runTests();
-});
-"
-```
-
-### Common Failure Patterns
-
-1. **Transpilation bug**: The Ruby-to-JS conversion produces incorrect code
-   - Check `lib/ruby2js/filter/` for filter issues
-   - Check `lib/ruby2js/converter/` for conversion issues
-   - Use `bin/ruby2js --ast` vs `--filtered-ast` to see where transformation happens
-
-2. **Missing polyfill**: A Ruby method has no JS equivalent in the test harness
-   - Add to `demo/selfhost/test_harness.mjs`
-
-3. **Runtime incompatibility**: Code works in Ruby but not in JS
-   - Fix in source Ruby file (`lib/ruby2js/*.rb`) with dual-compatible code
-   - Example: `arg.is_a?(Range)` won't work in JS; use `arg.respond_to?(:begin)` instead
-
-### Promoting Specs
-
-When a partial spec passes all tests:
-1. Move it from `partial` to `ready` in `spec_manifest.json`
-2. Commit and push - CI will now enforce it passes
-
-### Debugging Selfhost Transpilation Failures
-
-**Never edit generated files.** Files ending in `.js` in the selfhost directory are generated outputs. Fix issues in the original source:
-- Ruby source in `lib/ruby2js/` (for dual-compatible code)
-- Converter handlers in `lib/ruby2js/converter/`
-- Filters in `lib/ruby2js/filter/`
-
-**Approach selection:**
-- Few occurrences → change Ruby source (e.g., add explicit `self.`)
-- Pervasive pattern → change selfhost filter
-- Affects all users → change core Ruby2JS filter
-
-**Workflow:**
-1. Rebuild and run tests: `bundle exec rake -f demo/selfhost/Rakefile local && cd demo/selfhost && node run_all_specs.mjs --verbose`
-2. Create minimal reproduction: `bin/ruby2js --filter selfhost -e 'your_code'`
-3. Examine AST: `bin/ruby2js --filter selfhost --filtered-ast -e 'your_code'`
-4. Assess how widespread the issue is with grep
-5. Fix and verify
+- **[SELFHOST.md](./SELFHOST.md)** - Building, testing, and debugging the selfhost transpiler (`demo/selfhost/`)
+- **[METADATA.md](./METADATA.md)** - Cross-file metadata pipeline: how Rails filters share type info between controllers, models, and views
+- **[VISION.md](./VISION.md)** - Design principles: use existing infrastructure, fix bugs before pivoting, preserve deployment optionality

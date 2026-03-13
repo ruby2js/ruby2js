@@ -111,5 +111,6 @@ If you're familiar with Vue, Svelte, Astro, or React, see [Coming From...](/docs
 - **[Hotwire](/docs/juntos/hotwire)** — Real-time features and Stimulus controllers
 - **[CLI Reference](/docs/juntos/cli)** — The `juntos` commands
 - **[Architecture](/docs/juntos/architecture)** — What gets generated and how it works
+- **[Cross-File Metadata](/docs/juntos/type-inference)** — How types and model info flow between files
 - **[Testing](/docs/juntos/testing)** — Write tests for your transpiled app
 - **[Deployment](/docs/juntos/deploying/)** — Deploy to any target
