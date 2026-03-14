@@ -207,18 +207,20 @@ Same source files, different transpilation targets.
 When you select a browser database (`dexie`, `sqljs`, or `pglite`), `juntos test` automatically runs in Vitest browser mode — tests execute in a real Chromium browser instead of jsdom:
 
 ```bash
-# Node.js + jsdom (default)
+# Node.js + jsdom (run once)
 npx juntos test -d sqlite
 
-# Real browser + IndexedDB via Dexie
+# Real browser + IndexedDB via Dexie (watch mode)
 npx juntos test -d dexie
 
-# Real browser + SQLite WASM
-npx juntos test -d sqljs
+# Run once in browser (CI)
+npx juntos test -d dexie --run
 
-# Real browser + PGlite
-npx juntos test -d pglite
+# Watch mode with jsdom
+npx juntos test -d sqlite --watch
 ```
+
+Browser databases default to **watch mode** — the browser stays open and re-runs tests as you edit files. Server databases default to **run-once mode**. Use `--run` or `--watch` to override.
 
 On first run, `juntos test` auto-installs `@vitest/browser-playwright` and Chromium. The same test files work in both modes — only the database adapter and runtime environment change.
 

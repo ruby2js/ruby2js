@@ -4582,15 +4582,26 @@ async function runTest(options, testArgs) {
     }
   }
 
-  // Build vitest command
-  const args = ['vitest', 'run'];
+  // Determine watch vs run mode
+  const hasWatch = testArgs.includes('--watch');
+  const hasRun = testArgs.includes('--run');
+  const filteredArgs = testArgs.filter(a => a !== '--watch' && a !== '--run');
 
-  // Pass through any additional arguments (file patterns, etc.)
-  if (testArgs && testArgs.length > 0) {
-    args.push(...testArgs);
+  // Default: browser targets watch, others run once
+  const watchMode = hasWatch || (!hasRun && isBrowserTest);
+
+  // Build vitest command
+  const args = ['vitest'];
+  if (!watchMode) {
+    args.push('run');
   }
 
-  console.log('Running tests...');
+  // Pass through any additional arguments (file patterns, etc.)
+  if (filteredArgs.length > 0) {
+    args.push(...filteredArgs);
+  }
+
+  console.log(watchMode ? 'Running tests in watch mode...' : 'Running tests...');
   const result = spawnSync('npx', args, {
     cwd: APP_ROOT,
     stdio: 'inherit',
@@ -5440,10 +5451,17 @@ switch (command) {
       console.log('Usage: juntos test [options] [files...]\n\nRun tests with Vitest.\n');
       console.log('Options:');
       console.log('  -d, --database ADAPTER   Database adapter for tests');
-      console.log('\nExamples:');
+      console.log('  --watch                  Watch mode (re-run on file changes)');
+      console.log('  --run                    Run once and exit (CI mode)');
+      console.log('\nBrowser databases (dexie, sqljs, pglite) default to watch mode.');
+      console.log('Server databases (sqlite, pg, etc.) default to run-once mode.\n');
+      console.log('Examples:');
       console.log('  juntos test                    # Run all tests');
       console.log('  juntos test articles.test.mjs  # Run specific test file');
       console.log('  juntos test -d sqlite          # Run tests with SQLite');
+      console.log('  juntos test -d dexie           # Run in browser (watch mode)');
+      console.log('  juntos test -d dexie --run     # Run in browser once (CI)');
+      console.log('  juntos test -d sqlite --watch  # Watch mode with jsdom');
       process.exit(0);
     }
     runTest(options, commandArgs).catch(err => {
