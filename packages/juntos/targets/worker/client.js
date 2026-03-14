@@ -177,8 +177,9 @@ export class Application extends ApplicationBase {
   static bridge = null;
 
   static async start() {
-    // Check for SharedWorker support
-    if (typeof SharedWorker === 'undefined') {
+    // Check for SharedWorker support (use globalThis — bare SharedWorker
+    // may be undefined inside ES modules in some Firefox versions)
+    if (!globalThis.SharedWorker) {
       console.warn('[juntos] SharedWorker not available, falling back to browser target');
       // @vite-ignore: browser fallback is not bundled — it requires a different
       // database adapter (Dexie/IndexedDB) that may not be installed
