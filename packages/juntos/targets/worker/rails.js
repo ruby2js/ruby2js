@@ -20,6 +20,7 @@ import {
 } from 'juntos/rails_server.js';
 
 import { setWorker } from 'juntos/adapters/active_record_worker.mjs';
+import { setStorageWorker } from 'juntos/adapters/active_storage_worker.mjs';
 
 // Re-export base helpers
 export { createContext, createFlash, truncate, pluralize, dom_id };
@@ -140,6 +141,9 @@ export class Application extends ApplicationServer {
     // Wire the dedicated Worker into the MessagePort adapter
     // so ActiveRecord queries flow through to the database
     setWorker(this.dbWorker);
+
+    // Wire the dedicated Worker for Active Storage file operations
+    setStorageWorker(this.dbWorker);
 
     // Initialize database in the dedicated Worker
     await this.initDatabaseWorker();

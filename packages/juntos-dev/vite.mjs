@@ -1352,8 +1352,7 @@ export * from 'juntos/adapters/active_record_worker.mjs';
 `;
                 }
                 if (id === '\0juntos:worker:active-storage') {
-                  // No-op: Active Storage not yet supported in SharedWorker context
-                  return `export function initActiveStorage() {}`;
+                  return `export * from 'juntos/adapters/active_storage_worker.mjs';`;
                 }
                 return null;
               }
@@ -2857,8 +2856,7 @@ export * from 'juntos/adapters/${adapterFile}';
       // Server version of juntos:active-storage
       if (id === '\0juntos:active-storage') {
         if (targetDir === 'worker') {
-          // No-op: Active Storage not yet supported in worker target
-          return `export function initActiveStorage() {}`;
+          return `export * from 'juntos/adapters/active_storage_worker.mjs';`;
         }
         return `export * from 'juntos/adapters/${storageAdapterFile}';`;
       }
