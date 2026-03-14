@@ -1949,6 +1949,10 @@ const DATABASE_PACKAGES = {
   indexeddb: ['dexie'],
   sqljs: ['sql.js'],
   'sql.js': ['sql.js'],
+  sqlite_wasm: ['@sqlite.org/sqlite-wasm'],
+  'sqlite-wasm': ['@sqlite.org/sqlite-wasm'],
+  wa_sqlite: ['wa-sqlite'],
+  'wa-sqlite': ['wa-sqlite'],
   pglite: ['@electric-sql/pglite'],
   // Node.js databases
   sqlite: ['better-sqlite3'],
@@ -1967,6 +1971,7 @@ const DATABASE_PACKAGES = {
 
 const RUNTIME_PACKAGES = {
   browser: ['@hotwired/turbo', '@hotwired/stimulus', 'react', 'react-dom'],
+  worker: ['@hotwired/turbo', '@hotwired/stimulus', 'react', 'react-dom'],
   node: ['@hotwired/turbo', '@hotwired/stimulus'],
   bun: ['@hotwired/turbo', '@hotwired/stimulus'],
   deno: []
@@ -1977,7 +1982,11 @@ const VALID_TARGETS = {
   // Browser-only databases
   dexie: ['browser', 'capacitor'],
   sqljs: ['browser', 'capacitor', 'electron', 'tauri', 'electrobun'],
-  pglite: ['browser', 'node', 'capacitor', 'electron', 'tauri', 'electrobun'],
+  sqlite_wasm: ['worker', 'browser', 'capacitor', 'electron', 'tauri', 'electrobun'],
+  'sqlite-wasm': ['worker', 'browser', 'capacitor', 'electron', 'tauri', 'electrobun'],
+  wa_sqlite: ['worker', 'browser', 'capacitor', 'electron', 'tauri', 'electrobun'],
+  'wa-sqlite': ['worker', 'browser', 'capacitor', 'electron', 'tauri', 'electrobun'],
+  pglite: ['worker', 'browser', 'node', 'capacitor', 'electron', 'tauri', 'electrobun'],
   // Node.js databases
   sqlite: ['node', 'bun', 'electron'],
   pg: ['node', 'bun', 'deno', 'electron'],
