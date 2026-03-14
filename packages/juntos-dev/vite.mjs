@@ -1308,6 +1308,10 @@ function createConfigPlugin(config, appRoot) {
           'globalThis.JUNTOS_HYDRATION': rpcState.dualBundleEnabled ? 'true' : 'false',
           // Worker target: tell the SharedWorker which real adapter
           // to load in the dedicated database Worker
+          // Worker target: define the SharedWorker URL for client.js
+          ...(config.target === 'worker' ? {
+            'WORKER_URL': '"/worker.js"'
+          } : {}),
           ...(config.target === 'worker' ? (() => {
             const adapterMap = {
               'pglite': 'active_record_pglite.mjs',
@@ -1349,6 +1353,7 @@ function createConfigPlugin(config, appRoot) {
         // build don't apply, so we provide a minimal resolver here.
         ...(config.target === 'worker' ? {
           worker: {
+            format: 'es',
             plugins: () => [{
               name: 'juntos-worker-virtual',
               resolveId(id) {
@@ -1381,7 +1386,10 @@ export * from 'juntos/adapters/active_record_worker.mjs';
             rollupOptions: {
               output: {
                 // Fingerprint worker scripts for cache busting
-                entryFileNames: 'assets/[name]-[hash].js'
+                entryFileNames: 'assets/[name]-[hash].js',
+                // Workers must be self-contained — they can't import
+                // chunks from the main thread bundle
+                inlineDynamicImports: true
               }
             }
           }
@@ -1773,10 +1781,18 @@ function getRollupOptions(target, database) {
       };
 
     case 'worker':
-      // Three entry points: client (main thread), SharedWorker, dedicated Worker
-      // All get content-hashed filenames for cache busting
+      // Two entry points: main thread HTML + SharedWorker JS
+      // The dedicated Worker (db_worker.js) is bundled automatically by Vite
       return {
-        input: '.browser/index.html'
+        input: {
+          main: '.browser/index.html',
+          worker: '.browser/worker.js'
+        },
+        output: {
+          // SharedWorker entry gets a fixed name (referenced by WORKER_URL define)
+          entryFileNames: (chunkInfo) =>
+            chunkInfo.name === 'worker' ? '[name].js' : 'assets/[name]-[hash].js'
+        }
       };
 
     case 'node':
@@ -1969,6 +1985,22 @@ function createBrowserEntryPlugin(config, appRoot) {
 
       // Generate main.js (real file, uses relative paths from .browser/)
       fs.writeFileSync(mainPath, getMainJs(false));
+
+      // Worker target: generate SharedWorker entry as a separate rollup input
+      // Bundled by the main Vite build (which has all transform plugins)
+      if (config.target === 'worker') {
+        const workerEntryPath = path.join(browserDir, 'worker.js');
+        const routesPath = '../config/routes.rb';
+        const layoutFile = path.join(appRoot, 'app/views/layouts/application.html.erb');
+        let workerJs = `// SharedWorker entry point\n`;
+        workerJs += `import { Application } from '${routesPath}';\n`;
+        if (fs.existsSync(layoutFile)) {
+          workerJs += `import { layout } from '${layoutFile.replace(appRoot + '/', '../')}';\n`;
+          workerJs += `Application.configure({ layout: layout });\n`;
+        }
+        workerJs += `Application.start();\n`;
+        fs.writeFileSync(workerEntryPath, workerJs);
+      }
 
       console.log('[juntos] Generated .browser/ entry files for build');
     },

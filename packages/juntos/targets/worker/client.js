@@ -187,11 +187,9 @@ export class Application extends ApplicationBase {
     }
 
     try {
-      // Create SharedWorker with Vite-fingerprinted URL
-      const worker = new SharedWorker(
-        new URL('./rails.js', import.meta.url),
-        { type: 'module', name: 'juntos' }
-      );
+      // WORKER_URL is defined at build time by Vite — it points to the
+      // fingerprinted SharedWorker bundle produced as a separate rollup entry
+      const worker = new SharedWorker(WORKER_URL, { type: 'module', name: 'juntos' });
 
       this.bridge = new WorkerBridge(worker);
 
