@@ -84,15 +84,15 @@ Builds and deploys to serverless platforms.
 
 ## Database Adapters
 
-| Adapter | Runtime | Storage | Model Operations |
-|---------|---------|---------|------------------|
+| Adapter | Target | Storage | Model Operations |
+|---------|--------|---------|------------------|
 | `dexie` | Browser | IndexedDB | Direct (local) |
 | `sqljs` | Browser | SQLite/WASM | Direct (local) |
-| `sqlite-wasm` | Browser | SQLite/WASM + OPFS | Direct (local) |
-| `wa-sqlite` | Browser | SQLite/WASM + OPFS | Direct (local) |
-| `pglite` | Browser, Node | PostgreSQL/WASM | Direct (local) |
-| `sqlite` | Node, Bun | SQLite file | Direct (server) |
-| `pg` | Node, Bun, Deno | PostgreSQL | Direct (server) |
+| `sqlite-wasm` | Worker | SQLite/WASM + OPFS | Direct (local) |
+| `wa-sqlite` | Worker | SQLite/WASM + OPFS | Direct (local) |
+| `pglite` | Worker | PostgreSQL/WASM + OPFS | Direct (local) |
+| `sqlite` | Node | SQLite file | Direct (server) |
+| `pg` | Node | PostgreSQL | Direct (server) |
 | `neon` | Vercel | Serverless PostgreSQL | Direct (server) |
 | `d1` | Cloudflare | Edge SQLite | Direct (server) |
 

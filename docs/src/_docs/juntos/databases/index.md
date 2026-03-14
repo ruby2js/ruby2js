@@ -80,13 +80,16 @@ bin/juntos up -d supabase
 
 ## Default Target Inference
 
-When you specify a universal database, Juntos defaults to Vercel deployment:
+When you specify a database, Juntos infers the deployment target:
 
 ```bash
-bin/juntos up -d neon        # → vercel target
-bin/juntos up -d turso       # → vercel target
-bin/juntos up -d planetscale # → vercel target
-bin/juntos up -d supabase    # → vercel target
+bin/juntos up -d dexie         # → browser target
+bin/juntos up -d sqlite-wasm   # → worker target (OPFS)
+bin/juntos up -d pglite        # → worker target (OPFS)
+bin/juntos up -d neon          # → vercel target
+bin/juntos up -d turso         # → vercel target
+bin/juntos up -d planetscale   # → vercel target
+bin/juntos up -d supabase      # → vercel target
 ```
 
 Override with `-t`:

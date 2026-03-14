@@ -84,11 +84,19 @@ No Ruby required. The generated code is idiomatic JavaScript—ES2022 classes, a
 
 ## Target Differences
 
+### Worker (SharedWorker)
+
+- Entry: `index.html` loads client bridge, which creates a `SharedWorker`
+- Routing: SharedWorker runs `Router.dispatch()` (same as server targets)
+- Database: SQLite/WASM or PGlite with OPFS persistence, in a dedicated Worker
+- Rendering: SharedWorker returns HTML via `MessagePort`, Turbo renders it
+- Multi-tab: One SharedWorker instance serves all tabs
+
 ### Browser
 
 - Entry: `index.html` loads `config/routes.js`
 - Routing: Client-side, updates `#hash` or uses History API
-- Database: IndexedDB (Dexie), SQLite/WASM, or PGlite
+- Database: IndexedDB (Dexie) or sql.js
 - Rendering: Direct DOM manipulation via `innerHTML`
 
 ### Node.js / Bun / Deno
@@ -143,6 +151,7 @@ Turbo Streams broadcasting uses WebSockets for real-time updates. Support varies
 
 | Target | WebSocket Implementation |
 |--------|-------------------------|
+| Worker | `BroadcastChannel` (SharedWorker + all tabs) |
 | Browser | `BroadcastChannel` (same-origin tabs) |
 | Node.js | `ws` package |
 | Bun | Native `Bun.serve` WebSocket |

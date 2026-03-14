@@ -17,7 +17,8 @@ These targets require transpilation. Rails can't run here; Juntos can:
 
 | Target | Best For | Database Options |
 |--------|----------|------------------|
-| **[Browser](/docs/juntos/deploying/browser)** | Offline-first, local-first, demos | Dexie, sql.js, PGlite |
+| **[Worker](/docs/juntos/deploying/worker)** | Offline-first with OPFS persistence | PGlite, sqlite-wasm, wa-sqlite |
+| **[Browser](/docs/juntos/deploying/browser)** | Offline-first, local-first, demos | Dexie, sql.js |
 | **[Vercel Edge](/docs/juntos/deploying/vercel)** | Global edge, auto-scaling | [Neon](/docs/juntos/databases/neon), [Turso](/docs/juntos/databases/turso), [PlanetScale](/docs/juntos/databases/planetscale), [Supabase](/docs/juntos/databases/supabase) |
 | **[Deno Deploy](/docs/juntos/deploying/deno-deploy)** | Edge, Deno/TypeScript native | [Neon](/docs/juntos/databases/neon), [Turso](/docs/juntos/databases/turso), [PlanetScale](/docs/juntos/databases/planetscale), [Supabase](/docs/juntos/databases/supabase) |
 | **[Cloudflare Workers](/docs/juntos/deploying/cloudflare)** | Edge computing, maximum distribution | D1, Turso |
@@ -43,22 +44,30 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 
 ## Quick Comparison
 
-| Aspect | Browser | Node.js | Fly.io | Vercel | Cloudflare | Capacitor | Electron | Tauri | Electrobun |
-|--------|---------|---------|--------|--------|------------|-----------|----------|-------|------------|
-| Infrastructure | None (static) | Server/container | Container | On-demand | On-demand | App stores | User install | User install | User install |
-| Scaling | N/A | Manual | Automatic | Automatic | Automatic | Per-device | Per-device | Per-device | Per-device |
-| Cold starts | None | N/A | ~200-500ms | ~50-250ms | ~5-50ms | None | None | None | None |
-| Database | Client-side | TCP/file | MPG (Postgres) | HTTP APIs | D1 binding | Client-side | File/client | Client-side | Client-side |
-| Native APIs | Limited | N/A | N/A | N/A | N/A | Full device | Full OS | Rust backend | Bun/TypeScript |
-| Distribution | URL | Deploy | Deploy | Deploy | Deploy | App Store | DMG/EXE | DMG/EXE | DMG/EXE |
-| Bundle size | N/A | N/A | N/A | N/A | N/A | ~5MB | ~150MB | ~3-10MB | ~14MB |
+| Aspect | Worker | Browser | Node.js | Fly.io | Vercel | Cloudflare | Capacitor | Electron | Tauri | Electrobun |
+|--------|--------|---------|---------|--------|--------|------------|-----------|----------|-------|------------|
+| Infrastructure | None (static) | None (static) | Server/container | Container | On-demand | On-demand | App stores | User install | User install | User install |
+| Scaling | N/A | N/A | Manual | Automatic | Automatic | Automatic | Per-device | Per-device | Per-device | Per-device |
+| Cold starts | None | None | N/A | ~200-500ms | ~50-250ms | ~5-50ms | None | None | None | None |
+| Database | OPFS (Worker) | Client-side | TCP/file | MPG (Postgres) | HTTP APIs | D1 binding | Client-side | File/client | Client-side | Client-side |
+| Multi-tab | Shared | Independent | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| Native APIs | Limited | Limited | N/A | N/A | N/A | N/A | Full device | Full OS | Rust backend | Bun/TypeScript |
+| Distribution | URL | URL | Deploy | Deploy | Deploy | Deploy | App Store | DMG/EXE | DMG/EXE | DMG/EXE |
+| Bundle size | N/A | N/A | N/A | N/A | N/A | N/A | ~5MB | ~150MB | ~3-10MB | ~14MB |
 
 ## Choosing a Target
 
+**Choose Worker if:**
+- Your app works offline or local-first
+- You want OPFS persistence (survives browser storage pressure)
+- You want multi-tab sharing (one database, all tabs)
+- You want the main thread unblocked (all logic runs in Workers)
+- *Rails can't do this*
+
 **Choose Browser if:**
 - Your app works offline or local-first
-- Data stays on the user's device
-- You want zero infrastructure
+- You're using Dexie (IndexedDB) or sql.js
+- You want the simplest possible setup
 - *Rails can't do this*
 
 **Choose Vercel, Deno Deploy, or Cloudflare if:**
@@ -110,11 +119,13 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 When you don't specify a target, Juntos infers it from your database:
 
 ```bash
-bin/juntos up -d dexie      # → browser
-bin/juntos up -d sqlite     # → node
-bin/juntos up -d neon       # → vercel
-bin/juntos up -d d1         # → cloudflare
-bin/juntos up -d mpg        # → fly
+bin/juntos up -d dexie        # → browser
+bin/juntos up -d sqlite-wasm  # → worker
+bin/juntos up -d pglite       # → worker
+bin/juntos up -d sqlite       # → node
+bin/juntos up -d neon         # → vercel
+bin/juntos up -d d1           # → cloudflare
+bin/juntos up -d mpg          # → fly
 ```
 
 Override with `-t`:
@@ -132,7 +143,7 @@ You don't need to hit remote databases during development. Use the familiar `con
 | Deploy Target | Prod Database | Dev Adapter | Dev Target | Notes |
 |---------------|---------------|-------------|------------|-------|
 | Cloudflare Workers | d1 | sqlite | node | Same SQL dialect |
-| Vercel Edge | neon | pglite | browser | No server needed |
+| Vercel Edge | neon | pglite | worker | No server needed |
 | Vercel Edge | turso | sqlite | node | Same SQL dialect |
 | Deno Deploy | neon | pg | deno | Requires local PostgreSQL |
 | Fly.io | mpg | sqlite | node | Local SQLite, prod Postgres |

@@ -27,9 +27,8 @@ Browser deployment creates a static site that runs your entire application clien
 |---------|---------|----------|
 | `dexie` | IndexedDB | Most apps, best performance |
 | `sqljs` | SQLite/WASM | SQL compatibility, smaller datasets |
-| `sqlite-wasm` | SQLite/WASM + OPFS | SQL compatibility, persistent storage |
-| `wa-sqlite` | SQLite/WASM + OPFS | SQL compatibility, flexible VFS |
-| `pglite` | PostgreSQL/WASM | PostgreSQL features, larger apps |
+
+OPFS-capable adapters (`sqlite-wasm`, `wa-sqlite`, `pglite`) now default to the [worker target](/docs/juntos/deploying/worker), which runs them in a dedicated Worker for better persistence and multi-tab support. You can still force them to the browser target with `-t browser`.
 
 ## Development
 
@@ -110,7 +109,8 @@ Data persists in the browser:
 
 - **IndexedDB (Dexie):** Survives browser restarts, ~50MB+ storage
 - **sql.js:** In-memory by default, can persist to IndexedDB
-- **PGlite:** Persists to IndexedDB
+
+For OPFS-based persistence (more durable, better performance), use the [worker target](/docs/juntos/deploying/worker) with `sqlite-wasm`, `wa-sqlite`, or `pglite`.
 
 To clear data, use browser DevTools → Application → Storage → Clear site data.
 
