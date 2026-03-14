@@ -22,16 +22,18 @@ import { singularize, pluralize, underscore } from 'juntos/adapters/inflector.mj
  * Default target for each database adapter (used when target not specified).
  */
 export const DEFAULT_TARGETS = Object.freeze({
-  // Browser-only databases
+  // Browser-only databases (no OPFS)
   dexie: 'browser',
   indexeddb: 'browser',
   sqljs: 'browser',
   'sql.js': 'browser',
-  pglite: 'browser',
-  sqlite_wasm: 'browser',
-  'sqlite-wasm': 'browser',
-  wa_sqlite: 'browser',
-  'wa-sqlite': 'browser',
+
+  // Browser databases with OPFS support (benefit from Worker for persistence)
+  pglite: 'worker',
+  sqlite_wasm: 'worker',
+  'sqlite-wasm': 'worker',
+  wa_sqlite: 'worker',
+  'wa-sqlite': 'worker',
 
   // TCP-based server databases
   better_sqlite3: 'node',

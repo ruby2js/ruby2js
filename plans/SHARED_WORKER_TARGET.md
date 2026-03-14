@@ -213,13 +213,16 @@ No new work. The existing `TurboBroadcast` class uses `BroadcastChannel` which i
 | `packages/juntos/targets/worker/rails.js` | SharedWorker: router, controllers, models, views |
 | `packages/juntos/targets/worker/client.js` | Main thread: Turbo bridge |
 | `packages/juntos/adapters/active_record_worker.mjs` | Generic SQL-over-MessagePort adapter for application tier |
+| `packages/juntos-dev/stubs/node_fs.mjs` | Stub for node:fs (SharedWorker has no filesystem) |
+| `packages/juntos-dev/stubs/node_path.mjs` | Stub for node:path (SharedWorker has no filesystem) |
 
 ## Modified Files
 
 | File | Change |
 |------|--------|
-| `packages/juntos-dev/vite.mjs` | Worker target in build config |
-| `packages/juntos-dev/transform.mjs` | Worker target mapping |
+| `packages/juntos-dev/vite.mjs` | Worker target in build config, virtual module resolution, node stubs |
+| `packages/juntos-dev/transform.mjs` | OPFS-capable adapters default to worker target |
+| `packages/juntos/adapters/active_record_pglite.mjs` | OPFS via OpfsAhpFS when in Worker context |
 
 ## Risks
 

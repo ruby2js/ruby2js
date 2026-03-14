@@ -1234,7 +1234,7 @@ function createConfigPlugin(config, appRoot) {
 
       // For dev mode with browser targets, don't set rollupOptions.input
       // (HTML is served virtually by configureServer, no real file needed)
-      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun'];
+      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun', 'worker'];
       const isBrowserTarget = browserTargets.includes(config.target);
       const isDevMode = command === 'serve';
 
@@ -1284,7 +1284,25 @@ function createConfigPlugin(config, appRoot) {
         // globalThis.JUNTOS_HYDRATION tells rails_server.js whether client.js exists
         // This is set to true by createDualBundlePlugin when RPC is detected
         define: {
-          'globalThis.JUNTOS_HYDRATION': rpcState.dualBundleEnabled ? 'true' : 'false'
+          'globalThis.JUNTOS_HYDRATION': rpcState.dualBundleEnabled ? 'true' : 'false',
+          // Worker target: tell the SharedWorker which real adapter
+          // to load in the dedicated database Worker
+          ...(config.target === 'worker' ? (() => {
+            const adapterMap = {
+              'pglite': 'active_record_pglite.mjs',
+              'sqlite_wasm': 'active_record_sqlite_wasm.mjs',
+              'sqlite-wasm': 'active_record_sqlite_wasm.mjs',
+              'wa_sqlite': 'active_record_wa_sqlite.mjs',
+              'wa-sqlite': 'active_record_wa_sqlite.mjs',
+              'sqljs': 'active_record_sqljs.mjs'
+            };
+            const realAdapter = adapterMap[config.database] || 'active_record_sqlite_wasm.mjs';
+            const workerDbConfig = loadDatabaseConfig(appRoot, { quiet: true }) || {};
+            return {
+              'DB_ADAPTER_PATH': JSON.stringify(`juntos/adapters/${realAdapter}`),
+              'DB_CONFIG': JSON.stringify(workerDbConfig)
+            };
+          })() : {})
         },
         build: {
           target: buildTarget,
@@ -1296,7 +1314,15 @@ function createConfigPlugin(config, appRoot) {
           rollupOptions
         },
         resolve: {
-          alias: aliases,
+          alias: {
+            ...aliases,
+            // Worker target: stub Node.js built-ins imported by rails_server.js
+            // (only used for Vite manifest reading, which the SharedWorker doesn't need)
+            ...(config.target === 'worker' ? {
+              'node:fs': path.join(path.dirname(new URL(import.meta.url).pathname), 'stubs/node_fs.mjs'),
+              'node:path': path.join(path.dirname(new URL(import.meta.url).pathname), 'stubs/node_path.mjs')
+            } : {})
+          },
           // Add Ruby extensions for auto-resolution
           extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.jsx.rb', '.rb'],
           // Ensure these packages resolve from the app's node_modules, not from the package
@@ -1335,7 +1361,7 @@ export { application };`,
 
     // Serve pages in dev mode
     configureServer(server) {
-      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun'];
+      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun', 'worker'];
 
       if (browserTargets.includes(config.target)) {
         // Browser targets: serve virtual index.html (SPA fallback)
@@ -1494,7 +1520,7 @@ export { application };`,
 
     // Flatten .browser/ output to dist root for browser targets
     async closeBundle() {
-      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun'];
+      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun', 'worker'];
       if (!browserTargets.includes(config.target)) return;
 
       const distDir = path.join(appRoot, 'dist');
@@ -1689,6 +1715,13 @@ function getRollupOptions(target, database) {
         external: ['electrobun/bun', 'electrobun/view']
       };
 
+    case 'worker':
+      // Three entry points: client (main thread), SharedWorker, dedicated Worker
+      // All get content-hashed filenames for cache busting
+      return {
+        input: '.browser/index.html'
+      };
+
     case 'node':
     case 'bun':
     case 'deno':
@@ -1827,7 +1860,7 @@ function createTailwindPlugin(appRoot) {
  * and ensures files exist when Vite's rollup resolver needs them for builds.
  */
 function createBrowserEntryPlugin(config, appRoot) {
-  const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun'];
+  const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri', 'electrobun', 'worker'];
   const isBrowserTarget = browserTargets.includes(config.target);
 
   // Virtual module ID for main.js
@@ -2600,6 +2633,7 @@ function createVirtualPlugin(config, appRoot) {
     'deno': 'deno',
     'vercel-edge': 'vercel-edge',
     'vercel-node': 'vercel-node',
+    'worker': 'worker',
     'deno-deploy': 'vercel-edge',  // Deno Deploy uses same runtime as Vercel Edge
     'fly': 'node'  // Fly.io runs Node.js
   };
@@ -2643,6 +2677,7 @@ function createVirtualPlugin(config, appRoot) {
     'cloudflare': 'active_storage_s3.mjs', // Cloudflare Workers - use R2 via S3 API
     'vercel-edge': 'active_storage_s3.mjs',
     'vercel-node': 'active_storage_disk.mjs',
+    'worker': 'active_storage_indexeddb.mjs',  // SharedWorker — storage via main thread IndexedDB
     'deno-deploy': 'active_storage_s3.mjs'
   };
 
@@ -2731,7 +2766,12 @@ function createVirtualPlugin(config, appRoot) {
       }
 
       // Server version of juntos:rails
+      // For worker target, main thread loads client.js (the bridge);
+      // the SharedWorker (rails.js) is loaded by client.js via new SharedWorker()
       if (id === '\0juntos:rails') {
+        if (targetDir === 'worker') {
+          return `export * from 'juntos/targets/worker/client.js';`;
+        }
         return `export * from 'juntos/targets/${targetDir}/rails.js';`;
       }
 
@@ -2741,7 +2781,16 @@ function createVirtualPlugin(config, appRoot) {
       }
 
       // Server version of juntos:active-record
+      // For worker target, use MessagePort adapter (SQL forwarded to dedicated Worker)
       if (id === '\0juntos:active-record') {
+        if (targetDir === 'worker') {
+          return `
+// Database configuration injected at build time
+export const DB_CONFIG = ${JSON.stringify(dbConfig)};
+
+export * from 'juntos/adapters/active_record_worker.mjs';
+`;
+        }
         return `
 // Database configuration injected at build time
 // Runtime environment variables take precedence

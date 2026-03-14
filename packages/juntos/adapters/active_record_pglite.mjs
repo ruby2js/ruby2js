@@ -1,6 +1,7 @@
 // ActiveRecord adapter for PGLite (PostgreSQL in WebAssembly)
 // This file is copied to dist/lib/active_record.mjs at build time
-// PGLite provides PostgreSQL compatibility in the browser with optional IndexedDB persistence
+// PGLite provides PostgreSQL compatibility in the browser with OPFS persistence (in a Worker)
+// or IndexedDB persistence (on the main thread)
 
 import { PostgresDialect, PG_TYPE_MAP } from './dialects/postgres.mjs';
 import { attr_accessor, initTimePolyfill, quoteId } from 'juntos/adapters/active_record_base.mjs';
@@ -22,11 +23,31 @@ export async function initDatabase(options = {}) {
   const { PGlite } = await import('@electric-sql/pglite');
 
   // Determine storage backend:
-  // - idb://dbname for IndexedDB persistence (survives page refresh)
+  // - OPFS via OpfsAhpFS (requires Worker context, best performance)
+  // - idb://dbname for IndexedDB persistence (main thread fallback)
   // - memory:// for ephemeral in-memory storage
+  let pgliteOptions = {
+    // Optional: relaxed durability for better performance (skip fsync)
+    relaxedDurability: config.relaxedDurability ?? false,
+    // Optional: debug logging (1-5)
+    debug: config.debug
+  };
+
   let dataDir;
   if (config.persist !== false && config.database) {
-    dataDir = `idb://${config.database}`;
+    // Try OPFS first (requires Worker context), fall back to IndexedDB
+    if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope) {
+      try {
+        const { OpfsAhpFS } = await import('@electric-sql/pglite/opfs-ahp');
+        pgliteOptions.fs = new OpfsAhpFS(config.database);
+        dataDir = null; // fs option handles storage
+      } catch {
+        // OPFS not available, fall back to IndexedDB
+        dataDir = `idb://${config.database}`;
+      }
+    } else {
+      dataDir = `idb://${config.database}`;
+    }
   } else if (config.dataDir) {
     dataDir = config.dataDir;
   } else {
@@ -34,12 +55,7 @@ export async function initDatabase(options = {}) {
   }
 
   // Create PGLite instance
-  db = await PGlite.create(dataDir, {
-    // Optional: relaxed durability for better performance (skip fsync)
-    relaxedDurability: config.relaxedDurability ?? false,
-    // Optional: debug logging (1-5)
-    debug: config.debug
-  });
+  db = await PGlite.create(dataDir, pgliteOptions);
 
   console.log(`Connected to PGLite: ${dataDir}`);
 
