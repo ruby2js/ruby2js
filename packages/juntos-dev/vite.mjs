@@ -1280,6 +1280,27 @@ function createConfigPlugin(config, appRoot) {
 
       // Vite-native structure: config at root, output to dist/
       return {
+        // Worker target: stub Node.js built-ins that rails_server.js imports
+        // (only used for Vite manifest reading, not needed in SharedWorker)
+        ...(config.target === 'worker' ? {
+          plugins: [{
+            name: 'juntos-node-stubs',
+            resolveId(id) {
+              if (id === 'node:fs') return '\0stub:node:fs';
+              if (id === 'node:path') return '\0stub:node:path';
+              return null;
+            },
+            load(id) {
+              if (id === '\0stub:node:fs') {
+                return 'export function existsSync() { return false; }\nexport function readFileSync() { return ""; }\nexport default { existsSync, readFileSync };';
+              }
+              if (id === '\0stub:node:path') {
+                return 'export function join(...a) { return a.join("/"); }\nexport function dirname(p) { return p.replace(/\\/[^/]*$/, ""); }\nexport default { join, dirname };';
+              }
+              return null;
+            }
+          }]
+        } : {}),
         // Define compile-time constants
         // globalThis.JUNTOS_HYDRATION tells rails_server.js whether client.js exists
         // This is set to true by createDualBundlePlugin when RPC is detected
@@ -1316,15 +1337,7 @@ function createConfigPlugin(config, appRoot) {
           rollupOptions
         },
         resolve: {
-          alias: {
-            ...aliases,
-            // Worker target: stub Node.js built-ins imported by rails_server.js
-            // (only used for Vite manifest reading, which the SharedWorker doesn't need)
-            ...(config.target === 'worker' ? {
-              'node:fs': path.join(path.dirname(new URL(import.meta.url).pathname), 'stubs/node_fs.mjs'),
-              'node:path': path.join(path.dirname(new URL(import.meta.url).pathname), 'stubs/node_path.mjs')
-            } : {})
-          },
+          alias: aliases,
           // Add Ruby extensions for auto-resolution
           extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.jsx.rb', '.rb'],
           // Ensure these packages resolve from the app's node_modules, not from the package
@@ -1341,6 +1354,8 @@ function createConfigPlugin(config, appRoot) {
               resolveId(id) {
                 if (id === 'juntos:active-record') return '\0juntos:worker:active-record';
                 if (id === 'juntos:active-storage') return '\0juntos:worker:active-storage';
+                if (id === 'node:fs') return '\0stub:node:fs';
+                if (id === 'node:path') return '\0stub:node:path';
                 return null;
               },
               load(id) {
@@ -1354,16 +1369,15 @@ export * from 'juntos/adapters/active_record_worker.mjs';
                 if (id === '\0juntos:worker:active-storage') {
                   return `export * from 'juntos/adapters/active_storage_worker.mjs';`;
                 }
+                if (id === '\0stub:node:fs') {
+                  return 'export function existsSync() { return false; }\nexport function readFileSync() { return ""; }\nexport default { existsSync, readFileSync };';
+                }
+                if (id === '\0stub:node:path') {
+                  return 'export function join(...a) { return a.join("/"); }\nexport function dirname(p) { return p.replace(/\\/[^/]*$/, ""); }\nexport default { join, dirname };';
+                }
                 return null;
               }
             }],
-            resolve: {
-              alias: {
-                // Stub Node.js built-ins for SharedWorker (no filesystem)
-                'node:fs': path.join(path.dirname(new URL(import.meta.url).pathname), 'stubs/node_fs.mjs'),
-                'node:path': path.join(path.dirname(new URL(import.meta.url).pathname), 'stubs/node_path.mjs')
-              }
-            },
             rollupOptions: {
               output: {
                 // Fingerprint worker scripts for cache busting
