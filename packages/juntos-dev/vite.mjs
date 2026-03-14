@@ -856,12 +856,14 @@ function createRubyTransformPlugin(config, appRoot) {
       // Registers models with both Application and the adapter's modelRegistry
       // Also registers for RPC when dual bundle mode is enabled (hydration needs RPC)
       if (id === '\0juntos:models') {
-        const allModels = findModels(appRoot).filter(m => m !== 'application_record');
+        const allModels = findModels(appRoot);
+        const concreteModels = allModels.filter(m => m !== 'application_record');
         const models = (config.include?.length || config.exclude?.length)
-          ? allModels.filter(m => shouldIncludeFile(`app/models/${m}.rb`, config.include, config.exclude))
-          : allModels;
+          ? concreteModels.filter(m => shouldIncludeFile(`app/models/${m}.rb`, config.include, config.exclude))
+          : concreteModels;
         const collisions = findLeafCollisions(models);
-        const imports = models.map(m => {
+        // Import all models including ApplicationRecord
+        const imports = allModels.map(m => {
           const leafClass = classify(m.split('/').pop());
           const alias = modelClassName(m, collisions);
           if (alias !== leafClass) {
@@ -869,7 +871,10 @@ function createRubyTransformPlugin(config, appRoot) {
           }
           return `import { ${alias} } from 'app/models/${m}.rb';`;
         });
+        // Only concrete models go in the registry
         const classNames = models.map(m => modelClassName(m, collisions));
+        // All models (including abstract) are exported
+        const exportNames = allModels.map(m => modelClassName(m, collisions));
         // Register for RPC if dual bundle mode (client needs to call server for model ops)
         const rpcRegistration = rpcState.dualBundleEnabled
           ? `\nApplication.registerModelsForRPC(models);`
@@ -893,7 +898,7 @@ for (const migration of migrations) {
   }
 }
 
-export { ${classNames.join(', ')} };
+export { ${exportNames.join(', ')} };
 `;
       }
 
