@@ -58,8 +58,14 @@ class WorkerBridge {
   constructor(worker) {
     this.port = worker.port;
     this.pending = new Map();
+    this._readyResolve = null;
+    this._ready = new Promise(resolve => { this._readyResolve = resolve; });
 
     this.port.onmessage = ({ data }) => {
+      if (data.type === 'ready') {
+        this._readyResolve();
+        return;
+      }
       if (data.type === 'response' && data.id) {
         const resolver = this.pending.get(data.id);
         if (resolver) {
@@ -70,6 +76,11 @@ class WorkerBridge {
     };
 
     this.port.start();
+  }
+
+  // Wait for SharedWorker to finish initialization
+  waitForReady() {
+    return this._ready;
   }
 
   // Send a request to the SharedWorker and return a Promise for the response
@@ -168,6 +179,9 @@ export class Application extends ApplicationBase {
       );
 
       this.bridge = new WorkerBridge(worker);
+
+      // Wait for SharedWorker to finish initializing (database, migrations)
+      await this.bridge.waitForReady();
 
       if (!this.layoutFn) {
         document.getElementById('loading').style.display = 'none';

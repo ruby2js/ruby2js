@@ -19,8 +19,9 @@ import {
   resolveContent
 } from 'juntos/rails_server.js';
 
+import * as adapter from 'juntos/adapters/active_record_worker.mjs';
 import { setWorker } from 'juntos/adapters/active_record_worker.mjs';
-import { setStorageWorker } from 'juntos/adapters/active_storage_worker.mjs';
+import { setStorageWorker, initActiveStorage } from 'juntos/adapters/active_storage_worker.mjs';
 
 // Re-export base helpers
 export { createContext, createFlash, truncate, pluralize, dom_id };
@@ -132,6 +133,30 @@ export class Application extends ApplicationServer {
 
   // Start the SharedWorker application
   static async start() {
+    this._ready = false;
+
+    // Listen for tab connections immediately (before async init)
+    // so we don't miss the first tab's connect event
+    self.onconnect = (event) => {
+      const port = event.ports[0];
+      this.ports.add(port);
+
+      port.onmessage = async ({ data }) => {
+        await this.handleMessage(port, data);
+      };
+
+      port.onmessageerror = () => {
+        this.ports.delete(port);
+      };
+
+      port.start();
+
+      // If already initialized, signal ready immediately
+      if (this._ready) {
+        port.postMessage({ type: 'ready' });
+      }
+    };
+
     // Spawn the dedicated database Worker
     this.dbWorker = new Worker(
       new URL('./db_worker.js', import.meta.url),
@@ -148,21 +173,30 @@ export class Application extends ApplicationServer {
     // Initialize database in the dedicated Worker
     await this.initDatabaseWorker();
 
-    // Listen for tab connections
-    self.onconnect = (event) => {
-      const port = event.ports[0];
-      this.ports.add(port);
+    // Wire the adapter for model registry
+    this.activeRecordModule = adapter;
+    if (adapter.modelRegistry && this.models) {
+      Object.assign(adapter.modelRegistry, this.models);
+    }
 
-      port.onmessage = async ({ data }) => {
-        await this.handleMessage(port, data);
-      };
+    // Initialize Active Storage
+    try {
+      await initActiveStorage();
+    } catch (e) {
+      // Active Storage not available - no-op
+    }
 
-      port.onmessageerror = () => {
-        this.ports.delete(port);
-      };
+    // Run migrations and seeds
+    const { wasFresh } = await this.runMigrations(adapter);
+    if (this.seeds && wasFresh) {
+      await this.seeds.run();
+    }
 
-      port.start();
-    };
+    // Mark as ready and notify all connected tabs
+    this._ready = true;
+    for (const port of this.ports) {
+      port.postMessage({ type: 'ready' });
+    }
 
     console.log('SharedWorker started');
   }
