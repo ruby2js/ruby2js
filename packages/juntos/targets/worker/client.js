@@ -59,11 +59,26 @@ class WorkerBridge {
     this.port = worker.port;
     this.pending = new Map();
     this._readyResolve = null;
-    this._ready = new Promise(resolve => { this._readyResolve = resolve; });
+    this._readyReject = null;
+    this._ready = new Promise((resolve, reject) => {
+      this._readyResolve = resolve;
+      this._readyReject = reject;
+    });
+
+    // Handle SharedWorker errors
+    worker.onerror = (e) => {
+      console.error('[juntos] SharedWorker error:', e);
+      this._readyReject?.(new Error('SharedWorker failed to load'));
+    };
 
     this.port.onmessage = ({ data }) => {
       if (data.type === 'ready') {
         this._readyResolve();
+        return;
+      }
+      if (data.type === 'error') {
+        console.error('[juntos] SharedWorker initialization error:', data.error);
+        this._readyReject?.(new Error(data.error));
         return;
       }
       if (data.type === 'response' && data.id) {

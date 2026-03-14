@@ -157,48 +157,56 @@ export class Application extends ApplicationServer {
       }
     };
 
-    // Spawn the dedicated database Worker
-    this.dbWorker = new Worker(
-      new URL('./db_worker.js', import.meta.url),
-      { type: 'module' }
-    );
-
-    // Wire the dedicated Worker into the MessagePort adapter
-    // so ActiveRecord queries flow through to the database
-    setWorker(this.dbWorker);
-
-    // Wire the dedicated Worker for Active Storage file operations
-    setStorageWorker(this.dbWorker);
-
-    // Initialize database in the dedicated Worker
-    await this.initDatabaseWorker();
-
-    // Wire the adapter for model registry
-    this.activeRecordModule = adapter;
-    if (adapter.modelRegistry && this.models) {
-      Object.assign(adapter.modelRegistry, this.models);
-    }
-
-    // Initialize Active Storage
     try {
-      await initActiveStorage();
+      // Spawn the dedicated database Worker
+      this.dbWorker = new Worker(
+        new URL('./db_worker.js', import.meta.url),
+        { type: 'module' }
+      );
+
+      // Wire the dedicated Worker into the MessagePort adapter
+      // so ActiveRecord queries flow through to the database
+      setWorker(this.dbWorker);
+
+      // Wire the dedicated Worker for Active Storage file operations
+      setStorageWorker(this.dbWorker);
+
+      // Initialize database in the dedicated Worker
+      await this.initDatabaseWorker();
+
+      // Wire the adapter for model registry
+      this.activeRecordModule = adapter;
+      if (adapter.modelRegistry && this.models) {
+        Object.assign(adapter.modelRegistry, this.models);
+      }
+
+      // Initialize Active Storage
+      try {
+        await initActiveStorage();
+      } catch (e) {
+        // Active Storage not available - no-op
+      }
+
+      // Run migrations and seeds
+      const { wasFresh } = await this.runMigrations(adapter);
+      if (this.seeds && wasFresh) {
+        await this.seeds.run();
+      }
+
+      // Mark as ready and notify all connected tabs
+      this._ready = true;
+      for (const port of this.ports) {
+        port.postMessage({ type: 'ready' });
+      }
+
+      console.log('SharedWorker started');
     } catch (e) {
-      // Active Storage not available - no-op
+      console.error('SharedWorker initialization failed:', e);
+      // Notify all connected tabs of the error
+      for (const port of this.ports) {
+        port.postMessage({ type: 'error', error: e.message });
+      }
     }
-
-    // Run migrations and seeds
-    const { wasFresh } = await this.runMigrations(adapter);
-    if (this.seeds && wasFresh) {
-      await this.seeds.run();
-    }
-
-    // Mark as ready and notify all connected tabs
-    this._ready = true;
-    for (const port of this.ports) {
-      port.postMessage({ type: 'ready' });
-    }
-
-    console.log('SharedWorker started');
   }
 
   // Initialize the database in the dedicated Worker
