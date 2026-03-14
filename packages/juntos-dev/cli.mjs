@@ -1280,10 +1280,12 @@ beforeAll(async () => {
 
   // Install fetch interceptor so Stimulus controllers can reach controller actions
   installFetchInterceptor();
+
+  // Initial database setup so globalThis.__fixtures is available for test beforeAll hooks
+  await initBrowserDb();
 });
 
-beforeEach(async () => {
-  resetCookies();
+async function initBrowserDb() {
   const activeRecord = await import('juntos:active-record');
   await activeRecord.initDatabase({ database: ':memory:' });
 
@@ -1304,13 +1306,19 @@ beforeEach(async () => {
   await rails.Application.runMigrations(activeRecord);
   await loadFixtures();
   globalThis.__fixtures = _fixtures;
-});
+}
 
-afterEach(async () => {
+beforeEach(async () => {
+  resetCookies();
   const activeRecord = await import('juntos:active-record');
   if (activeRecord.closeDatabase) {
     await activeRecord.closeDatabase();
   }
+  await initBrowserDb();
+});
+
+afterEach(async () => {
+  // cleanup handled in beforeEach
 });
 `);
   } else {
