@@ -790,19 +790,19 @@ The `--intermediate` flag is useful for ERB files — it shows the Ruby code tha
 
 The CLI auto-installs the required npm package for each adapter:
 
-| Adapter | npm Package | Targets |
-|---------|-------------|---------|
+| Adapter | npm Package | Default Target |
+|---------|-------------|----------------|
 | `dexie` | dexie | browser |
-| `sqlite` | better-sqlite3 | node, bun |
 | `sqljs` | sql.js | browser |
-| `sqlite-wasm` | @sqlite.org/sqlite-wasm | browser |
-| `wa-sqlite` | wa-sqlite | browser |
-| `pglite` | @electric-sql/pglite | browser, node |
-| `pg` | pg | node, bun, deno |
-| `neon` | @neondatabase/serverless | vercel, node |
-| `turso` | @libsql/client | vercel, node |
+| `sqlite-wasm` | @sqlite.org/sqlite-wasm | worker |
+| `wa-sqlite` | wa-sqlite | worker |
+| `pglite` | @electric-sql/pglite | worker |
+| `sqlite` | better-sqlite3 | node |
+| `pg` | pg | node |
+| `neon` | @neondatabase/serverless | vercel |
+| `turso` | @libsql/client | vercel |
 | `d1` | (none - Cloudflare binding) | cloudflare |
-| `mysql` | mysql2 | node, bun |
+| `mysql` | mysql2 | node |
 
 **Aliases:** Common variations are accepted automatically:
 - `indexeddb` → dexie
@@ -821,7 +821,8 @@ When target is not specified, it's inferred from the database:
 
 | Database | Default Target |
 |----------|---------------|
-| dexie, sqljs, sqlite-wasm, wa-sqlite, pglite | browser |
+| dexie, sqljs | browser |
+| sqlite-wasm, wa-sqlite, pglite | worker |
 | sqlite, pg, mysql | node |
 | neon, turso | vercel |
 | d1 | cloudflare |
