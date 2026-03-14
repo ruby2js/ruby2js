@@ -189,9 +189,13 @@ export class Application extends ApplicationBase {
     }
 
     try {
-      // Read fingerprinted worker URL from <meta> tag injected at build time
+      // Read fingerprinted URLs from <meta> tags injected at build time
       const workerUrl = document.querySelector('meta[name="juntos-worker"]')?.content || '/worker.js';
+      const dbWorkerUrl = document.querySelector('meta[name="juntos-db-worker"]')?.content || '/db_worker.js';
       const worker = new SharedWorker(workerUrl, { type: 'module', name: 'juntos' });
+
+      // Send the DB Worker URL to the SharedWorker (it can't read DOM meta tags)
+      worker.port.postMessage({ type: 'config', dbWorkerUrl });
 
       this.bridge = new WorkerBridge(worker);
 

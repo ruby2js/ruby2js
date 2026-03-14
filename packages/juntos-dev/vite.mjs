@@ -1321,7 +1321,6 @@ function createConfigPlugin(config, appRoot) {
             const workerDbConfig = loadDatabaseConfig(appRoot, { quiet: true }) || {};
             const dialect = config.database === 'pglite' ? 'postgres' : 'sqlite';
             return {
-              'DB_ADAPTER_PATH': JSON.stringify(`juntos/adapters/${realAdapter}`),
               'DB_CONFIG': JSON.stringify(workerDbConfig),
               'DB_DIALECT': JSON.stringify(dialect)
             };
@@ -1342,7 +1341,8 @@ function createConfigPlugin(config, appRoot) {
           extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.jsx.rb', '.rb'],
           // Ensure these packages resolve from the app's node_modules, not from the package
           // (browser rails.js has dynamic imports for optional React and database adapters)
-          dedupe: ['react', 'react-dom', 'dexie', 'better-sqlite3', '@neondatabase/serverless', '@libsql/client']
+          dedupe: ['react', 'react-dom', 'dexie', 'better-sqlite3', '@neondatabase/serverless', '@libsql/client',
+            '@sqlite.org/sqlite-wasm', 'wa-sqlite', '@electric-sql/pglite', 'sql.js']
         },
         // Worker target: resolve virtual modules inside SharedWorker/Worker builds
         // Vite bundles workers in a separate build pass; plugins from the main
@@ -1382,10 +1382,7 @@ export * from 'juntos/adapters/active_record_worker.mjs';
             rollupOptions: {
               output: {
                 // Fingerprint worker scripts for cache busting
-                entryFileNames: 'assets/[name]-[hash].js',
-                // Workers must be self-contained — they can't import
-                // chunks from the main thread bundle
-                inlineDynamicImports: true
+                entryFileNames: 'assets/[name]-[hash].js'
               }
             }
           }
@@ -1607,14 +1604,19 @@ export { application };`,
         if (fs.existsSync(manifestPath)) {
           const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
           const workerEntry = manifest['.browser/worker.js'] || manifest['worker.js'];
-          if (workerEntry?.file) {
-            const indexHtml = path.join(distDir, 'index.html');
-            if (fs.existsSync(indexHtml)) {
-              let html = fs.readFileSync(indexHtml, 'utf8');
+          const dbWorkerEntry = manifest['.browser/db_worker.js'] || manifest['db_worker.js'];
+          const indexHtml = path.join(distDir, 'index.html');
+          if (fs.existsSync(indexHtml)) {
+            let html = fs.readFileSync(indexHtml, 'utf8');
+            if (workerEntry?.file) {
               html = html.replace('</head>', `  <meta name="juntos-worker" content="/${workerEntry.file}">\n</head>`);
-              fs.writeFileSync(indexHtml, html);
               console.log(`[juntos] Worker URL: /${workerEntry.file}`);
             }
+            if (dbWorkerEntry?.file) {
+              html = html.replace('</head>', `  <meta name="juntos-db-worker" content="/${dbWorkerEntry.file}">\n</head>`);
+              console.log(`[juntos] DB Worker URL: /${dbWorkerEntry.file}`);
+            }
+            fs.writeFileSync(indexHtml, html);
           }
         }
       }
@@ -1795,12 +1797,14 @@ function getRollupOptions(target, database) {
       };
 
     case 'worker':
-      // Two entry points: main thread HTML + SharedWorker JS
-      // The dedicated Worker (db_worker.js) is bundled automatically by Vite
+      // Three entry points: main thread HTML, SharedWorker, database adapter
+      // The dedicated Worker (db_worker.js) is bundled by Vite's worker sub-build
+      // and imports db_adapter at runtime via URL
       return {
         input: {
           main: '.browser/index.html',
-          worker: '.browser/worker.js'
+          worker: '.browser/worker.js',
+          db_worker: '.browser/db_worker.js'
         },
         output: {
           // All entries get fingerprinted names for cache busting
@@ -1974,6 +1978,21 @@ function createBrowserEntryPlugin(config, appRoot) {
     const layoutPath = fs.existsSync(layoutFile)
       ? (isVirtual ? '/app/views/layouts/application.html.erb' : '../app/views/layouts/application.html.erb')
       : null;
+
+    // Worker target: main.js imports the client bridge directly
+    // (juntos:rails resolves to the SharedWorker runtime for routes.rb)
+    if (config.target === 'worker') {
+      const layoutImport = layoutPath ? `\nimport { layout } from '${layoutPath}';` : '';
+      const layoutConfig = layoutPath ? '\nApplication.configure({ layout: layout });' : '';
+      return `// Main entry point for worker target (client bridge)
+import * as Turbo from '@hotwired/turbo';
+import { Application } from 'juntos/targets/worker/client.js';
+import '${controllersPath}';${layoutImport}
+window.Turbo = Turbo;${layoutConfig}
+Application.start();
+`;
+    }
+
     return generateBrowserMainJs(routesPath, controllersPath, layoutPath);
   }
 
@@ -2000,7 +2019,8 @@ function createBrowserEntryPlugin(config, appRoot) {
       fs.writeFileSync(mainPath, getMainJs(false));
 
       // Worker target: generate SharedWorker entry as a separate rollup input
-      // Bundled by the main Vite build (which has all transform plugins)
+      // juntos:rails resolves to worker/rails.js, so routes.rb will register
+      // routes on the SharedWorker's Router and Application
       if (config.target === 'worker') {
         const workerEntryPath = path.join(browserDir, 'worker.js');
         const routesPath = '../config/routes.rb';
@@ -2013,6 +2033,13 @@ function createBrowserEntryPlugin(config, appRoot) {
         }
         workerJs += `Application.start();\n`;
         fs.writeFileSync(workerEntryPath, workerJs);
+
+        // Generate db_worker.js — re-exports the framework's db_worker
+        // Bundled by the main build so juntos:db-adapter resolves correctly
+        const dbWorkerPath = path.join(browserDir, 'db_worker.js');
+        fs.writeFileSync(dbWorkerPath,
+          `// Dedicated database Worker entry point\nexport * from 'juntos/targets/worker/db_worker.js';\n`
+        );
       }
 
       console.log('[juntos] Generated .browser/ entry files for build');
@@ -2833,6 +2860,9 @@ function createVirtualPlugin(config, appRoot) {
         }
       }
 
+      // Database adapter for the dedicated Worker (resolved at build time)
+      if (id === 'juntos:db-adapter') return '\0juntos:db-adapter';
+
       // For virtual modules, add suffix to distinguish client vs server versions
       if (id === 'juntos:rails') {
         // Check if this import is from the client bundle
@@ -2862,17 +2892,32 @@ function createVirtualPlugin(config, appRoot) {
     },
 
     load(id) {
+      // Database adapter for the dedicated Worker
+      if (id === '\0juntos:db-adapter') {
+        const adapterMap = {
+          'pglite': 'active_record_pglite.mjs',
+          'sqlite_wasm': 'active_record_sqlite_wasm.mjs',
+          'sqlite-wasm': 'active_record_sqlite_wasm.mjs',
+          'wa_sqlite': 'active_record_wa_sqlite.mjs',
+          'wa-sqlite': 'active_record_wa_sqlite.mjs',
+          'sqljs': 'active_record_sqljs.mjs'
+        };
+        const realAdapter = adapterMap[config.database] || 'active_record_sqlite_wasm.mjs';
+        return `export * from 'juntos/adapters/${realAdapter}';`;
+      }
+
       // Browser path helper - routes through controllers instead of fetch()
       if (id === '\0juntos:path-helper:browser') {
         return `export * from 'juntos/path_helper_browser.mjs';`;
       }
 
       // Server version of juntos:rails
-      // For worker target, main thread loads client.js (the bridge);
-      // the SharedWorker (rails.js) is loaded by client.js via new SharedWorker()
+      // For worker target, resolve to the SharedWorker runtime (rails.js)
+      // so routes register on the SharedWorker's Router/Application.
+      // The main thread client bridge is imported directly by main.js.
       if (id === '\0juntos:rails') {
         if (targetDir === 'worker') {
-          return `export * from 'juntos/targets/worker/client.js';`;
+          return `export * from 'juntos/targets/worker/rails.js';`;
         }
         return `export * from 'juntos/targets/${targetDir}/rails.js';`;
       }

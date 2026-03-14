@@ -16,6 +16,11 @@ import {
   truncate,
   pluralize,
   dom_id,
+  navigate,
+  submitForm,
+  formData,
+  handleFormResult,
+  setupFormHandlers,
   resolveContent
 } from 'juntos/rails_server.js';
 
@@ -24,7 +29,7 @@ import { setWorker } from 'juntos/adapters/active_record_worker.mjs';
 import { setStorageWorker, initActiveStorage } from 'juntos/adapters/active_storage_worker.mjs';
 
 // Re-export base helpers
-export { createContext, createFlash, truncate, pluralize, dom_id };
+export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
 // Router — uses the server Router's dispatch which returns Fetch API Responses
 export class Router extends RouterServer {
@@ -125,15 +130,28 @@ export function getAssetPath(name) { return `/assets/${name}`; }
 
 // Application class for the SharedWorker
 export class Application extends ApplicationServer {
+  // Propagate configuration to the parent class (ApplicationServer)
+  // so Router.htmlResponse() can access the layout via Application.wrapInLayout()
+  static configure(options) {
+    super.configure(options);
+    ApplicationServer.configure(options);
+  }
+
   // Connected tab ports
   static ports = new Set();
 
   // Reference to the dedicated database Worker
   static dbWorker = null;
 
+  // Fingerprinted DB Worker URL (received from main thread)
+  static dbWorkerUrl = null;
+
+
   // Start the SharedWorker application
   static async start() {
     this._ready = false;
+    let configResolve;
+    const configReady = new Promise(resolve => { configResolve = resolve; });
 
     // Listen for tab connections immediately (before async init)
     // so we don't miss the first tab's connect event
@@ -142,6 +160,11 @@ export class Application extends ApplicationServer {
       this.ports.add(port);
 
       port.onmessage = async ({ data }) => {
+        if (data.type === 'config') {
+          if (data.dbWorkerUrl) this.dbWorkerUrl = data.dbWorkerUrl;
+          configResolve();
+          return;
+        }
         await this.handleMessage(port, data);
       };
 
@@ -158,11 +181,11 @@ export class Application extends ApplicationServer {
     };
 
     try {
-      // Spawn the dedicated database Worker
-      this.dbWorker = new Worker(
-        new URL('./db_worker.js', import.meta.url),
-        { type: 'module' }
-      );
+      // Wait for config from the main thread (DB Worker URL)
+      await configReady;
+
+      // Spawn the dedicated database Worker using the fingerprinted URL
+      this.dbWorker = new Worker(this.dbWorkerUrl, { type: 'module' });
 
       // Wire the dedicated Worker into the MessagePort adapter
       // so ActiveRecord queries flow through to the database
@@ -225,10 +248,9 @@ export class Application extends ApplicationServer {
 
       this.dbWorker.addEventListener('message', handler);
 
-      // DB_ADAPTER_PATH and DB_CONFIG are defined at build time by Vite
+      // DB_CONFIG is defined at build time by Vite
       this.dbWorker.postMessage({
         type: 'init',
-        adapter: DB_ADAPTER_PATH,
         config: DB_CONFIG
       });
     });

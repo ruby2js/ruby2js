@@ -3,7 +3,9 @@
 // and executes SQL queries received via postMessage from the SharedWorker.
 // Also handles file storage via OPFS for Active Storage.
 
-let adapter = null;
+// juntos:db-adapter is resolved at build time by the worker plugin
+// to the real database adapter (e.g., active_record_sqlite_wasm.mjs)
+import * as adapter from 'juntos:db-adapter';
 
 // OPFS directory handle for file storage
 let storageDir = null;
@@ -11,8 +13,6 @@ let storageDir = null;
 self.onmessage = async ({ data }) => {
   if (data.type === 'init') {
     try {
-      // Import the existing adapter unchanged — PGlite or SQLite WASM
-      adapter = await import(data.adapter);
       await adapter.initDatabase(data.config || {});
       self.postMessage({ type: 'ready' });
     } catch (e) {
@@ -24,25 +24,18 @@ self.onmessage = async ({ data }) => {
   if (data.type === 'exec') {
     const { id, sql, params } = data;
     try {
-      const isSelect = sql.trim().toUpperCase().startsWith('SELECT')
-        || sql.trim().toUpperCase().startsWith('PRAGMA');
-
-      let result;
-      if (isSelect) {
-        const rows = await adapter.query(sql, params || []);
-        result = { id, type: 'result', rows, changes: 0, lastInsertRowId: null };
-      } else {
-        const execResult = await adapter.execute(sql, params || []);
-        result = {
-          id,
-          type: 'result',
-          rows: [],
-          changes: execResult.changes || 0,
-          lastInsertRowId: execResult.lastInsertRowid || null
-        };
-      }
-
-      self.postMessage(result);
+      // Use ActiveRecord._execute() — it handles both SELECT and mutations
+      // correctly for any adapter (sqlite-wasm, pglite, wa-sqlite, sql.js)
+      const execResult = await adapter.ActiveRecord._execute(sql, params || []);
+      const rows = adapter.ActiveRecord._getRows(execResult);
+      const lastInsertRowId = adapter.ActiveRecord._getLastInsertId(execResult);
+      self.postMessage({
+        id,
+        type: 'result',
+        rows,
+        changes: execResult.changes || 0,
+        lastInsertRowId
+      });
     } catch (e) {
       self.postMessage({ id, type: 'error', error: e.message });
     }
