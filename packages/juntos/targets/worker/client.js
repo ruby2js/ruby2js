@@ -167,6 +167,28 @@ export function turbo_stream_from(channelName) {
   return '';
 }
 
+// Custom element for stream subscriptions from SharedWorker-rendered HTML.
+// When the SharedWorker renders a view containing turbo_stream_from, it returns
+// <juntos-stream-source channel="...">. When Turbo inserts this HTML into the
+// DOM, connectedCallback subscribes to BroadcastChannel on the main thread.
+if (typeof customElements !== 'undefined' && !customElements.get('juntos-stream-source')) {
+  customElements.define('juntos-stream-source', class extends HTMLElement {
+    connectedCallback() {
+      const channel = this.getAttribute('channel');
+      if (channel) {
+        TurboBroadcast.subscribe(channel);
+      }
+    }
+
+    disconnectedCallback() {
+      const channel = this.getAttribute('channel');
+      if (channel) {
+        TurboBroadcast.unsubscribe(channel);
+      }
+    }
+  });
+}
+
 // Stub Router for client — route matching happens in the SharedWorker
 // We only need a minimal Router to satisfy imports; the real dispatch
 // happens in the SharedWorker via WorkerBridge.

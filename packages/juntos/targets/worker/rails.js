@@ -123,9 +123,10 @@ export { TurboBroadcast as BroadcastChannel };
 globalThis.TurboBroadcast = TurboBroadcast;
 
 // Helper for views to subscribe to turbo streams
+// Returns a custom element that the main thread picks up via connectedCallback
+// (same pattern as turbo-cable-stream-source in @hotwired/turbo-rails)
 export function turbo_stream_from(channelName) {
-  TurboBroadcast.subscribe(channelName);
-  return '';
+  return `<juntos-stream-source channel="${channelName}"></juntos-stream-source>`;
 }
 
 // Layout helpers — no-ops in SharedWorker (CSS/JS handled by Vite on main thread)
