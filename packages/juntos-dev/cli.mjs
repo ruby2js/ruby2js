@@ -1242,7 +1242,80 @@ export default mergeConfig(viteConfig, defineConfig({
   }
 
   const setupPath = join(testDir, 'setup.mjs');
-  writeFileSync(setupPath, `// Test setup for Vitest
+  const isBrowserDb = DEFAULT_TARGETS[config.database] === 'browser';
+
+  if (isBrowserDb) {
+    // Browser databases (Dexie, PGlite, sql.js): no savepoints, re-init per test
+    writeFileSync(setupPath, `// Test setup for Vitest (browser database)
+// Re-initializes the database and reloads fixtures before each test
+
+import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
+import { installFetchInterceptor, resetCookies } from 'juntos/test_fetch.mjs';
+import { loadFixtures, _fixtures } from './__fixtures.mjs';${stimSection}
+
+// Suppress ActiveRecord CRUD logging during tests
+const _info = console.info;
+const _debug = console.debug;
+console.info = () => {};
+console.debug = () => {};
+
+afterAll(() => {
+  console.info = _info;
+  console.debug = _debug;
+});
+
+let rails, migrations;
+
+beforeAll(async () => {
+  // Import models (registers them with Application and modelRegistry)
+  await import('juntos:models');
+
+  // Configure migrations
+  rails = await import('juntos:rails');
+  migrations = await import('juntos:migrations');
+  rails.Application.configure({ migrations: migrations.migrations });
+
+  // Import routes (registers routes with Router via RouterBase.resources())
+  await import('../config/routes.rb');
+
+  // Install fetch interceptor so Stimulus controllers can reach controller actions
+  installFetchInterceptor();
+});
+
+beforeEach(async () => {
+  resetCookies();
+  const activeRecord = await import('juntos:active-record');
+  await activeRecord.initDatabase({ database: ':memory:' });
+
+  // For Dexie/IndexedDB: register table schemas and open database
+  if (activeRecord.defineSchema) {
+    activeRecord.registerSchema('schema_migrations', '&version');
+    for (const migration of migrations.migrations) {
+      if (migration.tableSchemas) {
+        for (const [table, schema] of Object.entries(migration.tableSchemas)) {
+          activeRecord.registerSchema(table, schema);
+        }
+      }
+    }
+    activeRecord.defineSchema(1);
+    await activeRecord.openDatabase();
+  }
+
+  await rails.Application.runMigrations(activeRecord);
+  await loadFixtures();
+  globalThis.__fixtures = _fixtures;
+});
+
+afterEach(async () => {
+  const activeRecord = await import('juntos:active-record');
+  if (activeRecord.closeDatabase) {
+    await activeRecord.closeDatabase();
+  }
+});
+`);
+  } else {
+    // SQL databases (better-sqlite3, pg, etc.): use savepoints for fast rollback
+    writeFileSync(setupPath, `// Test setup for Vitest
 // Initializes the database once, loads fixtures, uses savepoints per test
 
 import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
@@ -1298,6 +1371,7 @@ afterEach(async () => {
   activeRecord.rollbackSavepoint();
 });
 `);
+  }
 }
 
 // ============================================
