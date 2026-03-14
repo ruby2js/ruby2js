@@ -5,9 +5,14 @@
 // Database-engine-agnostic — the dedicated Worker runs the real adapter
 // (PGlite, SQLite WASM, wa-sqlite). This adapter just serializes SQL
 // over the MessagePort boundary.
+//
+// The dialect (SQLite vs Postgres) is selected at build time via
+// DB_DIALECT, which Vite defines based on the configured database.
 
 import { attr_accessor, initTimePolyfill } from 'juntos/adapters/active_record_base.mjs';
 import { modelRegistry, CollectionProxy, Reference, HasOneReference } from 'juntos/adapters/active_record_sql.mjs';
+import { SQLiteDialect } from './dialects/sqlite.mjs';
+import { PostgresDialect } from './dialects/postgres.mjs';
 
 // Re-export shared utilities
 export { attr_accessor, modelRegistry, CollectionProxy, Reference, HasOneReference };
@@ -77,7 +82,6 @@ export async function addIndex(tableName, columns, options = {}) {
 
 // Add a column (forwarded as raw SQL)
 export async function addColumn(tableName, columnName, columnType) {
-  // This is engine-specific SQL, so we let the dedicated Worker handle it
   return sendMessage({ type: 'exec', sql: `ALTER TABLE ${tableName} ADD COLUMN "${columnName}" TEXT` });
 }
 
@@ -119,7 +123,6 @@ export function getDatabase() {
 
 // Close the database connection
 export async function closeDatabase() {
-  // The dedicated Worker manages the database lifecycle
   dbWorker = null;
 }
 
@@ -128,19 +131,29 @@ export async function importDump(sql) {
   return sendMessage({ type: 'execSQL', sql });
 }
 
-// Determine the dialect based on configuration
-// This is set at build time via Vite define
-const dialect = globalThis.__JUNTOS_DB_DIALECT__ || 'sqlite';
+// Transaction support
+export async function beginTransaction() {
+  return sendMessage({ type: 'begin' });
+}
 
-// Dynamic base class selection would require async import
-// Instead, we import both and select at module level
-// The Vite build will tree-shake the unused one
-import { SQLiteDialect } from './dialects/sqlite_browser.mjs';
+export async function commitTransaction() {
+  return sendMessage({ type: 'commit' });
+}
+
+export async function rollbackTransaction() {
+  return sendMessage({ type: 'rollback' });
+}
+
+// Select dialect based on DB_DIALECT (defined at build time by Vite).
+// Postgres adapters (pglite) use $1-style placeholders and RETURNING id;
+// SQLite adapters (sqlite-wasm, wa-sqlite, sqljs) use ? placeholders.
+const BaseDialect = (typeof DB_DIALECT !== 'undefined' && DB_DIALECT === 'postgres')
+  ? PostgresDialect
+  : SQLiteDialect;
 
 // Worker ActiveRecord implementation
 // Sends all SQL to the dedicated Worker via MessagePort
-export class ActiveRecord extends SQLiteDialect {
-  // Execute SQL via the dedicated Worker
+export class ActiveRecord extends BaseDialect {
   static async _execute(sql, params = []) {
     const result = await sendMessage({ type: 'exec', sql, params });
 

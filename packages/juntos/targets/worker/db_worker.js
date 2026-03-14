@@ -77,4 +77,38 @@ self.onmessage = async ({ data }) => {
     }
     return;
   }
+
+  // Transaction support: begin, commit, rollback
+  if (data.type === 'begin') {
+    const { id } = data;
+    try {
+      await adapter.execute('BEGIN');
+      self.postMessage({ id, type: 'result', rows: [], changes: 0, lastInsertRowId: null });
+    } catch (e) {
+      self.postMessage({ id, type: 'error', error: e.message });
+    }
+    return;
+  }
+
+  if (data.type === 'commit') {
+    const { id } = data;
+    try {
+      await adapter.execute('COMMIT');
+      self.postMessage({ id, type: 'result', rows: [], changes: 0, lastInsertRowId: null });
+    } catch (e) {
+      self.postMessage({ id, type: 'error', error: e.message });
+    }
+    return;
+  }
+
+  if (data.type === 'rollback') {
+    const { id } = data;
+    try {
+      await adapter.execute('ROLLBACK');
+      self.postMessage({ id, type: 'result', rows: [], changes: 0, lastInsertRowId: null });
+    } catch (e) {
+      self.postMessage({ id, type: 'error', error: e.message });
+    }
+    return;
+  }
 };

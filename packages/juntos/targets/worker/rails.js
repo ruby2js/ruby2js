@@ -19,6 +19,8 @@ import {
   resolveContent
 } from 'juntos/rails_server.js';
 
+import { setWorker } from 'juntos:active-record';
+
 // Re-export base helpers
 export { createContext, createFlash, truncate, pluralize, dom_id };
 
@@ -134,6 +136,10 @@ export class Application extends ApplicationServer {
       new URL('./db_worker.js', import.meta.url),
       { type: 'module' }
     );
+
+    // Wire the dedicated Worker into the MessagePort adapter
+    // so ActiveRecord queries flow through to the database
+    setWorker(this.dbWorker);
 
     // Initialize database in the dedicated Worker
     await this.initDatabaseWorker();

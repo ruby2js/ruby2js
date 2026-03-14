@@ -1298,9 +1298,11 @@ function createConfigPlugin(config, appRoot) {
             };
             const realAdapter = adapterMap[config.database] || 'active_record_sqlite_wasm.mjs';
             const workerDbConfig = loadDatabaseConfig(appRoot, { quiet: true }) || {};
+            const dialect = config.database === 'pglite' ? 'postgres' : 'sqlite';
             return {
               'DB_ADAPTER_PATH': JSON.stringify(`juntos/adapters/${realAdapter}`),
-              'DB_CONFIG': JSON.stringify(workerDbConfig)
+              'DB_CONFIG': JSON.stringify(workerDbConfig),
+              'DB_DIALECT': JSON.stringify(dialect)
             };
           })() : {})
         },
