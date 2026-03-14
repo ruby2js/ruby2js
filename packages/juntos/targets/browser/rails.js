@@ -940,7 +940,7 @@ export class TurboBroadcast {
   // Broadcast a message to all subscribers
   // Called by model broadcast_*_to and broadcast_json_to methods
   static broadcast(channelName, html) {
-    console.log(`  [Broadcast] ${channelName}:`, html.substring(0, 100) + (html.length > 100 ? '...' : ''));
+    console.debug(`  [Broadcast] ${channelName}:`, html.substring(0, 100) + (html.length > 100 ? '...' : ''));
     const channel = this.getChannel(channelName);
     channel.postMessage(html);
     // Only render via Turbo for Turbo Stream content (not JSON broadcasts)
@@ -953,7 +953,7 @@ export class TurboBroadcast {
   // Used by turbo_stream_from helper in views
   // Returns empty string for ERB interpolation compatibility
   static subscribe(channelName, callback) {
-    console.log(`  [Subscribe] ${channelName}`);
+    console.debug(`  [Subscribe] ${channelName}`);
     const channel = this.getChannel(channelName);
     channel.onmessage = (event) => {
       console.log(`  [Received] ${channelName}:`, event.data.substring(0, 100) + (event.data.length > 100 ? '...' : ''));
