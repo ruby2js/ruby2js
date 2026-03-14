@@ -1331,6 +1331,48 @@ function createConfigPlugin(config, appRoot) {
           // (browser rails.js has dynamic imports for optional React and database adapters)
           dedupe: ['react', 'react-dom', 'dexie', 'better-sqlite3', '@neondatabase/serverless', '@libsql/client']
         },
+        // Worker target: resolve virtual modules inside SharedWorker/Worker builds
+        // Vite bundles workers in a separate build pass; plugins from the main
+        // build don't apply, so we provide a minimal resolver here.
+        ...(config.target === 'worker' ? {
+          worker: {
+            plugins: () => [{
+              name: 'juntos-worker-virtual',
+              resolveId(id) {
+                if (id === 'juntos:active-record') return '\0juntos:worker:active-record';
+                if (id === 'juntos:active-storage') return '\0juntos:worker:active-storage';
+                return null;
+              },
+              load(id) {
+                if (id === '\0juntos:worker:active-record') {
+                  const dbConfig = loadDatabaseConfig(appRoot, { quiet: true }) || {};
+                  return `
+export const DB_CONFIG = ${JSON.stringify(dbConfig)};
+export * from 'juntos/adapters/active_record_worker.mjs';
+`;
+                }
+                if (id === '\0juntos:worker:active-storage') {
+                  // No-op: Active Storage not yet supported in SharedWorker context
+                  return `export function initActiveStorage() {}`;
+                }
+                return null;
+              }
+            }],
+            resolve: {
+              alias: {
+                // Stub Node.js built-ins for SharedWorker (no filesystem)
+                'node:fs': path.join(path.dirname(new URL(import.meta.url).pathname), 'stubs/node_fs.mjs'),
+                'node:path': path.join(path.dirname(new URL(import.meta.url).pathname), 'stubs/node_path.mjs')
+              }
+            },
+            rollupOptions: {
+              output: {
+                // Fingerprint worker scripts for cache busting
+                entryFileNames: 'assets/[name]-[hash].js'
+              }
+            }
+          }
+        } : {}),
         // Ensure react/react-dom are pre-bundled in dev
         // Exclude packages that use virtual modules esbuild can't resolve
         // Include the database adapter's npm package since juntos is excluded
@@ -2679,7 +2721,7 @@ function createVirtualPlugin(config, appRoot) {
     'cloudflare': 'active_storage_s3.mjs', // Cloudflare Workers - use R2 via S3 API
     'vercel-edge': 'active_storage_s3.mjs',
     'vercel-node': 'active_storage_disk.mjs',
-    'worker': 'active_storage_indexeddb.mjs',  // SharedWorker — storage via main thread IndexedDB
+    // 'worker' intentionally omitted — Active Storage not yet supported in worker target
     'deno-deploy': 'active_storage_s3.mjs'
   };
 
@@ -2814,6 +2856,10 @@ export * from 'juntos/adapters/${adapterFile}';
 
       // Server version of juntos:active-storage
       if (id === '\0juntos:active-storage') {
+        if (targetDir === 'worker') {
+          // No-op: Active Storage not yet supported in worker target
+          return `export function initActiveStorage() {}`;
+        }
         return `export * from 'juntos/adapters/${storageAdapterFile}';`;
       }
 

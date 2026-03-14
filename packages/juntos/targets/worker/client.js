@@ -11,11 +11,16 @@ import {
   createFlash,
   truncate,
   pluralize,
-  dom_id
+  dom_id,
+  navigate,
+  submitForm,
+  formData,
+  handleFormResult,
+  setupFormHandlers
 } from 'juntos/rails_base.js';
 
 // Re-export base helpers
-export { createFlash, truncate, pluralize, dom_id };
+export { createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
 // Browser no-ops for layout helpers (CSS/JS handled by Vite)
 export function stylesheetLinkTag() { return ''; }
@@ -149,7 +154,9 @@ export class Application extends ApplicationBase {
     // Check for SharedWorker support
     if (typeof SharedWorker === 'undefined') {
       console.warn('[juntos] SharedWorker not available, falling back to browser target');
-      const browser = await import('juntos/targets/browser/rails.js');
+      // @vite-ignore: browser fallback is not bundled — it requires a different
+      // database adapter (Dexie/IndexedDB) that may not be installed
+      const browser = await import(/* @vite-ignore */ 'juntos/targets/browser/rails.js');
       return browser.Application.start();
     }
 
