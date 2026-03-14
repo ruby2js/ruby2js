@@ -26,12 +26,24 @@ export async function initDatabase(options = {}) {
   const { default: sqlite3InitModule } = await import('@sqlite.org/sqlite-wasm');
   const sqlite3 = await sqlite3InitModule();
 
-  // Try OPFS persistence first, fall back to in-memory
-  if (opfs && sqlite3.oo1.OpfsDb) {
+  // Try OPFS persistence, fall back to in-memory
+  if (opfs && typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope) {
+    // In a Worker: use opfs-sahpool VFS (best performance, no COOP/COEP headers needed)
+    try {
+      const poolUtil = await sqlite3.installOpfsSAHPoolVfs({
+        initialCapacity: 6,
+        clearOnInit: false
+      });
+      db = new poolUtil.OpfsSAHPoolDb('/' + dbName);
+    } catch {
+      // OPFS not available, fall back to in-memory
+      db = new sqlite3.oo1.DB();
+    }
+  } else if (opfs && sqlite3.oo1.OpfsDb) {
+    // On main thread: try legacy OPFS VFS (requires COOP/COEP headers)
     try {
       db = new sqlite3.oo1.OpfsDb(dbName);
     } catch {
-      // OPFS not available (e.g., not in secure context), fall back
       db = new sqlite3.oo1.DB();
     }
   } else {
