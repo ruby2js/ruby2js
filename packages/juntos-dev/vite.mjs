@@ -1308,10 +1308,6 @@ function createConfigPlugin(config, appRoot) {
           'globalThis.JUNTOS_HYDRATION': rpcState.dualBundleEnabled ? 'true' : 'false',
           // Worker target: tell the SharedWorker which real adapter
           // to load in the dedicated database Worker
-          // Worker target: define the SharedWorker URL for client.js
-          ...(config.target === 'worker' ? {
-            'WORKER_URL': '"/worker.js"'
-          } : {}),
           ...(config.target === 'worker' ? (() => {
             const adapterMap = {
               'pglite': 'active_record_pglite.mjs',
@@ -1605,6 +1601,24 @@ export { application };`,
       await fs.promises.rmdir(browserOutDir);
       console.log('[juntos] Flattened .browser/ output to dist/');
 
+      // Worker target: inject <meta name="juntos-worker"> with fingerprinted URL
+      if (config.target === 'worker') {
+        const manifestPath = path.join(distDir, '.vite', 'manifest.json');
+        if (fs.existsSync(manifestPath)) {
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+          const workerEntry = manifest['.browser/worker.js'] || manifest['worker.js'];
+          if (workerEntry?.file) {
+            const indexHtml = path.join(distDir, 'index.html');
+            if (fs.existsSync(indexHtml)) {
+              let html = fs.readFileSync(indexHtml, 'utf8');
+              html = html.replace('</head>', `  <meta name="juntos-worker" content="/${workerEntry.file}">\n</head>`);
+              fs.writeFileSync(indexHtml, html);
+              console.log(`[juntos] Worker URL: /${workerEntry.file}`);
+            }
+          }
+        }
+      }
+
       // Generate Electrobun config files
       if (config.target === 'electrobun') {
         generateElectrobunConfig(distDir, appRoot);
@@ -1789,9 +1803,8 @@ function getRollupOptions(target, database) {
           worker: '.browser/worker.js'
         },
         output: {
-          // SharedWorker entry gets a fixed name (referenced by WORKER_URL define)
-          entryFileNames: (chunkInfo) =>
-            chunkInfo.name === 'worker' ? '[name].js' : 'assets/[name]-[hash].js'
+          // All entries get fingerprinted names for cache busting
+          entryFileNames: 'assets/[name]-[hash].js'
         }
       };
 

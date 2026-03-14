@@ -180,17 +180,18 @@ export class Application extends ApplicationBase {
     // Check for SharedWorker support (use globalThis — bare SharedWorker
     // may be undefined inside ES modules in some Firefox versions)
     if (!globalThis.SharedWorker) {
-      console.warn('[juntos] SharedWorker not available, falling back to browser target');
-      // @vite-ignore: browser fallback is not bundled — it requires a different
-      // database adapter (Dexie/IndexedDB) that may not be installed
-      const browser = await import(/* @vite-ignore */ 'juntos/targets/browser/rails.js');
-      return browser.Application.start();
+      const msg = 'This app requires SharedWorker support (Chrome 80+, Firefox 114+, Safari 18.2+). '
+        + 'Please use a supported browser, or rebuild with: juntos build -t browser';
+      console.error('[juntos]', msg);
+      const el = document.getElementById('loading') || document.body;
+      el.innerHTML = `<p style="color: red; padding: 20px;">${msg}</p>`;
+      return;
     }
 
     try {
-      // WORKER_URL is defined at build time by Vite — it points to the
-      // fingerprinted SharedWorker bundle produced as a separate rollup entry
-      const worker = new SharedWorker(WORKER_URL, { type: 'module', name: 'juntos' });
+      // Read fingerprinted worker URL from <meta> tag injected at build time
+      const workerUrl = document.querySelector('meta[name="juntos-worker"]')?.content || '/worker.js';
+      const worker = new SharedWorker(workerUrl, { type: 'module', name: 'juntos' });
 
       this.bridge = new WorkerBridge(worker);
 
