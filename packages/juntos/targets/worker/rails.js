@@ -19,7 +19,7 @@ import {
   resolveContent
 } from 'juntos/rails_server.js';
 
-import { setWorker } from 'juntos:active-record';
+import { setWorker } from 'juntos/adapters/active_record_worker.mjs';
 
 // Re-export base helpers
 export { createContext, createFlash, truncate, pluralize, dom_id };
