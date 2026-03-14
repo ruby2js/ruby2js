@@ -11,6 +11,7 @@ import {
   Router as RouterServer,
   Application as ApplicationServer,
   TurboBroadcast as TurboBroadcastServer,
+  getCSRF,
   createContext,
   createFlash,
   truncate,
@@ -23,6 +24,10 @@ import {
   setupFormHandlers,
   resolveContent
 } from 'juntos/rails_server.js';
+
+// Disable CSRF validation — the worker target has no network boundary
+// to protect against (all requests come from the same origin via MessagePort)
+getCSRF().validateToken = async () => true;
 
 import * as adapter from 'juntos/adapters/active_record_worker.mjs';
 import { setWorker } from 'juntos/adapters/active_record_worker.mjs';
