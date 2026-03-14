@@ -146,11 +146,20 @@ export class Application extends ApplicationServer {
   // Connected tab ports
   static ports = new Set();
 
-  // Reference to the dedicated database Worker
+  // Reference to the dedicated database Worker (or MessagePort proxy)
   static dbWorker = null;
 
   // Fingerprinted DB Worker URL (received from main thread)
   static dbWorkerUrl = null;
+
+  // The tab ID that hosts the dedicated Worker (null if Firefox direct mode)
+  static dbWorkerHostId = null;
+
+  // Whether we can create Workers directly (Firefox) or need tab delegation (Chrome)
+  static canCreateWorker = null;
+
+  // Map of tab ID → port
+  static tabPorts = new Map();
 
 
   // Start the SharedWorker application
@@ -165,17 +174,20 @@ export class Application extends ApplicationServer {
       const port = event.ports[0];
       this.ports.add(port);
 
-      port.onmessage = async ({ data }) => {
+      port.onmessage = async (event) => {
+        const { data } = event;
         if (data.type === 'config') {
           if (data.dbWorkerUrl) this.dbWorkerUrl = data.dbWorkerUrl;
+          if (data.tabId) this.tabPorts.set(data.tabId, port);
           configResolve();
           return;
         }
+        if (data.type === 'create-db-worker') return; // handled by requestWorkerFromTab
         await this.handleMessage(port, data);
       };
 
       port.onmessageerror = () => {
-        this.ports.delete(port);
+        this.handleTabDisconnect(port);
       };
 
       port.start();
@@ -186,22 +198,29 @@ export class Application extends ApplicationServer {
       }
     };
 
+    // Listen for tab close announcements via BroadcastChannel
+    const lifecycle = new globalThis.BroadcastChannel('juntos:lifecycle');
+    lifecycle.onmessage = ({ data }) => {
+      if (data.type === 'tab-closing' && data.tabId) {
+        const port = this.tabPorts.get(data.tabId);
+        if (port) {
+          this.tabPorts.delete(data.tabId);
+          this.ports.delete(port);
+        }
+        // If this tab was hosting the dedicated Worker, respawn
+        if (data.tabId === this.dbWorkerHostId) {
+          this.dbWorkerHostId = null;
+          this.respawnDbWorker();
+        }
+      }
+    };
+
     try {
       // Wait for config from the main thread (DB Worker URL)
       await configReady;
 
-      // Spawn the dedicated database Worker using the fingerprinted URL
-      this.dbWorker = new Worker(this.dbWorkerUrl, { type: 'module' });
-
-      // Wire the dedicated Worker into the MessagePort adapter
-      // so ActiveRecord queries flow through to the database
-      setWorker(this.dbWorker);
-
-      // Wire the dedicated Worker for Active Storage file operations
-      setStorageWorker(this.dbWorker);
-
-      // Initialize database in the dedicated Worker
-      await this.initDatabaseWorker();
+      // Spawn and initialize the dedicated database Worker
+      await this.spawnDbWorker();
 
       // Wire the adapter for model registry
       this.activeRecordModule = adapter;
@@ -236,6 +255,110 @@ export class Application extends ApplicationServer {
         port.postMessage({ type: 'error', error: e.message });
       }
     }
+  }
+
+  // Create and initialize the dedicated database Worker
+  static async spawnDbWorker(tabPort = null) {
+    // Try directly first (works in Firefox); fall back to asking a
+    // connected tab to create it (Chrome doesn't expose Worker in SharedWorker)
+    if (this.canCreateWorker === null || this.canCreateWorker === true) {
+      try {
+        this.dbWorker = new Worker(this.dbWorkerUrl, { type: 'module' });
+        this.canCreateWorker = true;
+        this.dbWorkerHost = null;
+      } catch {
+        this.canCreateWorker = false;
+      }
+    }
+
+    if (!this.canCreateWorker) {
+      const hostTab = tabPort || this.ports.values().next().value;
+      this.dbWorker = await this.requestWorkerFromTab(hostTab);
+      // Find the tab ID for the host port
+      for (const [id, port] of this.tabPorts) {
+        if (port === hostTab) {
+          this.dbWorkerHostId = id;
+          break;
+        }
+      }
+    }
+
+    // Wire the dedicated Worker into the MessagePort adapter
+    setWorker(this.dbWorker);
+
+    // Wire for Active Storage file operations
+    setStorageWorker(this.dbWorker);
+
+    // Initialize database in the dedicated Worker
+    await this.initDatabaseWorker();
+  }
+
+  // Respawn the dedicated Worker on another tab (when the host tab closes)
+  static async respawnDbWorker() {
+    if (this.ports.size === 0) {
+      console.warn('No tabs available to respawn database Worker');
+      return;
+    }
+
+    console.log('Database Worker host disconnected, respawning...');
+    try {
+      await this.spawnDbWorker();
+      console.log('Database Worker respawned successfully');
+    } catch (e) {
+      console.error('Failed to respawn database Worker:', e);
+    }
+  }
+
+  // Handle a tab disconnecting (via onmessageerror)
+  static handleTabDisconnect(port) {
+    this.ports.delete(port);
+    // Find and remove tab ID
+    for (const [id, p] of this.tabPorts) {
+      if (p === port) {
+        this.tabPorts.delete(id);
+        if (id === this.dbWorkerHostId) {
+          this.dbWorkerHostId = null;
+          this.respawnDbWorker();
+        }
+        break;
+      }
+    }
+  }
+
+  // Ask a connected tab to create the dedicated Worker (Chrome fallback)
+  // Returns a MessagePort that proxies to the Worker
+  static requestWorkerFromTab(tab = null) {
+    return new Promise((resolve, reject) => {
+      tab = tab || this.ports.values().next().value;
+      if (!tab) {
+        reject(new Error('No connected tabs to create Worker'));
+        return;
+      }
+
+      // Create a MessageChannel — one port for us, one for the Worker
+      const channel = new MessageChannel();
+
+      // Listen for the tab to confirm the Worker was created
+      const handler = ({ data }) => {
+        if (data.type === 'db-worker-created') {
+          tab.removeEventListener?.('message', handler);
+          // Use our end of the channel as the "worker" — it has the same
+          // postMessage/addEventListener interface as a Worker
+          channel.port1.start();
+          resolve(channel.port1);
+        } else if (data.type === 'db-worker-error') {
+          tab.removeEventListener?.('message', handler);
+          reject(new Error(data.error));
+        }
+      };
+      tab.addEventListener('message', handler);
+
+      // Ask the tab to create the Worker and wire it to port2
+      tab.postMessage(
+        { type: 'create-db-worker', url: this.dbWorkerUrl },
+        [channel.port2]
+      );
+    });
   }
 
   // Initialize the database in the dedicated Worker

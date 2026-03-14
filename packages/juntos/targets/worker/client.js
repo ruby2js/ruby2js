@@ -71,7 +71,8 @@ class WorkerBridge {
       this._readyReject?.(new Error('SharedWorker failed to load'));
     };
 
-    this.port.onmessage = ({ data }) => {
+    this.port.onmessage = (event) => {
+      const { data } = event;
       if (data.type === 'ready') {
         this._readyResolve();
         return;
@@ -79,6 +80,22 @@ class WorkerBridge {
       if (data.type === 'error') {
         console.error('[juntos] SharedWorker initialization error:', data.error);
         this._readyReject?.(new Error(data.error));
+        return;
+      }
+      // SharedWorker asks us to create a dedicated Worker (Chrome fallback)
+      if (data.type === 'create-db-worker') {
+        try {
+          const dbWorker = new Worker(data.url, { type: 'module' });
+          // Wire the MessageChannel port to the dedicated Worker
+          // Forward messages in both directions
+          const workerPort = event.ports[0];
+          dbWorker.onmessage = (e) => workerPort.postMessage(e.data);
+          workerPort.onmessage = (e) => dbWorker.postMessage(e.data);
+          workerPort.start();
+          this.port.postMessage({ type: 'db-worker-created' });
+        } catch (e) {
+          this.port.postMessage({ type: 'db-worker-error', error: e.message });
+        }
         return;
       }
       if (data.type === 'response' && data.id) {
@@ -214,10 +231,18 @@ export class Application extends ApplicationBase {
       // Read fingerprinted URLs from <meta> tags injected at build time
       const workerUrl = document.querySelector('meta[name="juntos-worker"]')?.content || '/worker.js';
       const dbWorkerUrl = document.querySelector('meta[name="juntos-db-worker"]')?.content || '/db_worker.js';
+      const tabId = crypto.randomUUID();
       const worker = new SharedWorker(workerUrl, { type: 'module', name: 'juntos' });
 
-      // Send the DB Worker URL to the SharedWorker (it can't read DOM meta tags)
-      worker.port.postMessage({ type: 'config', dbWorkerUrl });
+      // Send config to the SharedWorker (it can't read DOM meta tags)
+      worker.port.postMessage({ type: 'config', dbWorkerUrl, tabId });
+
+      // Announce when this tab is closing so the SharedWorker can respawn
+      // the dedicated Worker if this tab was hosting it
+      const lifecycle = new globalThis.BroadcastChannel('juntos:lifecycle');
+      window.addEventListener('beforeunload', () => {
+        lifecycle.postMessage({ type: 'tab-closing', tabId });
+      });
 
       this.bridge = new WorkerBridge(worker);
 
