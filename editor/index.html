@@ -471,38 +471,54 @@
         setProgress(100, 'Ready!');
         document.getElementById('loading-overlay').classList.add('hidden');
 
-        // Listen for server-ready
+        // Listen for server-ready and xdg-open
         const isFirefox = navigator.userAgent.includes('Firefox');
+        let serverBaseUrl = null;
 
-        container.on('server-ready', (port, url) => {
-          const label = isTestMode ? 'Tests' : 'Preview';
-          const iframeUrl = isTestMode ? url.replace(/\/?$/, '/__vitest_test__/') : url;
-          xterm.writeln(`\r\n\x1b[32m Server ready: ${url}\x1b[0m\r\n`);
-          setTerminalStatus('Server running');
-
+        function showPreview(iframeUrl, label) {
           const header = document.getElementById('preview-header');
           const openLink = document.createElement('a');
           openLink.href = iframeUrl;
           openLink.target = '_blank';
           openLink.textContent = 'Open in new window';
           header.innerHTML = '';
-          header.appendChild(document.createTextNode(`${label} — ${url} `));
+          header.appendChild(document.createTextNode(`${label} `));
           header.appendChild(openLink);
 
-          // Small delay to ensure Vite has finished initial compilation
-          setTimeout(() => {
-            document.getElementById('preview-placeholder').style.display = 'none';
-            if (isFirefox) {
-              // Firefox cannot render WebContainer previews in iframes due to
-              // cross-origin isolation limitations. Show a message instead.
-              const placeholder = document.getElementById('preview-placeholder');
-              placeholder.style.display = '';
-              placeholder.innerHTML = 'Firefox does not support preview in iframes.<br>Use the "Open in new window" link above.';
-            } else {
-              document.getElementById('preview-iframe').style.display = 'block';
-              document.getElementById('preview-iframe').src = iframeUrl;
-            }
-          }, 500);
+          document.getElementById('preview-placeholder').style.display = 'none';
+          if (isFirefox) {
+            const placeholder = document.getElementById('preview-placeholder');
+            placeholder.style.display = '';
+            placeholder.innerHTML = 'Firefox does not support preview in iframes.<br>Use the "Open in new window" link above.';
+          } else {
+            document.getElementById('preview-iframe').style.display = 'block';
+            document.getElementById('preview-iframe').src = iframeUrl;
+          }
+        }
+
+        container.on('server-ready', (port, url) => {
+          serverBaseUrl = url;
+          xterm.writeln(`\r\n\x1b[32m Server ready: ${url}\x1b[0m\r\n`);
+          setTerminalStatus('Server running');
+
+          if (!isTestMode) {
+            // Dev mode: load the app directly
+            setTimeout(() => showPreview(url, `Preview — ${url}`), 500);
+          }
+          // Test mode: wait for xdg-open event with the proper session URL
+        });
+
+        // In test mode, vitest's preview provider calls openBrowser() which
+        // triggers xdg-open. The URL includes the session ID needed for the
+        // WebSocket connection. Rewrite localhost URL to WebContainer URL.
+        container.on('xdg-open', (localUrl) => {
+          if (!isTestMode || !serverBaseUrl) return;
+          // localUrl is like http://localhost:63315/__vitest_test__/?sessionId=...
+          // Rewrite to the WebContainer's external URL
+          const path = new URL(localUrl).pathname + new URL(localUrl).search;
+          const iframeUrl = serverBaseUrl.replace(/\/?$/, path);
+          xterm.writeln(`\x1b[32m Opening test UI: ${iframeUrl}\x1b[0m\r\n`);
+          showPreview(iframeUrl, 'Tests');
         });
 
         // Step 6: Auto-run setup commands
