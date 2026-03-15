@@ -4638,18 +4638,36 @@ async function runTest(options, testArgs) {
     }
   }
 
-  // Determine watch vs run mode
+  // Parse juntos-specific flags
   const hasWatch = testArgs.includes('--watch');
   const hasRun = testArgs.includes('--run');
-  const filteredArgs = testArgs.filter(a => a !== '--watch' && a !== '--run' && a !== '--preview');
+  const hasUI = testArgs.includes('--ui');
+  const filteredArgs = testArgs.filter(a => a !== '--watch' && a !== '--run' && a !== '--preview' && a !== '--ui');
 
-  // Default: browser targets and preview mode watch, others run once
-  const watchMode = hasWatch || (!hasRun && (isBrowserTest || usePreview));
+  // Install @vitest/ui if requested
+  if (hasUI && !isPackageInstalled('@vitest/ui')) {
+    console.log('Installing @vitest/ui...');
+    try {
+      execSync('npm install @vitest/ui', {
+        cwd: APP_ROOT,
+        stdio: 'inherit'
+      });
+    } catch (e) {
+      console.error('Failed to install @vitest/ui.');
+      process.exit(1);
+    }
+  }
+
+  // Default: browser targets, preview, and --ui use watch mode; others run once
+  const watchMode = hasWatch || (!hasRun && (isBrowserTest || usePreview || hasUI));
 
   // Build vitest command
   const args = ['vitest'];
   if (!watchMode) {
     args.push('run');
+  }
+  if (hasUI) {
+    args.push('--ui');
   }
 
   // Pass through any additional arguments (file patterns, etc.)
@@ -5527,6 +5545,7 @@ switch (command) {
       console.log('  -d, --database ADAPTER   Database adapter for tests');
       console.log('  --watch                  Watch mode (re-run on file changes)');
       console.log('  --run                    Run once and exit (CI mode)');
+      console.log('  --ui                     Open Vitest UI dashboard in browser');
       console.log('  --preview                Use preview browser provider (no Playwright)');
       console.log('\nBrowser databases (dexie, sqljs, pglite) default to watch mode.');
       console.log('Server databases (sqlite, pg, etc.) default to run-once mode.\n');
@@ -5538,6 +5557,7 @@ switch (command) {
       console.log('  juntos test -d dexie --run     # Run in browser once (CI)');
       console.log('  juntos test -d sqlite --watch  # Watch mode with jsdom');
       console.log('  juntos test -d dexie --preview # Browser tests without Playwright');
+      console.log('  juntos test --ui               # Visual test dashboard');
       process.exit(0);
     }
     runTest(options, commandArgs).catch(err => {

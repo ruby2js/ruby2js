@@ -221,11 +221,17 @@ npx juntos test -d sqlite --watch
 
 # Preview provider (no Playwright needed, ideal for WebContainers)
 npx juntos test -d dexie --preview
+
+# Visual test dashboard (works with any mode)
+npx juntos test -d sqlite --ui
+npx juntos test -d dexie --ui
 ```
 
-Browser databases default to **watch mode** — the browser stays open and re-runs tests as you edit files. Server databases default to **run-once mode**. Use `--run` or `--watch` to override.
+Browser databases default to **watch mode** — the browser stays open and re-runs tests as you edit files. Server databases default to **run-once mode**. Use `--run` or `--watch` to override. The `--ui` flag implies watch mode.
 
 On first run, `juntos test` auto-installs the required browser provider. By default this is `@vitest/browser-playwright` with Chromium. Use `--preview` to use the lightweight `@vitest/browser-preview` provider instead — it runs tests in the page itself without Playwright or system browser binaries, making it ideal for WebContainers and quick local testing.
+
+Use `--ui` to open the [Vitest UI](https://vitest.dev/guide/ui) dashboard in your browser. It provides a visual test tree, pass/fail status, error details, and re-run controls. Works with both Node/jsdom and browser test modes.
 
 Browser mode is useful when your tests depend on real browser APIs that jsdom doesn't support (IndexedDB, Web Components, CSS queries, `IntersectionObserver`, etc.), or when you want to test with the same database adapter your production browser target uses.
 
