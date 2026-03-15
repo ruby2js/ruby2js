@@ -226,17 +226,16 @@
         setProgress(45, `Building mount tree (${fileCount} files)...`);
         const mountTree = buildMountTree(demoFiles);
 
-        // Add package tarballs as binary files in root
+        // Keep package tarballs as raw buffers (written after mount to avoid encoding issues)
         setProgress(50, 'Preparing packages...');
         const packageNames = ['ruby2js-beta.tgz', 'juntos-beta.tgz', 'juntos-dev-beta.tgz', 'vite-plugin-ruby2js-beta.tgz'];
-        for (let i = 0; i < packageResponses.length; i++) {
-          const buf = await packageResponses[i].arrayBuffer();
-          mountTree[packageNames[i]] = { file: { contents: new Uint8Array(buf) } };
-        }
+        const packageBuffers = await Promise.all(
+          packageResponses.map(r => r.arrayBuffer())
+        );
 
         // Step 2: Boot WebContainer
         setProgress(60, 'Booting WebContainer...');
-        const { WebContainer } = await import('https://unpkg.com/@webcontainer/api@1.5.1/dist/index.js');
+        const { WebContainer } = await import('https://unpkg.com/@webcontainer/api@1.6.1/dist/index.js');
 
         let container;
         try {
@@ -253,6 +252,11 @@
         // Step 3: Mount files
         setProgress(75, 'Mounting file system...');
         await container.mount(mountTree);
+
+        // Write binary tarballs directly to avoid mount tree encoding issues
+        for (let i = 0; i < packageNames.length; i++) {
+          await container.fs.writeFile(packageNames[i], new Uint8Array(packageBuffers[i]));
+        }
 
         // Step 4: Set up terminal
         setProgress(90, 'Starting terminal...');
