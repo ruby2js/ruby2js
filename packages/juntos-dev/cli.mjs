@@ -1032,7 +1032,7 @@ export async function loadFixtures() {}
  * Called by `juntos test` before running vitest.
  * Writes .test.mjs files alongside the .rb source files.
  */
-async function transpileTestFiles(appRoot, config) {
+async function transpileTestFiles(appRoot, config, { preview = false } = {}) {
   const testDir = join(appRoot, 'test');
   if (!existsSync(testDir)) return;
 
@@ -1179,7 +1179,27 @@ async function transpileTestFiles(appRoot, config) {
   // Generate vitest.config.js — always regenerate to match database/environment
   const isBrowserTest = DEFAULT_TARGETS[config.database] === 'browser';
   const vitestConfigPath = join(appRoot, 'vitest.config.js');
-  if (isBrowserTest) {
+  if (isBrowserTest && preview) {
+    writeFileSync(vitestConfigPath, `import { defineConfig, mergeConfig } from 'vitest/config';
+import { preview as previewProvider } from '@vitest/browser-preview';
+import viteConfig from './vite.config.js';
+
+export default mergeConfig(viteConfig, defineConfig({
+  test: {
+    globals: true,
+    browser: {
+      enabled: true,
+      provider: previewProvider(),
+      instances: [
+        { browser: 'chromium' }
+      ]
+    },
+    include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
+    setupFiles: ['./test/setup.mjs']
+  }
+}));
+`);
+  } else if (isBrowserTest) {
     writeFileSync(vitestConfigPath, `import { defineConfig, mergeConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import viteConfig from './vite.config.js';
@@ -4545,7 +4565,8 @@ async function runTest(options, testArgs) {
     database: options.database,
     target: options.target
   });
-  await transpileTestFiles(APP_ROOT, config);
+  const usePreview = testArgs.includes('--preview');
+  await transpileTestFiles(APP_ROOT, config, { preview: usePreview });
 
   // Ensure vitest is installed
   if (!isPackageInstalled('vitest')) {
@@ -4563,28 +4584,45 @@ async function runTest(options, testArgs) {
 
   // Install test environment packages based on database target
   const isBrowserTest = DEFAULT_TARGETS[options.database] === 'browser';
-  if (isBrowserTest) {
-    if (!isPackageInstalled('@vitest/browser-playwright')) {
-      console.log('Installing @vitest/browser-playwright...');
-      try {
-        execSync('npm install @vitest/browser-playwright', {
-          cwd: APP_ROOT,
-          stdio: 'inherit'
-        });
-      } catch (e) {
-        console.error('Failed to install @vitest/browser-playwright.');
-        process.exit(1);
+  if (isBrowserTest || usePreview) {
+    if (usePreview) {
+      // Preview provider: lightweight, no system browser needed (ideal for WebContainers)
+      if (!isPackageInstalled('@vitest/browser-preview')) {
+        console.log('Installing @vitest/browser-preview...');
+        try {
+          execSync('npm install @vitest/browser-preview', {
+            cwd: APP_ROOT,
+            stdio: 'inherit'
+          });
+        } catch (e) {
+          console.error('Failed to install @vitest/browser-preview.');
+          process.exit(1);
+        }
       }
+    } else {
+      // Playwright provider: full browser automation
+      if (!isPackageInstalled('@vitest/browser-playwright')) {
+        console.log('Installing @vitest/browser-playwright...');
+        try {
+          execSync('npm install @vitest/browser-playwright', {
+            cwd: APP_ROOT,
+            stdio: 'inherit'
+          });
+        } catch (e) {
+          console.error('Failed to install @vitest/browser-playwright.');
+          process.exit(1);
+        }
 
-      console.log('Installing Playwright browsers...');
-      try {
-        execSync('npx playwright install --with-deps chromium', {
-          cwd: APP_ROOT,
-          stdio: 'inherit'
-        });
-      } catch (e) {
-        console.error('Failed to install Playwright browsers.');
-        process.exit(1);
+        console.log('Installing Playwright browsers...');
+        try {
+          execSync('npx playwright install --with-deps chromium', {
+            cwd: APP_ROOT,
+            stdio: 'inherit'
+          });
+        } catch (e) {
+          console.error('Failed to install Playwright browsers.');
+          process.exit(1);
+        }
       }
     }
   } else {
@@ -4603,10 +4641,10 @@ async function runTest(options, testArgs) {
   // Determine watch vs run mode
   const hasWatch = testArgs.includes('--watch');
   const hasRun = testArgs.includes('--run');
-  const filteredArgs = testArgs.filter(a => a !== '--watch' && a !== '--run');
+  const filteredArgs = testArgs.filter(a => a !== '--watch' && a !== '--run' && a !== '--preview');
 
-  // Default: browser targets watch, others run once
-  const watchMode = hasWatch || (!hasRun && isBrowserTest);
+  // Default: browser targets and preview mode watch, others run once
+  const watchMode = hasWatch || (!hasRun && (isBrowserTest || usePreview));
 
   // Build vitest command
   const args = ['vitest'];
@@ -5489,6 +5527,7 @@ switch (command) {
       console.log('  -d, --database ADAPTER   Database adapter for tests');
       console.log('  --watch                  Watch mode (re-run on file changes)');
       console.log('  --run                    Run once and exit (CI mode)');
+      console.log('  --preview                Use preview browser provider (no Playwright)');
       console.log('\nBrowser databases (dexie, sqljs, pglite) default to watch mode.');
       console.log('Server databases (sqlite, pg, etc.) default to run-once mode.\n');
       console.log('Examples:');
@@ -5498,6 +5537,7 @@ switch (command) {
       console.log('  juntos test -d dexie           # Run in browser (watch mode)');
       console.log('  juntos test -d dexie --run     # Run in browser once (CI)');
       console.log('  juntos test -d sqlite --watch  # Watch mode with jsdom');
+      console.log('  juntos test -d dexie --preview # Browser tests without Playwright');
       process.exit(0);
     }
     runTest(options, commandArgs).catch(err => {

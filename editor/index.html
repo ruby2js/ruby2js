@@ -505,7 +505,7 @@
 
         // Launch long-running process based on mode
         const cmdArgs = isTestMode
-          ? ['juntos', 'test', '-d', 'dexie']
+          ? ['juntos', 'test', '-d', 'dexie', '--preview']
           : ['juntos', 'dev', '-d', 'dexie', '--host'];
         const cmdLabel = isTestMode ? 'test runner' : 'dev server';
 
