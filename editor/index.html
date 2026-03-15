@@ -15,7 +15,9 @@
     #editor-container { grid-row: 1 / 2; min-width: 0; }
     #preview-pane { grid-row: 1 / 2; border-left: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
     #preview-pane iframe { flex: 1; border: none; background: #fff; width: 100%; min-height: 0; }
-    #preview-header { padding: 4px 8px; background: #252526; border-bottom: 1px solid #333; font-size: 12px; color: #999; flex-shrink: 0; }
+    #preview-header { padding: 4px 8px; background: #252526; border-bottom: 1px solid #333; font-size: 12px; color: #999; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
+    #preview-header a { color: #569cd6; text-decoration: none; margin-left: 8px; }
+    #preview-header a:hover { text-decoration: underline; }
     #preview-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; background: #1a1a1a; color: #666; font-size: 13px; text-align: center; padding: 20px; }
     #terminal-pane { grid-column: 1 / -1; grid-row: 2 / 3; border-top: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
     #terminal-header { padding: 4px 8px; background: #252526; border-bottom: 1px solid #333; font-size: 12px; color: #999; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
@@ -51,7 +53,7 @@
     <div id="preview-pane">
       <div id="preview-header">Preview</div>
       <div id="preview-placeholder">Starting server...</div>
-      <iframe id="preview-iframe" credentialless style="display: none;"></iframe>
+      <iframe id="preview-iframe" style="display: none;"></iframe>
     </div>
     <div id="terminal-pane">
       <div id="terminal-header">
@@ -470,17 +472,36 @@
         document.getElementById('loading-overlay').classList.add('hidden');
 
         // Listen for server-ready
+        const isFirefox = navigator.userAgent.includes('Firefox');
+
         container.on('server-ready', (port, url) => {
           const label = isTestMode ? 'Tests' : 'Preview';
+          const iframeUrl = isTestMode ? url.replace(/\/?$/, '/__vitest_test__/') : url;
           xterm.writeln(`\r\n\x1b[32m Server ready: ${url}\x1b[0m\r\n`);
           setTerminalStatus('Server running');
-          document.getElementById('preview-header').textContent = `${label} — ${url}`;
+
+          const header = document.getElementById('preview-header');
+          const openLink = document.createElement('a');
+          openLink.href = iframeUrl;
+          openLink.target = '_blank';
+          openLink.textContent = 'Open in new window';
+          header.innerHTML = '';
+          header.appendChild(document.createTextNode(`${label} — ${url} `));
+          header.appendChild(openLink);
+
           // Small delay to ensure Vite has finished initial compilation
           setTimeout(() => {
             document.getElementById('preview-placeholder').style.display = 'none';
-            document.getElementById('preview-iframe').style.display = 'block';
-            const iframeUrl = isTestMode ? url.replace(/\/?$/, '/__vitest_test__/') : url;
-            document.getElementById('preview-iframe').src = iframeUrl;
+            if (isFirefox) {
+              // Firefox cannot render WebContainer previews in iframes due to
+              // cross-origin isolation limitations. Show a message instead.
+              const placeholder = document.getElementById('preview-placeholder');
+              placeholder.style.display = '';
+              placeholder.innerHTML = 'Firefox does not support preview in iframes.<br>Use the "Open in new window" link above.';
+            } else {
+              document.getElementById('preview-iframe').style.display = 'block';
+              document.getElementById('preview-iframe').src = iframeUrl;
+            }
           }, 500);
         });
 
