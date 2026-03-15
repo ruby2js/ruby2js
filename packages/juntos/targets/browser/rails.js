@@ -10,6 +10,8 @@ import {
   dom_id
 } from 'juntos/rails_base.js';
 
+import { getViewRenderer } from 'juntos/rails_server.js';
+
 // Re-export base helpers
 // Note: createContext is defined in this file with browser-specific logic
 export { createFlash, truncate, pluralize, dom_id };
@@ -171,22 +173,15 @@ export class Router extends RouterBase {
   }
 
   // Render content directly to the DOM (used when Turbo isn't handling the response)
-  // For validation re-renders, React elements, and no-layout fallback
+  // For validation re-renders, framework elements, and no-layout fallback
   static async renderContent(context, content) {
     const resolved = await Promise.resolve(content);
 
-    if (resolved && typeof resolved === 'object' && resolved.$$typeof) {
-      // React element - use ReactDOM to render
+    if (getViewRenderer().isFrameworkElement(resolved)) {
+      // Framework element - render to DOM via view-renderer
       const container = document.getElementById('content');
       const wrappedContent = Application.wrapInLayout(context, resolved);
-
-      const { createRoot } = await import('react-dom/client');
-      if (container._reactRoot) {
-        container._reactRoot.unmount();
-      }
-      const root = createRoot(container);
-      container._reactRoot = root;
-      root.render(wrappedContent);
+      getViewRenderer().clientRenderElement(wrappedContent, container);
     } else if (Application.layoutFn) {
       // Has layout — render full document and morph body
       const fullHtml = Application.wrapInLayout(context, resolved);
@@ -252,20 +247,11 @@ export class Router extends RouterBase {
       // Await if content is a promise
       const resolved = await Promise.resolve(content);
 
-      // Check if content is a React element (has $$typeof Symbol)
-      if (resolved && typeof resolved === 'object' && resolved.$$typeof) {
-        // React element - use hydrateRoot for initial hydration
+      // Check if content is a framework element
+      if (getViewRenderer().isFrameworkElement(resolved)) {
+        // Framework element - hydrate via view-renderer
         const wrappedContent = Application.wrapInLayout(context, resolved);
-        const { hydrateRoot } = await import('react-dom/client');
-
-        // Clear any existing React root from previous renders
-        if (rootElement._reactRoot) {
-          rootElement._reactRoot.unmount();
-        }
-
-        // Hydrate the server-rendered content
-        const root = hydrateRoot(rootElement, wrappedContent);
-        rootElement._reactRoot = root;
+        getViewRenderer().clientHydrateElement(wrappedContent, rootElement);
 
         console.log(`[juntos] Hydration complete for ${controllerName}#${action}`);
       } else {

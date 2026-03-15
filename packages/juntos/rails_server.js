@@ -95,34 +95,41 @@ export function javascriptImportmapTags() {
   return '<script type="module" src="/app/javascript/application.js"></script>';
 }
 
-// Lazy-loaded ReactDOMServer for rendering React elements
-// Only imported when needed (apps with RBX/JSX views)
-let ReactDOMServer = null;
-async function getReactDOMServer() {
-  if (!ReactDOMServer) {
-    ReactDOMServer = await import('react-dom/server');
-  }
-  return ReactDOMServer;
+// View renderer — injected via setViewRenderer() by the juntos:rails virtual module.
+// Default is noop (string-only views). When a framework is detected at build time,
+// the virtual module imports the appropriate renderer and injects it here.
+let _renderer = {
+  renderElement: String,
+  isFrameworkElement: () => false,
+  clientRenderElement: (el, container) => { container.innerHTML = String(el); },
+  clientHydrateElement: (el, container) => { container.innerHTML = String(el); }
+};
+
+export function setViewRenderer(renderer) {
+  _renderer = renderer;
+}
+
+export function getViewRenderer() {
+  return _renderer;
 }
 
 // Resolve view content to HTML string
-// Handles: strings, Promises, and React elements
+// Handles: strings, Promises, and framework elements (React, Vue, Svelte)
 // Exported for use by target-specific htmlResponse overrides
 //
-// When hydrationPath is provided and content is a React element,
+// When hydrationPath is provided and content is a framework element,
 // wraps the output in <div data-juntos-view="/path" data-juntos-props="...">
 // for client hydration.
 export async function resolveContent(content, hydrationPath = null, viewProps = null) {
-  // Await if content is a promise (async ERB or async React component)
+  // Await if content is a promise (async ERB or async component)
   const resolved = await Promise.resolve(content);
 
   // Convert to HTML string based on type
   if (typeof resolved === 'string') {
     return resolved;
   } else {
-    // React element - render to string
-    const ReactDOMServer = await getReactDOMServer();
-    const html = ReactDOMServer.renderToString(resolved);
+    // Framework element - render to string via view-renderer
+    const html = _renderer.renderElement(resolved);
 
     // Wrap in hydration marker if path provided (for client-side hydration)
     if (hydrationPath) {

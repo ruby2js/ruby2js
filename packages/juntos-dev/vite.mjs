@@ -88,10 +88,13 @@ const rpcState = {
   rpcImporters: new Set(),
   // Whether dual bundle mode is enabled (detected or configured)
   dualBundleEnabled: false,
+  // Detected view framework: 'react', 'vue', 'svelte', or null (string-only views)
+  viewFramework: null,
   // Reset state for new builds
   reset() {
     this.rpcImporters.clear();
     this.dualBundleEnabled = false;
+    this.viewFramework = null;
   }
 };
 
@@ -102,6 +105,11 @@ const rpcState = {
  * Scans .jsx.rb files for:
  * - import [Model], from: 'app/models/*.rb'
  * - import [...], from: 'config/routes.rb'
+ *
+ * Also detects the view framework by file extension:
+ * - .jsx.rb → 'react'
+ * - .vue.rb → 'vue'
+ * - .svelte.rb → 'svelte'
  */
 function preScanForRpcImports(appRoot) {
   const rpcFiles = [];
@@ -111,11 +119,27 @@ function preScanForRpcImports(appRoot) {
   const modelImportPattern = /from:\s*['"]app\/models\/[^'"]+\.rb['"]/;
   const routesImportPattern = /from:\s*['"]config\/routes\.rb['"]/;
 
+  // View framework detection by file extension
+  const VIEW_FRAMEWORK_MAP = {
+    '.jsx.rb': 'react',
+    '.vue.rb': 'vue',
+    '.svelte.rb': 'svelte'
+  };
+
+  function detectViewFramework(filename) {
+    for (const [ext, framework] of Object.entries(VIEW_FRAMEWORK_MAP)) {
+      if (filename.endsWith(ext)) return framework;
+    }
+    return null;
+  }
+
   // Scan app/components/*.jsx.rb
   const componentsDir = path.join(appRoot, 'app/components');
   if (fs.existsSync(componentsDir)) {
     const files = fs.readdirSync(componentsDir).filter(f => f.endsWith('.jsx.rb'));
     for (const file of files) {
+      const framework = detectViewFramework(file);
+      if (framework) rpcState.viewFramework = framework;
       const content = fs.readFileSync(path.join(componentsDir, file), 'utf8');
       if (modelImportPattern.test(content) || routesImportPattern.test(content)) {
         rpcFiles.push(path.join(componentsDir, file));
@@ -123,7 +147,7 @@ function preScanForRpcImports(appRoot) {
     }
   }
 
-  // Scan app/views/**/*.jsx.rb
+  // Scan app/views/**/*.{jsx,vue,svelte}.rb
   const viewsDir = path.join(appRoot, 'app/views');
   if (fs.existsSync(viewsDir)) {
     const scanDir = (dir) => {
@@ -132,10 +156,14 @@ function preScanForRpcImports(appRoot) {
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
           scanDir(fullPath);
-        } else if (entry.name.endsWith('.jsx.rb')) {
-          const content = fs.readFileSync(fullPath, 'utf8');
-          if (modelImportPattern.test(content) || routesImportPattern.test(content)) {
-            rpcFiles.push(fullPath);
+        } else {
+          const framework = detectViewFramework(entry.name);
+          if (framework) rpcState.viewFramework = framework;
+          if (entry.name.endsWith('.jsx.rb')) {
+            const content = fs.readFileSync(fullPath, 'utf8');
+            if (modelImportPattern.test(content) || routesImportPattern.test(content)) {
+              rpcFiles.push(fullPath);
+            }
           }
         }
       }
@@ -385,6 +413,36 @@ export function createClientPlugins(options = {}) {
 }
 
 /**
+ * Map view framework name to renderer package path.
+ */
+const VIEW_RENDERER_MAP = {
+  'react': 'juntos/renderers/react.mjs',
+  // Future: 'vue': 'juntos/renderers/vue.mjs',
+  // Future: 'svelte': 'juntos/renderers/svelte.mjs',
+};
+
+/**
+ * Generate the juntos:view-renderer virtual module based on detected framework.
+ * Re-exports from the appropriate renderer in juntos/renderers/.
+ * When no framework is detected, uses noop renderer (tree-shakes away).
+ */
+function generateViewRendererModule() {
+  const renderer = VIEW_RENDERER_MAP[rpcState.viewFramework] || 'juntos/renderers/noop.mjs';
+  return `export * from '${renderer}';`;
+}
+
+/**
+ * Generate import code to inject the view renderer into rails_server.js.
+ * Used by the juntos:rails virtual module to wire up the renderer before
+ * re-exporting the target-specific runtime. Uses real package paths (not
+ * virtual modules) so Node.js can resolve them in vitest forks pool.
+ */
+function generateViewRendererImport() {
+  const renderer = VIEW_RENDERER_MAP[rpcState.viewFramework] || 'juntos/renderers/noop.mjs';
+  return `import * as _viewRenderer from '${renderer}';\nimport { setViewRenderer as _setViewRenderer } from 'juntos/rails_server.js';\n_setViewRenderer(_viewRenderer);\n`;
+}
+
+/**
  * Virtual plugin for client builds.
  * Always routes to RPC adapter and browser runtime.
  */
@@ -396,6 +454,7 @@ function createClientVirtualPlugin() {
     resolveId(id) {
       if (id === 'juntos:active-record') return '\0juntos:active-record:rpc';
       if (id === 'juntos:rails') return '\0juntos:rails:browser';
+      if (id === 'juntos:view-renderer') return '\0juntos:view-renderer';
       return null;
     },
 
@@ -404,7 +463,11 @@ function createClientVirtualPlugin() {
         return `export * from 'juntos/adapters/active_record_rpc.mjs';`;
       }
       if (id === '\0juntos:rails:browser') {
-        return `export * from 'juntos/targets/browser/rails.js';`;
+        const rendererImport = generateViewRendererImport();
+        return `${rendererImport}export * from 'juntos/targets/browser/rails.js';`;
+      }
+      if (id === '\0juntos:view-renderer') {
+        return generateViewRendererModule();
       }
       return null;
     }
@@ -1341,7 +1404,8 @@ function createConfigPlugin(config, appRoot) {
           extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.jsx.rb', '.rb'],
           // Ensure these packages resolve from the app's node_modules, not from the package
           // (browser rails.js has dynamic imports for optional React and database adapters)
-          dedupe: ['react', 'react-dom', 'dexie', 'better-sqlite3', '@neondatabase/serverless', '@libsql/client',
+          dedupe: [...(rpcState.viewFramework === 'react' ? ['react', 'react-dom'] : []),
+            'dexie', 'better-sqlite3', '@neondatabase/serverless', '@libsql/client',
             '@sqlite.org/sqlite-wasm', 'wa-sqlite', '@electric-sql/pglite', 'sql.js']
         },
         // Worker target: resolve virtual modules inside SharedWorker/Worker builds
@@ -1387,11 +1451,11 @@ export * from 'juntos/adapters/active_record_worker.mjs';
             }
           }
         } : {}),
-        // Ensure react/react-dom are pre-bundled in dev
+        // Pre-bundle framework packages in dev (only if detected)
         // Exclude packages that use virtual modules esbuild can't resolve
         // Include the database adapter's npm package since juntos is excluded
         optimizeDeps: {
-          include: ['react', 'react-dom', 'react-dom/client', ...getDatabasePackages(config.database)],
+          include: [...(rpcState.viewFramework === 'react' ? ['react', 'react-dom', 'react-dom/client'] : []), ...getDatabasePackages(config.database)],
           exclude: ['juntos'],
           // Replace Rails importmap-style controllers/index.js during esbuild pre-bundling
           esbuildOptions: {
@@ -1893,10 +1957,12 @@ function getNativeModules(database) {
   // Client-side framework modules that should not be bundled in server builds
   const clientModules = ['@hotwired/stimulus', '@hotwired/turbo', '@hotwired/turbo-rails'];
 
-  // React modules - externalize for SSR (resolved at runtime)
-  const reactModules = ['react', 'react-dom', 'react-dom/server', 'react-dom/client'];
+  // Framework modules - externalize for SSR only if detected (resolved at runtime)
+  const frameworkModules = rpcState.viewFramework === 'react'
+    ? ['react', 'react-dom', 'react-dom/server', 'react-dom/client']
+    : [];
 
-  return [...baseModules, ...(dbModules[database] || []), ...wsModules, ...clientModules, ...reactModules];
+  return [...baseModules, ...(dbModules[database] || []), ...wsModules, ...clientModules, ...frameworkModules];
 }
 
 /**
@@ -2178,6 +2244,10 @@ import path from 'node:path';
 // Pre-generated juntos:paths content (path helpers for routes)
 const PATHS_MODULE_CONTENT = \`${escapedPathsContent}\`;
 
+// Pre-generated juntos:view-renderer content (framework-specific rendering)
+const VIEW_RENDERER_MODULE = ${JSON.stringify(generateViewRendererModule())};
+const VIEW_RENDERER_IMPORT = ${JSON.stringify(generateViewRendererImport())};
+
 // Minimal virtual plugin for client - RPC adapter, browser runtime, and paths
 const clientVirtualPlugin = {
   name: 'juntos-client-virtual',
@@ -2186,6 +2256,7 @@ const clientVirtualPlugin = {
     if (id === 'juntos:active-record') return '\\0juntos:active-record:rpc';
     if (id === 'juntos:rails') return '\\0juntos:rails:browser';
     if (id === 'juntos:active-storage') return '\\0juntos:active-storage:client';
+    if (id === 'juntos:view-renderer') return '\\0juntos:view-renderer';
     if (id === 'juntos:paths') return '\\0juntos:paths';
     return null;
   },
@@ -2194,11 +2265,14 @@ const clientVirtualPlugin = {
       return "export * from 'juntos/adapters/active_record_rpc.mjs';";
     }
     if (id === '\\0juntos:rails:browser') {
-      return "export * from 'juntos/targets/browser/rails.js';";
+      return VIEW_RENDERER_IMPORT + "export * from 'juntos/targets/browser/rails.js';";
     }
     if (id === '\\0juntos:active-storage:client') {
       // No-op: client bundle is for RPC hydration, not Active Storage
       return "export function initActiveStorage() {}";
+    }
+    if (id === '\\0juntos:view-renderer') {
+      return VIEW_RENDERER_MODULE;
     }
     if (id === '\\0juntos:paths') {
       return PATHS_MODULE_CONTENT;
@@ -2238,12 +2312,12 @@ export default {
     },
     // Include .jsx.rb extension for Ruby+JSX files
     extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.jsx.rb', '.rb'],
-    // Ensure React is resolved from project's node_modules, not linked package's
-    dedupe: ['react', 'react-dom']
+    // Ensure framework packages are resolved from project's node_modules
+    dedupe: ${JSON.stringify(rpcState.viewFramework === 'react' ? ['react', 'react-dom'] : [])}
   },
-  // Dedupe React to prevent multiple instances
+  // Pre-bundle framework packages
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-dom/client']
+    include: ${JSON.stringify(rpcState.viewFramework === 'react' ? ['react', 'react-dom', 'react-dom/client'] : [])}
   },
   logLevel: 'warn'
 };
@@ -2879,6 +2953,9 @@ function createVirtualPlugin(config, appRoot) {
         return isClient ? '\0juntos:active-storage:client' : '\0juntos:active-storage';
       }
 
+      // juntos:view-renderer - framework-specific element rendering
+      if (id === 'juntos:view-renderer') return '\0juntos:view-renderer';
+
       // juntos:paths - path helpers extracted from routes (breaks circular dependency)
       if (id === 'juntos:paths') return '\0juntos:paths';
 
@@ -2911,20 +2988,27 @@ function createVirtualPlugin(config, appRoot) {
         return `export * from 'juntos/path_helper_browser.mjs';`;
       }
 
+      // View renderer - framework-specific element rendering
+      if (id === '\0juntos:view-renderer') {
+        return generateViewRendererModule();
+      }
+
       // Server version of juntos:rails
       // For worker target, resolve to the SharedWorker runtime (rails.js)
       // so routes register on the SharedWorker's Router/Application.
       // The main thread client bridge is imported directly by main.js.
       if (id === '\0juntos:rails') {
+        const rendererImport = generateViewRendererImport();
         if (targetDir === 'worker') {
-          return `export * from 'juntos/targets/worker/rails.js';`;
+          return `${rendererImport}export * from 'juntos/targets/worker/rails.js';`;
         }
-        return `export * from 'juntos/targets/${targetDir}/rails.js';`;
+        return `${rendererImport}export * from 'juntos/targets/${targetDir}/rails.js';`;
       }
 
       // Client version of juntos:rails - always use browser runtime
       if (id === '\0juntos:rails:client') {
-        return `export * from 'juntos/targets/browser/rails.js';`;
+        const rendererImport = generateViewRendererImport();
+        return `${rendererImport}export * from 'juntos/targets/browser/rails.js';`;
       }
 
       // Server version of juntos:active-record

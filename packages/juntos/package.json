@@ -26,7 +26,8 @@
     "./testing.mjs": "./testing.mjs",
     "./test_fetch.mjs": "./test_fetch.mjs",
     "./system_test.mjs": "./system_test.mjs",
-    "./url_helpers.mjs": "./url_helpers.mjs"
+    "./url_helpers.mjs": "./url_helpers.mjs",
+    "./renderers/*": "./renderers/*"
   },
   "files": [
     "adapters/",
@@ -46,7 +47,8 @@
     "test_fetch.mjs",
     "system_test.mjs",
     "turbo_cable_simple.js",
-    "url_helpers.mjs"
+    "url_helpers.mjs",
+    "renderers/"
   ],
   "keywords": [
     "activerecord",

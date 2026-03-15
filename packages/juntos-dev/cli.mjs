@@ -1970,8 +1970,8 @@ const DATABASE_PACKAGES = {
 };
 
 const RUNTIME_PACKAGES = {
-  browser: ['@hotwired/turbo', '@hotwired/stimulus', 'react', 'react-dom'],
-  worker: ['@hotwired/turbo', '@hotwired/stimulus', 'react', 'react-dom'],
+  browser: ['@hotwired/turbo', '@hotwired/stimulus'],
+  worker: ['@hotwired/turbo', '@hotwired/stimulus'],
   node: ['@hotwired/turbo', '@hotwired/stimulus'],
   bun: ['@hotwired/turbo', '@hotwired/stimulus'],
   deno: []
@@ -2046,6 +2046,15 @@ function ensurePackagesInstalled(options) {
   const target = options.target || 'browser';
   if (RUNTIME_PACKAGES[target]) {
     for (const pkg of RUNTIME_PACKAGES[target]) {
+      if (!isPackageInstalled(pkg)) {
+        missing.push(pkg);
+      }
+    }
+  }
+
+  // Check if app uses React views (.jsx.rb files need react + react-dom)
+  if (hasViewFrameworkFiles('.jsx.rb')) {
+    for (const pkg of ['react', 'react-dom']) {
       if (!isPackageInstalled(pkg)) {
         missing.push(pkg);
       }
@@ -5124,6 +5133,24 @@ function checkUsesBroadcasting() {
           if (/turbo_stream_from/.test(content)) return true;
         }
       }
+    } catch (e) {}
+  }
+
+  return false;
+}
+
+// Check if app has view files with a specific extension (e.g., '.jsx.rb')
+function hasViewFrameworkFiles(ext) {
+  const dirs = [
+    join(APP_ROOT, 'app/views'),
+    join(APP_ROOT, 'app/components')
+  ];
+
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue;
+    try {
+      const result = execSync(`find ${dir} -name "*${ext}"`, { encoding: 'utf-8' }).trim();
+      if (result) return true;
     } catch (e) {}
   }
 

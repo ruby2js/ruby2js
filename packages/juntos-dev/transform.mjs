@@ -1172,9 +1172,7 @@ export function generatePackageJsonForEject(appName, config = {}) {
     scripts,
     dependencies: {
       'ruby2js': `${RELEASES_BASE}/ruby2js-beta.tgz`,
-      'juntos': `${RELEASES_BASE}/juntos-beta.tgz`,
-      'react': '^18.0.0',
-      'react-dom': '^18.0.0'
+      'juntos': `${RELEASES_BASE}/juntos-beta.tgz`
     },
     devDependencies: {
       'vite': '^7.0.0',
@@ -1186,6 +1184,12 @@ export function generatePackageJsonForEject(appName, config = {}) {
   if (isBrowserTarget) {
     pkg.dependencies['@hotwired/turbo'] = '^8.0.0';
     pkg.dependencies['@hotwired/stimulus'] = '^3.2.0';
+  }
+
+  // Add React if app uses JSX views
+  if (config.viewFramework === 'react') {
+    pkg.dependencies['react'] = '^18.0.0';
+    pkg.dependencies['react-dom'] = '^18.0.0';
   }
 
   // Add database adapter dependency based on config
