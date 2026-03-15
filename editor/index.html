@@ -69,7 +69,12 @@
     const RELEASES = 'https://ruby2js.github.io/ruby2js/releases';
     const params = new URLSearchParams(location.search);
     const demo = params.get('demo') || 'blog';
-    document.title = `Ruby2JS Editor — ${demo}`;
+    const mode = params.get('mode') || 'dev'; // 'dev' or 'test'
+    const isTestMode = mode === 'test';
+    document.title = `Ruby2JS ${isTestMode ? 'Tests' : 'Editor'} — ${demo}`;
+
+    document.getElementById('preview-header').textContent = isTestMode ? 'Test Results' : 'Preview';
+    document.getElementById('preview-placeholder').textContent = isTestMode ? 'Starting test runner...' : 'Starting server...';
 
     const loadingStatus = document.getElementById('loading-status');
     const loadingBar = document.getElementById('loading-bar');
@@ -421,11 +426,11 @@
         const treeEl = document.getElementById('file-tree');
         buildFileTreeUI(textCache, treeEl, openFile);
 
-        // Auto-expand app/ and open default file
+        // Auto-expand first dir and open default file
         const appDir = treeEl.querySelector('.tree-item.dir');
         if (appDir) appDir.click();
 
-        const defaultFile = 'app/models/article.rb';
+        const defaultFile = isTestMode ? 'test/models/article_test.rb' : 'app/models/article.rb';
         if (textCache[defaultFile]) {
           const fileEl = treeEl.querySelector(`[data-path="${defaultFile}"]`);
           if (fileEl) {
@@ -462,9 +467,10 @@
 
         // Listen for server-ready
         container.on('server-ready', (port, url) => {
+          const label = isTestMode ? 'Tests' : 'Preview';
           xterm.writeln(`\r\n\x1b[32m Server ready: ${url}\x1b[0m\r\n`);
           setTerminalStatus('Server running');
-          document.getElementById('preview-header').textContent = `Preview — ${url}`;
+          document.getElementById('preview-header').textContent = `${label} — ${url}`;
           // Small delay to ensure Vite has finished initial compilation
           setTimeout(() => {
             document.getElementById('preview-placeholder').style.display = 'none';
@@ -474,8 +480,9 @@
         });
 
         // Step 6: Auto-run setup commands
+        const modeLabel = isTestMode ? 'TESTS' : 'DEMO';
         xterm.writeln('\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
-        xterm.writeln(`\x1b[36m  ${demo.toUpperCase()} DEMO - Setting up...\x1b[0m`);
+        xterm.writeln(`\x1b[36m  ${demo.toUpperCase()} ${modeLabel} - Setting up...\x1b[0m`);
         xterm.writeln('\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m\r\n');
 
         // npm install
@@ -496,26 +503,31 @@
         // Small delay to ensure config files are fully written
         await new Promise(r => setTimeout(r, 500));
 
-        // juntos dev (this one doesn't exit)
-        setTerminalStatus('Starting dev server...');
-        xterm.writeln(`\x1b[36m$ npx juntos dev -d dexie --host\x1b[0m`);
+        // Launch long-running process based on mode
+        const cmdArgs = isTestMode
+          ? ['juntos', 'test', '-d', 'dexie']
+          : ['juntos', 'dev', '-d', 'dexie', '--host'];
+        const cmdLabel = isTestMode ? 'test runner' : 'dev server';
 
-        const devProcess = await container.spawn('npx', ['juntos', 'dev', '-d', 'dexie', '--host'], {
+        setTerminalStatus(`Starting ${cmdLabel}...`);
+        xterm.writeln(`\x1b[36m$ npx ${cmdArgs.join(' ')}\x1b[0m`);
+
+        const serverProcess = await container.spawn('npx', cmdArgs, {
           terminal: { cols: xterm.cols, rows: xterm.rows },
           env: { JUNTOS_DATABASE: 'dexie' },
         });
 
-        devProcess.output.pipeTo(new WritableStream({
+        serverProcess.output.pipeTo(new WritableStream({
           write(data) { xterm.write(data); }
         }));
 
-        const devInput = devProcess.input.getWriter();
-        xterm.onData(data => devInput.write(data));
-        xterm.onResize(({ cols, rows }) => devProcess.resize({ cols, rows }));
+        const serverInput = serverProcess.input.getWriter();
+        xterm.onData(data => serverInput.write(data));
+        xterm.onResize(({ cols, rows }) => serverProcess.resize({ cols, rows }));
 
-        devProcess.exit.then(code => {
-          xterm.writeln(`\r\n\x1b[33mDev server exited (code ${code}). Refresh to restart.\x1b[0m`);
-          setTerminalStatus('Server stopped');
+        serverProcess.exit.then(code => {
+          xterm.writeln(`\r\n\x1b[33m${isTestMode ? 'Test runner' : 'Dev server'} exited (code ${code}). Refresh to restart.\x1b[0m`);
+          setTerminalStatus(`${isTestMode ? 'Tests' : 'Server'} stopped`);
         });
 
         window.container = container;
