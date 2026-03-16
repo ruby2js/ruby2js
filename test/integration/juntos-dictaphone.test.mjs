@@ -37,7 +37,7 @@ describe('Dictaphone Demo Integration Tests', () => {
     // This executes vitest which transforms .rb files on-the-fly
     // Note: Uses sqlite/node for Node.js compatibility (browser tests would need fake-indexeddb)
     try {
-      const output = execSync('JUNTOS_DATABASE=sqlite npm test', {
+      const output = execSync('npx juntos test -d sqlite --run', {
         cwd: DEMO_DIR,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
