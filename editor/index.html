@@ -10,19 +10,21 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; font-family: system-ui, sans-serif; background: #1e1e1e; color: #ccc; overflow: hidden; }
-    #app { display: grid; grid-template-columns: 220px 1fr 1fr; grid-template-rows: 1fr 200px; height: 100vh; overflow: hidden; }
-    #file-tree { grid-row: 1 / 2; overflow-y: auto; background: #252526; border-right: 1px solid #333; padding: 8px 0; font-size: 13px; }
-    #editor-container { grid-row: 1 / 2; min-width: 0; }
-    #preview-pane { grid-row: 1 / 2; border-left: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
+    #app { display: grid; grid-template-columns: 220px 4px 1fr 4px 1fr; grid-template-rows: 1fr 4px 200px; height: 100vh; overflow: hidden; }
+    #file-tree { grid-column: 1; grid-row: 1; overflow-y: auto; background: #252526; padding: 8px 0; font-size: 13px; }
+    #editor-container { grid-column: 3; grid-row: 1; min-width: 0; }
+    #preview-pane { grid-column: 5; grid-row: 1; display: flex; flex-direction: column; overflow: hidden; }
     #preview-pane iframe { flex: 1; border: none; background: #fff; width: 100%; min-height: 0; }
-    #preview-header { padding: 4px 8px; background: #252526; border-bottom: 1px solid #333; font-size: 12px; color: #999; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
-    #preview-header a { color: #569cd6; text-decoration: none; margin-left: 8px; }
-    #preview-header a:hover { text-decoration: underline; }
+    #preview-header { padding: 4px 8px; background: #252526; border-bottom: 1px solid #333; font-size: 12px; color: #999; flex-shrink: 0; }
     #preview-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; background: #1a1a1a; color: #666; font-size: 13px; text-align: center; padding: 20px; }
-    #terminal-pane { grid-column: 1 / -1; grid-row: 2 / 3; border-top: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
+    #terminal-pane { grid-column: 1 / -1; grid-row: 3; display: flex; flex-direction: column; overflow: hidden; }
     #terminal-header { padding: 4px 8px; background: #252526; border-bottom: 1px solid #333; font-size: 12px; color: #999; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
     #terminal-status { color: #569cd6; }
     #terminal { flex: 1; overflow: hidden; }
+    .gutter-col { grid-row: 1; cursor: col-resize; background: #333; }
+    .gutter-col:hover { background: #569cd6; }
+    .gutter-row { grid-column: 1 / -1; grid-row: 2; cursor: row-resize; background: #333; }
+    .gutter-row:hover { background: #569cd6; }
 
     .tree-item { padding: 2px 8px 2px 0; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tree-item:hover { background: #2a2d2e; }
@@ -49,12 +51,15 @@
   </div>
   <div id="app">
     <div id="file-tree"></div>
+    <div class="gutter-col" data-col="1"></div>
     <div id="editor-container"></div>
+    <div class="gutter-col" data-col="2"></div>
     <div id="preview-pane">
       <div id="preview-header">Preview</div>
       <div id="preview-placeholder">Starting server...</div>
       <iframe id="preview-iframe" style="display: none;"></iframe>
     </div>
+    <div class="gutter-row"></div>
     <div id="terminal-pane">
       <div id="terminal-header">
         <span>Terminal</span>
@@ -67,6 +72,60 @@
   <script type="module">
     import { Terminal } from 'https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/+esm';
     import { FitAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/+esm';
+
+    // =========================================================================
+    // Resizable pane dividers
+    // =========================================================================
+    {
+      const app = document.getElementById('app');
+      let dragging = null;
+
+      for (const gutter of document.querySelectorAll('.gutter-col, .gutter-row')) {
+        gutter.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          dragging = { el: gutter, type: gutter.classList.contains('gutter-col') ? 'col' : 'row' };
+          document.body.style.cursor = dragging.type === 'col' ? 'col-resize' : 'row-resize';
+          // Prevent iframe from stealing mouse events
+          document.querySelectorAll('iframe').forEach(f => f.style.pointerEvents = 'none');
+        });
+      }
+
+      document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const rect = app.getBoundingClientRect();
+        if (dragging.type === 'col') {
+          const x = e.clientX - rect.left;
+          const cols = getComputedStyle(app).gridTemplateColumns.split(' ').map(parseFloat);
+          // cols: [fileTree, gutter, editor, gutter, preview]
+          const colIndex = parseInt(dragging.el.dataset.col);
+          if (colIndex === 1) {
+            // Dragging between file-tree and editor
+            const newFileTree = Math.max(100, Math.min(x, rect.width - 200));
+            app.style.gridTemplateColumns = `${newFileTree}px 4px 1fr 4px 1fr`;
+          } else {
+            // Dragging between editor and preview
+            const fileTreeWidth = cols[0];
+            const available = rect.width - fileTreeWidth - 8; // minus two gutters
+            const editorWidth = Math.max(100, Math.min(x - fileTreeWidth - 4, available - 100));
+            const previewWidth = available - editorWidth;
+            app.style.gridTemplateColumns = `${fileTreeWidth}px 4px ${editorWidth}px 4px ${previewWidth}px`;
+          }
+        } else {
+          // Dragging horizontal divider between top panes and terminal
+          const y = e.clientY - rect.top;
+          const topHeight = Math.max(100, Math.min(y - 2, rect.height - 100));
+          const bottomHeight = rect.height - topHeight - 4;
+          app.style.gridTemplateRows = `${topHeight}px 4px ${bottomHeight}px`;
+        }
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = null;
+        document.body.style.cursor = '';
+        document.querySelectorAll('iframe').forEach(f => f.style.pointerEvents = '');
+      });
+    }
 
     const RELEASES = 'https://ruby2js.github.io/ruby2js/releases';
     const params = new URLSearchParams(location.search);
@@ -477,19 +536,13 @@
 
         function showPreview(iframeUrl, label) {
           const header = document.getElementById('preview-header');
-          const openLink = document.createElement('a');
-          openLink.href = iframeUrl;
-          openLink.target = '_blank';
-          openLink.textContent = 'Open in new window';
-          header.innerHTML = '';
-          header.appendChild(document.createTextNode(`${label} `));
-          header.appendChild(openLink);
+          header.textContent = label;
 
           document.getElementById('preview-placeholder').style.display = 'none';
           if (isFirefox) {
             const placeholder = document.getElementById('preview-placeholder');
             placeholder.style.display = '';
-            placeholder.innerHTML = 'Firefox does not support preview in iframes.<br>Use the "Open in new window" link above.';
+            placeholder.innerHTML = 'Preview is not available in Firefox due to<br>WebContainer cross-origin isolation limitations.<br><br>The terminal below shows full output.<br>Use Chrome or Edge for the visual preview.';
           } else {
             document.getElementById('preview-iframe').style.display = 'block';
             document.getElementById('preview-iframe').src = iframeUrl;
