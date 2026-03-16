@@ -741,7 +741,7 @@ jobs:
               .demo h3 a { color: #2563eb; text-decoration: none; }
               .demo h3 a:hover { text-decoration: underline; }
               .demo p { margin: 0; color: #4a5568; }
-              .demo-links { display: flex; flex-direction: column; gap: 0.25rem; margin-left: 1rem; font-size: 0.875rem; }
+              .demo-links { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.75rem; margin-left: 1rem; font-size: 0.875rem; }
               .demo-links a { color: #2563eb; text-decoration: none; white-space: nowrap; }
               .demo-links a:hover { text-decoration: underline; }
               .releases { margin-top: 2rem; padding: 1rem; background: #edf2f7; border-radius: 8px; }
@@ -763,6 +763,7 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=blog">Editor</a>
+                  <a href="editor/?demo=blog&mode=test">Test</a>
                   <a href="https://github.com/ruby2js/ruby2js/blob/master/test/blog/create-blog">Create</a>
                   <a href="releases/demo-blog.tar.gz">Tarball</a>
                 </div>
@@ -774,6 +775,7 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=chat">Editor</a>
+                  <a href="editor/?demo=chat&mode=test">Test</a>
                   <a href="https://github.com/ruby2js/ruby2js/blob/master/test/chat/create-chat">Create</a>
                   <a href="releases/demo-chat.tar.gz">Tarball</a>
                 </div>
@@ -785,6 +787,7 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=notes">Editor</a>
+                  <a href="editor/?demo=notes&mode=test">Test</a>
                   <a href="https://github.com/ruby2js/ruby2js/blob/master/test/notes/create-notes">Create</a>
                   <a href="releases/demo-notes.tar.gz">Tarball</a>
                 </div>
@@ -826,6 +829,7 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=photo_gallery">Editor</a>
+                  <a href="editor/?demo=photo_gallery&mode=test">Test</a>
                   <a href="https://github.com/ruby2js/ruby2js/blob/master/test/photo_gallery/create-photo-gallery">Create</a>
                   <a href="releases/demo-photo-gallery.tar.gz">Tarball</a>
                 </div>
@@ -837,6 +841,7 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=dictaphone">Editor</a>
+                  <a href="editor/?demo=dictaphone&mode=test">Test</a>
                   <a href="https://github.com/ruby2js/ruby2js/blob/master/test/dictaphone/create-dictaphone">Create</a>
                   <a href="releases/demo-dictaphone.tar.gz">Tarball</a>
                 </div>
@@ -848,6 +853,7 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=workflow">Editor</a>
+                  <a href="editor/?demo=workflow&mode=test">Test</a>
                   <a href="https://github.com/ruby2js/ruby2js/blob/master/test/workflow/create-workflow">Create</a>
                   <a href="releases/demo-workflow.tar.gz">Tarball</a>
                 </div>
@@ -859,6 +865,7 @@ jobs:
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=ballroom">Editor</a>
+                  <a href="editor/?demo=ballroom&mode=test">Test</a>
                   <a href="https://github.com/rubys/ballroom">GitHub</a>
                   <a href="releases/demo-ballroom.tar.gz">Tarball</a>
                 </div>
