@@ -179,6 +179,35 @@ describe Ruby2JS::Filter::Erb do
     end
   end
 
+  describe 'filter ordering' do
+    # When Functions filter runs before Erb, .to_s becomes .toString()
+    # The Erb filter must handle both forms for collapse to work
+    def to_js_functions_first(string, eslevel: 2015)
+      _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Functions, Ruby2JS::Filter::Erb], eslevel: eslevel).to_s)
+    end
+
+    it "should collapse buf appends when Functions filter runs first" do
+      erb_src = 'def render; _buf = ::String.new; _buf << "<h1>"; _buf.append= ( @title ).to_s; _buf << "</h1>"; _buf.to_s; end'
+      result = to_js_functions_first(erb_src)
+      result.must_include '`<h1>${escapeHTML(title)}</h1>`'
+      result.wont_include '_buf +='
+    end
+
+    it "should handle multiple expressions when Functions runs first" do
+      erb_src = 'def render; _buf = ::String.new; _buf << "<h1>"; _buf.append= ( @title ).to_s; _buf << "</h1><p>"; _buf.append= ( @body ).to_s; _buf << "</p>"; _buf.to_s; end'
+      result = to_js_functions_first(erb_src)
+      result.must_include '`<h1>${escapeHTML(title)}</h1><p>${escapeHTML(body)}</p>`'
+      result.wont_include '_buf +='
+    end
+
+    it "should eliminate buffer variable when Functions runs first" do
+      erb_src = 'def render; _buf = ::String.new; _buf << "<h1>Hello</h1>"; _buf.to_s; end'
+      result = to_js_functions_first(erb_src)
+      result.must_include 'return "<h1>Hello</h1>"'
+      result.wont_include '_buf'
+    end
+  end
+
   describe 'layout mode' do
     def to_js_layout(string, eslevel: 2015)
       _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Erb, Ruby2JS::Filter::Functions], eslevel: eslevel, layout: true).to_s)

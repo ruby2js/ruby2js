@@ -183,8 +183,8 @@ module Ruby2JS
             arg = arg.children[0]
           end
 
-          # Handle .to_s calls
-          if arg&.type == :send && arg.children[1] == :to_s
+          # Handle .to_s calls (also .toString after Functions filter)
+          if arg&.type == :send && (arg.children[1] == :to_s || arg.children[1] == :toString)
             inner = arg.children[0]
             # Remove unnecessary parens from ((expr))
             while inner&.type == :begin && inner.children.length == 1
@@ -248,8 +248,8 @@ module Ruby2JS
           return process(target)
         end
 
-        # Strip .to_s calls on buffer (final return)
-        if method == :to_s && args.empty? && target&.type == :lvar &&
+        # Strip .to_s/.toString calls on buffer (final return)
+        if (method == :to_s || method == :toString) && args.empty? && target&.type == :lvar &&
            target.children.first == @erb_bufvar
           return process(target)
         end
