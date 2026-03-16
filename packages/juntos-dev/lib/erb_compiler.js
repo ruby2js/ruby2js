@@ -27,7 +27,7 @@ export class ErbCompiler {
   };
 
   // Compile ERB template to Ruby code
-  // Format: _buf = ::String.new; _buf << 'literal'.freeze; _buf.append= ( expr ).to_s; ... _buf.to_s
+  // Format: _buf = ::String.new; _buf += 'literal'; _buf.append= ( expr ).to_s; ... _buf.to_s
   // Key: buffer operations use semicolons, code blocks use newlines
   get src() {
     let ruby_code = "def render\n_buf = ::String.new;";
@@ -43,7 +43,7 @@ export class ErbCompiler {
         text = this.#template.slice(pos);
 
         if (text && text.length != 0) {
-          ruby_code += ` _buf << ${this.#emit_ruby_string(text)};`
+          ruby_code += ` _buf += ${this.#emit_ruby_string(text)};`
         };
 
         break
@@ -72,7 +72,7 @@ export class ErbCompiler {
         };
 
         if (text && text.length != 0) {
-          ruby_code += ` _buf << ${this.#emit_ruby_string(text)};`
+          ruby_code += ` _buf += ${this.#emit_ruby_string(text)};`
         }
       };
 
@@ -168,7 +168,7 @@ export class ErbCompiler {
       // For output expressions, if followed by a newline, add it as a separate literal
       // This matches Ruby Erubi which splits the newline after output expressions
       if (is_output_expr && pos < this.#template.length && this.#template[pos] == "\n") {
-        ruby_code += ` _buf << ${this.#emit_ruby_string("\n")};`;
+        ruby_code += ` _buf += ${this.#emit_ruby_string("\n")};`;
         pos++
       }
     };

@@ -23,7 +23,7 @@ class ErbCompiler
   end
 
   # Compile ERB template to Ruby code
-  # Format: _buf = ::String.new; _buf << 'literal'.freeze; _buf.append= ( expr ).to_s; ... _buf.to_s
+  # Format: _buf = ::String.new; _buf += 'literal'; _buf.append= ( expr ).to_s; ... _buf.to_s
   # Key: buffer operations use semicolons, code blocks use newlines
   def src
     ruby_code = "def render\n_buf = ::String.new;"
@@ -36,7 +36,7 @@ class ErbCompiler
       if erb_start.nil? || erb_start < 0
         # No more ERB tags, add remaining text
         text = @template[pos..-1]
-        ruby_code += " _buf << #{emit_ruby_string(text)};" if text && !text.empty?
+        ruby_code += " _buf += #{emit_ruby_string(text)};" if text && !text.empty?
         break
       end
 
@@ -62,7 +62,7 @@ class ErbCompiler
             end
           end
         end
-        ruby_code += " _buf << #{emit_ruby_string(text)};" if text && !text.empty?
+        ruby_code += " _buf += #{emit_ruby_string(text)};" if text && !text.empty?
       end
 
       # Handle -%> (trim trailing newline)
@@ -132,7 +132,7 @@ class ErbCompiler
       # For output expressions, if followed by a newline, add it as a separate literal
       # This matches Ruby Erubi which splits the newline after output expressions
       if is_output_expr && pos < @template.length && @template[pos] == "\n"
-        ruby_code += " _buf << #{emit_ruby_string("\n")};"
+        ruby_code += " _buf += #{emit_ruby_string("\n")};"
         pos += 1
       end
     end
