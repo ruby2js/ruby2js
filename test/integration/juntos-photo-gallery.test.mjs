@@ -35,7 +35,7 @@ describe('Photo Gallery Demo Integration Tests', () => {
     // Run npm test in the demo directory
     // This executes vitest which transforms .rb files on-the-fly
     try {
-      const output = execSync('npx juntos test -d sqlite --run', {
+      const output = execSync('JUNTOS_DATABASE=sqlite npm test', {
         cwd: DEMO_DIR,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
