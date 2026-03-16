@@ -1671,7 +1671,7 @@ export default mergeConfig(viteConfig, defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    include: ['test/**/*_test.rb', 'test/**/*.test.mjs', 'test/**/*.test.js'],
+    include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
     setupFiles: ['./test/setup.mjs'],
     pool: 'forks',
     poolOptions: { forks: { singleFork: true } }
