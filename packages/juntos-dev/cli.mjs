@@ -1176,6 +1176,16 @@ export default mergeConfig(viteConfig, defineConfig({
   const setupPath = join(testDir, 'setup.mjs');
   const isBrowserDb = DEFAULT_TARGETS[config.database] === 'browser';
 
+  // Detect CSS for browser test mode (so views render with styles)
+  let cssImport = '';
+  const tailwindCss = join(appRoot, 'app/assets/tailwind/application.css');
+  const juntossCss = join(appRoot, 'app/assets/tailwind/juntos.css');
+  if (existsSync(tailwindCss)) {
+    cssImport = `\nimport '../app/assets/tailwind/application.css';`;
+  } else if (existsSync(juntossCss)) {
+    cssImport = `\nimport '../app/assets/tailwind/juntos.css';`;
+  }
+
   if (isBrowserDb) {
     // Browser databases (Dexie, PGlite, sql.js): no savepoints, re-init per test
     writeFileSync(setupPath, `// Test setup for Vitest (browser database)
@@ -1183,7 +1193,7 @@ export default mergeConfig(viteConfig, defineConfig({
 
 import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { installFetchInterceptor, resetCookies } from 'juntos/test_fetch.mjs';
-import { loadFixtures, _fixtures } from './__fixtures.mjs';${stimSection}
+import { loadFixtures, _fixtures } from './__fixtures.mjs';${stimSection}${cssImport}
 
 // Suppress ActiveRecord CRUD logging during tests
 const _info = console.info;
