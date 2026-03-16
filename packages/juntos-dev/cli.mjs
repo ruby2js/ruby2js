@@ -1062,115 +1062,27 @@ async function transpileTestFiles(appRoot, config, { preview = false } = {}) {
     ? buildFixturePlan('', fixtures, associationMap, { loadAll: true })
     : null;
 
-  // Shared plan for test files: replacements only, no setupCode
-  // (fixtures are loaded globally via __fixtures.mjs, not per-file)
+  // Write fixture plan as JSON for the vite plugin to read during on-the-fly transformation.
+  // Test .rb files are now transformed by the vite plugin (with source maps and HMR),
+  // not pre-transpiled to .test.mjs by the CLI.
   const sharedPlan = fullPlan
     ? { replacements: fullPlan.replacements, fixtureModels: fullPlan.fixtureModels }
     : null;
 
+  const fixturePlanPath = join(testDir, '.fixture-plan.json');
+  if (sharedPlan) {
+    writeFileSync(fixturePlanPath, JSON.stringify(sharedPlan, null, 2));
+  } else if (existsSync(fixturePlanPath)) {
+    unlinkSync(fixturePlanPath);
+  }
+
+  // Count test files for reporting
   let count = 0;
-
-  // Transpile model tests
-  if (hasModelTests) {
-    for (const file of findRubyTestFiles(modelTestDir)) {
-      const outName = file.replace(/_test\.rb$/, '.test.mjs');
-      const outPath = join(modelTestDir, outName);
-
-      // Skip if .test.mjs is newer than _test.rb
-      if (existsSync(outPath)) {
-        const rbStat = statSync(join(modelTestDir, file));
-        const mjsStat = statSync(outPath);
-        if (mjsStat.mtimeMs > rbStat.mtimeMs) continue;
-      }
-
-      try {
-        const source = readFileSync(join(modelTestDir, file), 'utf-8');
-        metadata.fixture_plan = sharedPlan;
-        const result = await transformRuby(source, join(modelTestDir, file), 'test', config, appRoot, metadata);
-        let code = result.code;
-
-        // Skip empty test suites (no test() calls)
-        if (!/\btest\s*\(/.test(code)) {
-          if (existsSync(outPath)) unlinkSync(outPath);
-          continue;
-        }
-
-        writeFileSync(outPath, code);
-        count++;
-      } catch (err) {
-        console.warn(`  Warning: Failed to transpile ${file}: ${err.message}`);
-      }
-    }
+  for (const dir of [modelTestDir, controllerTestDir, systemTestDir]) {
+    if (existsSync(dir)) count += findRubyTestFiles(dir).length;
   }
-
-  // Transpile controller tests
-  if (hasControllerTests) {
-    for (const file of findRubyTestFiles(controllerTestDir)) {
-      const outName = file.replace(/_test\.rb$/, '.test.mjs');
-      const outPath = join(controllerTestDir, outName);
-
-      // Skip if .test.mjs is newer than _test.rb
-      if (existsSync(outPath)) {
-        const rbStat = statSync(join(controllerTestDir, file));
-        const mjsStat = statSync(outPath);
-        if (mjsStat.mtimeMs > rbStat.mtimeMs) continue;
-      }
-
-      try {
-        const source = readFileSync(join(controllerTestDir, file), 'utf-8');
-        metadata.fixture_plan = sharedPlan;
-        const result = await transformRuby(source, join(controllerTestDir, file), 'test', config, appRoot, metadata);
-        let code = result.code;
-
-        // Skip empty test suites (no test() calls)
-        if (!/\btest\s*\(/.test(code)) {
-          if (existsSync(outPath)) unlinkSync(outPath);
-          continue;
-        }
-
-        writeFileSync(outPath, code);
-        count++;
-      } catch (err) {
-        console.warn(`  Warning: Failed to transpile ${file}: ${err.message}`);
-      }
-    }
-  }
-
-  // Transpile system tests
-  if (hasSystemTests) {
-    for (const file of findRubyTestFiles(systemTestDir)) {
-      const outName = file.replace(/_test\.rb$/, '.test.mjs');
-      const outPath = join(systemTestDir, outName);
-
-      // Skip if .test.mjs is newer than _test.rb
-      if (existsSync(outPath)) {
-        const rbStat = statSync(join(systemTestDir, file));
-        const mjsStat = statSync(outPath);
-        if (mjsStat.mtimeMs > rbStat.mtimeMs) continue;
-      }
-
-      try {
-        const source = readFileSync(join(systemTestDir, file), 'utf-8');
-        metadata.fixture_plan = sharedPlan;
-        const result = await transformRuby(source, join(systemTestDir, file), 'test', config, appRoot, metadata);
-        let code = result.code;
-
-        // Skip empty test suites (no test() calls)
-        if (!/\btest\s*\(/.test(code)) {
-          if (existsSync(outPath)) unlinkSync(outPath);
-          continue;
-        }
-
-        writeFileSync(outPath, code);
-        count++;
-      } catch (err) {
-        console.warn(`  Warning: Failed to transpile ${file}: ${err.message}`);
-      }
-    }
-  }
-
   if (count > 0) {
-    console.log(`Transpiled ${count} test file${count > 1 ? 's' : ''}.`);
+    console.log(`Found ${count} test file${count > 1 ? 's' : ''} (transformed on-the-fly by Vite).`);
   }
 
   // Generate test/__fixtures.mjs — shared fixture creation module
@@ -1194,7 +1106,7 @@ export default mergeConfig(viteConfig, defineConfig({
         { browser: 'chromium' }
       ]
     },
-    include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
+    include: ['test/**/*_test.rb', 'test/**/*.test.mjs', 'test/**/*.test.js'],
     setupFiles: ['./test/setup.mjs']
   }
 }));
@@ -1214,7 +1126,7 @@ export default mergeConfig(viteConfig, defineConfig({
         { browser: 'chromium' }
       ]
     },
-    include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
+    include: ['test/**/*_test.rb', 'test/**/*.test.mjs', 'test/**/*.test.js'],
     setupFiles: ['./test/setup.mjs']
   }
 }));
@@ -1227,7 +1139,7 @@ export default mergeConfig(viteConfig, defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
+    include: ['test/**/*_test.rb', 'test/**/*.test.mjs', 'test/**/*.test.js'],
     setupFiles: ['./test/setup.mjs'],
     pool: 'forks',
     poolOptions: { forks: { singleFork: true } }
@@ -1759,7 +1671,7 @@ export default mergeConfig(viteConfig, defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
+    include: ['test/**/*_test.rb', 'test/**/*.test.mjs', 'test/**/*.test.js'],
     setupFiles: ['./test/setup.mjs'],
     pool: 'forks',
     poolOptions: { forks: { singleFork: true } }

@@ -62,6 +62,7 @@ import {
   buildAppManifest,
   extractHelperMethods,
   shouldIncludeFile,
+  deriveAssociationMap,
   ErbCompiler
 } from './transform.mjs';
 
@@ -724,14 +725,17 @@ function createRubyTransformPlugin(config, appRoot) {
     const relPath = path.relative(appRoot, filePath);
     const isModel = relPath.startsWith('app/models/') || relPath.startsWith('app' + path.sep + 'models' + path.sep);
     const isHelper = relPath.startsWith('app/helpers/') || relPath.startsWith('app' + path.sep + 'helpers' + path.sep);
-    if (!isModel && !isHelper) return js;
+    const isTest = relPath.startsWith('test/') || relPath.startsWith('test' + path.sep);
+    if (!isModel && !isHelper && !isTest) return js;
 
     const modelMap = getModelClassMap();
     let currentRelPath;
     if (isModel) {
       currentRelPath = relPath.replace(/^app\/models\/|^app\\models\\/g, '').replace(/\.rb$|\.js$/, '');
-    } else {
+    } else if (isHelper) {
       currentRelPath = relPath.replace(/^app\/helpers\/|^app\\helpers\\/g, '').replace(/\.rb$|\.js$/, '');
+    } else {
+      currentRelPath = relPath.replace(/\.rb$|\.js$/, '');
     }
 
     for (const [className, modelPath] of Object.entries(modelMap)) {
@@ -773,6 +777,9 @@ function createRubyTransformPlugin(config, appRoot) {
         } else {
           importPath = [...Array(up).fill('..'), ...down, targetFile + '.rb'].join('/');
         }
+      } else if (isTest) {
+        // Test files use absolute-style imports resolved by the plugin
+        importPath = `app/models/${modelPath}.rb`;
       } else {
         // Compute relative path from helper to model (app/helpers/ → app/models/)
         const currentParts = currentRelPath.split('/');
@@ -789,6 +796,49 @@ function createRubyTransformPlugin(config, appRoot) {
       js = `import { ${className} } from '${importPath}';\n${js}`;
     }
 
+    return js;
+  }
+
+  // Add imports for controllers and path helpers referenced in test files.
+  // Scans for ClassName patterns matching controllers and *_path/*_url patterns.
+  function addTestImports(js, filePath) {
+    const imports = [];
+
+    // Find controller references (e.g., ArticlesController.index)
+    const controllerDir = path.join(appRoot, 'app/controllers');
+    if (fs.existsSync(controllerDir)) {
+      const controllerFiles = fs.readdirSync(controllerDir)
+        .filter(f => f.endsWith('_controller.rb') && f !== 'application_controller.rb');
+
+      for (const file of controllerFiles) {
+        const className = file.replace(/_controller\.rb$/, '')
+          .split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('') + 'Controller';
+        const refPattern = new RegExp(`\\b${className}\\b`);
+        if (!refPattern.test(js)) continue;
+        const importPattern = new RegExp(`import\\s+\\{[^}]*\\b${className}\\b[^}]*\\}\\s+from`);
+        if (importPattern.test(js)) continue;
+        imports.push(`import { ${className} } from 'app/controllers/${file}';`);
+      }
+    }
+
+    // Find path helper references (e.g., articles_path, article_path, new_article_path)
+    // Only _path helpers are available from juntos:paths (_url is a Rails convention not used in JS)
+    const pathRefs = js.match(/\b\w+_path\b/g);
+    if (pathRefs) {
+      const unique = [...new Set(pathRefs)];
+      const pathImports = unique.filter(name => {
+        // Skip if already imported
+        const importPattern = new RegExp(`import\\s+\\{[^}]*\\b${name}\\b[^}]*\\}\\s+from`);
+        return !importPattern.test(js);
+      });
+      if (pathImports.length > 0) {
+        imports.push(`import { ${pathImports.join(', ')} } from 'juntos:paths';`);
+      }
+    }
+
+    if (imports.length > 0) {
+      js = imports.join('\n') + '\n' + js;
+    }
     return js;
   }
 
@@ -834,6 +884,23 @@ function createRubyTransformPlugin(config, appRoot) {
     // Share metadata with other plugins via config object
     config._metadata = metadata;
     return metadata;
+  }
+
+  // Lazy fixture plan for test file transformation
+  let _fixturePlan = undefined; // undefined = not loaded, null = no fixtures
+  function getFixturePlan() {
+    if (_fixturePlan !== undefined) return _fixturePlan;
+    try {
+      const planPath = path.join(appRoot, 'test', '.fixture-plan.json');
+      if (fs.existsSync(planPath)) {
+        _fixturePlan = JSON.parse(fs.readFileSync(planPath, 'utf-8'));
+      } else {
+        _fixturePlan = null;
+      }
+    } catch {
+      _fixturePlan = null;
+    }
+    return _fixturePlan;
   }
 
   // Local wrapper for transformRuby that uses closure's config/appRoot
@@ -883,6 +950,17 @@ function createRubyTransformPlugin(config, appRoot) {
           });
         });
         return [];
+      }
+
+      // Test file changes: invalidate transform cache so vitest picks up changes
+      if (normalizedFile.includes('/test/') && file.endsWith('_test.rb')) {
+        transformCache.delete(file);
+        return; // Let vitest handle the re-run
+      }
+
+      // Fixture file changes: invalidate fixture plan
+      if (normalizedFile.includes('/test/fixtures/') && file.endsWith('.yml')) {
+        _fixturePlan = undefined; // Force reload on next transform
       }
     },
 
@@ -1092,7 +1170,8 @@ export { application };
         let section = null;
 
         // Determine transformation section
-        if (id.includes('/app/javascript/controllers/')) section = 'stimulus';
+        if (id.includes('/test/') && id.endsWith('_test.rb')) section = 'test';
+        else if (id.includes('/app/javascript/controllers/')) section = 'stimulus';
         else if (id.includes('/app/controllers/')) section = 'controllers';
         else if (id.includes('/db/migrate/')) section = null; // Migrations use default options
         else if (id.endsWith('/routes.rb')) section = null; // Routes use default with special options
@@ -1113,6 +1192,18 @@ export { application };
             base: config.base || '/'
           };
           result = convert(source, options);
+        } else if (section === 'test') {
+          // Attach fixture plan to metadata for test file transformation
+          const meta = await ensureManifest();
+          meta.fixture_plan = getFixturePlan();
+          result = await transformRubyLocal(source, id, section);
+          meta.fixture_plan = null; // Clean up after transform
+
+          // Skip empty test suites (no test() calls) — return a trivial passing suite
+          const testJs = result.toString();
+          if (!/\btest\s*\(/.test(testJs)) {
+            return { code: 'test.skip("empty test suite", () => {})', map: null };
+          }
         } else {
           result = await transformRubyLocal(source, id, section);
         }
@@ -1134,6 +1225,11 @@ export { application };
         }
 
         js = addCrossModelImports(js, id);
+
+        // Test files: add imports for controllers and path helpers
+        if (section === 'test') {
+          js = addTestImports(js, id);
+        }
 
         // For routes.rb, re-export database functions from the bundled adapter
         // This allows migrate.mjs and server.mjs to use the same adapter instance
