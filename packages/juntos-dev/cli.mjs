@@ -1359,7 +1359,9 @@ function parseCommonArgs(args) {
     // Render options
     html: false,        // --html: output full HTML content
     check: false,       // --check: silent success/failure check
-    search: null        // --search TEXT: search for text in output
+    search: null,       // --search TEXT: search for text in output
+    // Compare options
+    diff: false         // --diff: show unified diff
   };
 
   const remaining = [];
@@ -1468,6 +1470,8 @@ function parseCommonArgs(args) {
       options.metadata = true;
     } else if (arg === '--e2e') {
       options.e2e = true;
+    } else if (arg === '--diff') {
+      options.diff = true;
     } else if (arg === '--html') {
       options.html = true;
     } else if (arg === '--check') {
@@ -3159,6 +3163,327 @@ async function runRender(options, paths) {
 
   if (exitCode !== 0) {
     const err = new Error(options.check ? 'Check failed' : 'Render encountered errors');
+    err.exitCode = exitCode;
+    throw err;
+  }
+}
+
+// ============================================
+// Command: compare
+// ============================================
+
+/**
+ * Normalize HTML to strip environment-specific differences between Rails and Juntos output.
+ * Removes CSRF tokens, asset fingerprints, importmaps, whitespace differences, etc.
+ */
+function normalizeHtml(html) {
+  let lines = html.split('\n');
+
+  // Strip non-HTML preamble (e.g., migration output from juntos)
+  // Also strip <!DOCTYPE html> line itself (Rails strips it via routes.call)
+  const firstHtml = lines.findIndex(l => l.trim().startsWith('<!DOCTYPE') || l.trim().startsWith('<html'));
+  if (firstHtml > 0) lines = lines.slice(firstHtml);
+  lines = lines.filter(l => !l.trim().startsWith('<!DOCTYPE'));
+
+  let text = lines.join('\n');
+
+  // Strip ERB debug comments: <!-- BEGIN ... --> and <!-- END ... -->
+  text = text.replace(/<!--\s*(?:BEGIN|END)\s+.*?-->\n?/gs, '');
+
+  // Strip CSRF meta tag
+  text = text.replace(/<meta\s+name="csrf-token"[^>]*>\n?/g, '');
+
+  // Strip importmap script block
+  text = text.replace(/<script\s+type="importmap"[^>]*>.*?<\/script>\n?/gs, '');
+
+  // Strip modulepreload links
+  text = text.replace(/<link\s+rel="modulepreload"[^>]*>\n?/g, '');
+
+  // Strip module import scripts
+  text = text.replace(/<script\s+type="module"[^>]*>.*?<\/script>\n?/gs, '');
+
+  // Strip Rails-only application.css stylesheet
+  text = text.replace(/<link\s+rel="stylesheet"\s+href="\/assets\/application-[^"]*"[^>]*>\n?/g, '');
+
+  // Normalize asset fingerprints: /assets/name-HASH.ext → /assets/name.ext
+  text = text.replace(/\/assets\/([\w/]+)-[A-Za-z0-9]{8,}\.(css|js|png|svg|jpg)/g, '/assets/$1.$2');
+
+  // Strip trailing self-closing slash inconsistencies: normalize " />" to ">"
+  text = text.replace(/\s*\/>/g, '>');
+
+  // Strip empty authenticity_token hidden inputs
+  text = text.replace(/<input\s+type="hidden"\s+name="authenticity_token"\s+value="">\s*/g, '');
+
+  // Normalize autocomplete="off" on hidden inputs (Juntos adds it, Rails doesn't)
+  text = text.replace(/(<input\s+type="hidden"[^>]*?)\s+autocomplete="off"/g, '$1');
+
+  // Normalize signed stream names (Rails HMAC-signs them, Juntos doesn't)
+  text = text.replace(/(signed-stream-name="[^"]*?)==[^"]*"/g, '$1"');
+
+  // Strip leading/trailing whitespace per line
+  text = text.split('\n').map(l => l.trim()).join('\n');
+
+  // Remove consecutive blank lines
+  text = text.replace(/\n{2,}/g, '\n');
+
+  return text.trim() + '\n';
+}
+
+/**
+ * Compute a unified diff between two strings.
+ */
+function computeDiff(railsHtml, juntosHtml, urlPath) {
+  const tmpRails = join(APP_ROOT, '.compare-rails.tmp');
+  const tmpJuntos = join(APP_ROOT, '.compare-juntos.tmp');
+
+  try {
+    writeFileSync(tmpRails, railsHtml);
+    writeFileSync(tmpJuntos, juntosHtml);
+
+    try {
+      return execSync(
+        `diff -u --label "rails:${urlPath}" --label "juntos:${urlPath}" "${tmpRails}" "${tmpJuntos}"`,
+        { encoding: 'utf-8' }
+      );
+    } catch (e) {
+      // diff exits with 1 when files differ — that's expected
+      return e.stdout || '';
+    }
+  } finally {
+    try { unlinkSync(tmpRails); } catch {}
+    try { unlinkSync(tmpJuntos); } catch {}
+  }
+}
+
+async function runCompare(options, paths) {
+  validateRailsApp();
+  loadEnvLocal();
+  loadDatabaseConfig(options);
+  applyEnvOptions(options);
+
+  // Write a temporary Ruby script that renders paths via Rails
+  const railsScriptPath = join(APP_ROOT, '.juntos-compare-render.rb');
+  const railsScript = [
+    'require "./config/environment"',
+    'require "json"',
+    'ARGV.each do |path|',
+    '  path_info, query_string = path.split("?", 2)',
+    '  env = {',
+    '    "PATH_INFO" => path_info,',
+    '    "REQUEST_METHOD" => "GET",',
+    '    "QUERY_STRING" => query_string || "",',
+    '    "SERVER_NAME" => "localhost",',
+    '    "SERVER_PORT" => "3000",',
+    '    "HTTP_HOST" => "localhost:3000",',
+    '    "rack.url_scheme" => "http"',
+    '  }',
+    '  begin',
+    '    code, _headers, response = Rails.application.routes.call(env)',
+    '    html = code == 200 ? response.body.force_encoding("utf-8") : nil',
+    '    puts JSON.generate({ path: path, status: code, html: html })',
+    '  rescue => e',
+    '    puts JSON.generate({ path: path, status: 500, error: e.message })',
+    '  end',
+    'end',
+  ].join('\n');
+
+  writeFileSync(railsScriptPath, railsScript);
+
+  // Render all paths via Rails in one process
+  process.stderr.write('Rendering via Rails...');
+  let railsResults;
+  try {
+    const railsOutput = execSync(
+      `ruby ${JSON.stringify(railsScriptPath)} ${paths.map(p => JSON.stringify(p)).join(' ')}`,
+      { cwd: APP_ROOT, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 60000 }
+    );
+    railsResults = railsOutput.trim().split('\n').map(line => JSON.parse(line));
+    process.stderr.write(` done (${railsResults.length} pages)\n`);
+  } catch (e) {
+    process.stderr.write(' failed\n');
+    console.error('Rails render failed:', e.stderr || e.message);
+    process.exit(1);
+  } finally {
+    try { unlinkSync(railsScriptPath); } catch {}
+  }
+
+  // Create Vite server for Juntos rendering
+  process.stderr.write('Rendering via Juntos...');
+  const { createServer: createViteServer } = await import('vite');
+  const vite = await createViteServer({
+    server: { middlewareMode: true },
+    appType: 'custom',
+    root: APP_ROOT,
+    configFile: join(APP_ROOT, 'vite.config.js'),
+    logLevel: 'silent'
+  });
+
+  let exitCode = 0;
+  const results = [];
+
+  try {
+    // Load app via SSR
+    const routesMod = await vite.ssrLoadModule(join(APP_ROOT, 'config/routes.rb'));
+    const { Application } = routesMod;
+    const railsMod = await vite.ssrLoadModule('juntos:rails');
+    const { Router, createContext } = railsMod;
+    const serverMod = await vite.ssrLoadModule('juntos/rails_server.js');
+    const { resolveContent } = serverMod;
+
+    // Initialize database
+    const adapter = await vite.ssrLoadModule('juntos:active-record');
+    Application.activeRecordModule = adapter;
+    if (adapter.modelRegistry && Application.models) {
+      Object.assign(adapter.modelRegistry, Application.models);
+    }
+    const dbConfig = _loadDatabaseConfig(APP_ROOT, { quiet: true });
+    if (dbConfig.database && !dbConfig.database.startsWith('/')) {
+      dbConfig.database = join(APP_ROOT, dbConfig.database);
+    }
+    await adapter.initDatabase(dbConfig);
+    await Application.runMigrations(adapter);
+
+    // Render each path via Juntos
+    const juntosResults = [];
+    for (const urlPath of paths) {
+      const [pathInfo] = urlPath.split('?', 2);
+      const result = Router.match(pathInfo, 'GET');
+
+      if (!result) {
+        juntosResults.push({ path: urlPath, status: 404, html: null });
+        continue;
+      }
+
+      const { route, match } = result;
+      const mockReq = {
+        method: 'GET',
+        url: `http://localhost:3000${urlPath}`,
+        headers: { accept: 'text/html', host: 'localhost:3000' }
+      };
+      const queryParams = {};
+      const qIdx = urlPath.indexOf('?');
+      if (qIdx >= 0) {
+        const searchParams = new URLSearchParams(urlPath.substring(qIdx + 1));
+        for (const [key, value] of searchParams.entries()) {
+          queryParams[key] = value;
+        }
+      }
+      const context = createContext(mockReq, queryParams);
+      const actionMethod = route.action === 'new' ? '$new' : route.action;
+
+      try {
+        if (route.nested) {
+          const parentParamName = route.parentName.replace(/s$/, '') + '_id';
+          context.params[parentParamName] = parseInt(match[1]);
+          if (match[2]) context.params.id = parseInt(match[2]);
+        } else if (match[1]) {
+          context.params.id = parseInt(match[1]);
+        }
+
+        let html = await route.controller[actionMethod](context);
+        const resolved = await resolveContent(html);
+        const fullHtml = Application.wrapInLayout(context, resolved);
+        juntosResults.push({ path: urlPath, status: 200, html: fullHtml });
+      } catch (e) {
+        juntosResults.push({ path: urlPath, status: 500, error: e.message, html: null });
+      }
+    }
+
+    process.stderr.write(` done (${juntosResults.length} pages)\n`);
+
+    // Compare results
+    for (let i = 0; i < paths.length; i++) {
+      const urlPath = paths[i];
+      const rails = railsResults[i];
+      const juntos = juntosResults[i];
+
+      process.stderr.write(`  ${urlPath} ... `);
+
+      if (!rails || rails.status !== 200 || !rails.html) {
+        process.stderr.write('Rails render failed\n');
+        results.push({ path: urlPath, status: 'rails_error' });
+        exitCode = 1;
+        continue;
+      }
+
+      if (!juntos || juntos.status !== 200 || !juntos.html) {
+        process.stderr.write('Juntos render failed\n');
+        if (juntos?.error) process.stderr.write(`    ${juntos.error}\n`);
+        results.push({ path: urlPath, status: 'juntos_error' });
+        exitCode = 1;
+        continue;
+      }
+
+      const railsNorm = normalizeHtml(rails.html);
+      const juntosNorm = normalizeHtml(juntos.html);
+
+      if (railsNorm === juntosNorm) {
+        process.stderr.write('match\n');
+        results.push({ path: urlPath, status: 'match' });
+      } else {
+        const diff = computeDiff(railsNorm, juntosNorm, urlPath);
+        const diffLines = diff.split('\n').filter(l =>
+          (l.startsWith('+') || l.startsWith('-')) && !l.startsWith('+++') && !l.startsWith('---')
+        ).length;
+        process.stderr.write(`${diffLines} line(s) differ\n`);
+        results.push({ path: urlPath, status: 'differ', diff, diffLines });
+        exitCode = 1;
+      }
+
+      if (options.verbose) {
+        console.log(`=== Rails normalized: ${urlPath} ===`);
+        console.log(railsNorm);
+        console.log(`=== Juntos normalized: ${urlPath} ===`);
+        console.log(juntosNorm);
+      }
+    }
+
+    // Close database
+    if (adapter.closeDatabase) {
+      await adapter.closeDatabase();
+    }
+    await vite.close();
+  } catch (e) {
+    await vite.close();
+    throw e;
+  }
+
+  // Summary
+  console.log('');
+  console.log('Results:');
+  for (const r of results) {
+    switch (r.status) {
+      case 'match':
+        console.log(`  ${r.path}  MATCH`);
+        break;
+      case 'differ':
+        console.log(`  ${r.path}  DIFFER (${r.diffLines} lines)`);
+        break;
+      case 'rails_error':
+        console.log(`  ${r.path}  RAILS ERROR`);
+        break;
+      case 'juntos_error':
+        console.log(`  ${r.path}  JUNTOS ERROR`);
+        break;
+    }
+  }
+
+  // Show diffs if requested
+  if (options.diff) {
+    for (const r of results) {
+      if (r.status === 'differ') {
+        console.log('');
+        console.log(r.diff);
+      }
+    }
+  }
+
+  const matchCount = results.filter(r => r.status === 'match').length;
+  console.log('');
+  console.log(`${matchCount}/${results.length} pages match`);
+
+  if (exitCode !== 0) {
+    const err = new Error('Comparison found differences');
     err.exitCode = exitCode;
     throw err;
   }
@@ -5197,6 +5522,7 @@ Commands:
   up        Build and run locally (node, bun, browser)
   db        Database commands (create, migrate, seed, prepare, drop, reset)
   render    Render pages without starting a server
+  compare   Compare Rails vs Juntos rendered HTML
   lint      Scan Ruby files for transpilation issues
   transform Show transpiled JavaScript for a file (debugging)
   info      Show current configuration
@@ -5413,6 +5739,32 @@ switch (command) {
       // Errors with exitCode were already reported per-path
       if (!err.exitCode) {
         console.error('Render failed:', formatError(err));
+      }
+      process.exit(err.exitCode || 1);
+    }
+    break;
+
+  case 'compare':
+    if (options.help || commandArgs.length === 0) {
+      console.log('Usage: juntos compare [options] PATH [PATH...]\n\nCompare Rails vs Juntos rendered HTML for the same pages.\n');
+      console.log('Renders each path via both Rails and Juntos, normalizes the HTML');
+      console.log('(stripping CSRF tokens, asset fingerprints, importmaps, whitespace),');
+      console.log('and reports differences.\n');
+      console.log('Options:');
+      console.log('  --diff                   Show unified diff for differing pages');
+      console.log('  -d, --database ADAPTER   Database adapter');
+      console.log('  -v, --verbose            Show full normalized HTML');
+      console.log('\nExamples:');
+      console.log('  juntos compare /');
+      console.log('  juntos compare / /articles /articles/1');
+      console.log('  juntos compare --diff / /articles');
+      process.exit(options.help ? 0 : 1);
+    }
+    try {
+      await runCompare(options, commandArgs);
+    } catch (err) {
+      if (!err.exitCode) {
+        console.error('Compare failed:', formatError(err));
       }
       process.exit(err.exitCode || 1);
     }

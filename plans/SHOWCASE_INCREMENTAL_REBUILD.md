@@ -67,6 +67,18 @@ npx juntos render -v /studios                 # Verbose (show timing, errors)
 
 Global options work here too: `-d sqlite`, `-t node`, `-e development`.
 
+#### `juntos compare` — Compare Rails vs Juntos output
+
+Renders each path via both Rails and Juntos, normalizes the HTML (stripping CSRF tokens, asset fingerprints, importmaps, signed stream names, whitespace), and reports differences.
+
+```bash
+npx juntos compare / /articles              # Summary: MATCH or DIFFER per page
+npx juntos compare --diff / /articles       # Show unified diff for differing pages
+npx juntos compare -v /articles/1           # Show full normalized HTML for both sides
+```
+
+Requires Ruby and a Rails-bootable app (uses `ruby` to render via `Rails.application.routes.call`). Both sides read from the same development database.
+
 #### `juntos transform` — Show transpiled JavaScript
 
 Shows the JavaScript output for any Ruby source file. Essential for debugging transpilation.
@@ -178,19 +190,26 @@ ruby scripts/render.rb --verbose /studios       # Timing and debug info
 
 ### 2. Transpiler comparison harness — DONE
 
-`scripts/compare.rb` renders each path via both Rails and Juntos, normalizes HTML (strips CSRF tokens, asset fingerprints, importmaps, whitespace), and reports MATCH/DIFFER.
+Now available as a built-in Juntos CLI command (`npx juntos compare`) usable in any Juntos project. Also available as `scripts/compare.rb` in ballroom for backwards compatibility.
 
 ```bash
-ruby scripts/compare.rb / /studios /people /heats /dances
-ruby scripts/compare.rb --diff /studios         # Show unified diff
+npx juntos compare / /studios /people /heats /dances
+npx juntos compare --diff /studios              # Show unified diff
+npx juntos compare -v /studios                  # Show full normalized HTML
+
+# Ballroom-specific script (same functionality)
+ruby scripts/compare.rb / /studios /people
+ruby scripts/compare.rb --diff /studios
 ruby scripts/compare.rb --test /studios         # Use test fixtures
-ruby scripts/compare.rb --verbose /studios      # Extra detail
 ```
 
 **What it normalizes:**
 - CSRF meta tags and tokens
 - Asset fingerprint hashes in URLs
 - Importmap script blocks
+- Module import scripts and modulepreload links
+- Signed turbo stream names (HMAC signatures)
+- `autocomplete="off"` on hidden inputs
 - Self-closing slash differences (`<br>` vs `<br/>`)
 - Trailing whitespace and blank lines
 
