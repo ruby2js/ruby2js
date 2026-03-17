@@ -45,10 +45,9 @@ src/
 ├── pages/
 │   ├── index.astro.rb           # Home page (Ruby frontmatter)
 │   └── posts/
-│       ├── index.astro.rb       # Post list page
-│       └── [slug].astro.rb      # Dynamic post detail page
+│       └── index.astro.rb       # Post list page
 ├── islands/
-│   ├── PostList.jsx.rb          # Interactive post list (Preact)
+│   ├── PostList.jsx.rb          # Interactive post list + inline detail (Preact)
 │   ├── PostForm.jsx.rb          # Create/edit form (Preact)
 │   ├── PostDetail.jsx.rb        # View/edit/delete (Preact)
 │   └── Counter.jsx.rb           # Demo counter (Preact)
@@ -86,13 +85,15 @@ React/Preact components written in Ruby:
 
 ```ruby
 # src/islands/PostList.jsx.rb
-import ['useState', 'useEffect'], from: 'preact/hooks'
+import ['useState', 'useEffect'], from: 'react'
 import ['setupDatabase', 'Post'], from: '../lib/db.js'
 import ['withRevalidate', 'invalidate'], from: '../lib/isr.js'
+import PostDetail, from: './PostDetail.jsx'
 
 def PostList()
   posts, setPosts = useState([])
   loading, setLoading = useState(true)
+  selectedSlug, setSelectedSlug = useState(nil)
 
   loadPosts = -> {
     withRevalidate('posts:all', 60, -> { Post.all() }).then do |data|
@@ -105,13 +106,22 @@ def PostList()
     setupDatabase().then { loadPosts.() }
   }, []
 
+  # Show post detail inline when selected
+  return %x{<PostDetail slug={selectedSlug} onBack={-> { setSelectedSlug(nil) }} />} if selectedSlug
+
   return %x{<div class="loading">Loading...</div>} if loading
 
-  %x{<div class="posts">
-    {posts.map { |post| <article key={post.id}>
-      <h3><a href={"/posts/" + post.slug}>{post.title}</a></h3>
-    </article> }}
-  </div>}
+  renderPost = ->(post) {
+    %x{<article key={post.id}>
+      <h3>
+        <a href="#" onClick={->(e) { e.preventDefault(); setSelectedSlug(post.slug) }}>
+          {post.title}
+        </a>
+      </h3>
+    </article>}
+  }
+
+  %x{<div class="posts">{posts.map(renderPost)}</div>}
 end
 
 export default PostList
