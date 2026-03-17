@@ -725,8 +725,9 @@ function createRubyTransformPlugin(config, appRoot) {
     const relPath = path.relative(appRoot, filePath);
     const isModel = relPath.startsWith('app/models/') || relPath.startsWith('app' + path.sep + 'models' + path.sep);
     const isHelper = relPath.startsWith('app/helpers/') || relPath.startsWith('app' + path.sep + 'helpers' + path.sep);
+    const isView = relPath.startsWith('app/views/') || relPath.startsWith('app' + path.sep + 'views' + path.sep);
     const isTest = relPath.startsWith('test/') || relPath.startsWith('test' + path.sep);
-    if (!isModel && !isHelper && !isTest) return js;
+    if (!isModel && !isHelper && !isView && !isTest) return js;
 
     const modelMap = getModelClassMap();
     let currentRelPath;
@@ -734,6 +735,8 @@ function createRubyTransformPlugin(config, appRoot) {
       currentRelPath = relPath.replace(/^app\/models\/|^app\\models\\/g, '').replace(/\.rb$|\.js$/, '');
     } else if (isHelper) {
       currentRelPath = relPath.replace(/^app\/helpers\/|^app\\helpers\\/g, '').replace(/\.rb$|\.js$/, '');
+    } else if (isView) {
+      currentRelPath = relPath.replace(/^app\/views\/|^app\\views\\/g, '').replace(/\.html\.erb$|\.erb$|\.rb$|\.js$/, '');
     } else {
       currentRelPath = relPath.replace(/\.rb$|\.js$/, '');
     }
@@ -780,6 +783,17 @@ function createRubyTransformPlugin(config, appRoot) {
       } else if (isTest) {
         // Test files use absolute-style imports resolved by the plugin
         importPath = `app/models/${modelPath}.rb`;
+      } else if (isView) {
+        // Compute relative path from view to model (app/views/events/ → app/models/)
+        const currentParts = currentRelPath.split('/');
+        const currentDir = currentParts.slice(0, -1);
+        const targetParts = modelPath.split('/');
+        const targetDir = targetParts.slice(0, -1);
+        const targetFile = targetParts[targetParts.length - 1];
+
+        // Go up from views/controller/ to app/, then down to models/
+        const upCount = currentDir.length + 1; // +1 to exit views/
+        importPath = [...Array(upCount).fill('..'), 'models', ...targetDir, targetFile + '.rb'].join('/');
       } else {
         // Compute relative path from helper to model (app/helpers/ → app/models/)
         const currentParts = currentRelPath.split('/');
@@ -1262,6 +1276,13 @@ export { application };
         console.error(`[juntos] Transform error in ${id}:`, error);
         throw error;
       }
+    },
+
+    // Add cross-model imports for ERB view files (loaded by the ERB plugin)
+    transform(code, id) {
+      if (!id.endsWith('.erb')) return null;
+      const js = addCrossModelImports(code, id);
+      return js !== code ? { code: js, map: null } : null;
     }
   };
 }

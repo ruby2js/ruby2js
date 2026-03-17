@@ -2411,10 +2411,17 @@ module Ruby2JS
               if choices
                 # Dynamic choices — generate option elements by mapping over the collection.
                 # Supports both simple arrays ["a","b"] and [label, value] pairs.
+                # Also handles hashes by converting to entries:
+                #   Array.isArray(x) ? x : Object.entries(x)
                 # Uses a ternary to detect pairs: Array.isArray(c) ? [c[1], c[0]] : [c, c]
+                choices_expr = process(choices)
+                normalized_choices = s(:if,
+                  s(:send, s(:const, nil, :Array), :isArray, choices_expr),
+                  choices_expr,
+                  s(:send, s(:const, nil, :Object), :entries, choices_expr))
                 map_expr = s(:send,
                   s(:send,
-                    process(choices), :map,
+                    s(:begin, normalized_choices), :map,
                     s(:block, s(:send, nil, :proc),
                       s(:args, s(:arg, :_c)),
                       s(:dstr,

@@ -388,8 +388,12 @@ module Ruby2JS
 
           if node.type == :const
             const_name = resolve_const_name(node)
-            # Skip known non-model constants and Ruby/Node globals
-            unless %w[ApplicationController ENV ARGV STDIN STDOUT STDERR].include?(const_name) || const_name.end_with?('Controller', 'Views')
+            # Skip known non-model constants: globals, suffixed names, and
+            # all-uppercase identifiers (FONTS, URI, etc. are Ruby constants
+            # or stdlib classes, not model references).
+            unless %w[ApplicationController ENV ARGV STDIN STDOUT STDERR].include?(const_name) ||
+                const_name.end_with?('Controller', 'Views') ||
+                const_name == const_name.upcase
               @rails_model_refs.add(const_name)
               return  # don't recurse into children of this const node (already resolved)
             end
@@ -974,6 +978,9 @@ module Ruby2JS
             elsif target.nil? && method == :head
               # head :ok -> nil (just an acknowledgment, no response body)
               return s(:nil)
+            elsif target.nil? && method == :request
+              # request -> context.request (Rails request object from context)
+              return s(:attr, s(:lvar, :context), :request)
             elsif target&.type == :send &&
                   target.children[0].nil? &&
                   target.children[1] == :params &&

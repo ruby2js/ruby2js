@@ -264,6 +264,7 @@ export function createContext(req, params = {}) {
       path: url.pathname,
       method: req.method,
       url: url.href,  // Full URL for redirect base
+      original_url: url.href,  // Rails: request.original_url
       headers: headers
     },
 

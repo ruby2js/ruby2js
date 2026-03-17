@@ -787,7 +787,7 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include 'entry[pair]'
       result.must_include 'class="input"'
       result.must_include '<option value="" label=" "></option>'
-      result.must_include 'avail.map'
+      result.must_include 'Object.entries(avail)).map'
       result.must_include '<option value="'
       result.must_include '</option>'
       result.must_include '</select>'
@@ -798,8 +798,18 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result = erb_to_js('<%= form_with(model: @entry) do |form| %><%= form.select "status", statuses, {}, class: "input" %><% end %>')
       result.must_include '<select'
       result.must_include 'entry[status]'
-      result.must_include 'statuses.map'
+      result.must_include 'Object.entries(statuses)).map'
       result.wont_include '<option value=""></option>'
+      result.must_include '</select>'
+    end
+
+    it "should handle select with hash choices (normalizes to Object.entries)" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @event) do |form| %><%= form.select :font_family, fonts, {}, class: "input" %><% end %>')
+      result.must_include '<select'
+      result.must_include 'event[font_family]'
+      result.must_include 'Array.isArray(fonts) ? fonts : Object.entries(fonts)'
+      result.must_include '.map('
       result.must_include '</select>'
     end
 

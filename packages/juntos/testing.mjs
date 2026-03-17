@@ -99,7 +99,11 @@ export function createContext() {
     request: {
       headers: {
         accept: 'text/html'
-      }
+      },
+      url: 'http://localhost:3000/',
+      original_url: 'http://localhost:3000/',
+      path: '/',
+      method: 'GET'
     }
   };
 }

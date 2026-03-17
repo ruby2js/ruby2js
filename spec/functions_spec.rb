@@ -104,6 +104,18 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'JSON.pretty_generate(obj)' ).must_equal 'JSON.stringify(obj, null, 2)'
     end
 
+    it "should handle URI.join" do
+      to_js( 'URI.join(base, "../public")' ).must_equal 'new URL("../public", base)'
+    end
+
+    it "should handle URI.join with multiple args" do
+      to_js( 'URI.join(base, middle, tail)' ).must_equal 'new URL(tail, new URL(middle, base))'
+    end
+
+    it "should handle URI.parse" do
+      to_js( 'URI.parse("http://example.com")' ).must_equal 'new URL("http://example.com")'
+    end
+
     it "should map JSON::ParserError to SyntaxError" do
       to_js( 'begin; rescue JSON::ParserError; end' ).must_equal 'try {} catch ($EXCEPTION) {if ($EXCEPTION instanceof SyntaxError) {} else {throw $EXCEPTION}}'
     end

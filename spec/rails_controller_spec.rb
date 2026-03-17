@@ -809,6 +809,50 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).must_include 'ENV.fetch'
     end
 
+    it "does not import all-uppercase constants as models" do
+      source = <<~RUBY
+        class EventsController < ApplicationController
+          FONTS = {
+            'Arial' => 'Helvetica, Arial',
+            'Georgia' => 'Georgia'
+          }
+
+          def publish
+            @fonts = FONTS
+            @url = URI.join(request.original_url, '../public')
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).wont_include 'import { FONTS }'
+      _(result).wont_include 'f_o_n_t_s'
+      _(result).wont_include 'import { URI }'
+      _(result).wont_include 'u_r_i'
+      # request should be rewritten to context.request
+      _(result).must_include 'context.request.original_url'
+      # URI.join should become new URL (handled by functions filter)
+      _(result).must_include 'new URL'
+    end
+
+    it "rewrites bare request to context.request in controller actions" do
+      source = <<~RUBY
+        class PagesController < ApplicationController
+          def info
+            @path = request.path
+            @method = request.method
+            @host = request.host
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      _(result).must_include 'context.request.path'
+      _(result).must_include 'context.request.method'
+      _(result).must_include 'context.request.host'
+      _(result).wont_match(/[^.]request\.path/)
+    end
+
     it "does not duplicate import for require_relative constants" do
       source = <<~RUBY
         require_relative '../../lib/erb_prism_converter'

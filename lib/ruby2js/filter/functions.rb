@@ -818,6 +818,22 @@ module Ruby2JS
             super
           end
 
+        elsif target == s(:const, nil, :URI)
+          if method == :join and args.length >= 2
+            # URI.join(base, relative) => new URL(relative, base)
+            # For multiple args, chain: URI.join(a,b,c) => new URL(c, new URL(b, a))
+            result = process(args.first)
+            args[1..].each do |arg|
+              result = S(:send, s(:const, nil, :URL), :new, process(arg), result)
+            end
+            result
+          elsif method == :parse and args.length == 1
+            # URI.parse(str) => new URL(str)
+            process S(:send, s(:const, nil, :URL), :new, args.first)
+          else
+            super
+          end
+
         elsif method == :[]
           # resolve negative literal indexes
           i = proc do |index|

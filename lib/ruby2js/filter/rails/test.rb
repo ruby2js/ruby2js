@@ -1223,7 +1223,7 @@ module Ruby2JS
         # Includes a _flash variable that persists across context() calls
         # so flash assertions can read values set by controller actions.
         def build_context_helper
-          s(:jsraw, "let _flash = {};\n\nfunction context(params = {}) {\n  _flash = {};\n  return {params, flash: {get(k) {return _flash[k] || \"\"}, set(k, v) {_flash[k] = v}, consumeNotice() {let n = _flash.notice; delete _flash.notice; return {present: !!n, value: n}}, consumeAlert() {let a = _flash.alert; delete _flash.alert; return a || \"\"}}, contentFor: {}}\n}")
+          s(:jsraw, "let _flash = {};\n\nfunction context(params = {}) {\n  _flash = {};\n  return {params, flash: {get(k) {return _flash[k] || \"\"}, set(k, v) {_flash[k] = v}, consumeNotice() {let n = _flash.notice; delete _flash.notice; return {present: !!n, value: n}}, consumeAlert() {let a = _flash.alert; delete _flash.alert; return a || \"\"}}, contentFor: {}, request: {headers: {accept: 'text/html'}, url: 'http://localhost:3000/', original_url: 'http://localhost:3000/', path: '/', method: 'GET'}}\n}")
         end
 
         # Standard REST actions — URL helpers with these names map directly
