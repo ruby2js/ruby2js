@@ -3218,7 +3218,11 @@ function normalizeHtml(html) {
   text = text.replace(/(<input\s+type="hidden"[^>]*?)\s+autocomplete="off"/g, '$1');
 
   // Normalize signed stream names (Rails HMAC-signs them, Juntos doesn't)
-  text = text.replace(/(signed-stream-name="[^"]*?)==[^"]*"/g, '$1"');
+  // Base64 may or may not end with = padding; HMAC signature follows --
+  text = text.replace(/(signed-stream-name="[A-Za-z0-9+/]+=*)--[^"]*"/g, '$1"');
+
+  // Normalize closing tags joined on the same line (e.g., "</form>    </main>" → separate lines)
+  text = text.replace(/(<\/\w+>)\s+(<\/\w+>)/g, '$1\n$2');
 
   // Strip leading/trailing whitespace per line
   text = text.split('\n').map(l => l.trim()).join('\n');

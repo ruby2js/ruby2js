@@ -2100,11 +2100,11 @@ module Ruby2JS
         # Build HTML attributes string from options hash (static classes only)
         def build_field_attrs(options)
           attrs = []
+          attrs << "rows=\"#{options[:rows]}\"" if options[:rows]
+          attrs << "cols=\"#{options[:cols]}\"" if options[:cols]
           attrs << "class=\"#{options[:class]}\"" if options[:class]
           attrs << "id=\"#{options[:id]}\"" if options[:id]
           attrs << "style=\"#{options[:style]}\"" if options[:style]
-          attrs << "rows=\"#{options[:rows]}\"" if options[:rows]
-          attrs << "cols=\"#{options[:cols]}\"" if options[:cols]
           attrs << "placeholder=\"#{options[:placeholder]}\"" if options[:placeholder]
           attrs << "disabled" if options[:disabled]
           attrs << "readonly" if options[:readonly]
@@ -2137,10 +2137,10 @@ module Ruby2JS
         def build_field_attrs_dynamic(options)
           # Build non-class attributes
           attrs = []
-          attrs << "id=\"#{options[:id]}\"" if options[:id]
-          attrs << "style=\"#{options[:style]}\"" if options[:style]
           attrs << "rows=\"#{options[:rows]}\"" if options[:rows]
           attrs << "cols=\"#{options[:cols]}\"" if options[:cols]
+          attrs << "id=\"#{options[:id]}\"" if options[:id]
+          attrs << "style=\"#{options[:style]}\"" if options[:style]
           attrs << "placeholder=\"#{options[:placeholder]}\"" if options[:placeholder]
           attrs << "disabled" if options[:disabled]
           attrs << "readonly" if options[:readonly]
@@ -2168,8 +2168,8 @@ module Ruby2JS
               # Has conditional classes - return dynamic expression
               return [static_attrs, dynamic_class_expr]
             elsif static_class_attr && static_class_attr.length > 0
-              # Static class only
-              return [static_class_attr + static_attrs, nil]
+              # Static class only — rows/cols before class to match Rails attribute order
+              return [static_attrs + static_class_attr, nil]
             end
           end
 
@@ -2280,16 +2280,17 @@ module Ruby2JS
 
               if dynamic_class_expr
                 # Has conditional classes - generate dynamic class attribute
+                # rows/cols before class to match Rails attribute order
                 s(:dstr,
-                  s(:str, %(<textarea name="#{model}[#{name}]" id="#{model}_#{name}" class=")),
+                  s(:str, %(<textarea#{static_attrs} class=")),
                   s(:begin, process(dynamic_class_expr)),
-                  s(:str, %("#{static_attrs}>)),
+                  s(:str, %(" name="#{model}[#{name}]" id="#{model}_#{name}">\n)),
                   s(:begin, value_expr),
                   s(:str, '</textarea>'))
               else
                 # Static classes only
                 s(:dstr,
-                  s(:str, %(<textarea name="#{model}[#{name}]" id="#{model}_#{name}"#{static_attrs}>)),
+                  s(:str, %(<textarea#{static_attrs} name="#{model}[#{name}]" id="#{model}_#{name}">\n)),
                   s(:begin, value_expr),
                   s(:str, '</textarea>'))
               end
@@ -2370,7 +2371,7 @@ module Ruby2JS
               end
               extra_attrs = build_field_attrs(options)
               label_for = @erb_model_name ? "#{model}_#{name}" : name
-              html = %(<label for="#{label_for}"#{extra_attrs}>#{label_text}</label>)
+              html = %(<label#{extra_attrs} for="#{label_for}">#{label_text}</label>)
               s(:str, html)
             elsif field_name
               # Dynamic label - generate <label> with expression as text
