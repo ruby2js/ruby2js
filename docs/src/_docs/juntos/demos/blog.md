@@ -211,6 +211,23 @@ Nothing special. Nothing modified for transpilation. Standard Rails conventions 
 - `after_create_commit` / `after_destroy_commit` callbacks
 - Comment count updates live on the index page
 
+## Verified Parity
+
+The blog demo achieves identical HTML output between Rails and Juntos. You can verify this yourself:
+
+```bash
+npx juntos compare / /articles /articles/1 /articles/new /articles/1/edit
+```
+
+This renders each page via both Rails and Juntos, normalizes environment-specific differences (CSRF tokens, asset fingerprints, importmaps), and reports MATCH or DIFFER with optional unified diffs (`--diff`).
+
+All 5 pages match. All tests pass on both runtimes:
+
+- **Rails**: 20 tests, 51 assertions, 0 failures
+- **Juntos**: 22 tests, 0 failures
+
+The only normalized differences are infrastructure-level: CSRF token signatures (Rails has a secret key, Juntos doesn't), importmap vs module script tags, and asset fingerprint hashes. The actual content — HTML structure, links, forms, attributes, data — is identical.
+
 ## What Works Differently
 
 - **Migrations** — In browsers, migrations run automatically on startup
