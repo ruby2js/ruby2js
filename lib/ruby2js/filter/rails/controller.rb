@@ -127,6 +127,28 @@ module Ruby2JS
                      export_module
                    end
 
+          # Clear comments that were inside the controller class body.
+          # After the controller is transformed to an IIFE, these would become
+          # orphan comments outside the module and look like leaks
+          # (e.g., scaffold "Only allow trusted parameters" boilerplate).
+          # Remove them from _raw so reassociate_comments won't re-classify them.
+          raw = @comments.get(:_raw)
+          if raw && body
+            body_loc = body.respond_to?(:loc) && body.loc
+            if body_loc
+              body_start = body_loc.respond_to?(:expression) ? body_loc.expression.begin_pos : nil
+              body_end = body_loc.respond_to?(:expression) ? body_loc.expression.end_pos : nil
+              if body_start && body_end
+                filtered = raw.select do |comment|
+                  comment_pos = comment.respond_to?(:loc) && comment.loc.respond_to?(:expression) ?
+                    comment.loc.expression.begin_pos : nil
+                  !(comment_pos && comment_pos >= body_start && comment_pos <= body_end)
+                end
+                @comments.set(:_raw, filtered)
+              end
+            end
+          end
+
           @rails_controller = nil
           @rails_controller_name = nil
           @rails_controller_plural = nil

@@ -2414,9 +2414,15 @@ module Ruby2JS
         end
 
         def generate_validate_method
-          return nil if @rails_validations.empty?
-
           validation_calls = []
+
+          # Rails 5+: belongs_to validates presence by default (unless optional: true)
+          @rails_associations.each do |assoc|
+            next unless assoc[:type] == :belongs_to
+            next if assoc[:options][:optional]
+            validation_calls.push(
+              s(:send, s(:self), :validates_presence_of, s(:str, assoc[:name].to_s)))
+          end
 
           @rails_validations.each do |v|
             attr = v[:attribute]

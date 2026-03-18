@@ -344,6 +344,11 @@ class CommentTest < ActiveSupport::TestCase
     comment = article.comments.build(commenter: "Someone")
     assert_not comment.save
   end
+
+  test "requires valid article" do
+    comment = Comment.new(commenter: "Test", body: "A test comment.", article_id: 999999)
+    assert_not comment.save
+  end
 end
 TEST
 
@@ -392,6 +397,7 @@ class ArticlesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", @article.title
     assert_select "h2", "Comments"
+    assert_select "#comments .p-4", minimum: 1
   end
 
   test "should get edit" do

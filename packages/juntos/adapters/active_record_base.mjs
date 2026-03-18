@@ -276,7 +276,17 @@ export class ActiveRecordBase {
 
       await this._runCallbacks('before_create');
 
-      const result = await this._insert();
+      let result;
+      try {
+        result = await this._insert();
+      } catch (e) {
+        // Convert FK constraint errors to validation errors (matches Rails behavior)
+        if (e.message && e.message.includes('FOREIGN KEY constraint failed')) {
+          this.addError('base', 'foreign key constraint failed');
+          return false;
+        }
+        throw e;
+      }
 
       if (result) {
         await this._processNestedAttributes();
