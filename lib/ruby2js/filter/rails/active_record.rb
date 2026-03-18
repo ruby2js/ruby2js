@@ -160,6 +160,9 @@ module Ruby2JS
           if self.model_ref?(const_name, model_refs)
             return :await! if AR_CLASS_METHODS.include?(method)
 
+            # new is a constructor, not a database operation — no await needed
+            return nil if method == :new
+
             # Zero-arg: scope (getter) or custom class method (parens)
             if args.empty?
               return self.known_scope?(method, const_name, metadata) ? :await_attr : :await!
