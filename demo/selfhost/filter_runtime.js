@@ -31,8 +31,10 @@ function urlToPath(pathOrUrl) {
   return pathOrUrl;
 }
 
-// Only define File polyfill in Node.js; preserve browser's native File constructor
-if (typeof globalThis.File !== 'function') globalThis.File = {
+// Ruby File polyfill (exist/mtime). Skip in browsers where File is the native
+// constructor (used by Turbo, FormData, etc.) but apply in Node.js where
+// File exists as a web-compat class without Ruby's methods.
+if (typeof window === 'undefined') globalThis.File = {
   exist(path) {
     if (!_fs) return false;
     try {
