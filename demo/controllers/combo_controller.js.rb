@@ -45,7 +45,7 @@ class ComboController < DemoController
     ruby_panel.setAttribute 'name', 'ruby'
     div = document.createElement('div')
     # Use selfhost controller if data-selfhost="true" is set
-    controller_name = element.dataset.selfhost == 'true' ? 'selfhost-ruby' : 'ruby'
+    controller_name = element.dataset.opal == 'true' ? 'ruby' : 'selfhost-ruby'
     div.setAttribute 'data-controller', controller_name
     div.setAttribute 'data-options', element.dataset.options
     # Pass ERB mode flag if set
