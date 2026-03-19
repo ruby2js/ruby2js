@@ -20663,26 +20663,30 @@ function urlToPath(pathOrUrl) {
   return pathOrUrl;
 }
 
-// Ruby File polyfill (exist/mtime). Only apply when File.exist is not
-// already available — preserves the browser's native File constructor.
-if (!globalThis.File?.exist) globalThis.File = {
-  exist(path) {
+// Ruby File polyfill (exist/mtime). Add methods to the existing File
+// object/constructor rather than replacing it, so the browser's native
+// File constructor (used by Turbo, FormData, etc.) is preserved.
+if (!globalThis.File) {
+  globalThis.File = {};
+}
+if (!globalThis.File.exist) {
+  globalThis.File.exist = function(path) {
     if (!_fs) return false;
     try {
       return _fs.existsSync(urlToPath(path));
     } catch {
       return false;
     }
-  },
-  mtime(path) {
+  };
+  globalThis.File.mtime = function(path) {
     if (!_fs) return null;
     try {
       return _fs.statSync(urlToPath(path)).mtime;
     } catch {
       return null;
     }
-  }
-};
+  };
+}
 
 // Array.prototype.dup - Ruby's dup creates a shallow copy
 if (!Array.prototype.dup) {
