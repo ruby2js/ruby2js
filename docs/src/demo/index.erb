@@ -1,0 +1,271 @@
+---
+layout: default
+---
+
+
+<style>
+  .js.editor { background-color: #ffffcc }
+  .ruby.editor { resize: vertical; overflow: auto; height: 200px; background-color: #ffeeee; margin-bottom: 5px; }
+  .ruby .cm-wrap { background-color: #ffeeee; height: 100% }
+  .js .cm-wrap { background-color: #ffffdd; height: 100% }
+  .ruby .cm-wrap .cm-content .cm-activeLine { background-color: #ffdddd; margin-right: 2px }
+  .js .cm-wrap .cm-content .cm-activeLine { background-color: #ffffcc; margin-right: 2px }
+
+  .unloc {background-color: yellow}
+  .loc {background-color: white}
+  .loc span.hidden, .unloc span.hidden {font-size: 0}
+  .container.narrow-container {padding: 0; margin: 0 3%; max-width: 91%}
+  .exception {background-color:#ff0; margin: 1em 0; padding: 1em; border: 4px solid red; border-radius: 1em}
+
+
+  sl-menu { display: none }
+  .narrow-container pre {padding: 0 1rem}
+  .narrow-container h1.title, .narrow-container h2.title {margin: 0.5rem 0}
+
+</style>
+
+
+<div class="container narrow-container">
+  
+    <h1 class="title is-size-4">Ruby</h1>
+    <sl-dialog id="option" label="Option">
+      <sl-input></sl-input>
+      <sl-button slot="footer" type="primary">Close</sl-button>
+    </sl-dialog>
+  
+
+  <form method="post">
+    <div data-controller="selfhost-ruby">
+      <textarea class="ruby form-control" name="ruby" rows="8" placeholder="Ruby source">puts "Hello world!"</textarea>
+    </div>
+
+    <div class="options" data-controller="options">
+      <input class="btn btn-primary" type="submit" value="Convert" style="display: none">
+
+      
+        <sl-checkbox id="preset" name="preset" checked>Use Preset</sl-checkbox>
+      
+
+      <label for="eslevel">ESLevel:</label>
+      
+        <sl-dropdown id="eslevel" name="eslevel">
+          <sl-button slot="trigger" caret>default</sl-button>
+          <sl-menu>
+            <sl-menu-item type="checkbox" checked>default</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" value="2020">2020</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" value="2021">2021</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" value="2022">2022</sl-menu-item>
+            
+          </sl-menu>
+        </sl-dropdown>
+      
+
+      
+        <sl-checkbox id="ast" name="ast">Show AST</sl-checkbox>
+      
+
+      
+        <sl-dropdown id="filters" close-on-select="false">
+          <sl-button slot="trigger" caret>Filters</sl-button>
+          <sl-menu>
+            
+              <sl-menu-item type="checkbox" name="action_cable">action_cable</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="active_support">active_support</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="alpine">alpine</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="astro">astro</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="camelCase">camelCase</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="cjs">cjs</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="combiner">combiner</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="erb">erb</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="esm">esm</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="functions">functions</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="haml">haml</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="ink">ink</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="jest">jest</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="jsx">jsx</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="lit">lit</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="lit-element">lit-element</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="minitest">minitest</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="node">node</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="nokogiri">nokogiri</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="phlex">phlex</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="polyfill">polyfill</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="pragma">pragma</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="processor">processor</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="rails">rails</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="rails_test">rails_test</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="react">react</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="return">return</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="securerandom">securerandom</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="selfhost">selfhost</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="sfc">sfc</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="stimulus">stimulus</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="tagged_templates">tagged_templates</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="turbo">turbo</sl-menu-item>
+            
+              <sl-menu-item type="checkbox" name="vue">vue</sl-menu-item>
+            
+          </sl-menu>
+        </sl-dropdown>
+      
+
+      
+        <sl-dropdown id="options" close-on-select="false">
+          <sl-button slot="trigger" caret>Options</sl-button>
+          <sl-menu>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="autoexports" data-args="true">autoexports</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="autoimports" data-args="true">autoimports</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="defs" data-args="true">defs</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="exclude" data-args="true">exclude</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="filepath" data-args="true">filepath</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="identity">identity</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="include" data-args="true">include</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="include-all">include-all</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="include-only" data-args="true">include-only</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="ivars" data-args="true">ivars</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="nullish">nullish</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="nullish_to_s">nullish_to_s</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="truthy">truthy</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="strict">strict</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="template_literal_tags" data-args="true">template_literal_tags</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="underscored_private">underscored_private</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="sourcemap">sourcemap</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="ast">ast</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="filtered-ast">filtered-ast</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="show-comments">show-comments</sl-menu-item>
+            
+              
+              
+              <sl-menu-item type="checkbox" name="filter-trace">filter-trace</sl-menu-item>
+            
+          </sl-menu>
+        </sl-dropdown>
+      
+    </div>
+  </form>
+
+  
+
+  
+
+  <div id="parsed" style="display: none">
+    <h2 class="title is-size-6">AST</h2>
+    <pre></pre>
+  </div>
+
+  <div id="filtered" style="display: none">
+    <h2 class="title is-size-6">filtered AST</h2>
+    <pre></pre>
+  </div>
+
+  <div id="js" data-controller="js" style="display: block">
+    <h2 class="title is-size-4">JavaScript</h2>
+    <pre class="js"></pre>
+  </div>
+</div>
+
+
+
+<div style="text-align: center; margin-top: 2rem; padding: 1rem; background: #f8f9fa; border-radius: 4px;">
+  <a href="/demo/selfhost" style="color: #0d6efd;">
+    Try the Self-Hosted Preview &rarr;
+  </a>
+  <span style="color: #666; font-size: 0.85em; margin-left: 0.5rem;">
+    (experimental)
+  </span>
+</div>

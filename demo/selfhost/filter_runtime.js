@@ -31,7 +31,8 @@ function urlToPath(pathOrUrl) {
   return pathOrUrl;
 }
 
-globalThis.File = {
+// Only define File polyfill in Node.js; preserve browser's native File constructor
+if (typeof globalThis.File !== 'function') globalThis.File = {
   exist(path) {
     if (!_fs) return false;
     try {
