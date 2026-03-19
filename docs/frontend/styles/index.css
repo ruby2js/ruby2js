@@ -1,0 +1,54 @@
+/* All @import statements must come before any other rules */
+@import "@shoelace-style/shoelace/dist/themes/light.css";
+@import "base.css";
+@import "custom_elements.css";
+@import "helpers.css";
+@import "content.css";
+@import "controls.css";
+@import "layout.css";
+@import "syntax.css";
+@import "typography.css";
+@import "../../src/_components/docs/note.css";
+@import "../../src/_components/shared/navbar.css";
+@import "livedemo.css";
+
+/* CSS custom properties replacing Sass variables */
+:root {
+  --grey-darker: #2a2a26;
+  --grey-dark: #3e3e3e;
+  --grey: #888;
+  --grey-light: #c9c8b8;
+  --grey-lighter: #e6e1d7;
+  --white-ter: #f6f6f6;
+  --yellow: #ffd725;
+  --orange: #f88a23;
+  --green: #7addcf;
+  --blue: #29abe0;
+  --red: #c92514;
+  --red-dark: #460f0e;
+  --primary: #242341;
+  --info: var(--red);
+  --warning: var(--orange);
+  --warning-invert: #fff;
+  --text: #4a4a4a;
+  --text-strong: #363636;
+  --link: var(--red-dark);
+  --scheme-main: var(--white-ter);
+  --family-sans-serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  --family-monospace: ui-monospace, monospace;
+  --body-size: 18px;
+  --navbar-bg: var(--primary);
+  --navbar-item-color: var(--white-ter);
+  --navbar-hover-bg: #1b1a30;
+  --card-shadow: 0 2px 3px rgba(62, 62, 62, 0.1), 0 0 0 1px rgba(62, 62, 62, 0.1);
+  --box-shadow: 0 0.5em 1em -0.125em rgba(10, 10, 10, 0.1), 0 0 0 1px rgba(10, 10, 10, 0.02);
+  --border: #dbdbdb;
+}
+
+.has-text-red-dark {
+  color: var(--red-dark) !important;
+}
+
+footer.footer strong {
+  color: white;
+}

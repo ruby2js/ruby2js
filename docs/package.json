@@ -23,15 +23,13 @@
     "postcss-load-config": "^4.0.1",
     "postcss-preset-env": "^7.4.3",
     "read-cache": "^1.0.0",
-    "rollup": "^4.0.0",
-    "sass": "^1.58.0"
+    "rollup": "^4.0.0"
   },
   "dependencies": {
     "@hotwired/stimulus": "^3.0.0",
     "@shoelace-style/shoelace": "^2.0.0",
     "animated-scroll-to": "^2.0.12",
     "bridgetown-quick-search": "3.0.3",
-    "bulma": "^0.9.1",
     "lit": "^2.0.0"
   }
 }

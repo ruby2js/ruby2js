@@ -1,0 +1,60 @@
+h1, h2, h3 {
+  letter-spacing: -0.05em;
+}
+
+body.home main h1.title {
+  font-size: 4rem;
+}
+@media screen and (max-width: 32rem) {
+  body.home main h1.title {
+    font-size: 15.5vw;
+  }
+}
+
+body.home main ul {
+  margin-left: 3.5em;
+  list-style-type: none;
+}
+body.home main ul ui-icon {
+  position: absolute;
+  margin-left: -3em;
+}
+@media screen and (max-width: 768px) {
+  body.home main ul {
+    margin-left: 10vw;
+  }
+  body.home main ul ui-icon {
+    margin-left: -2.5em;
+  }
+}
+@media screen and (min-width: 1216px) {
+  body.home main ul {
+    margin-left: 4.5em;
+  }
+}
+
+body.home main .is-size-5 {
+  margin-right: 0.2em;
+}
+
+.footer a {
+  color: var(--yellow);
+}
+.footer a:hover {
+  color: var(--orange);
+}
+
+.minimal-line-height pre {
+  line-height: 135%;
+}
+
+h2 .tag {
+  margin-bottom: 2px;
+  margin-left: 0.6em;
+  letter-spacing: normal;
+  font-weight: 500;
+}
+
+.functions-list li > code:first-child {
+  font-weight: bold;
+}

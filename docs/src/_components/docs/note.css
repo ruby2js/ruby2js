@@ -1,22 +1,24 @@
 .note {
-  background: lighten($green, 25%);
+  background: #e0f7f4;
   padding: 40px;
   padding-left: calc(2rem - 5px);
   padding-right: 2rem;
-  border-left: solid 5px $green;
+  border-left: solid 5px var(--green);
   font-size: 0.9em;
   font-weight: 500;
   margin-left: -2rem;
   margin-right: -2rem;
-  @include mobile {
+  margin-bottom: 1.5rem;
+}
+@media screen and (max-width: 768px) {
+  .note {
     margin-left: -1rem;
     margin-right: -1rem;
   }
-  margin-bottom: 1.5rem;
-  &.warning {
-    border-left-color: $red;
-    background: lighten($red, 48%);
-  }
+}
+.note.warning {
+  border-left-color: var(--red);
+  background: #fbdad7;
 }
 
 table + .note {

@@ -16,20 +16,6 @@
   text-transform: uppercase;
 }
 
-.notification {
-  @each $name, $pair in $colors {
-    $color: nth($pair, 1);
-    $color-invert: nth($pair, 2);
-
-    &.is-#{$name} {
-      a:not(.button) {
-        color: $color-invert;
-        text-decoration: underline;
-      }
-    }
-  }
-}
-
 .navbar .ruby2js-logo {
   transition: opacity 0.2s ease-in-out;
 }
@@ -44,11 +30,6 @@ a,
   font-weight: 700;
 }
 
-body.post .button.is-small {
-  height: auto;
-  white-space: normal;
-}
-
 @keyframes fade-in-button {
   from {
     opacity: 0;
@@ -61,9 +42,6 @@ body.post .button.is-small {
 }
 
 #mobile-nav-activator {
-  @include tablet {
-    display: none;
-  }
   height: auto;
   position: fixed;
   z-index: 10;
@@ -72,14 +50,18 @@ body.post .button.is-small {
   box-shadow: 0px 3px 9px rgba(0, 0, 0, 0.3);
   animation-name: fade-in-button;
   animation-duration: 0.75s;
-
-  .not-shown {
+}
+@media screen and (min-width: 769px) {
+  #mobile-nav-activator {
     display: none;
   }
-  .shown {
-    animation-name: fade-in-button;
-    animation-duration: 0.45s;
-  }
+}
+#mobile-nav-activator .not-shown {
+  display: none;
+}
+#mobile-nav-activator .shown {
+  animation-name: fade-in-button;
+  animation-duration: 0.45s;
 }
 
 nav .search-item input {
@@ -90,25 +72,27 @@ nav .search-item input {
   opacity: 0.8;
   width: 95%;
   max-width: 400px;
-  &::-webkit-search-decoration {
-    -webkit-appearance: none;
-  }
-  &::placeholder {
-    color: #888;
-    opacity: 1;
-  }
-
   border: none;
-  &:focus {
-    opacity: 1;
-  }
+}
+nav .search-item input::-webkit-search-decoration {
+  -webkit-appearance: none;
+}
+nav .search-item input::placeholder {
+  color: #888;
+  opacity: 1;
+}
+nav .search-item input:focus {
+  opacity: 1;
+}
 
-  @include desktop {
+@media screen and (min-width: 1024px) {
+  nav .search-item input {
     width: calc(9vw * 2);
   }
 }
+
 bridgetown-search-results {
-  --link-color: #{$link};
+  --link-color: var(--link);
   --divider-color: var(--sl-color-gray-200);
   --text-color: var(--sl-color-gray-700);
 }

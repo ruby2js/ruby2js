@@ -15,7 +15,7 @@ import "@shoelace-style/shoelace/dist/components/tab-panel/tab-panel.js"
 import { setBasePath } from "@shoelace-style/shoelace/dist/utilities/base-path.js"
 setBasePath("/shoelace-assets")
 
-import "index.scss"
+import "index.css"
 
 import components from "bridgetownComponents/**/*.{js,jsx,js.rb,css}"
 

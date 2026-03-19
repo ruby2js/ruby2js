@@ -1,0 +1,144 @@
+.content {
+  word-break: break-word;
+}
+
+body.post .content h3 {
+  text-align: center;
+  margin-bottom: 2.5rem;
+  color: var(--red);
+}
+body.post .content h3:not(:first-child) {
+  margin-top: 3.5rem;
+}
+
+.content .highlight {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.content h2:not(:first-child) {
+  margin-top: 1.4285em;
+}
+
+body.docs .content .heading-anchor {
+  color: var(--info);
+  font-size: 0.9em;
+  margin-left: 0.5em;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+body.docs .content h2:hover .heading-anchor,
+body.docs .content h3:hover .heading-anchor {
+  opacity: 1;
+}
+
+@media screen and (max-width: 768px) {
+  .box.px-8 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+}
+
+.box ul,
+.box ol {
+  margin-top: 2rem !important;
+  margin-bottom: 2rem !important;
+  width: 85%;
+}
+.box ul li + li,
+.box ol li + li {
+  margin-top: 2rem;
+}
+
+.content a:not(.button),
+a.wavy-underline {
+  text-decoration: underline;
+  text-decoration-color: var(--red);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.box .author {
+  color: var(--primary);
+}
+.box .author .avatar {
+  height: 48px;
+  width: 48px;
+  object-fit: cover;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+}
+
+table.settings tr > td:first-child {
+  width: 65%;
+}
+table.settings.bigger-output tr > td:first-child {
+  width: 40%;
+}
+table.settings.biggest-output tr > td:first-child {
+  width: 25%;
+}
+table.settings .option,
+table.settings .filter {
+  color: #1b8dbb;
+}
+table.settings .flag,
+table.settings .output {
+  color: #af5806;
+}
+table.settings p.default {
+  margin-top: -0.5em;
+  font-weight: bold;
+}
+table.settings p.default code {
+  font-size: 1em;
+  color: #1c6f63;
+}
+table.settings th:first-child,
+table.settings td:first-child {
+  background: #fcfcfc;
+}
+table.settings th {
+  text-transform: uppercase;
+}
+
+@media screen and (max-width: 600px) {
+  table.settings th:first-child:before {
+    content: "\01F447 ";
+  }
+  table.settings th:last-child:after {
+    content: " \01F447";
+  }
+  table.settings th,
+  table.settings td {
+    display: block;
+    width: 100% !important;
+  }
+  table.settings td:last-child {
+    text-align: right !important;
+  }
+}
+
+h2.no_toc {
+  color: var(--orange);
+}
+
+ul#markdown-toc {
+  border-left: solid 5px var(--orange);
+  margin-left: -2rem;
+  margin-bottom: 4.25rem !important;
+  list-style-type: none;
+  padding-left: calc(2rem - 5px);
+}
+ul#markdown-toc ul {
+  margin-top: 0.5em !important;
+  margin-bottom: 1em !important;
+}
+ul#markdown-toc li + li {
+  margin-top: 0.2em;
+}
+ul#markdown-toc a {
+  text-decoration: none;
+  font-weight: 500;
+}

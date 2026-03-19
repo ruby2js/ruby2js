@@ -1,0 +1,83 @@
+.navbar.beta {
+  background-color: #2b4d5b;
+}
+.navbar.beta ui-label.tag {
+  position: absolute;
+  right: 2.9rem;
+  margin-top: 1.3rem;
+  transform: rotate(-9deg);
+}
+.navbar.beta a.navbar-item:focus,
+.navbar.beta a.navbar-item:focus-within,
+.navbar.beta a.navbar-item:hover,
+.navbar.beta a.navbar-item.is-active,
+.navbar.beta .navbar-link:focus,
+.navbar.beta .navbar-link:focus-within,
+.navbar.beta .navbar-link:hover,
+.navbar.beta .navbar-link.is-active {
+  background-color: #1f3b46;
+}
+
+@media screen and (min-width: 1024px) {
+  .navbar .container .navbar-brand {
+    margin-left: -1.55rem;
+  }
+}
+
+.navbar .ruby2js-logo {
+  width: 60px;
+  margin-left: -6px;
+  margin-right: 6px;
+}
+@media (max-width: 1023px) {
+  .navbar .ruby2js-logo {
+    width: 45px;
+    margin-bottom: -5px;
+  }
+}
+.navbar .ruby2js-logo svg {
+  -webkit-filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.3));
+  filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.3));
+}
+.navbar .ruby2js-logo svg path {
+  fill: white;
+}
+
+.navbar .navbar-brand .navbar-item:hover {
+  background: var(--navbar-hover-bg);
+}
+
+.navbar .navbar-item .title {
+  color: white;
+  text-shadow: 2px 3px 3px rgba(0, 0, 0, 0.3);
+}
+
+.navbar .navbar-item,
+.navbar .navbar-link {
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+@media screen and (min-width: 1024px) {
+  .navbar .navbar-dropdown .navbar-item {
+    color: var(--text);
+  }
+}
+
+@media screen and (max-width: 1023px) {
+  .navbar .navbar-menu {
+    background-color: inherit;
+  }
+}
+
+.navbar .navbar-burger span {
+  background-color: var(--white-ter);
+}
+.navbar .navbar-burger:hover span {
+  background-color: var(--white-ter);
+}
+
+.navbar.is-transparent {
+  background-color: transparent;
+}
