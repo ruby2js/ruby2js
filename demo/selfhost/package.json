@@ -55,6 +55,6 @@
     "url": "https://github.com/ruby2js/ruby2js"
   },
   "dependencies": {
-    "@ruby/prism": "^1.6.0"
+    "@ruby/prism": "^1.9.0"
   }
 }
