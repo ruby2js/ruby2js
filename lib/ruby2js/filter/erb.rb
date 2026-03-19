@@ -577,7 +577,7 @@ module Ruby2JS
       end
 
       # Check if a node contains only buffer appends (safe to inline)
-      # Returns true for op_asgn on bufvar, or begin blocks where all children are buf_only?
+      # Returns true for op_asgn on bufvar, begin blocks, inlineable if/for/for_of
       def buf_only?(node, bufvar)
         return false unless ast_node?(node)
 
@@ -595,6 +595,20 @@ module Ruby2JS
             result = false unless buf_only?(child, bufvar)
           end
           return result
+        end
+
+        # Inlineable if: both branches are buf_only
+        if node.type == :if
+          then_branch = node.children[1]
+          else_branch = node.children[2]
+          return false unless then_branch && buf_only?(then_branch, bufvar)
+          return else_branch.nil? || buf_only?(else_branch, bufvar)
+        end
+
+        # Inlineable for/for_of: body is buf_only
+        if node.type == :for || node.type == :for_of
+          body = node.children[2]
+          return body && buf_only?(body, bufvar)
         end
 
         false
@@ -624,6 +638,10 @@ module Ruby2JS
           node.children.each do |child|
             buf_to_dstr_parts(child, bufvar).each { |p| parts.push(p) }
           end
+        elsif node.type == :if
+          inline_if_to_dstr_part(node, bufvar).each { |p| parts.push(p) }
+        elsif node.type == :for || node.type == :for_of
+          inline_each_to_dstr_part(node, bufvar).each { |p| parts.push(p) }
         end
 
         parts
@@ -649,8 +667,8 @@ module Ruby2JS
 
       # Check if a node is an inlineable .each block (body is buf_only?)
       def inlineable_each?(node, bufvar)
-        return false unless ast_node?(node) && node.type == :for
-        # :for nodes are [var, collection, body]
+        return false unless ast_node?(node) && (node.type == :for || node.type == :for_of)
+        # :for and :for_of nodes are [var, collection, body]
         body = node.children[2]
         body && buf_only?(body, bufvar)
       end
@@ -681,7 +699,7 @@ module Ruby2JS
           buf_to_dstr_parts(node, bufvar)
         elsif node.type == :if
           inline_if_to_dstr_part(node, bufvar)
-        elsif node.type == :for
+        elsif node.type == :for || node.type == :for_of
           inline_each_to_dstr_part(node, bufvar)
         else
           []
@@ -756,14 +774,14 @@ module Ruby2JS
           else_branch = recursive_collapse_body(else_branch, bufvar) if else_branch
 
           s(:if, cond, then_branch, else_branch)
-        elsif node.type == :for
+        elsif node.type == :for || node.type == :for_of
           lvar = node.children[0]
           collection = node.children[1]
           body = node.children[2]
 
           body = recursive_collapse_body(body, bufvar) if body
 
-          s(:for, lvar, collection, body)
+          s(node.type, lvar, collection, body)
         elsif node.type == :begin
           new_children = collapse_buf_appends([*node.children], bufvar)
           s(:begin, *new_children)
@@ -831,13 +849,13 @@ module Ruby2JS
             else
               # Single element — if it's inlineable control flow that's alone,
               # don't inline it (no benefit), but do recursively collapse its body
-              if child.type == :if || child.type == :for
+              if child.type == :if || child.type == :for || child.type == :for_of
                 result << recursive_collapse(child, bufvar)
               else
                 result << child
               end
             end
-          elsif child.type == :if || child.type == :for || child.type == :begin
+          elsif child.type == :if || child.type == :for || child.type == :for_of || child.type == :begin
             # Non-inlineable control flow — recursively collapse within
             result << recursive_collapse(child, bufvar)
             i += 1

@@ -20,7 +20,7 @@ module Ruby2JS
       strings = children.select {|child| ast_node?(child) && child.type==:str}.
         map {|child| child.children.last}.join
       # Note: use (scan || []) pattern for JS compatibility where match() returns null
-      heredoc = (strings.length > 40 and (strings.scan("\n") || []).length > 3)
+      heredoc = (strings.scan("\n") || []).length > 0
 
       put '`'
       children.each do |child|

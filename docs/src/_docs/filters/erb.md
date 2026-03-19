@@ -20,15 +20,11 @@ _erbout = +''; _erbout.<< "<h1>".freeze; _erbout.<<(( @title ).to_s); _erbout.<<
 _buf = ::String.new; _buf << '<h1>'.freeze; _buf << (@title).to_s; _buf << '</h1>'.freeze; _buf.to_s
 ```
 
-The ERB filter detects this pattern and transforms it into a JavaScript render function:
+The ERB filter detects this pattern and transforms it into a JavaScript render function using template literals:
 
 ```javascript
 function render({ title }) {
-  let _erbout = "";
-  _erbout += "<h1>";
-  _erbout += String(title);
-  _erbout += "</h1>";
-  return _erbout
+  return `<h1>${escapeHTML(title)}</h1>`
 }
 ```
 
@@ -49,13 +45,7 @@ puts Ruby2JS.convert(erb_src, filters: [:erb], eslevel: 2020)
 ```javascript
 // Output:
 function render({ content, title }) {
-  let _erbout = "";
-  _erbout += "<h1>";
-  _erbout += String(title);
-  _erbout += "</h1><p>";
-  _erbout += String(content);
-  _erbout += "</p>";
-  return _erbout
+  return `<h1>${escapeHTML(title)}</h1><p>${escapeHTML(content)}</p>`
 }
 ```
 
@@ -81,17 +71,12 @@ puts Ruby2JS.convert(erb_src, filters: [:erb, :functions], eslevel: 2020)
 ```javascript
 // Output:
 function render({ items }) {
-  let _erbout = "";
-  _erbout += "<ul>\n";
-
-  for (let item of items) {
-    _erbout += "\n  <li>";
-    _erbout += String(item.name);
-    _erbout += "</li>\n"
-  };
-
-  _erbout += "\n</ul>\n";
-  return _erbout
+  return `<ul>
+${items.map(item => (`
+  <li>${escapeHTML(item.name)}</li>
+`)).join("")}
+</ul>
+`
 }
 ```
 
@@ -112,11 +97,7 @@ puts Ruby2JS.convert(herb_src, filters: [:erb], eslevel: 2020)
 ```javascript
 // Output:
 function render({ title }) {
-  let _buf = "";
-  _buf += "<h1>";
-  _buf += String(title);
-  _buf += "</h1>";
-  return _buf.toString()
+  return `<h1>${escapeHTML(title)}</h1>`
 }
 ```
 
@@ -124,15 +105,15 @@ function render({ title }) {
 
 The filter performs these transformations:
 
-| Ruby Pattern              | JavaScript Output                     |
-| ------------------------- | ------------------------------------- |
-| `_erbout = +''`           | `let _erbout = ""`                    |
-| `_buf = ::String.new`     | `let _buf = ""`                       |
-| `_erbout.<< "str".freeze` | `_erbout += "str"`                    |
-| `_erbout.<<((@var).to_s)` | `_erbout += String(var)`              |
-| `@title`                  | `title` (from destructured parameter) |
-| `raw(html)`               | `html` (pass-through)                 |
-| `str.html_safe`           | `str` (pass-through)                  |
+| Ruby Pattern              | JavaScript Output                                           |
+| ------------------------- | ----------------------------------------------------------- |
+| `_erbout = +''`           | `let _erbout = ""` (eliminated when all appends collapse)   |
+| `_buf = ::String.new`     | `let _buf = ""` (eliminated when all appends collapse)      |
+| `_erbout.<< "str".freeze` | Inlined into template literal, or `_erbout += "str"`        |
+| `_erbout.<<((@var).to_s)` | `${escapeHTML(var)}` in template literal, or `escapeHTML(var)` |
+| `@title`                  | `title` (from destructured parameter)                       |
+| `raw(html)`               | `html` (pass-through, no escaping)                          |
+| `str.html_safe`           | `str` (pass-through, no escaping)                           |
 
 ## Using with Rails Helpers
 
@@ -160,13 +141,7 @@ puts Ruby2JS.convert(src, filters: [:"rails/helpers", :erb], eslevel: 2020)
 ```javascript
 // Output:
 function render({ user }) {
-  let _buf = "";
-  _buf += "<form data-model=\"user\">";
-  _buf += "<label for=\"user_name\">Name</label>";
-  _buf += "<input type=\"text\" name=\"user[name]\" id=\"user_name\">";
-  _buf += "<input type=\"submit\" value=\"Save\">";
-  _buf += "</form>";
-  return _buf
+  return `<form data-model="user"><label for="user_name">Name</label><input type="text" name="user[name]" id="user_name"><input type="submit" value="Save"></form>`
 }
 ```
 
