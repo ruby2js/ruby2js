@@ -353,7 +353,7 @@
   <% end %>
 
   <form method="post">
-    <div<%= @live ? ' data-controller="ruby"' : '' %>>
+    <div<%= @live ? ' data-controller="selfhost-ruby"' : '' %>>
       <textarea class="ruby form-control" name="ruby" rows="8" placeholder="Ruby source"><%= @ruby || 'puts "Hello world!"' %></textarea>
     </div>
 

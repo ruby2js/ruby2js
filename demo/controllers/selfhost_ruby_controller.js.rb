@@ -8,6 +8,11 @@ class SelfhostRubyController < DemoController
       element: document.querySelector(element.dataset.source))
   end
 
+  def ast=(value)
+    @ast = value
+    convert()
+  end
+
   attr_reader :options
 
   def options=(value)
@@ -37,6 +42,7 @@ class SelfhostRubyController < DemoController
   end
 
   async def setup()
+    @ast = false
     @options ||= {}
     @selfhost_ready = false
     @filters_loaded = {}
@@ -97,6 +103,7 @@ class SelfhostRubyController < DemoController
       bundle_url = "#{window.location.origin}/demo/selfhost/ruby2js.js"
       selfhost = await import(bundle_url)
       @selfhost_convert = selfhost.convert
+      @selfhost_parse = selfhost.parse
       @selfhost_Ruby2JS = selfhost.Ruby2JS
       @selfhost_ready = true
 
@@ -178,6 +185,11 @@ class SelfhostRubyController < DemoController
   # convert ruby to JS using selfhost, sending results to target Controller
   async def convert()
     return unless targets.size > 0 and @rubyEditor and @selfhost_ready
+    parsed = document.getElementById('parsed')
+    filtered = document.getElementById('filtered')
+
+    parsed.style.display = 'none' if parsed
+    filtered.style.display = 'none' if filtered
 
     ruby = @rubyEditor.state.doc.to_s
 
@@ -193,6 +205,18 @@ class SelfhostRubyController < DemoController
 
       # Load required filters
       filter_names = @options[:filters] || []
+
+      # Handle preset option - load preset filters
+      if @options[:preset] or @options['preset']
+        preset_filters = %w[esm functions pragma return]
+        preset_filters.each do |name|
+          unless filter_names.include?(name)
+            filter_names = preset_filters.concat(filter_names)
+            break
+          end
+        end
+      end
+
       loaded_filters = []
 
       # Add ERB filter if in ERB mode
@@ -242,10 +266,69 @@ class SelfhostRubyController < DemoController
 
         targets.each {|target| target.contents = js}
       end
+
+      # AST display (only for non-SFC mode)
+      if !is_sfc and ruby != '' and @ast and parsed and filtered
+        raw, comments = @selfhost_parse.call(ruby)
+        trees = [walk(raw).join(''), walk(result.ast).join('')]
+
+        parsed.querySelector('pre').innerHTML = trees[0]
+        parsed.style.display = 'block'
+        if trees[0] != trees[1]
+          filtered.querySelector('pre').innerHTML = trees[1]
+          filtered.style.display = 'block'
+        end
+      end
     rescue => e
       console.error("[SelfhostRubyController] conversion error:", e)
       targets.each {|target| target.exception = e.to_s}
     end
+  end
+
+  # convert AST into displayable form
+  def walk(ast, indent='', tail='', last=true)
+    return [] unless ast
+    output = ["<div class=#{nil == ast.location ? 'unloc' : 'loc'}>"]
+    output << "#{indent}<span class=hidden>s(:</span>#{ast.type}"
+    output << '<span class=hidden>,</span>' unless ast.children.empty?
+
+    if ast.children.any? {|child| child.is_a?(Object) && child.respond_to?(:children)}
+      ast.children.each_with_index do |child, index|
+        ctail = index == ast.children.length - 1 ? ')' + tail : ''
+        lastc = last && !ctail.empty?
+
+        if child.is_a?(Object) && child.respond_to?(:children)
+          output.push *walk(child, "  #{indent}", ctail, lastc)
+        else
+          output << "<div>#{indent}  "
+
+          if child.is_a? String and child =~ /\A[!-~]+\z/
+            output << ":#{child}"
+          else
+            output << child == nil ? 'nil' : child.inspect
+          end
+
+          output << "<span class=hidden>#{ctail}#{',' unless lastc}</span>"
+          output << ' ' if lastc
+          output << '</div>'
+        end
+      end
+    else
+      ast.children.each_with_index do |child, index|
+        if ast.type != :str and child.is_a? String and child =~ /\A[!-~]+\z/
+          output << " :#{child}"
+        else
+          output << " #{nil == child ? 'nil' : child.inspect}"
+        end
+        output << '<span class=hidden>,</span>' unless index == ast.children.length - 1
+      end
+      output << "<span class=hidden>)#{tail}#{',' unless last}</span>"
+      output << ' ' if last
+    end
+
+    output << '</div>'
+
+    return output
   end
 
   # remove editor on disconnect
