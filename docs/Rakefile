@@ -189,6 +189,21 @@ task :selfhost_copy_filters => [selfhost_dir, :selfhost_build] do
     src = "#{selfhost_source}/filters/rails/#{filter}.js"
     cp src, "#{rails_dir}/#{filter}.js" if File.exist?(src)
   end
+
+  # Replace node: imports with browser-safe stubs (these filters use
+  # path/fs for file resolution which is only needed in Node.js tooling)
+  Dir.glob("#{filters_dir}/**/*.js").each do |file|
+    content = File.read(file)
+    next unless content.include?('from "node:')
+    content = content
+      .sub(/^import path from "node:path";\n/,
+        "const path = { dirname: () => '.', relative: () => '', " \
+        "resolve: (...a) => a[a.length-1], join: (...a) => a.join('/') };\n")
+      .sub(/^import fs from "node:fs";\n/,
+        "const fs = { existsSync: () => false, statSync: () => ({isFile: () => false}), " \
+        "readFileSync: () => '', realpathSync: (p) => p };\n")
+    File.write(file, content)
+  end
 end
 
 # Copy lib directory (erb_compiler.js, etc.)
