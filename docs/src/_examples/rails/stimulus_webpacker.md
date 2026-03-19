@@ -63,7 +63,7 @@ Remove `app/javascript/controllers/hello_controller.js`, and create
 `app/javascript/controllers/hello_controller.js.rb` with the following
 contents:
 
-<div data-controller="ruby" data-options='{
+<div data-controller="selfhost-ruby" data-options='{
   "eslevel": 2022,
   "autoexports": "default",
   "filters": ["esm", "stimulus", "functions"]

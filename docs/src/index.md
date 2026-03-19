@@ -16,7 +16,7 @@ exclude_from_search: true
 
 For example:
 
-<div data-controller="ruby" data-options='{
+<div data-controller="selfhost-ruby" data-options='{
   "preset": true,
   "filters": ["camelCase"]
 }'></div>
