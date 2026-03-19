@@ -1940,7 +1940,8 @@ const VALID_TARGETS = {
   // Serverless databases
   neon: ['node', 'vercel', 'vercel-edge', 'capacitor', 'electron', 'tauri', 'electrobun'],
   turso: ['node', 'vercel', 'vercel-edge', 'cloudflare', 'capacitor', 'electron', 'tauri', 'electrobun'],
-  d1: ['cloudflare']
+  d1: ['cloudflare'],
+  do: ['cloudflare']
 };
 
 // Default target for each database adapter
@@ -1953,7 +1954,8 @@ const DEFAULT_TARGETS = {
   mysql: 'node',
   neon: 'vercel',
   turso: 'vercel',
-  d1: 'cloudflare'
+  d1: 'cloudflare',
+  do: 'cloudflare'
 };
 
 function validateDatabaseTarget(options) {

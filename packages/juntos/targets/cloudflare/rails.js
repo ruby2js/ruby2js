@@ -151,7 +151,28 @@ export class Application extends ApplicationServer {
     this._initialized = true;
   }
 
-  // Create the Worker fetch handler
+  // Create a thin Worker that routes all requests to a DurableApp instance
+  // Usage in worker entry point:
+  //   import { Application, Router, DurableApp } from './lib/rails.js';
+  //   Application.configure({ ... });
+  //   export default Application.durableWorker();
+  //   export { DurableApp };
+  static durableWorker() {
+    const app = this;
+    return {
+      async fetch(request, env, ctx) {
+        if (!env.APP) {
+          return new Response('DurableApp binding not configured. Add APP binding to wrangler.toml.', { status: 503 });
+        }
+
+        const id = env.APP.idFromName('default');
+        const stub = env.APP.get(id);
+        return stub.fetch(request);
+      }
+    };
+  }
+
+  // Create the Worker fetch handler (D1 mode)
   // Usage in worker entry point:
   //   import { Application, Router, TurboBroadcaster } from './lib/rails.js';
   //   export default Application.worker();
@@ -334,7 +355,13 @@ export class TurboBroadcast {
   static env = null;
 
   static async broadcast(channel, html) {
-    // Get env from Application
+    // If running inside a DurableApp, broadcast directly (no network hop)
+    if (DurableApp._instance) {
+      DurableApp._instance.broadcastToStream(channel, html);
+      return;
+    }
+
+    // Otherwise, use the separate TurboBroadcaster DO (D1 mode)
     const env = Application.env;
     if (!env || !env.TURBO_BROADCASTER) {
       console.warn('TurboBroadcast: Durable Object not configured');
@@ -361,3 +388,162 @@ export { TurboBroadcast as BroadcastChannel };
 
 // Set on globalThis for instance methods in active_record_base.mjs
 globalThis.TurboBroadcast = TurboBroadcast;
+
+// Durable Object that IS the application
+// Combines app logic, SQLite storage, and WebSocket broadcasting in a single DO
+// Used with the 'do' database adapter instead of D1
+//
+// The Worker entry point becomes a thin router:
+//   export default Application.durableWorker();
+//   export { DurableApp };
+//
+// wrangler.toml:
+//   [durable_objects]
+//   bindings = [{ name = "APP", class_name = "DurableApp" }]
+//   [[migrations]]
+//   tag = "v1"
+//   new_sqlite_classes = ["DurableApp"]
+export class DurableApp {
+  static _instance = null;
+
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+    this.streams = new Map();
+    this._initialized = false;
+  }
+
+  async ensureInitialized() {
+    if (this._initialized) return;
+
+    // Set singleton so TurboBroadcast can reach us directly
+    DurableApp._instance = this;
+
+    // Store env on Application for any code that needs it
+    Application.env = this.env;
+
+    // Import and initialize the adapter with DO's SqlStorage
+    const adapter = await import('juntos:active-record');
+    Application.activeRecordModule = adapter;
+    await adapter.initDatabase({ sql: this.state.storage.sql });
+
+    // Run migrations if configured
+    if (Application._config?.migrations) {
+      const { runMigrations } = await import('juntos:migrations');
+      await runMigrations(adapter, Application._config.migrations);
+    }
+
+    this._initialized = true;
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    // Handle WebSocket upgrade for Turbo Streams
+    if (request.headers.get('Upgrade') === 'websocket') {
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair);
+
+      this.state.acceptWebSocket(server);
+      server.send(JSON.stringify({ type: 'welcome' }));
+
+      return new Response(null, { status: 101, webSocket: client });
+    }
+
+    // Initialize database on first request
+    await this.ensureInitialized();
+
+    // Dispatch the request through the router
+    try {
+      return await Router.dispatch(request);
+    } catch (e) {
+      console.error('DurableApp error:', e);
+      return new Response(`<h1>500 Internal Server Error</h1><pre>${e.stack}</pre>`, {
+        status: 500,
+        headers: { 'Content-Type': 'text/html' }
+      });
+    }
+  }
+
+  // WebSocket message handler (hibernation-compatible)
+  async webSocketMessage(ws, message) {
+    try {
+      const msg = JSON.parse(message);
+
+      switch (msg.type) {
+        case 'subscribe':
+          this.subscribe(ws, msg.stream);
+          break;
+        case 'unsubscribe':
+          this.unsubscribe(ws, msg.stream);
+          break;
+      }
+    } catch (e) {
+      console.error('WebSocket message error:', e);
+    }
+  }
+
+  async webSocketClose(ws, code, reason, wasClean) {
+    this.cleanup(ws);
+  }
+
+  async webSocketError(ws, error) {
+    console.error('WebSocket error:', error);
+    this.cleanup(ws);
+  }
+
+  subscribe(ws, stream) {
+    if (!this.streams.has(stream)) {
+      this.streams.set(stream, new Set());
+    }
+    this.streams.get(stream).add(ws);
+
+    const attachment = ws.deserializeAttachment() || { streams: [] };
+    if (!attachment.streams.includes(stream)) {
+      attachment.streams.push(stream);
+    }
+    ws.serializeAttachment(attachment);
+
+    try {
+      ws.send(JSON.stringify({ type: 'subscribed', stream }));
+    } catch (e) {
+      // Ignore send errors
+    }
+  }
+
+  unsubscribe(ws, stream) {
+    const subscribers = this.streams.get(stream);
+    if (subscribers) {
+      subscribers.delete(ws);
+      if (subscribers.size === 0) {
+        this.streams.delete(stream);
+      }
+    }
+  }
+
+  cleanup(ws) {
+    const attachment = ws.deserializeAttachment();
+    if (attachment && attachment.streams) {
+      for (const stream of attachment.streams) {
+        this.unsubscribe(ws, stream);
+      }
+    }
+  }
+
+  broadcastToStream(stream, html) {
+    const subscribers = this.streams.get(stream);
+    if (!subscribers || subscribers.size === 0) {
+      return;
+    }
+
+    const message = JSON.stringify({ stream, html });
+
+    for (const ws of subscribers) {
+      try {
+        ws.send(message);
+      } catch (e) {
+        this.cleanup(ws);
+      }
+    }
+  }
+}

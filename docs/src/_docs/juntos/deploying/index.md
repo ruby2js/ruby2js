@@ -21,7 +21,7 @@ These targets require transpilation. Rails can't run here; Juntos can:
 | **[Browser](/docs/juntos/deploying/browser)** | Offline-first, local-first, demos | Dexie, sql.js |
 | **[Vercel Edge](/docs/juntos/deploying/vercel)** | Global edge, auto-scaling | [Neon](/docs/juntos/databases/neon), [Turso](/docs/juntos/databases/turso), [PlanetScale](/docs/juntos/databases/planetscale), [Supabase](/docs/juntos/databases/supabase) |
 | **[Deno Deploy](/docs/juntos/deploying/deno-deploy)** | Edge, Deno/TypeScript native | [Neon](/docs/juntos/databases/neon), [Turso](/docs/juntos/databases/turso), [PlanetScale](/docs/juntos/databases/planetscale), [Supabase](/docs/juntos/databases/supabase) |
-| **[Cloudflare Workers](/docs/juntos/deploying/cloudflare)** | Edge computing, maximum distribution | D1, Turso |
+| **[Cloudflare Workers](/docs/juntos/deploying/cloudflare)** | Edge computing, maximum distribution | D1, DO, Turso |
 | **[Capacitor](/docs/juntos/deploying/capacitor)** | iOS/Android mobile apps | Dexie, sql.js, HTTP-based |
 | **[Electron](/docs/juntos/deploying/electron)** | Desktop apps (macOS/Windows/Linux) | SQLite, sql.js, HTTP-based |
 | **[Tauri](/docs/juntos/deploying/tauri)** | Lightweight desktop apps | sql.js, PGlite, HTTP-based |
@@ -125,6 +125,7 @@ bin/juntos up -d pglite       # → worker
 bin/juntos up -d sqlite       # → node
 bin/juntos up -d neon         # → vercel
 bin/juntos up -d d1           # → cloudflare
+bin/juntos up -d do           # → cloudflare
 bin/juntos up -d mpg          # → fly
 ```
 
@@ -143,6 +144,7 @@ You don't need to hit remote databases during development. Use the familiar `con
 | Deploy Target | Prod Database | Dev Adapter | Dev Target | Notes |
 |---------------|---------------|-------------|------------|-------|
 | Cloudflare Workers | d1 | sqlite | node | Same SQL dialect |
+| Cloudflare Workers | do | sqlite | node | Same SQL dialect, cell architecture |
 | Vercel Edge | neon | pglite | worker | No server needed |
 | Vercel Edge | turso | sqlite | node | Same SQL dialect |
 | Deno Deploy | neon | pg | deno | Requires local PostgreSQL |

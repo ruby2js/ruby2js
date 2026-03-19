@@ -12,7 +12,10 @@ Run your Rails app on Cloudflare's global network with D1 database.
 
 ## Overview
 
-Cloudflare Workers deployment runs your application on Cloudflare's edge network—over 300 cities worldwide. D1 is Cloudflare's native SQLite database, purpose-built for Workers.
+Cloudflare Workers deployment runs your application on Cloudflare's edge network—over 300 cities worldwide. Two database options are available:
+
+- **D1** — Cloudflare's shared SQLite database, accessed via Worker bindings
+- **Durable Objects (DO)** — Per-instance embedded SQLite, co-located with your app logic and WebSockets
 
 **Use cases:**
 
@@ -20,6 +23,7 @@ Cloudflare Workers deployment runs your application on Cloudflare's edge network
 - Cloudflare ecosystem integration
 - Edge computing with D1's read replicas
 - Cost-effective serverless deployment
+- Cell architecture with isolated per-instance databases (DO)
 
 ## Prerequisites
 
@@ -35,10 +39,11 @@ That's it! The `db:prepare` command handles D1 database creation automatically.
 
 | Adapter | Service | Notes |
 |---------|---------|-------|
-| `d1` | Cloudflare D1 | Native SQLite, recommended |
+| `d1` | Cloudflare D1 | Shared SQLite database, recommended for most apps |
+| `do` | Durable Objects | Per-instance SQLite, app + DB + WebSockets in one object |
 | `turso` | Turso | SQLite with sync, HTTP protocol |
 
-D1 is the primary choice for Cloudflare deployments.
+Choose **D1** when you need a shared database that multiple Workers can query (traditional web app pattern). Choose **DO** when each instance should own its own database—the cell architecture where app logic, storage, and WebSockets are co-located in a single hibernatable object.
 
 ## Deployment
 
@@ -273,18 +278,112 @@ This deletes the cached page, forcing regeneration on the next request.
 
 🧪 **Feedback requested** — [Share your experience](https://github.com/ruby2js/ruby2js/discussions)
 
+## Durable Objects Mode
+
+When using `do` as the database adapter, your entire application runs inside a Durable Object—app logic, SQLite database, and WebSocket connections are co-located in a single instance.
+
+### Deployment
+
+```bash
+# Prepare database and deploy
+bin/juntos deploy -d do
+```
+
+### Generated Files
+
+#### wrangler.toml
+
+```toml
+name = "myapp"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[durable_objects]
+bindings = [{ name = "APP", class_name = "DurableApp" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DurableApp"]
+
+[assets]
+directory = "./app/assets"
+```
+
+#### src/index.js
+
+```javascript
+import { Application, Router, DurableApp } from '../lib/rails.js';
+import '../config/routes.js';
+import { migrations } from '../db/migrate/index.js';
+import { Seeds } from '../db/seeds.js';
+import { layout } from '../app/views/layouts/application.js';
+
+Application.configure({
+  migrations: migrations,
+  seeds: Seeds,
+  layout: layout
+});
+
+export default Application.durableWorker();
+export { DurableApp };
+```
+
+### Architecture
+
+```
+Request → Worker (thin router) → DurableApp {
+                                   SQLite (state.storage.sql)
+                                   App logic (controllers, models)
+                                   WebSockets (Turbo Streams)
+                                 }
+```
+
+The Worker is just a routing stub—all application logic runs inside the DO. This means:
+
+- **Zero-latency database queries** — SQLite is in-process, no network hops
+- **Built-in WebSockets** — Turbo Streams work without a separate broadcaster DO
+- **Hibernation** — The DO sleeps between requests, paying nothing when idle
+- **Isolated storage** — Each DO instance has its own database
+
+### D1 vs DO
+
+| Aspect | D1 | Durable Objects |
+|--------|-----|-----------------|
+| Database scope | Shared across all Workers | Private per DO instance |
+| Query latency | Network round-trip | Zero (in-process) |
+| WebSockets | Requires separate TurboBroadcaster DO | Built in |
+| Cross-instance queries | Yes (it's one database) | No (each DO is isolated) |
+| Hibernation | N/A (Worker is stateless) | Yes — sleeps between requests |
+| Scaling model | One DB, many Workers | Many DOs, each with own DB |
+| Backups | D1 time-travel UI | Manual |
+| Best for | Traditional shared-database apps | Cell architecture, per-tenant isolation |
+
+### When to Use DO
+
+- **Per-tenant apps** — Each user, team, or event gets its own DO with isolated data
+- **Real-time apps** — WebSockets and database in the same object, no coordination overhead
+- **Offline-capable cells** — Small, self-contained databases that hibernate when idle
+- **Conference demos** — The audience interacts with a live DO that has no traditional server
+
 ## Limitations
 
+### D1 mode
 - **No filesystem** — Use R2 for object storage
-- **No WebSockets** — Use Durable Objects or external services
+- **No WebSockets** — Use Durable Objects (TurboBroadcaster) or external services
 - **CPU limits** — 10-50ms CPU time per request (not wall time)
 - **Memory limits** — 128MB per Worker
+
+### DO mode
+- **No cross-instance queries** — Each DO has its own database
+- **No D1 time-travel backups** — You manage durability
+- **Single-threaded** — One request processed at a time per DO instance
 
 ## Comparison with Vercel
 
 | Aspect | Cloudflare | Vercel |
 |--------|------------|--------|
-| Database | D1 (native SQLite) | Neon/Turso/PlanetScale |
+| Database | D1 or DO (SQLite) | Neon/Turso/PlanetScale |
 | Edge locations | 300+ cities | ~20 regions |
 | Pricing model | Requests + duration | Requests + compute |
 | Static assets | Integrated CDN | Integrated CDN |

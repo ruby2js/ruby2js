@@ -2971,6 +2971,7 @@ function createVirtualPlugin(config, appRoot) {
     'turso': 'active_record_turso.mjs',
     'planetscale': 'active_record_planetscale.mjs',
     'd1': 'active_record_d1.mjs',
+    'do': 'active_record_do.mjs',
     'sqljs': 'active_record_sqljs.mjs',
     'sqlite_wasm': 'active_record_sqlite_wasm.mjs',
     'sqlite-wasm': 'active_record_sqlite_wasm.mjs',
