@@ -31,10 +31,9 @@ function urlToPath(pathOrUrl) {
   return pathOrUrl;
 }
 
-// Ruby File polyfill (exist/mtime). Skip in browsers where File is the native
-// constructor (used by Turbo, FormData, etc.) but apply in Node.js where
-// File exists as a web-compat class without Ruby's methods.
-if (typeof window === 'undefined') globalThis.File = {
+// Ruby File polyfill (exist/mtime). Only apply when File.exist is not
+// already available — preserves the browser's native File constructor.
+if (!globalThis.File?.exist) globalThis.File = {
   exist(path) {
     if (!_fs) return false;
     try {
