@@ -46,35 +46,12 @@ root = File.expand_path('..', docs)
 demo = "#{root}/demo"
 source_files = Rake::FileList.new("#{root}/lib/**/*.rb", "#{root}/lib/ruby2js.rb")
 filters = Rake::FileList.new("#{root}/lib/ruby2js/filter/*.rb")
-opal_files = Rake::FileList.new("#{root}/demo/*.opal")
 controller_files = Rake::FileList.new("#{root}/demo/controllers/*_controller.js.rb")
 
 require 'bundler/setup'
-require 'regexp_parser'
-regexp_parser_path = File.dirname(Gem.find_files_from_load_path('regexp_parser').first)
 
 terser = "npx terser --compress --mangle"
 terser = "cat" if ENV['NODE_ENV'] == 'development'
-
-file "#{root}/demo/filters.opal" => filters do
-  puts 'generate filters.opal'
-  content = filters.map do |file|
-    next if File.basename(file) == 'lit-element.rb'
-    require file
-    "require #{"ruby2js/filter/#{File.basename(file, '.rb')}".inspect}"
-  end
-
-  # find each module and add it to the list of filters.
-  filters = {}
-  Ruby2JS::Filter::DEFAULTS.each do |mod|
-    method = mod.instance_method(mod.instance_methods.first)
-    name = method.source_location.first
-    filters[File.basename(name, '.rb')] = mod
-  end
-  content << "Ruby2JS::Filter.registered_filters.merge!(#{filters.inspect})"
-
-  IO.write "#{root}/demo/filters.opal", content.compact.join("\n")
-end
 
 file "#{dest}/index.erb" => [*filters, "#{root}/demo/views/demo.erb"] do
   puts "Generating #{dest}/index.erb"
@@ -105,22 +82,9 @@ file "#{dest}/index.erb" => [*filters, "#{root}/demo/views/demo.erb"] do
   template = ERB.new(File.read(template_path), trim_mode: '-')
   body = template.result(binding)
 
-  # Add link to self-hosted demo at the bottom
-  selfhost_link = <<~HTML
-    <div style="text-align: center; margin-top: 2rem; padding: 1rem; background: #f8f9fa; border-radius: 4px;">
-      <a href="/demo/selfhost" style="color: #0d6efd;">
-        Try the Self-Hosted Preview &rarr;
-      </a>
-      <span style="color: #666; font-size: 0.85em; margin-left: 0.5rem;">
-        (experimental)
-      </span>
-    </div>
-  HTML
-
   erb_output = [
     "---\nlayout: default\n---\n",
-    body,
-    selfhost_link
+    body
   ].join("\n")
 
   IO.write("#{dest}/index.erb", erb_output)
@@ -142,23 +106,6 @@ file "#{dest}/livedemo.js" => ["#{root}/demo/livedemo.js.rb", *controller_files]
   sh "#{RbConfig.ruby} #{root}/demo/ruby2js.rb --filter esm --filter require --filter stimulus --filter functions --identity --es2020 #{root}/demo/livedemo.js.rb | " +
     "npx rollup -f iife --context window -p @rollup/plugin-node-resolve 2>/dev/null | " +
     "#{terser} > #{dest}/livedemo.js"
-end
-
-deps = [*opal_files, *source_files, "#{root}/demo/filters.opal"]
-opal = "opal --compile -E -I #{regexp_parser_path} -I #{root}/lib -I #{demo} #{demo}/ruby2js.opal"
-
-file "#{dest}/ruby2js.js" => deps do
-  mkdir dest unless Dir.exist? dest
-  Dir.chdir dest do
-    sh "#{opal} | #{terser} > #{dest}/ruby2js.js"
-  end
-end
-
-file "ruby2js.js" => deps do
-  target = File.expand_path('ruby2js.js')
-  Dir.chdir docs do
-    sh "#{opal} | #{terser} > #{target}"
-  end
 end
 
 task :clean do
@@ -255,8 +202,6 @@ task :selfhost_copy_lib => [selfhost_dir, :selfhost_build] do
   end
 end
 
-# Note: index.html is checked into docs/src/demo/selfhost/ directly
-
 task :selfhost => [
   :selfhost_copy_prism_browser,
   :selfhost_copy_bundle,
@@ -272,29 +217,6 @@ end
 desc "Build livedemo.js (for CI smoke test)"
 task :livedemo => "#{dest}/livedemo.js"
 
-desc "Test that the Opal-compiled Ruby2JS converts code correctly"
-task :test_demo => ["#{dest}/ruby2js.js"] do
-  # Use the Ruby gem directly to test preset conversion
-  # This validates that the same logic that built the demo works correctly
-  require 'ruby2js'
-  require 'ruby2js/filter/functions'
-  require 'ruby2js/filter/esm'
-  require 'ruby2js/filter/return'
-
-  # Test 1: Basic conversion with preset (puts -> console.log)
-  result1 = Ruby2JS.convert('puts "hello"', preset: true).to_s
-  unless result1.include?('console.log')
-    raise "FAIL: preset conversion of puts - expected console.log, got: #{result1}"
-  end
-
-  # Test 2: Verify functions filter is applied (upcase -> toUpperCase)
-  result2 = Ruby2JS.convert('"hello".upcase', preset: true).to_s
-  unless result2.include?('toUpperCase')
-    raise "FAIL: preset conversion of upcase - expected toUpperCase, got: #{result2}"
-  end
-
-  puts "Demo smoke test passed: preset conversion works correctly"
-end
 
 # NPM package tarballs for beta distribution
 # These go to /releases/ on the website for URL-based npm install
@@ -416,9 +338,7 @@ task :default => [
   "#{dest}/editor.js",
   "#{dest}/litelement.js",
   "#{dest}/livedemo.js",
-  "#{dest}/ruby2js.js",
   :selfhost,
-  :npm_packages,
-  :test_demo
+  :npm_packages
 ]
 
