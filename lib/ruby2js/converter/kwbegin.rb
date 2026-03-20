@@ -21,8 +21,26 @@ module Ruby2JS
       block = children.first
 
       if @state == :expression
+        # For rescue in expression context, apply autoreturn to both
+        # the try body and each resbody so the IIFE returns a value
+        wrapped = children.map do |child|
+          if child&.type == :rescue
+            rc = child.children.dup
+            rc[0] = s(:autoreturn, rc[0]) if rc[0]
+            (1...rc.length).each do |i|
+              next unless rc[i]&.type == :resbody
+              resbody_children = rc[i].children.dup
+              resbody_children[2] = s(:autoreturn, resbody_children[2]) if resbody_children[2]
+              rc[i] = rc[i].updated(nil, resbody_children)
+            end
+            child.updated(nil, rc)
+          else
+            s(:autoreturn, child)
+          end
+        end
+
         parse s(:send, s(:block, s(:send, nil, :proc), s(:args),
-          s(:begin, s(:autoreturn, *children))), :[])
+          s(:begin, *wrapped)), :[])
         return
       end
 
