@@ -1302,9 +1302,24 @@ module Ruby2JS
           types = options[:types]
           if types.is_a?(Array)
             types = types.map(&:to_s)
+          elsif types.respond_to?(:type) && types.type == :const
+            # Constant reference (e.g., Leafable::TYPES)
+            # Resolve from concern metadata
+            module_name = types.children[0]&.children&.last.to_s rescue nil
+            const_name = types.children[1].to_s
+
+            meta = @options[:metadata]
+            resolved = meta && meta['concerns'] &&
+              meta['concerns'][module_name] &&
+              meta['concerns'][module_name]['constants'] &&
+              meta['concerns'][module_name]['constants'][const_name]
+
+            if resolved
+              types = resolved.map(&:to_s)
+            else
+              raise "DependencyError: unresolved constant #{module_name}::#{const_name}"
+            end
           else
-            # Constant reference (e.g., Leafable::TYPES) — can't resolve at
-            # transpile time, so skip delegated_type generation
             return
           end
 

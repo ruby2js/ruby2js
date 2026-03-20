@@ -307,4 +307,18 @@ describe Ruby2JS::Filter::Rails::Concern do
       assert_includes result, 'break'
     end
   end
+
+  describe "constant metadata" do
+    it "records array constants in metadata" do
+      metadata = {}
+      to_js(<<~RUBY, metadata: metadata)
+        module Leafable
+          extend ActiveSupport::Concern
+          TYPES = %w[Page Section Picture]
+        end
+      RUBY
+      assert_equal ['Page', 'Section', 'Picture'],
+        metadata['concerns']['Leafable']['constants']['TYPES']
+    end
+  end
 end

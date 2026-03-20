@@ -292,7 +292,8 @@ function normalizeFilterNames(filters) {
 /**
  * Find all model files in app/models/ (recursive).
  * Returns array of model paths (without .rb extension), e.g. ['account', 'identity/access_token'].
- * Skips concerns/ subdirectory (handled separately via mixins).
+ * Includes concerns/ subdirectory — dependency ordering is handled by
+ * the retry loop in buildAppManifest.
  */
 export function findModels(appRoot) {
   const modelsDir = path.join(appRoot, 'app/models');
@@ -303,7 +304,6 @@ export function findModels(appRoot) {
     const results = [];
     for (const entry of entries) {
       if (entry.isDirectory()) {
-        if (entry.name === 'concerns') continue;
         results.push(...walk(path.join(dir, entry.name), prefix ? `${prefix}/${entry.name}` : entry.name));
       } else if (entry.name.endsWith('.rb') && !entry.name.startsWith('._')) {
         const name = entry.name.replace('.rb', '');
@@ -459,19 +459,38 @@ export async function buildAppManifest(appRoot, config, { mode = 'vite' } = {}) 
     ? allModels.filter(m => shouldIncludeFile(`app/models/${m}.rb`, config.include, config.exclude))
     : allModels;
 
-  for (const modelPath of models) {
-    const file = modelPath + '.rb';
-    const filePath = path.join(modelsDir, file);
-    if (!fs.existsSync(filePath)) continue;
+  let pending = models.slice();
+  while (pending.length > 0) {
+    const deferred = [];
 
-    try {
-      let source = fs.readFileSync(filePath, 'utf-8');
+    for (const modelPath of pending) {
+      const file = modelPath + '.rb';
+      const filePath = path.join(modelsDir, file);
+      if (!fs.existsSync(filePath)) continue;
 
-      const result = await transformRuby(source, filePath, null, config, appRoot, metadata);
-      modelCache.set(filePath, { code: result.code, map: result.map });
-    } catch (err) {
-      console.warn(`[juntos] buildAppManifest: skipped ${file}: ${err.message}`);
+      try {
+        let source = fs.readFileSync(filePath, 'utf-8');
+
+        const result = await transformRuby(source, filePath, null, config, appRoot, metadata);
+        modelCache.set(filePath, { code: result.code, map: result.map });
+      } catch (err) {
+        if ((err.message || err)?.toString().includes('DependencyError')) {
+          deferred.push(modelPath);
+        } else {
+          console.warn(`[juntos] buildAppManifest: skipped ${file}: ${err.message}`);
+        }
+      }
     }
+
+    // If nothing was resolved this pass, we're stuck
+    if (deferred.length >= pending.length) {
+      for (const modelPath of deferred) {
+        console.warn(`[juntos] buildAppManifest: unresolved dependency in ${modelPath}.rb`);
+      }
+      break;
+    }
+
+    pending = deferred;
   }
 
   // Scan app/helpers/ for application helper modules

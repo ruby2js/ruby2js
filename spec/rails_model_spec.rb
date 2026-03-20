@@ -305,6 +305,44 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'static get blog_posts()'
       assert_match(/entryable_type === "BlogPost"/, result)
     end
+
+    it "resolves types from concern metadata" do
+      # Skip in selfhost: tests cross-file metadata plumbing
+      return skip() unless defined?(Minitest)
+
+      metadata = {
+        'concerns' => {
+          'Leafable' => {
+            'methods' => [],
+            'constants' => { 'TYPES' => ['Page', 'Section', 'Picture'] }
+          }
+        }
+      }
+      result = to_js(<<~RUBY, metadata: metadata)
+        class Leaf < ApplicationRecord
+          delegated_type :leafable, types: Leafable::TYPES
+        end
+      RUBY
+      assert_includes result, 'get page()'
+      assert_includes result, 'get section()'
+      assert_includes result, 'get picture()'
+      assert_includes result, 'static get pages()'
+      assert_includes result, 'static get sections()'
+      assert_includes result, 'static get pictures()'
+    end
+
+    it "raises on unresolved constant reference" do
+      # Skip in selfhost: tests Ruby-side error propagation
+      return skip() unless defined?(Minitest)
+
+      assert_raises RuntimeError do
+        to_js(<<~RUBY)
+          class Leaf < ApplicationRecord
+            delegated_type :leafable, types: Leafable::TYPES
+          end
+        RUBY
+      end
+    end
   end
 
   describe "validates" do

@@ -82,6 +82,7 @@ module Ruby2JS
     end
   end
 
+
   @@eslevel_default = 2020
   @@eslevel_preset_default = 2022
   @@strict_default = false

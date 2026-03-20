@@ -66,7 +66,22 @@ module Ruby2JS
               end
             end
 
-            meta['concerns'][concern_name] = { 'methods' => method_names }
+            # Collect constants (e.g., TYPES = %w[Page Section Picture])
+            constants = {}
+            body.each do |n|
+              next unless n.respond_to?(:type) && n.type == :casgn
+              const_name = n.children[1].to_s
+              const_value = n.children[2]
+              if const_value&.type == :array
+                constants[const_name] = const_value.children.map { |c|
+                  c.type == :str ? c.children[0] : c.children[0].to_s
+                }
+              end
+            end
+
+            concern_meta = { 'methods' => method_names }
+            concern_meta['constants'] = constants if constants.any?
+            meta['concerns'][concern_name] = concern_meta
           end
 
           # Build class body node

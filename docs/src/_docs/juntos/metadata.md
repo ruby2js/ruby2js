@@ -17,7 +17,7 @@ When `juntos build` or `juntos transform` processes your application, each filte
 
 ```
 Models          → associations, scopes, enums, instance methods, parameterized methods
-Concerns        → method names
+Concerns        → method names, constants
 Controllers     → instance variable types, file paths
                      ↓
 Controllers     ← uses model metadata for async/sync decisions
@@ -207,7 +207,7 @@ Without this metadata, `entry.subject_category` in a test would transpile to pro
 
 ## Concern Metadata
 
-Concerns record which methods they define:
+Concerns record which methods they define and which constants they declare:
 
 ```ruby
 module Trackable
@@ -220,6 +220,31 @@ end
 ```
 
 This allows downstream filters to recognize `track_event` as a known method when it appears in models that include `Trackable`.
+
+### Constants
+
+Array constants defined in concerns are recorded in metadata so that other models can reference them:
+
+```ruby
+module Leafable
+  extend ActiveSupport::Concern
+  TYPES = %w[Page Section Picture]
+end
+```
+
+```ruby
+class Leaf < ApplicationRecord
+  delegated_type :leafable, types: Leafable::TYPES
+end
+```
+
+The model filter resolves `Leafable::TYPES` by looking it up in concern metadata. If the concern hasn't been processed yet, the file is deferred and retried after other files have been processed (see [Dependency Resolution](#dependency-resolution) below).
+
+## Dependency Resolution
+
+Model files are processed sequentially, and each filter writes metadata that downstream files may depend on. When a file references metadata that hasn't been populated yet (e.g., a constant from a concern that hasn't been processed), transpilation raises a dependency error and the file is deferred.
+
+The build loop retries deferred files after each pass. As long as each pass successfully processes at least one file, the loop continues. This handles arbitrary dependency chains without requiring a pre-scan or explicit ordering — most applications process all files in a single pass with zero overhead.
 
 ## When Inference Fails
 
