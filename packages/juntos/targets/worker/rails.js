@@ -417,7 +417,25 @@ export class Application extends ApplicationServer {
             const [key, value] = pair.split('=');
             if (key) {
               const decodedKey = decodeURIComponent(key.replace(/\+/g, ' '));
-              const decodedValue = decodeURIComponent((value || '').replace(/\+/g, ' '));
+              let decodedValue = decodeURIComponent((value || '').replace(/\+/g, ' '));
+
+              // Reconstruct file uploads from data URIs
+              // Format: datauri:<filename>:data:<mime>;base64,<data>
+              if (typeof decodedValue === 'string' && decodedValue.startsWith('datauri:')) {
+                const rest = decodedValue.slice(8); // after "datauri:"
+                const colonIdx = rest.indexOf(':');
+                const filename = rest.slice(0, colonIdx);
+                const dataURI = rest.slice(colonIdx + 1);
+                // Parse data URI: data:<mime>;base64,<data>
+                const match2 = dataURI.match(/^data:([^;]+);base64,(.+)$/);
+                if (match2) {
+                  const binary = atob(match2[2]);
+                  const bytes = new Uint8Array(binary.length);
+                  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                  decodedValue = new File([bytes], filename, { type: match2[1] });
+                }
+              }
+
               const match = decodedKey.match(/^([^\[]+)\[([^\]]+)\]$/);
               if (match) {
                 const [, model, field] = match;
@@ -441,12 +459,32 @@ export class Application extends ApplicationServer {
         responseHeaders[key] = value;
       });
 
+      // Detect binary content types and base64-encode the body
+      const contentType = responseHeaders['content-type'] || '';
+      const isBinary = contentType.startsWith('image/') ||
+        contentType.startsWith('audio/') ||
+        contentType.startsWith('video/') ||
+        contentType === 'application/octet-stream' ||
+        contentType === 'application/pdf';
+
+      let body;
+      if (isBinary) {
+        const buffer = await response.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        body = btoa(binary);
+      } else {
+        body = await response.text();
+      }
+
       port.postMessage({
         id,
         type: 'response',
         status: response.status,
         headers: responseHeaders,
-        body: await response.text()
+        body,
+        binary: isBinary
       });
     } catch (e) {
       console.error('SharedWorker dispatch error:', e);

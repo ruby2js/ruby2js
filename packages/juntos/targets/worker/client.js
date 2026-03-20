@@ -269,6 +269,19 @@ export class Application extends ApplicationBase {
         let bodyString = null;
         const body = fetchOptions.body;
         if (body instanceof FormData) {
+          // Convert File objects to data URIs before serializing
+          // (Files can't be sent through postMessage as URLSearchParams)
+          for (const [key, value] of body.entries()) {
+            if (value instanceof File && value.size > 0) {
+              const dataURI = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(value);
+              });
+              body.set(key, `datauri:${value.name}:${dataURI}`);
+            }
+          }
           bodyString = new URLSearchParams(body).toString();
         } else if (body instanceof URLSearchParams) {
           bodyString = body.toString();
@@ -303,8 +316,17 @@ export class Application extends ApplicationBase {
         }
 
         // Create synthetic Response for Turbo
+        // Decode base64 binary responses back to a Blob
+        let responseBody = response.body;
+        if (response.binary) {
+          const binary = atob(response.body);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          responseBody = new Blob([bytes], { type: response.headers?.['content-type'] || 'application/octet-stream' });
+        }
+
         event.detail.fetchRequest = {
-          response: Promise.resolve(new Response(response.body, {
+          response: Promise.resolve(new Response(responseBody, {
             status: response.status,
             headers: response.headers
           }))
