@@ -404,9 +404,19 @@ export function assert(value, message) {
   }
 }
 
+export function assert_match(pattern, string) {
+  if (!(pattern instanceof RegExp)) {
+    pattern = new RegExp(pattern);
+  }
+  if (!pattern.test(string)) {
+    throw new Error(`Expected "${string}" to match ${pattern}`);
+  }
+}
+
 globalThis.assert = assert;
 globalThis.assert_equal = assert_equal;
 globalThis.assert_includes = assert_includes;
+globalThis.assert_match = assert_match;
 globalThis.refute_includes = refute_includes;
 globalThis.assert_raises = assert_raises;
 
