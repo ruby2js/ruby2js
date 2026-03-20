@@ -83,11 +83,11 @@ console.log(result.toString());
 
 ### Available Filters
 
-The following filters are available for browser use:
+All Ruby2JS filters are available for browser use:
 
-`functions` `esm` `return` `pragma` `camelCase` `stimulus` `active_support` `polyfill` `erb`
+`action_cable` `active_support` `alpine` `astro` `camelCase` `cjs` `combiner` `erb` `esm` `functions` `haml` `jest` `jsx` `lit` `node` `nokogiri` `phlex` `polyfill` `pragma` `react` `require` `return` `securerandom` `sfc` `stimulus` `tagged_templates` `turbo` `vue`
 
-Rails filters: `rails/model` `rails/controller` `rails/routes` `rails/schema` `rails/seeds` `rails/logger` `rails/helpers`
+Rails filters: `rails/active_record` `rails/concern` `rails/controller` `rails/helpers` `rails/logger` `rails/migration` `rails/model` `rails/playwright` `rails/routes` `rails/schema` `rails/seeds` `rails/test`
 
 ### Notes
 

@@ -178,16 +178,16 @@ task :selfhost_copy_filters => [selfhost_dir, :selfhost_build] do
   mkdir_p filters_dir unless File.exist?(filters_dir)
   mkdir_p rails_dir unless File.exist?(rails_dir)
 
-  # Core filters used by most combo boxes
-  %w[functions esm pragma return camelCase active_support polyfill erb stimulus].each do |filter|
-    src = "#{selfhost_source}/filters/#{filter}.js"
-    cp src, "#{filters_dir}/#{filter}.js" if File.exist?(src)
+  # Copy all built filters
+  Dir.glob("#{selfhost_source}/filters/*.js").each do |src|
+    cp src, "#{filters_dir}/#{File.basename(src)}"
   end
 
-  # Rails filters
-  %w[model controller routes schema seeds logger helpers].each do |filter|
-    src = "#{selfhost_source}/filters/rails/#{filter}.js"
-    cp src, "#{rails_dir}/#{filter}.js" if File.exist?(src)
+  # Copy all Rails filters
+  if File.exist?("#{selfhost_source}/filters/rails")
+    Dir.glob("#{selfhost_source}/filters/rails/*.js").each do |src|
+      cp src, "#{rails_dir}/#{File.basename(src)}"
+    end
   end
 
   # Replace node: imports with browser-safe stubs (these filters use
