@@ -10,7 +10,7 @@ jobs:
     name: Deploy app
     runs-on: ubuntu-latest
     concurrency:
-      group: deploy-group
+      group: fly-deploy
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
