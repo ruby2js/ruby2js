@@ -11,9 +11,7 @@ module Ruby2JS
     end
 
     def self.available_eslevels
-      @available_eslevels ||= Dir[File.join(File.dirname(__FILE__), 'es20*.rb')].map { |f|
-        File.basename(f, '.rb').sub('es', '')
-      }.sort
+      @available_eslevels ||= %w[2020 2021 2022 2023 2024 2025]
     end
 
     def self.available_options
