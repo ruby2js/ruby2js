@@ -248,6 +248,65 @@ describe Ruby2JS::Filter::Rails::Model do
     end
   end
 
+  describe "delegated_type" do
+    it "generates polymorphic belongs_to" do
+      result = to_js(<<~RUBY)
+        class Entry < ApplicationRecord
+          delegated_type :entryable, types: %w[Message Comment]
+        end
+      RUBY
+      # Should generate the polymorphic getter/setter
+      assert_includes result, 'get entryable()'
+      assert_includes result, 'this.attributes.entryable_id'
+      assert_includes result, 'this.attributes.entryable_type'
+    end
+
+    it "generates type predicates" do
+      result = to_js(<<~RUBY)
+        class Entry < ApplicationRecord
+          delegated_type :entryable, types: %w[Message Comment]
+        end
+      RUBY
+      assert_includes result, 'get message()'
+      assert_includes result, 'get comment()'
+      assert_match(/entryable_type === "Message"/, result)
+      assert_match(/entryable_type === "Comment"/, result)
+    end
+
+    it "generates type-specific getters" do
+      result = to_js(<<~RUBY)
+        class Entry < ApplicationRecord
+          delegated_type :entryable, types: %w[Message Comment]
+        end
+      RUBY
+      # Type getter returns entryable when type matches, null otherwise
+      assert_match(/this\.entryable.*:.*null/, result)
+    end
+
+    it "generates type-scoped class queries" do
+      result = to_js(<<~RUBY)
+        class Entry < ApplicationRecord
+          delegated_type :entryable, types: %w[Message Comment]
+        end
+      RUBY
+      assert_includes result, 'static get messages()'
+      assert_includes result, 'static get comments()'
+      assert_includes result, 'entryable_type: "Message"'
+      assert_includes result, 'entryable_type: "Comment"'
+    end
+
+    it "handles CamelCase type names" do
+      result = to_js(<<~RUBY)
+        class Entry < ApplicationRecord
+          delegated_type :entryable, types: %w[BlogPost]
+        end
+      RUBY
+      assert_includes result, 'get blog_post()'
+      assert_includes result, 'static get blog_posts()'
+      assert_match(/entryable_type === "BlogPost"/, result)
+    end
+  end
+
   describe "validates" do
     it "generates validate method with presence" do
       result = to_js(<<~RUBY)

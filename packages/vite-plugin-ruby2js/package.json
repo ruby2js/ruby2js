@@ -28,9 +28,6 @@
     "type": "git",
     "url": "https://github.com/ruby2js/ruby2js"
   },
-  "dependencies": {
-    "ruby2js": "*"
-  },
   "peerDependencies": {
     "vite": "^7.0.0"
   }

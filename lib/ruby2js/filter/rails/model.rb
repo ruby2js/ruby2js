@@ -76,6 +76,7 @@ module Ruby2JS
           @rails_scopes = []
           @rails_enums = []
           @rails_broadcasts_to = []  # broadcasts_to declarations
+          @rails_delegated_types = [] # delegated_type declarations
           @rails_attachments = []    # Active Storage attachments
           @rails_nested_attributes = []  # accepts_nested_attributes_for declarations
           @rails_alias_attributes = []   # alias_attribute declarations
@@ -984,6 +985,8 @@ module Ruby2JS
               collect_association(:has_one, args) if method_name == :has_one
             when :belongs_to
               collect_association(:belongs_to, args)
+            when :delegated_type
+              collect_delegated_type(args)
             when :has_one_attached
               collect_attachment(:has_one_attached, args)
             when :has_many_attached
@@ -1079,6 +1082,17 @@ module Ruby2JS
 
           # Sync methods with parameters (need parens but not await)
           model_meta['parameterized_methods'] = @rails_model_parameterized_methods if @rails_model_parameterized_methods&.any?
+
+          # Delegated type predicates (synchronous, should NOT be awaited)
+          dt_predicates = []
+          @rails_delegated_types.each do |dt|
+            dt[:types].each do |type_name|
+              method_name = type_name.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
+                .gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
+              dt_predicates.push("#{method_name}?")
+            end
+          end
+          model_meta['delegated_type_predicates'] = dt_predicates if dt_predicates.any?
 
           # File path for import generation in test filter
           model_meta['file'] = @options[:file] if @options[:file]
@@ -1262,6 +1276,49 @@ module Ruby2JS
           @rails_associations.push({
             type: type,
             name: name,
+            options: options
+          })
+        end
+
+        def collect_delegated_type(args)
+          return if args.empty?
+
+          role = args.first.children[0] if args.first.type == :sym
+          return unless role
+
+          options = {}
+          args[1..-1].each do |arg|
+            next unless arg.type == :hash
+            arg.children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              if key.type == :sym
+                options[key.children[0]] = extract_value(value)
+              end
+            end
+          end
+
+          # Resolve types: can be a literal array or a constant reference
+          types = options[:types]
+          if types.is_a?(Array)
+            types = types.map(&:to_s)
+          else
+            # Constant reference (e.g., Leafable::TYPES) — can't resolve at
+            # transpile time, so skip delegated_type generation
+            return
+          end
+
+          # Also register as a polymorphic belongs_to association so that
+          # the standard getter/setter/fk_getter/type_getter are generated
+          @rails_associations.push({
+            type: :belongs_to,
+            name: role,
+            options: { polymorphic: true, dependent: options[:dependent] }
+          })
+
+          @rails_delegated_types.push({
+            role: role,
+            types: types,
             options: options
           })
         end
@@ -1506,7 +1563,7 @@ module Ruby2JS
             # Skip DSL declarations (already collected)
             if child.type == :send && child.children[0].nil?
               method = child.children[1]
-              next if %i[has_many has_one belongs_to validates validates_associated scope broadcasts_to has_one_attached has_many_attached has_rich_text store enum include accepts_nested_attributes_for alias_attribute normalizes primary_abstract_class].include?(method)
+              next if %i[has_many has_one belongs_to delegated_type validates validates_associated scope broadcasts_to has_one_attached has_many_attached has_rich_text store enum include accepts_nested_attributes_for alias_attribute normalizes primary_abstract_class].include?(method)
               next if CALLBACKS.include?(method)
             end
 
@@ -1595,6 +1652,11 @@ module Ruby2JS
           # Generate association methods
           @rails_associations.each do |assoc|
             transformed << generate_association_method(assoc)
+          end
+
+          # Generate delegated_type convenience methods
+          @rails_delegated_types.each do |dt|
+            transformed << generate_delegated_type_methods(dt)
           end
 
           # Generate _resolveDefaults() for belongs_to with default: lambda
@@ -2092,6 +2154,60 @@ module Ruby2JS
             s(:autoreturn, fk_access))
 
           s(:begin, getter, setter, fk_getter)
+        end
+
+        # Generate delegated_type convenience methods:
+        #   - Type-specific getters: leaf.page, leaf.section, leaf.picture
+        #   - Type predicates: leaf.page?, leaf.section?, leaf.picture?
+        #   - Type-scoped class queries: Leaf.pages, Leaf.sections, Leaf.pictures
+        def generate_delegated_type_methods(dt)
+          role = dt[:role]
+          types = dt[:types]
+          type_column = "#{role}_type"
+
+          type_access = s(:send, s(:attr, s(:self), :attributes), :[],
+            s(:str, type_column))
+
+          methods = []
+
+          types.each do |type_name|
+            # Derive method name: "Page" -> "page", "SectionBreak" -> "section_break"
+            method_name = type_name.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
+              .gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
+
+            # Type predicate: get page?() / isPage { return this.attributes.leafable_type === "Page" }
+            predicate = s(:defget, "#{method_name}?".to_sym,
+              s(:args),
+              s(:autoreturn,
+                s(:send, type_access, :===, s(:str, type_name))))
+
+            methods.push(predicate)
+
+            # Type-specific getter: get page() { return this.page? ? this.leafable : null }
+            type_getter = s(:defget, method_name.to_sym,
+              s(:args),
+              s(:autoreturn,
+                s(:if,
+                  s(:send, type_access, :===, s(:str, type_name)),
+                  s(:attr, s(:self), role),
+                  s(:nil))))
+
+            methods.push(type_getter)
+
+            # Type-scoped class query: static get pages() { return this.where({leafable_type: "Page"}) }
+            # Use :defp to force getter (same pattern as zero-arg scopes)
+            plural_name = Ruby2JS::Inflector.pluralize(method_name)
+            scope_query = s(:defp, s(:self), plural_name.to_sym,
+              s(:args),
+              s(:autoreturn,
+                s(:send, s(:self), :where,
+                  s(:hash,
+                    s(:pair, s(:sym, type_column.to_sym), s(:str, type_name))))))
+
+            methods.push(scope_query)
+          end
+
+          s(:begin, *methods)
         end
 
         # Generate _resolveDefaults() method for belongs_to associations

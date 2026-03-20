@@ -461,7 +461,9 @@ export class MigrationSQL {
       columns_sql.push(`FOREIGN KEY (${fk.column}) REFERENCES ${fk.references_table}(${fk.references_column})`)
     };
 
-    return `CREATE TABLE IF NOT EXISTS ${stmt.table} (\n  ${columns_sql.join(",\n  ")}\n);`
+    return `CREATE TABLE IF NOT EXISTS ${stmt.table} (
+  ${columns_sql.join(",\n  ")}
+);`
   };
 
   static column_def_sql(col) {
@@ -550,7 +552,8 @@ export class MigrationSQL {
   };
 
   static remove_column_sql(stmt) {
-    return `-- Note: SQLite may not support DROP COLUMN\n-- ALTER TABLE ${stmt.table} DROP COLUMN ${stmt.column};`
+    return `-- Note: SQLite may not support DROP COLUMN
+-- ALTER TABLE ${stmt.table} DROP COLUMN ${stmt.column};`
   };
 
   static drop_table_sql(stmt) {

@@ -97,7 +97,8 @@ export class ErbCompiler {
         if (ErbCompiler.BLOCK_EXPR.test(expr)) {
           // Block expression: use .append= pattern that ERB filter expects
           ruby_expr_start = ruby_code.length + " _buf.append= ".length;
-          ruby_code += ` _buf.append= ${expr}\n`;
+          ruby_code += ` _buf.append= ${expr}
+`;
           ruby_expr_end = ruby_code.length - 1 // exclude newline;
 
           this.#position_map.push([
@@ -147,7 +148,8 @@ export class ErbCompiler {
         let erb_code_start = erb_start + 2 + (tag.length - tag.trimStart().length);
         let erb_code_end = erb_code_start + code.length;
         let ruby_code_start = ruby_code.length + 1 // after space;
-        ruby_code += ` ${code}\n`;
+        ruby_code += ` ${code}
+`;
         let ruby_code_end = ruby_code.length - 1 // exclude newline;
 
         this.#position_map.push([

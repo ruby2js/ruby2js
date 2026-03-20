@@ -76,6 +76,31 @@ export class Article extends ApplicationRecord {
 - `has_many` — `:class_name`, `:foreign_key`, `:dependent`, `:through`, `:source`
 - `belongs_to` — `:class_name`, `:foreign_key`, `:optional`
 - `has_one` — `:class_name`, `:foreign_key`
+- `delegated_type` — `:types`, `:dependent`
+
+### Delegated Types
+
+```ruby
+class Entry < ApplicationRecord
+  delegated_type :entryable, types: %w[Message Comment]
+end
+```
+
+```javascript
+export class Entry extends ApplicationRecord {
+  // polymorphic belongs_to getter/setter for entryable
+  get entryable() { /* ... */ }
+  set entryable(value) { /* ... */ }
+
+  // type predicates
+  get message() { return this.attributes.entryable_type === "Message" ? this.entryable : null }
+  get comment() { return this.attributes.entryable_type === "Comment" ? this.entryable : null }
+
+  // type-scoped queries
+  static get messages() { return this.where({entryable_type: "Message"}) }
+  static get comments() { return this.where({entryable_type: "Comment"}) }
+}
+```
 
 ### Nested Attributes
 
