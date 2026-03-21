@@ -532,9 +532,10 @@ module Ruby2JS
               next
             end
 
-            # Skip before_action declarations (we've collected them)
-            if child.type == :send && child.children[0].nil? && child.children[1] == :before_action
-              next
+            # Skip DSL declarations that don't have JS equivalents
+            if child.type == :send && child.children[0].nil?
+              dsl_method = child.children[1]
+              next if %i[before_action include allow_unauthenticated_access require_unauthenticated_access rate_limit].include?(dsl_method)
             end
 
             # Handle private methods: skip strong params (inlined as `params`)
