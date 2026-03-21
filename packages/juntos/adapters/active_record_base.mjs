@@ -475,6 +475,11 @@ export class ActiveRecordBase {
     this._after_update_callbacks.push(callback);
   }
 
+  static around_create(callback) {
+    if (!this._around_create_callbacks) this._around_create_callbacks = [];
+    this._around_create_callbacks.push(callback);
+  }
+
   static after_create_commit(callback) {
     if (!this._after_create_commit_callbacks) this._after_create_commit_callbacks = [];
     this._after_create_commit_callbacks.push(callback);
@@ -521,6 +526,48 @@ export class ActiveRecordBase {
   }
 
   // --- Declarative class methods ---
+
+  static has_secure_password(options = {}) {
+    // Lazily load bcryptjs (only when has_secure_password is used)
+    let bcrypt;
+    const loadBcrypt = async () => {
+      if (!bcrypt) bcrypt = (await import('bcryptjs')).default;
+      return bcrypt;
+    };
+
+    // password= setter: hashes and stores in password_digest
+    Object.defineProperty(this.prototype, 'password', {
+      set(value) {
+        this._password = value;
+        if (value != null && value !== '') {
+          // Synchronous hash for assignment context
+          // bcrypt may not be loaded yet; defer hashing to save()
+          this._password_pending = true;
+        }
+      },
+      get() { return this._password; },
+      configurable: true
+    });
+
+    // Hook into save to hash the password before persisting
+    const origBeforeSave = this._before_save_callbacks || [];
+    this._before_save_callbacks = [...origBeforeSave, async (record) => {
+      if (record._password_pending && record._password) {
+        const bc = await loadBcrypt();
+        record.attributes.password_digest = await bc.hash(record._password, 10);
+        record._password_pending = false;
+      }
+    }];
+
+    // authenticate(password) → returns record or false
+    this.prototype.authenticate = async function(password) {
+      const bc = await loadBcrypt();
+      if (await bc.compare(password, this.attributes.password_digest)) {
+        return this;
+      }
+      return false;
+    };
+  }
 
   static has_secure_token(field = 'token') {
     // Generates a unique token on create; no-op at class definition time

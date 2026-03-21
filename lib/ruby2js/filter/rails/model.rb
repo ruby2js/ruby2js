@@ -10,10 +10,10 @@ module Ruby2JS
         # Callback types we support
         CALLBACKS = %i[
           before_validation after_validation
-          before_save after_save
-          before_create after_create
-          before_update after_update
-          before_destroy after_destroy
+          before_save after_save around_save
+          before_create after_create around_create
+          before_update after_update around_update
+          before_destroy after_destroy around_destroy
           after_commit
           after_create_commit after_update_commit after_destroy_commit after_save_commit
           after_touch
@@ -1875,6 +1875,18 @@ module Ruby2JS
               # Convert to :defm since callback methods are called by framework
               method_node = rewritten.updated(:defm, rewritten.children)
               transformed << process(method_node)
+            end
+          end
+
+          # For concerns, emit method-name callback registrations inside the class body
+          # as static property initializers (same pattern as block callbacks)
+          if @is_factory_concern
+            @rails_callbacks.keys.each do |cb_type|
+              methods = @rails_callbacks[cb_type]
+              methods.each do |method_name|
+                transformed << s(:send, s(:self), :"_init_#{cb_type}=",
+                  s(:send, s(:self), cb_type, s(:str, method_name.to_s)))
+              end
             end
           end
 
