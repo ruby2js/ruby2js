@@ -482,25 +482,30 @@ module Ruby2JS
             processed_body = body.updated(processed_body.type, processed_body.children)
           end
 
-          # Generate callback - async if associations are accessed
+          # Build the callback function node
           if uses_associations
-            # Generate: ClassName.callback_method(async ($record) => { ... })
-            s(:send,
-              s(:const, nil, @rails_model_name.to_sym),
-              method,
-              s(:block,
-                s(:send, nil, :async),
-                s(:args, s(:arg, :"$record")),
-                processed_body))
+            callback_fn = s(:block,
+              s(:send, nil, :async),
+              s(:args, s(:arg, :"$record")),
+              processed_body)
           else
-            # Generate: ClassName.callback_method(($record) => { ... })
+            callback_fn = s(:block,
+              s(:send, nil, :proc),
+              s(:args, s(:arg, :"$record")),
+              processed_body)
+          end
+
+          if @is_factory_concern
+            # For concerns: static property initializer inside the class body
+            # static _init_cb = this.before_create(($record) => { ... })
+            s(:send, s(:self), :"_init_#{method}=",
+              s(:send, s(:self), method, callback_fn))
+          else
+            # For regular models: ClassName.callback_method(($record) => { ... })
             s(:send,
               s(:const, nil, @rails_model_name.to_sym),
               method,
-              s(:block,
-                s(:send, nil, :proc),
-                s(:args, s(:arg, :"$record")),
-                processed_body))
+              callback_fn)
           end
         end
 
