@@ -529,9 +529,11 @@ export class ActiveRecordBase {
 
   static has_secure_password(options = {}) {
     // Lazily load bcryptjs (only when has_secure_password is used)
+    // Use variable to prevent Rollup/Vite from resolving at build time
     let bcrypt;
+    const bcryptModule = 'bcryptjs';
     const loadBcrypt = async () => {
-      if (!bcrypt) bcrypt = (await import('bcryptjs')).default;
+      if (!bcrypt) bcrypt = (await import(/* @vite-ignore */ bcryptModule)).default;
       return bcrypt;
     };
 
