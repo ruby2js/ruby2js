@@ -192,9 +192,14 @@ export function getBuildOptions(section, target, sectionConfig = null) {
 
   // Use filters from sectionConfig if provided, otherwise use defaults
   // Filter names from config are normalized to match Ruby2JS conventions
-  const filters = sectionConfig?.filters
+  let filters = sectionConfig?.filters
     ? normalizeFilterNames(sectionConfig.filters)
     : defaultFilters[section] || defaultFilters.default;
+
+  // Prepend app-specific filters (loaded from config/ruby2js_filter.js)
+  if (appFilterNames.length > 0) {
+    filters = [...appFilterNames, ...filters];
+  }
 
   switch (section) {
     case 'stimulus':
@@ -2435,6 +2440,7 @@ export const ${className} = { ${members.join(', ')} };
 // Lazy-loaded ruby2js module
 let ruby2jsModule = null;
 let filtersLoaded = false;
+const appFilterNames = [];  // Track app-specific filter names for inclusion in filter chains
 
 /**
  * Ensure ruby2js module is loaded, Prism is initialized, and filters are loaded.
@@ -2481,7 +2487,12 @@ export async function ensureRuby2jsReady(appRoot) {
     if (appRoot) {
       const filterPath = path.join(appRoot, 'config', 'ruby2js_filter.js');
       if (fs.existsSync(filterPath)) {
-        await import(url.pathToFileURL(filterPath).href);
+        const filterModule = await import(url.pathToFileURL(filterPath).href);
+        // Record filter name for inclusion in filter chains
+        const filterClass = filterModule.default;
+        if (filterClass?.name) {
+          appFilterNames.push(filterClass.name);
+        }
       }
     }
 
