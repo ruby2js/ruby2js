@@ -7,6 +7,7 @@
 
 import path from 'node:path';
 import fs from 'node:fs';
+import url from 'node:url';
 
 // Import ERB compiler for .erb files
 import { ErbCompiler } from './lib/erb_compiler.js';
@@ -468,7 +469,7 @@ export function createMetadata(mode, appRoot) {
  * @returns {Promise<{metadata: Object, modelCache: Map<string, {code: string, map: Object}>}>}
  */
 export async function buildAppManifest(appRoot, config, { mode = 'vite' } = {}) {
-  await ensureRuby2jsReady();
+  await ensureRuby2jsReady(appRoot);
 
   const metadata = createMetadata(mode, appRoot);
   const modelCache = new Map(); // filePath → { code, map }
@@ -2437,8 +2438,9 @@ let filtersLoaded = false;
 
 /**
  * Ensure ruby2js module is loaded, Prism is initialized, and filters are loaded.
+ * @param {string} [appRoot] - Application root for loading app-specific filters
  */
-export async function ensureRuby2jsReady() {
+export async function ensureRuby2jsReady(appRoot) {
   if (!ruby2jsModule) {
     ruby2jsModule = await import('ruby2js');
     await ruby2jsModule.initPrism();
@@ -2475,6 +2477,14 @@ export async function ensureRuby2jsReady() {
     // Node.js filter (File operations, backtick commands, etc.)
     await import('ruby2js/filters/node.js');
 
+    // App-specific filter: load from config/ruby2js_filter.js if it exists
+    if (appRoot) {
+      const filterPath = path.join(appRoot, 'config', 'ruby2js_filter.js');
+      if (fs.existsSync(filterPath)) {
+        await import(url.pathToFileURL(filterPath).href);
+      }
+    }
+
     filtersLoaded = true;
   }
 
@@ -2505,7 +2515,7 @@ export async function ensurePlaywrightFilter() {
  * @returns {Promise<{code: string, map: Object}>}
  */
 export async function transformRuby(source, filePath, section, config, appRoot, metadata = null) {
-  const { convert } = await ensureRuby2jsReady();
+  const { convert } = await ensureRuby2jsReady(appRoot);
 
   // Get section-specific config from ruby2js.yml if available
   const sectionConfig = config.sections?.[section] || null;
