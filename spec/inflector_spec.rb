@@ -143,4 +143,27 @@ describe Ruby2JS::Inflector do
       _(Ruby2JS::Inflector.pluralize('buses')).must_equal 'buses'
     end
   end
+
+  describe 'underscore' do
+    it "handles simple CamelCase" do
+      _(Ruby2JS::Inflector.underscore('SimpleTest')).must_equal 'simple_test'
+      _(Ruby2JS::Inflector.underscore('ArticlesController')).must_equal 'articles_controller'
+    end
+
+    it "handles consecutive capitals as acronyms" do
+      _(Ruby2JS::Inflector.underscore('QRCode')).must_equal 'qr_code'
+      _(Ruby2JS::Inflector.underscore('HTMLParser')).must_equal 'html_parser'
+      _(Ruby2JS::Inflector.underscore('SSLError')).must_equal 'ssl_error'
+    end
+
+    it "handles all-caps words" do
+      _(Ruby2JS::Inflector.underscore('HTML')).must_equal 'html'
+      _(Ruby2JS::Inflector.underscore('SSL')).must_equal 'ssl'
+    end
+
+    it "handles single words" do
+      _(Ruby2JS::Inflector.underscore('Edits')).must_equal 'edits'
+      _(Ruby2JS::Inflector.underscore('article')).must_equal 'article'
+    end
+  end
 end

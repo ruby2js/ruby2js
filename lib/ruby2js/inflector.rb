@@ -169,8 +169,19 @@ module Ruby2JS
       i = 0
       while i < word.length
         ch = word[i]
-        if ch == ch.upcase && ch != ch.downcase
-          result += '_' if i > 0
+        is_upper = ch == ch.upcase && ch != ch.downcase
+        if is_upper
+          if i > 0
+            prev_upper = word[i-1] == word[i-1].upcase && word[i-1] != word[i-1].downcase
+            next_lower = i + 1 < word.length && word[i+1] == word[i+1].downcase && word[i+1] != word[i+1].upcase
+            # Insert _ before: first capital in a word, or start of new word
+            # after acronym (e.g., the C in "QRCode")
+            if prev_upper && next_lower
+              result += '_'
+            elsif !prev_upper
+              result += '_'
+            end
+          end
           result += ch.downcase
         else
           result += ch
