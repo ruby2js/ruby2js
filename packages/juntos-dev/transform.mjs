@@ -762,46 +762,56 @@ export function fixImportsForEject(js, fromFile, config = {}) {
   }
 
   const railsModule = `juntos/targets/${target}/rails.js`;
-
-  // Runtime modules → target-specific rails.js
-  js = js.replace(/from ['"]\.\.\/lib\/rails\.js['"]/g, `from '${railsModule}'`);
-  js = js.replace(/from ['"]\.\.\/\.\.\/lib\/rails\.js['"]/g, `from '${railsModule}'`);
-  js = js.replace(/from ['"]\.\.\/\.\.\/\.\.\/lib\/rails\.js['"]/g, `from '${railsModule}'`);
-  js = js.replace(/from ['"]lib\/rails\.js['"]/g, `from '${railsModule}'`);
-  js = js.replace(/from ['"](ruby2js-rails|juntos)\/rails_base\.js['"]/g, `from '${railsModule}'`);
   const adapterFile = getActiveRecordAdapterFile(config.database);
-  js = js.replace(/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, `from 'juntos/adapters/${adapterFile}'`);
-  js = js.replace(/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, `from 'juntos/adapters/${adapterFile}'`);
 
-  // juntos:rails virtual module → target-specific rails.js
-  js = js.replace(/from ['"]juntos:rails['"]/g, `from '${railsModule}'`);
+  // Depth-relative prefix for resolving paths from the current file to the project root
+  const depth = fromFile ? fromFile.split('/').length - 1 : 1;
+  const rootPrefix = '../'.repeat(depth);
 
-  // ActiveStorage virtual module → adapter
-  js = js.replace(/from ['"]juntos:active-storage['"]/g, "from 'juntos/adapters/active_storage_base.mjs'");
+  // Import path resolution table: source module → target module.
+  // A single pass matches all `from '...'` imports and resolves them.
+  const importMap = {
+    // Virtual modules
+    'juntos:rails': railsModule,
+    'juntos:active-storage': 'juntos/adapters/active_storage_base.mjs',
+    'juntos:url-helpers': 'juntos/url_helpers.mjs',
 
-  // URL helpers virtual module → url_helpers
-  js = js.replace(/from ['"]juntos:url-helpers['"]/g, "from 'juntos/url_helpers.mjs'");
+    // Runtime lib paths (various depths) → target-specific modules
+    '../lib/rails.js': railsModule,
+    '../../lib/rails.js': railsModule,
+    '../../../lib/rails.js': railsModule,
+    'lib/rails.js': railsModule,
+    'ruby2js-rails/rails_base.js': railsModule,
+    'juntos/rails_base.js': railsModule,
+    '../lib/active_record.mjs': `juntos/adapters/${adapterFile}`,
+    '../../lib/active_record.mjs': `juntos/adapters/${adapterFile}`,
+  };
 
-  // Virtual module @config/paths.js → config/paths.js with correct relative path
-  // Path helpers are in a separate file to avoid circular dependency with routes.js
-  if (fromFile) {
-    // Calculate relative path from the file to config/paths.js
-    const depth = fromFile.split('/').length - 1;
-    const prefix = '../'.repeat(depth);
-    js = js.replace(/from ['"]@config\/paths\.js['"]/g, `from '${prefix}config/paths.js'`);
-  } else {
-    // Fallback: assume we're one level deep
-    js = js.replace(/from ['"]@config\/paths\.js['"]/g, "from '../config/paths.js'");
-  }
+  // Dynamic path patterns (require prefix computation)
+  const dynamicPatterns = {
+    // @config/paths.js → depth-relative config/paths.js
+    '@config/paths.js': `${rootPrefix}config/paths.js`,
+  };
 
-  // Virtual module @helpers/*.js → app/helpers/*.js with correct relative path
-  if (fromFile) {
-    const depth = fromFile.split('/').length - 1;
-    const prefix = '../'.repeat(depth);
-    js = js.replace(/from ['"]@helpers\/([\w]+\.js)['"]/g, `from '${prefix}app/helpers/$1'`);
-  } else {
-    js = js.replace(/from ['"]@helpers\/([\w]+\.js)['"]/g, "from '../app/helpers/$1'");
-  }
+  // Resolve static and dynamic imports in a single pass
+  js = js.replace(/from (['"])(.*?)\1/g, (match, quote, source) => {
+    // Check static map first
+    if (importMap[source]) {
+      return `from '${importMap[source]}'`;
+    }
+
+    // Check dynamic patterns
+    if (dynamicPatterns[source]) {
+      return `from '${dynamicPatterns[source]}'`;
+    }
+
+    // @helpers/*.js → depth-relative app/helpers/*.js
+    if (source.startsWith('@helpers/')) {
+      return `from '${rootPrefix}app/helpers/${source.slice(9)}'`;
+    }
+
+    return match;
+  });
 
   // Fix selfhost converter Struct.new pattern: [(X = function X(...) {...}).prototype] = [X.prototype]
   // The right side references X before assignment completes. Simplify to plain let declaration.
