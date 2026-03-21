@@ -630,11 +630,17 @@ module Ruby2JS
                     s(:attr,
                       s(:lvar, :"$record"),
                       method)))
-              else
+              elsif args.empty?
                 # self.foo -> $record.foo (property access)
                 s(:attr,
                   s(:lvar, :"$record"),
                   method)
+              else
+                # self.foo = val -> $record.foo = val (setter or method call with args)
+                s(:send,
+                  s(:lvar, :"$record"),
+                  method,
+                  *args.map { |arg| transform_callback_body(arg) })
               end
             else
               # Recurse into target and args
