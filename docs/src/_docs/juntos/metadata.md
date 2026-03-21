@@ -207,7 +207,7 @@ Without this metadata, `entry.subject_category` in a test would transpile to pro
 
 ## Concern Metadata
 
-Concerns record which methods they define and which constants they declare:
+Concerns record which methods they define, which constants they declare, and their file path:
 
 ```ruby
 module Trackable
@@ -239,6 +239,10 @@ end
 ```
 
 The model filter resolves `Leafable::TYPES` by looking it up in concern metadata. If the concern hasn't been processed yet, the file is deferred and retried after other files have been processed (see [Dependency Resolution](#dependency-resolution) below).
+
+### File Paths
+
+The concern's source file path is recorded in metadata. The model filter uses this to generate correct import paths — particularly for namespaced concerns (e.g., `Account::Joinable` at `app/models/account/joinable.rb`) that don't follow the default `concerns/` directory convention.
 
 ## Dependency Resolution
 

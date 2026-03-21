@@ -1801,7 +1801,30 @@ module Ruby2JS
           # Build the import path relative to app/assets/
           import_path = asset_dir ? "#{asset_dir}/#{asset_path}" : asset_path
 
-          # Track this asset for import generation
+          # For non-browser targets (node, bun, etc.), use static URL paths
+          # instead of Vite imports.
+          # For browser targets, track asset for Vite import generation.
+          target = @options[:target].to_s
+          server_targets = %w[node bun deno fly electron]
+          if server_targets.include?(target)
+            static_path = "/#{import_path}"
+            attr_part = extract_tag_attrs(args)
+
+            return case tag_type
+            when :image_tag
+              s(:str, "<img src=\"#{static_path}\"#{attr_part}>")
+            when :asset_path, :image_path
+              s(:str, static_path)
+            when :video_tag
+              s(:str, "<video src=\"#{static_path}\"#{attr_part}></video>")
+            when :audio_tag
+              s(:str, "<audio src=\"#{static_path}\"#{attr_part}></audio>")
+            when :favicon_link_tag
+              s(:str, "<link rel=\"icon\" href=\"#{static_path}\"#{attr_part}>")
+            end
+          end
+
+          # Track this asset for import generation (browser/Vite only)
           @erb_asset_imports << { var_name: var_name, import_path: import_path }
 
           attr_part = extract_tag_attrs(args)

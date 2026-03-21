@@ -773,6 +773,9 @@ export function fixImportsForEject(js, fromFile, config = {}) {
   js = js.replace(/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, `from 'juntos/adapters/${adapterFile}'`);
   js = js.replace(/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, `from 'juntos/adapters/${adapterFile}'`);
 
+  // juntos:rails virtual module → target-specific rails.js
+  js = js.replace(/from ['"]juntos:rails['"]/g, `from '${railsModule}'`);
+
   // ActiveStorage virtual module → adapter
   js = js.replace(/from ['"]juntos:active-storage['"]/g, "from 'juntos/adapters/active_storage_base.mjs'");
 
