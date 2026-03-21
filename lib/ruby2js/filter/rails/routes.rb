@@ -26,6 +26,7 @@ module Ruby2JS
           @rails_path_helpers = []
           @rails_route_nesting = []
           @rails_resources = []  # Track resources for Router.resources() generation
+          @rails_controller_module = []  # Track scope module: for controller file paths
           @rails_root_route = nil
           @rails_in_member = false
           @rails_current_resource = nil
@@ -391,7 +392,9 @@ module Ruby2JS
           resource_info = {
             name: resource_name.to_s,
             controller_name: controller_name,
-            controller_file: "#{resource_name}_controller",
+            controller_file: (@rails_controller_module.any? ?
+              "#{@rails_controller_module.join('/')}/#{resource_name}_controller" :
+              "#{resource_name}_controller"),
             only: only_actions,
             nested: [],
             member_routes: [],
@@ -523,7 +526,9 @@ module Ruby2JS
             param: nil,
             type: :namespace
           })
+          @rails_controller_module.push(name.to_s)
           process_routes_body(body) if body
+          @rails_controller_module.pop
           @rails_route_nesting.pop
         end
 
@@ -531,6 +536,8 @@ module Ruby2JS
           # Extract options from scope args
           as_name = nil
           module_only = false
+
+          module_name = nil
 
           args.each do |arg|
             next unless arg.type == :hash
@@ -543,6 +550,7 @@ module Ruby2JS
                 as_name = value.children[0] if value.type == :sym || value.type == :str
               when :module
                 module_only = true
+                module_name = value.children[0].to_s if value.type == :sym || value.type == :str
               end
             end
           end
@@ -553,8 +561,10 @@ module Ruby2JS
             process_routes_body(body) if body
             @rails_route_nesting.pop
           elsif module_only
-            # scope module: :name → transparent for paths, just recurse
+            # scope module: :name → transparent for URL paths, but affects controller file path
+            @rails_controller_module.push(module_name) if module_name
             process_routes_body(body) if body
+            @rails_controller_module.pop if module_name
           else
             process_routes_body(body) if body
           end
