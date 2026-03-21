@@ -28,6 +28,7 @@
     "./system_test.mjs": "./system_test.mjs",
     "./url_helpers.mjs": "./url_helpers.mjs",
     "./current_attributes.mjs": "./current_attributes.mjs",
+    "./rails_stubs.mjs": "./rails_stubs.mjs",
     "./renderers/*": "./renderers/*"
   },
   "files": [
@@ -50,6 +51,7 @@
     "turbo_cable_simple.js",
     "url_helpers.mjs",
     "current_attributes.mjs",
+    "rails_stubs.mjs",
     "renderers/"
   ],
   "keywords": [

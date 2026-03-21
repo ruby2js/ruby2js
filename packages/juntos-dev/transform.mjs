@@ -1989,6 +1989,7 @@ export function generateMainJsForEject(config = {}) {
   return `// Main entry point for ejected Node.js server
 import { Application, Router } from '${railsModule}';
 import * as activeRecord from 'juntos/adapters/${adapterFile}';
+import 'juntos/rails_stubs.mjs';
 
 // Import models (registers them)
 import './app/models/index.js';
@@ -2483,20 +2484,21 @@ export async function ensureRuby2jsReady(appRoot) {
     // Node.js filter (File operations, backtick commands, etc.)
     await import('ruby2js/filters/node.js');
 
-    // App-specific filter: load from config/ruby2js_filter.js if it exists
-    if (appRoot) {
-      const filterPath = path.join(appRoot, 'config', 'ruby2js_filter.js');
-      if (fs.existsSync(filterPath)) {
-        const filterModule = await import(url.pathToFileURL(filterPath).href);
-        // Record filter name for inclusion in filter chains
-        const filterClass = filterModule.default;
-        if (filterClass?.name) {
-          appFilterNames.push(filterClass.name);
-        }
+    filtersLoaded = true;
+  }
+
+  // App-specific filter: load from config/ruby2js_filter.js if it exists
+  // Loaded outside filtersLoaded check so it works even when core filters
+  // were loaded by an earlier call without appRoot
+  if (appRoot && appFilterNames.length === 0) {
+    const filterPath = path.join(appRoot, 'config', 'ruby2js_filter.js');
+    if (fs.existsSync(filterPath)) {
+      const filterModule = await import(url.pathToFileURL(filterPath).href);
+      const filterClass = filterModule.default;
+      if (filterClass?.name) {
+        appFilterNames.push(filterClass.name);
       }
     }
-
-    filtersLoaded = true;
   }
 
   return ruby2jsModule;

@@ -588,6 +588,22 @@ export class ActiveRecordBase {
     // ActiveRecord::Store: key-value store in a single column; no-op at class definition time
   }
 
+  static delegate(...args) {
+    // Rails delegate: delegate :method, to: :association
+    // Creates a method that forwards to the association
+    const options = typeof args[args.length - 1] === 'object' ? args.pop() : {};
+    const target = options.to;
+    if (!target) return;
+
+    for (const method of args) {
+      if (typeof method !== 'string') continue;
+      Object.defineProperty(this.prototype, method, {
+        get() { return this[target]?.[method]; },
+        configurable: true
+      });
+    }
+  }
+
   static normalizes(field, options = {}) {
     if (!this._normalizations) this._normalizations = {};
     this._normalizations[field] = options;
