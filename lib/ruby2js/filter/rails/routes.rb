@@ -27,6 +27,7 @@ module Ruby2JS
           @rails_route_nesting = []
           @rails_resources = []  # Track resources for Router.resources() generation
           @rails_controller_module = []  # Track scope module: for controller file paths
+          @rails_direct_routes = []     # Track direct route definitions
           @rails_root_route = nil
           @rails_in_member = false
           @rails_current_resource = nil
@@ -146,6 +147,8 @@ module Ruby2JS
             process_collection(body)
           when :member
             process_member(body)
+          when :direct
+            process_direct(args, node.children[1], body)
           end
         end
 
@@ -597,6 +600,18 @@ module Ruby2JS
           @rails_in_member = false
         end
 
+        def process_direct(args, block_args, body)
+          return if args.empty?
+          name = args[0].children[0] if args[0].type == :sym
+          return unless name
+
+          @rails_direct_routes.push({
+            name: "#{name}_path".to_sym,
+            args: block_args,
+            body: body
+          })
+        end
+
         def extract_resource_options(args)
           options = {}
 
@@ -867,6 +882,16 @@ module Ruby2JS
             @rails_path_helpers.each do |helper|
               statements << build_path_helper(helper)
             end
+          end
+
+          # Generate direct route functions
+          @rails_direct_routes.each do |direct|
+            # direct :leafable do |leaf, options| ... end
+            # → export function leafable_path(leaf, options) { ... }
+            statements << s(:send, nil, :export,
+              s(:def, direct[:name],
+                direct[:args],
+                s(:autoreturn, direct[:body])))
           end
 
           # Generate Router.root() if defined
@@ -1373,6 +1398,15 @@ module Ruby2JS
           unique_helpers.each do |helper|
             exports << s(:const, nil, helper[:name])
           end
+
+          # Generate direct route functions
+          @rails_direct_routes.each do |direct|
+            statements << s(:def, direct[:name],
+              direct[:args],
+              s(:autoreturn, direct[:body]))
+            exports << s(:const, nil, direct[:name])
+          end
+
           statements << s(:export, s(:array, *exports))
 
           process(s(:begin, *statements))
