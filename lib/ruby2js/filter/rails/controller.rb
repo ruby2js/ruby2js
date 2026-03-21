@@ -1744,16 +1744,21 @@ module Ruby2JS
           end
 
           # Import each referenced model (skip if already imported via require/require_relative)
+          # Only import classes that exist as known models in metadata
+          known_models = @options[:metadata] && @options[:metadata]['models'] ?
+            @options[:metadata]['models'].keys : nil
           [*@rails_model_refs].sort.each do |model|
             next if @rails_required_constants.include?(model)
+            leaf_name = model.include?('::') ? model.split('::').last : model
+            next if known_models && !known_models.include?(leaf_name)
             # Handle nested class names like "Identity::AccessToken" -> "../models/identity/access_token.js"
             if model.include?('::')
               parts = model.split('::')
               import_name = parts.last  # Just the leaf class name
-              model_file = parts.map { |p| p.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '') }.join('/')
+              model_file = parts.map { |p| Ruby2JS::Inflector.underscore(p) }.join('/')
             else
               import_name = model
-              model_file = model.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '')
+              model_file = Ruby2JS::Inflector.underscore(model)
             end
             imports << s(:send, nil, :import,
               s(:array, s(:const, nil, import_name.to_sym)),
