@@ -654,6 +654,7 @@ module Ruby2JS
           method_name = node.children[0]
           @rails_current_action = method_name
           @rails_render_action = nil
+          @rails_skip_view_call = false
           args = node.children[1]
           body = node.children[2]
 
@@ -1539,9 +1540,16 @@ module Ruby2JS
               next unless pair.type == :pair
               key = pair.children[0]
               value = pair.children[1]
-              if key.type == :sym && key.children[0] == :json
-                # Wrap in {json: value} so wrap_redirect_hashes adds return
-                return s(:hash, s(:pair, s(:sym, :json), transform_ivars_to_locals(value)))
+              if key.type == :sym
+                format = key.children[0]
+                if format == :json
+                  # Wrap in {json: value} so wrap_redirect_hashes adds return
+                  return s(:hash, s(:pair, s(:sym, :json), transform_ivars_to_locals(value)))
+                elsif %i[plain html text body].include?(format)
+                  # render plain:/html:/text: -> inline response, skip view call
+                  @rails_skip_view_call = true
+                  return s(:hash, s(:pair, s(:sym, format), transform_ivars_to_locals(value)))
+                end
               end
             end
             nil
@@ -1643,6 +1651,9 @@ module Ruby2JS
 
           # Skip view call for actions that return redirect/render hashes
           return nil if %i[create update destroy].include?(action_name)
+
+          # Skip view call if action has explicit inline render (plain:, html:, etc.)
+          return nil if @rails_skip_view_call
 
           view_module = "#{@rails_controller_name}Views"
           # If render :other_action was called, use that template instead
