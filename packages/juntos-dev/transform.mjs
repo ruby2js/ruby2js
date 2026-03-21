@@ -370,9 +370,29 @@ export function findMigrations(appRoot) {
 export function findViewResources(appRoot) {
   const viewsDir = path.join(appRoot, 'app/views');
   if (!fs.existsSync(viewsDir)) return [];
-  return fs.readdirSync(viewsDir, { withFileTypes: true })
-    .filter(d => d.isDirectory() && d.name !== 'layouts' && !d.name.startsWith('.'))
-    .map(d => d.name);
+
+  function hasViewTemplates(dir) {
+    return fs.readdirSync(dir).some(f =>
+      f.endsWith('.html.erb') || f.endsWith('.jsx.rb') || f.endsWith('.turbo_stream.erb'));
+  }
+
+  function walk(dir, prefix) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const results = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name === 'layouts' || entry.name.startsWith('.')) continue;
+      const fullPath = path.join(dir, entry.name);
+      const name = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (hasViewTemplates(fullPath)) {
+        results.push(name);
+      }
+      // Recurse into subdirectories for nested resources (e.g., pages/edits)
+      results.push(...walk(fullPath, name));
+    }
+    return results;
+  }
+
+  return walk(viewsDir, '');
 }
 
 /**
@@ -2281,7 +2301,8 @@ function deduplicateViewExports(views) {
  */
 export function generateViewsModule(appRoot, resource) {
   const viewsDir = path.join(appRoot, 'app/views', resource);
-  if (!fs.existsSync(viewsDir)) return `export const ${capitalize(resource)}Views = {};`;
+  const leafName = resource.includes('/') ? resource.split('/').pop() : resource;
+  if (!fs.existsSync(viewsDir)) return `export const ${classify(singularize(leafName))}Views = {};`;
 
   // Collect ERB views (.html.erb)
   const erbViews = fs.readdirSync(viewsDir)
@@ -2320,7 +2341,9 @@ export function generateViewsModule(appRoot, resource) {
 
   // Create namespace object: ArticleViews = { index, show, new_, edit, ... }
   // Use singularized form to match controller filter (ArticleViews, not ArticlesViews)
-  const className = classify(singularize(resource)) + 'Views';
+  // Use leaf name for the export (pages/edits → Edit, books → Book)
+  const leafResource = resource.includes('/') ? resource.split('/').pop() : resource;
+  const className = classify(singularize(leafResource)) + 'Views';
   const members = views.map(v => v.exportName);
 
   return `${imports.join('\n')}
@@ -2334,7 +2357,8 @@ export { ${members.join(', ')} };
  */
 export function generateViewsModuleForEject(appRoot, resource) {
   const viewsDir = path.join(appRoot, 'app/views', resource);
-  if (!fs.existsSync(viewsDir)) return `export const ${capitalize(resource)}Views = {};`;
+  const leafName = resource.includes('/') ? resource.split('/').pop() : resource;
+  if (!fs.existsSync(viewsDir)) return `export const ${classify(singularize(leafName))}Views = {};`;
 
   // Collect ERB views (.html.erb)
   const erbViews = fs.readdirSync(viewsDir)
@@ -2363,15 +2387,19 @@ export function generateViewsModuleForEject(appRoot, resource) {
 
   const views = deduplicateViewExports([...erbViews, ...reactViews]);
 
+  // Use leaf name for the export and import paths
+  // For pages/edits, barrel is at pages/edits.js, imports from ./edits/show.js
+  const leafResource = resource.includes('/') ? resource.split('/').pop() : resource;
+
   const imports = views.map(v => {
     if (v.isReact) {
-      return `import ${v.exportName} from './${resource}/${v.outputFile}';`;
+      return `import ${v.exportName} from './${leafResource}/${v.outputFile}';`;
     } else {
-      return `import { render as ${v.exportName} } from './${resource}/${v.outputFile}';`;
+      return `import { render as ${v.exportName} } from './${leafResource}/${v.outputFile}';`;
     }
   });
 
-  const className = classify(singularize(resource)) + 'Views';
+  const className = classify(singularize(leafResource)) + 'Views';
   const members = views.map(v => v.exportName);
 
   return `${imports.join('\n')}

@@ -83,9 +83,18 @@ module Ruby2JS
               s(:module, class_name, nil)))
           end
 
-          # Extract controller name (e.g., ArticlesController -> Article, PeopleController -> Person)
-          @rails_controller_plural = Ruby2JS::Inflector.underscore(class_name.children.last.to_s.sub(/Controller$/, ''))
-          @rails_controller_name = Ruby2JS::Inflector.classify(Ruby2JS::Inflector.singularize(@rails_controller_plural))
+          # Extract controller name from class (e.g., EditsController -> Edit)
+          leaf_name = class_name.children.last.to_s.sub(/Controller$/, '')
+          @rails_controller_name = Ruby2JS::Inflector.classify(Ruby2JS::Inflector.singularize(Ruby2JS::Inflector.underscore(leaf_name)))
+
+          # Derive view/file path from file path when available (handles namespaced controllers)
+          if @options[:file] && @options[:file].to_s.include?('app/controllers/')
+            @rails_controller_plural = @options[:file].to_s
+              .sub(%r{.*app/controllers/}, '')
+              .sub(/_controller\.rb$/, '')
+          else
+            @rails_controller_plural = Ruby2JS::Inflector.underscore(leaf_name)
+          end
           @rails_controller = true
           @rails_controller_const = class_name.children.last
 
