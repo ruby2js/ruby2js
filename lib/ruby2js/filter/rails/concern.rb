@@ -81,6 +81,7 @@ module Ruby2JS
 
             concern_meta = { 'methods' => method_names }
             concern_meta['constants'] = constants if constants.any?
+            concern_meta['file'] = @options[:file] if @options[:file]
             meta['concerns'][concern_name] = concern_meta
           end
 

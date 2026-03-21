@@ -270,9 +270,22 @@ module Ruby2JS
             @rails_includes.each do |concern_const|
               concern_name = concern_const.children.last.to_s
               concern_file = concern_name.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '')
+
+              # Check metadata for actual file path
+              meta = @options[:metadata]
+              concern_meta = meta && meta['concerns'] && meta['concerns'][concern_name]
+              if concern_meta && concern_meta['file']
+                # Use actual file path relative to app/models/
+                concern_path = concern_meta['file'].sub(/^app\/models\//, './')
+                  .sub(/\.rb$/, '.js')
+              else
+                # Default to concerns/ directory
+                concern_path = "./concerns/#{concern_file}.js"
+              end
+
               concern_import = s(:send, nil, :import,
                 s(:array, s(:const, nil, concern_name.to_sym)),
-                s(:str, "./concerns/#{concern_file}.js"))
+                s(:str, concern_path))
               model_import_nodes.push(concern_import)
             end
           end
@@ -2487,9 +2500,15 @@ module Ruby2JS
           import_list.push(s(:const, nil, :HasOneReference)) if has_has_one
 
           if import_list.any?
+            # Determine depth relative to app/models/ for correct relative path
+            file = @options[:file] || ''
+            model_rel = file.sub(/^app\/models\//, '')
+            depth = model_rel.count('/')
+            ar_path = depth > 0 ? "#{'../' * depth}application_record.js" : "./application_record.js"
+
             imports.push(s(:send, nil, :import,
               s(:array, *import_list),
-              s(:str, "../application_record.js")))
+              s(:str, ar_path)))
           end
 
           # Import included concerns
