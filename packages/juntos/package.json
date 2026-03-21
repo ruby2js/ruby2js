@@ -27,6 +27,7 @@
     "./test_fetch.mjs": "./test_fetch.mjs",
     "./system_test.mjs": "./system_test.mjs",
     "./url_helpers.mjs": "./url_helpers.mjs",
+    "./current_attributes.mjs": "./current_attributes.mjs",
     "./renderers/*": "./renderers/*"
   },
   "files": [
@@ -48,6 +49,7 @@
     "system_test.mjs",
     "turbo_cable_simple.js",
     "url_helpers.mjs",
+    "current_attributes.mjs",
     "renderers/"
   ],
   "keywords": [

@@ -118,10 +118,16 @@ module Ruby2JS
               attr_names = collect_current_attribute_names(body)
               unless attr_names.empty?
                 @current_attrs_processing = true
+                # Replace ActiveSupport::CurrentAttributes with plain CurrentAttributes
+                new_superclass = s(:const, nil, :CurrentAttributes)
                 new_body = rewrite_current_attributes_body(body, attr_names)
-                result = process(node.updated(nil, [class_name, superclass, new_body]))
+                result = process(node.updated(nil, [class_name, new_superclass, new_body]))
                 @current_attrs_processing = false
-                return result
+                # Add import for CurrentAttributes
+                import_node = process(s(:send, nil, :import,
+                  s(:array, s(:const, nil, :CurrentAttributes)),
+                  s(:str, "juntos/current_attributes.mjs")))
+                return s(:begin, import_node, result)
               end
             end
 
