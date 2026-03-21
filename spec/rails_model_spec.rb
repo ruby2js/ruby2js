@@ -261,25 +261,17 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'this.attributes.entryable_type'
     end
 
-    it "generates type predicates" do
+    it "generates type-specific getters that double as predicates" do
       result = to_js(<<~RUBY)
         class Entry < ApplicationRecord
           delegated_type :entryable, types: %w[Message Comment]
         end
       RUBY
+      # Type getter returns entryable or null (null is falsy, so works as predicate)
       assert_includes result, 'get message()'
       assert_includes result, 'get comment()'
       assert_match(/entryable_type === "Message"/, result)
       assert_match(/entryable_type === "Comment"/, result)
-    end
-
-    it "generates type-specific getters" do
-      result = to_js(<<~RUBY)
-        class Entry < ApplicationRecord
-          delegated_type :entryable, types: %w[Message Comment]
-        end
-      RUBY
-      # Type getter returns entryable when type matches, null otherwise
       assert_match(/this\.entryable.*:.*null/, result)
     end
 

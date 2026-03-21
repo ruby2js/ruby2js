@@ -1089,7 +1089,7 @@ module Ruby2JS
             dt[:types].each do |type_name|
               method_name = type_name.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
                 .gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
-              dt_predicates.push("#{method_name}?")
+              dt_predicates.push(method_name)
             end
           end
           model_meta['delegated_type_predicates'] = dt_predicates if dt_predicates.any?
@@ -2190,15 +2190,9 @@ module Ruby2JS
             method_name = type_name.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
               .gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
 
-            # Type predicate: get page?() / isPage { return this.attributes.leafable_type === "Page" }
-            predicate = s(:defget, "#{method_name}?".to_sym,
-              s(:args),
-              s(:autoreturn,
-                s(:send, type_access, :===, s(:str, type_name))))
-
-            methods.push(predicate)
-
-            # Type-specific getter: get page() { return this.page? ? this.leafable : null }
+            # Type-specific getter doubles as predicate (returns object or null):
+            #   get page() { return leafable_type === "Page" ? this.leafable : null }
+            # In JS, null is falsy so `if (leaf.page)` works like Ruby's `leaf.page?`
             type_getter = s(:defget, method_name.to_sym,
               s(:args),
               s(:autoreturn,

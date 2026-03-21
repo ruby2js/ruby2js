@@ -92,7 +92,7 @@ export class Entry extends ApplicationRecord {
   get entryable() { /* ... */ }
   set entryable(value) { /* ... */ }
 
-  // type predicates
+  // type-specific getters (double as predicates — null is falsy)
   get message() { return this.attributes.entryable_type === "Message" ? this.entryable : null }
   get comment() { return this.attributes.entryable_type === "Comment" ? this.entryable : null }
 
