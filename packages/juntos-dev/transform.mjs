@@ -996,59 +996,36 @@ export function fixImportsForEject(js, fromFile, config = {}) {
     }
   }
 
-  // General model reference imports: scan for bare ClassName.method or new ClassName(
-  // references to known model classes that aren't imported. This handles cases like
-  // concern modules referencing Color.COLORS or Color.for_value() without an import.
+  // General model reference resolution: replace bare ClassName.method or new ClassName(
+  // references with modelRegistry.ClassName to avoid circular imports between models.
+  // This handles cases like User referencing Book.with_everyone_access.
   if (fromFile && fromFile.startsWith('app/models/') && config.models && config.modelClassMap) {
     const modelRelPath = fromFile.replace('app/models/', '').replace(/\.js$/, '');
-    const depth = modelRelPath.split('/').length - 1;
 
     for (const [className, modelPath] of Object.entries(config.modelClassMap)) {
-      // Skip if already imported
+      // Skip if already imported (explicit import takes precedence)
       const importPattern = new RegExp(`import\\s+\\{[^}]*\\b${className}\\b[^}]*\\}\\s+from`);
       if (importPattern.test(js)) continue;
 
       // Skip self-references
       if (modelPath === modelRelPath) continue;
 
-      // Skip if this file defines/exports a class with the same name (name collision between namespaces)
-      // e.g., card/entropy.js exports class Entropy — don't import Entropy from ../entropy.js
+      // Skip if this file defines/exports a class with the same name
       const definesClass = new RegExp(`(export\\s+)?(class|const|let|var|function)\\s+${className}\\b`);
       if (definesClass.test(js)) continue;
 
-      // Skip references to models in a subdirectory named after this file.
-      // e.g., notifier.js should not import from notifier/mention_notifier.js
-      // because those subclasses typically extend the parent, creating a circular dependency.
-      const baseName = modelRelPath.split('/').pop();
-      if (modelPath.startsWith(modelRelPath.replace(/[^/]+$/, baseName + '/'))) continue;
-
-      // Check if this class name is referenced (ClassName.something or new ClassName)
-      const refPattern = new RegExp(`\\b${className}\\b\\.\\w|\\bnew\\s+${className}\\b`);
-      if (!refPattern.test(js)) continue;
-
-      // Compute relative path
-      const currentDir = modelRelPath.split('/').slice(0, -1);
-      const targetParts = modelPath.split('/');
-      const targetDir = targetParts.slice(0, -1);
-      const targetFile = targetParts[targetParts.length - 1];
-
-      let common = 0;
-      while (common < currentDir.length && common < targetDir.length &&
-             currentDir[common] === targetDir[common]) {
-        common++;
+      // Replace bare ClassName references with modelRegistry.ClassName
+      // Matches ClassName.method and new ClassName( but not inside strings/imports
+      const refPattern = new RegExp(`\\b${className}\\b(?=\\.|\\()`, 'g');
+      if (refPattern.test(js)) {
+        // Ensure modelRegistry is imported
+        if (!js.includes('modelRegistry')) {
+          const depth = modelRelPath.split('/').length - 1;
+          const prefix = depth > 0 ? '../'.repeat(depth) : './';
+          js = `import { modelRegistry } from '${prefix}application_record.js';\n${js}`;
+        }
+        js = js.replace(new RegExp(`(?<!\\.)\\b${className}\\b(?=\\.)`, 'g'), `modelRegistry.${className}`);
       }
-      const up = currentDir.length - common;
-      const down = targetDir.slice(common);
-      let relativePath;
-      if (up === 0 && down.length === 0) {
-        relativePath = `./${targetFile}.js`;
-      } else if (up === 0) {
-        relativePath = `./${[...down, targetFile + '.js'].join('/')}`;
-      } else {
-        relativePath = [...Array(up).fill('..'), ...down, targetFile + '.js'].join('/');
-      }
-
-      js = `import { ${className} } from '${relativePath}';\n${js}`;
     }
   }
 
