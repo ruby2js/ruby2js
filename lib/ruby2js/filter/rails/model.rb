@@ -1047,11 +1047,15 @@ module Ruby2JS
             when :include
               if args.length == 1 && is_url_helpers_include?(args[0])
                 @rails_url_helpers = true
-              elsif args.length == 1 && args[0]&.type == :const && args[0].children[0].nil?
-                # Only simple consts (include Trackable), not nested framework
-                # modules (include ActionView::Helpers::TextHelper)
+              else
+                # Collect simple const includes (include Trackable, Searchable)
+                # Skip nested framework modules (include ActionView::Helpers::TextHelper)
                 @rails_includes ||= []
-                @rails_includes.push(args[0])
+                args.each do |arg|
+                  if arg&.type == :const && arg.children[0].nil?
+                    @rails_includes.push(arg)
+                  end
+                end
               end
             when *CALLBACKS
               collect_callback(method_name, args)
