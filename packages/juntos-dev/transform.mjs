@@ -833,6 +833,15 @@ export function fixImportsForEject(js, fromFile, config = {}) {
     return match;
   });
 
+  // Rewrite _url imports to _path (the helpers filter transforms _url calls
+  // to new URL(_path(...), request.url).toString(), so the import needs _path)
+  js = js.replace(/import\s*\{([^}]+)\}\s*from\s*(['"])(.*?paths\.js)\2/g, (match, names, quote, source) => {
+    const rewritten = names.replace(/(\w+)_url\b/g, '$1_path');
+    // Deduplicate (if both _url and _path were imported, now both are _path)
+    const unique = [...new Set(rewritten.split(',').map(s => s.trim()))].join(', ');
+    return `import { ${unique} } from ${quote}${source}${quote}`;
+  });
+
   // Fix selfhost converter Struct.new pattern: [(X = function X(...) {...}).prototype] = [X.prototype]
   // The right side references X before assignment completes. Simplify to plain let declaration.
   // ESM strict mode requires variable declaration (no implicit globals).

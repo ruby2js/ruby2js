@@ -289,6 +289,16 @@ module Ruby2JS
             return process_form_builder_method(method, args)
           end
 
+          # Rewrite _url helpers to new URL(_path(...), $context.request.url).toString()
+          if target.nil? && method.to_s.end_with?('_url')
+            path_method = method.to_s.sub(/_url$/, '_path').to_sym
+            path_call = s(:send, nil, path_method, *args)
+            request_url = s(:attr, s(:attr, s(:lvar, :"$context"), :request), :url)
+            return process s(:send,
+              s(:send, s(:const, nil, :URL), :new, path_call, request_url),
+              :to_s)
+          end
+
           # Handle link_to helper
           if method == :link_to && target.nil? && args.length >= 2
             return process_link_to(args)
