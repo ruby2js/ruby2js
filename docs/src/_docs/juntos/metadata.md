@@ -62,6 +62,7 @@ The controller filter recognizes these patterns on the right-hand side of instan
 | **number** | `count`, `sum`, `average`, `minimum`, `maximum`, `length`, `size` |
 | **string** | `to_s`, `name`, `title` |
 | **map** | `group_by` (block or block_pass form) |
+| **array** | Any chain starting from a model constant (e.g., `Book.where(...)`, `User.active.ordered`) |
 
 **Block methods:**
 
@@ -249,6 +250,19 @@ The concern's source file path is recorded in metadata. The model filter uses th
 Model files are processed sequentially, and each filter writes metadata that downstream files may depend on. When a file references metadata that hasn't been populated yet (e.g., a constant from a concern that hasn't been processed), transpilation raises a dependency error and the file is deferred.
 
 The build loop retries deferred files after each pass. As long as each pass successfully processes at least one file, the loop continues. This handles arbitrary dependency chains without requiring a pre-scan or explicit ordering — most applications process all files in a single pass with zero overhead.
+
+## Custom Inflections
+
+Rails applications can define custom inflection rules in `config/initializers/inflections.rb`. Juntos reads these at build time and registers them with both the transpile-time and runtime inflectors:
+
+```ruby
+# config/initializers/inflections.rb
+ActiveSupport::Inflector.inflections(:en) do |inflect|
+  inflect.irregular "leaf", "leaves"
+end
+```
+
+This ensures table names, model class lookups, and route helpers use the same pluralization as Rails. Without this, `Leaf` would produce table name `leafs` instead of `leaves`.
 
 ## When Inference Fails
 

@@ -137,7 +137,9 @@ module Ruby2JS
         prop_name = ivar_name.to_s[1..-1].to_sym  # @title -> title
 
         # In layouts, read ivars from context (set by views via $context.prop = value)
-        if erb_layout_mode?
+        # Note: inline the layout check to avoid predicate method transpilation issue
+        is_layout = @options && @options[:layout]
+        if is_layout
           return s(:attr, s(:lvar, :context), prop_name)
         end
 

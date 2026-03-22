@@ -947,6 +947,13 @@ module Ruby2JS
             # group_by with block_pass: items.group_by(&:type)
             return :map if method == :group_by
             # exists? returns boolean — skip
+
+            # Model query chains: Book.where(...).ordered → array
+            # Any chain starting from a model constant is a relation (array)
+            receiver = node.children[0]
+            if receiver && model_const?(receiver)
+              return :array
+            end
           end
 
           # group_by block returns a Map
@@ -962,6 +969,16 @@ module Ruby2JS
           end
 
           nil
+        end
+
+        # Walk a send chain to check if it originates from a model constant.
+        # Book.where(...).ordered → true (Book is a const)
+        # foo.bar → false (foo is a local variable)
+        def model_const?(node)
+          return false unless node.respond_to?(:type)
+          return true if node.type == :const && node.children[0].nil?
+          return model_const?(node.children[0]) if node.type == :send
+          false
         end
 
         def transform_ivars_to_locals(node)
