@@ -46,6 +46,16 @@ const IRREGULARS_PLURAL = {
   quiz: 'quizzes'
 };
 
+/**
+ * Register a custom irregular inflection (from config/initializers/inflections.rb).
+ * @param {string} singular - e.g., "leaf"
+ * @param {string} plural - e.g., "leaves"
+ */
+export function addIrregular(singular, plural) {
+  IRREGULARS_SINGULAR[plural.toLowerCase()] = singular.toLowerCase();
+  IRREGULARS_PLURAL[singular.toLowerCase()] = plural.toLowerCase();
+}
+
 // Words that are the same in singular and plural
 const UNCOUNTABLES = new Set([
   'equipment', 'information', 'rice', 'money', 'species',

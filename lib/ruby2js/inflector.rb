@@ -12,6 +12,17 @@
 module Ruby2JS
   module Inflector
     # Plural -> Singular mapping
+    # Custom irregular inflections (from config/initializers/inflections.rb)
+    # Note: use module-level hash (not @ivar) for JS compatibility —
+    # selfhost transpiles class methods as plain functions where `this` is undefined.
+    CUSTOM_IRREGULARS_SINGULAR = {}
+    CUSTOM_IRREGULARS_PLURAL = {}
+
+    def self.add_irregular(singular, plural)
+      CUSTOM_IRREGULARS_SINGULAR[plural.downcase] = singular.downcase
+      CUSTOM_IRREGULARS_PLURAL[singular.downcase] = plural.downcase
+    end
+
     IRREGULARS_SINGULAR = {
       'people' => 'person',
       'men' => 'man',
@@ -136,7 +147,7 @@ module Ruby2JS
       lower = word.downcase
       return word if UNCOUNTABLES.include?(lower)
 
-      irregular = IRREGULARS_SINGULAR[lower]
+      irregular = CUSTOM_IRREGULARS_SINGULAR[lower] || IRREGULARS_SINGULAR[lower]
       if irregular
         # Preserve original capitalization (inline capitalize for JS compatibility)
         if word[0] == word[0].upcase
@@ -195,7 +206,7 @@ module Ruby2JS
       lower = word.downcase
       return word if UNCOUNTABLES.include?(lower)
 
-      irregular = IRREGULARS_PLURAL[lower]
+      irregular = CUSTOM_IRREGULARS_PLURAL[lower] || IRREGULARS_PLURAL[lower]
       if irregular
         # Preserve original capitalization (inline capitalize for JS compatibility)
         if word[0] == word[0].upcase

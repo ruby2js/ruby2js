@@ -446,6 +446,25 @@ export function parseCurrentAttributes(appRoot) {
 }
 
 /**
+ * Parse config/initializers/inflections.rb for custom irregular inflections.
+ * Returns array of { singular, plural } pairs.
+ */
+export function parseInflections(appRoot) {
+  const filePath = path.join(appRoot, 'config/initializers/inflections.rb');
+  if (!fs.existsSync(filePath)) return [];
+
+  const source = fs.readFileSync(filePath, 'utf-8');
+  const irregulars = [];
+  // Match: inflect.irregular "singular", "plural" (with single or double quotes)
+  const pattern = /inflect\.irregular\s+['"](\w+)['"]\s*,\s*['"](\w+)['"]/g;
+  let match;
+  while ((match = pattern.exec(source)) !== null) {
+    irregulars.push({ singular: match[1], plural: match[2] });
+  }
+  return irregulars;
+}
+
+/**
  * Create a shared metadata object for threading through Ruby2JS filters.
  * Both eject and virtual test modes use this to ensure the same fields exist.
  * Model, concern, and controller filters write to this during transformation;
@@ -475,6 +494,23 @@ export function createMetadata(mode, appRoot) {
  */
 export async function buildAppManifest(appRoot, config, { mode = 'vite' } = {}) {
   await ensureRuby2jsReady(appRoot);
+
+  // Load custom inflections from config/initializers/inflections.rb
+  const customInflections = parseInflections(appRoot);
+  if (customInflections.length > 0) {
+    // Register with JS runtime inflector (used by transform pipeline)
+    const { addIrregular } = await import('juntos/adapters/inflector.mjs');
+    for (const { singular, plural } of customInflections) {
+      addIrregular(singular, plural);
+    }
+    // Register with selfhost inflector (used by filters during transpilation)
+    const { Ruby2JS } = await import('ruby2js');
+    if (Ruby2JS?.Inflector?.add_irregular) {
+      for (const { singular, plural } of customInflections) {
+        Ruby2JS.Inflector.add_irregular(singular, plural);
+      }
+    }
+  }
 
   const metadata = createMetadata(mode, appRoot);
   const modelCache = new Map(); // filePath → { code, map }
@@ -1973,7 +2009,7 @@ export function getActiveRecordAdapterFile(database) {
 /**
  * Generate main.js entry point for ejected Node.js server.
  */
-export function generateMainJsForEject(config = {}) {
+export function generateMainJsForEject(config = {}, appRoot = '.') {
   const adapterFile = getActiveRecordAdapterFile(config.database);
   const dbConfig = config.database === 'sqlite' || config.database === 'sqlite3' || config.database === 'better_sqlite3'
     ? `{ adapter: 'better_sqlite3', database: './db/development.sqlite3' }`
@@ -1986,11 +2022,18 @@ export function generateMainJsForEject(config = {}) {
   }
   const railsModule = `juntos/targets/${target}/rails.js`;
 
+  // Generate custom inflection registration code
+  const inflections = parseInflections(appRoot);
+  const inflectionCode = inflections.length > 0
+    ? `import { addIrregular } from 'juntos/adapters/inflector.mjs';\n` +
+      inflections.map(i => `addIrregular('${i.singular}', '${i.plural}');`).join('\n') + '\n\n'
+    : '';
+
   return `// Main entry point for ejected Node.js server
 import { Application, Router } from '${railsModule}';
 import * as activeRecord from 'juntos/adapters/${adapterFile}';
 import 'juntos/rails_stubs.mjs';
-
+${inflectionCode}
 // Import models (registers them)
 import './app/models/index.js';
 
