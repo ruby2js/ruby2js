@@ -35,6 +35,10 @@ module Ruby2JS
         kwargs = []
       end
 
+      # Remove anonymous block arguments (&) — no JS equivalent
+      # Named block args (&block) are kept as regular parameters
+      args = args.reject { |arg| arg.type == :blockarg && arg.children.empty? }
+
       # Deduplicate _ params (Ruby allows multiple, JS doesn't)
       count = [0]
       args = args.map { |arg| dedup_underscores(arg, count) }

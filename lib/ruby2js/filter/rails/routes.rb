@@ -427,7 +427,8 @@ module Ruby2JS
               path: full_path,
               controller: controller_name,
               action: action_name.to_s,
-              method: route[:method]
+              method: route[:method],
+              controller_module: @rails_controller_module.dup
             }
           end
 
@@ -478,7 +479,17 @@ module Ruby2JS
           }.join
           resource_path = "#{base_path}#{path_prefix}/#{resource_name}"
 
-          controller_name = "#{resource_name.to_s.split('_').map(&:capitalize).join}Controller"
+          if options[:controller]
+            # Explicit controller: "books/publications" → Books::PublicationsController
+            controller_name = options[:controller].split('/').map { |p|
+              p.split('_').map(&:capitalize).join
+            }.join('::') + 'Controller'
+          else
+            # Rails convention: singular resource still uses plural controller name
+            # resource :session → SessionsController
+            pluralized = Ruby2JS::Inflector.pluralize(resource_name.to_s)
+            controller_name = "#{pluralized.split('_').map(&:capitalize).join}Controller"
+          end
 
           # Singular resource routes (no :id)
           singular_routes = [
@@ -500,7 +511,8 @@ module Ruby2JS
               path: full_path,
               controller: controller_name,
               action: action_name.to_s,
-              method: route[:method]
+              method: route[:method],
+              controller_module: @rails_controller_module.dup
             }
           end
 
@@ -632,6 +644,8 @@ module Ruby2JS
                 options[:param] = value.children[0].to_s if value.type == :sym || value.type == :str
               when :path
                 options[:path] = value.children[0].to_s if value.type == :sym || value.type == :str
+              when :controller
+                options[:controller] = value.children[0].to_s if value.type == :str || value.type == :sym
               end
             end
           end
@@ -834,7 +848,7 @@ module Ruby2JS
               [s(:const, nil, :layout)])
           end
 
-          # Import controllers - collect all controllers from resources (deduplicated)
+          # Import controllers - collect from resources and custom routes (deduplicated)
           all_controllers = collect_all_controllers(@rails_resources)
           seen_controllers = {}
           all_controllers.each do |ctrl|
@@ -842,6 +856,35 @@ module Ruby2JS
             seen_controllers[ctrl[:controller_name]] = true
             statements << s(:import, "../app/controllers/#{ctrl[:controller_file]}.js",
               [s(:const, nil, ctrl[:controller_name].to_sym)])
+          end
+
+          # Also import controllers referenced by custom/singular routes
+          @rails_routes_list.each do |route|
+            ctrl_name = route[:controller]
+            next if seen_controllers[ctrl_name]
+            seen_controllers[ctrl_name] = true
+
+            # Skip Rails framework controllers (health, pwa)
+            next if ctrl_name.start_with?('Rails::')
+
+            # Derive file path from controller name
+            parts = ctrl_name.sub(/Controller$/, '').split('::')
+
+            if parts.length > 1
+              # Namespaced: Books::PublicationsController → books/publications_controller
+              ctrl_file = parts.map { |p| Ruby2JS::Inflector.underscore(p) }.join('/') + '_controller'
+            else
+              # Simple: use stored module context for scoped controllers
+              mod = route[:controller_module] || []
+              prefix = mod.any? ? mod.join('/') + '/' : ''
+              ctrl_file = "#{prefix}#{Ruby2JS::Inflector.underscore(parts[0])}_controller"
+            end
+
+            # Use leaf name for import binding (no :: in JS identifiers)
+            import_name = parts.last + 'Controller'
+
+            statements << s(:import, "../app/controllers/#{ctrl_file}.js",
+              [s(:const, nil, import_name.to_sym)])
           end
 
           # Deduplicate path helpers by name (later route overrides earlier,
