@@ -276,6 +276,18 @@ module Ruby2JS
           end
         end
 
+        def on_block(node)
+          call = node.children[0]
+          if !@erb_cache_processing && call&.type == :send && call.children[0].nil? && call.children[1] == :cache
+            # cache do...end → await cache(key, async () => { ... })
+            @erb_cache_processing = true
+            result = process s(:send, nil, :await, node)
+            @erb_cache_processing = false
+            return result
+          end
+          super
+        end
+
         def on_send(node)
           target, method, *args = node.children
 

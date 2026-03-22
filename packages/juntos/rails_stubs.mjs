@@ -14,6 +14,11 @@ Function.prototype.has_markdown = Function.prototype.has_markdown || function() 
 // Controller concern inclusion (no-op for MVP — concerns not mixed into controller IIFEs)
 globalThis.include = globalThis.include || function() {};
 
+// Fragment caching — pass-through for MVP (executes block without caching)
+// Returns the promise so the ERB template can await it.
+// The callback mutates _buf as a side effect.
+globalThis.cache = globalThis.cache || function(key, fn) { return fn(); };
+
 // Authentication stubs (Rails 8 generated authentication concern)
 globalThis.allow_unauthenticated_access = globalThis.allow_unauthenticated_access || function() {};
 globalThis.signed_in = true;  // Default to authenticated for MVP
