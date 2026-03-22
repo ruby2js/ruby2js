@@ -1473,9 +1473,11 @@ module Ruby2JS
             # redirect_to edit_article_url(@article) -> edit_article_path(article)
             # Pass through to path helper (already handles base path)
             helper_name = target.children[0].nil? ? target.children[1].to_s : ''
-            if helper_name.end_with?('_path') || helper_name.end_with?('_url')
-              # Normalize _url to _path
-              path_helper = helper_name.sub(/_url$/, '_path').to_sym
+            path_helper = helper_name.sub(/_url$/, '_path').to_sym
+            routes = @options[:metadata] && @options[:metadata][:routes_mapping]
+            # Check if it's a known route helper, or assume yes if no metadata
+            is_route_helper = routes.nil? || routes[path_helper.to_s]
+            if is_route_helper && (helper_name.end_with?('_path') || helper_name.end_with?('_url'))
               @rails_path_helpers.add(path_helper)
               # Use :send! to force method call with parentheses
               # Ruby source may have no parens but JS needs them

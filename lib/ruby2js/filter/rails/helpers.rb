@@ -292,11 +292,15 @@ module Ruby2JS
           # Rewrite _url helpers to new URL(_path(...), $context.request.url).toString()
           if target.nil? && method.to_s.end_with?('_url')
             path_method = method.to_s.sub(/_url$/, '_path').to_sym
-            path_call = s(:send, nil, path_method, *args)
-            request_url = s(:attr, s(:attr, s(:lvar, :"$context"), :request), :url)
-            return process s(:send,
-              s(:send, s(:const, nil, :URL), :new, path_call, request_url),
-              :to_s)
+            # Only rewrite if the corresponding _path helper exists in routes
+            routes = @options[:metadata] && @options[:metadata][:routes_mapping]
+            if routes.nil? || routes[path_method.to_s]
+              path_call = s(:send, nil, path_method, *args)
+              request_url = s(:attr, s(:attr, s(:lvar, :"$context"), :request), :url)
+              return process s(:send,
+                s(:send, s(:const, nil, :URL), :new, path_call, request_url),
+                :to_s)
+            end
           end
 
           # Handle link_to helper
