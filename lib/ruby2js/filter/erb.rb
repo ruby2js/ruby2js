@@ -135,16 +135,29 @@ module Ruby2JS
         return super unless @erb_bufvar  # Only transform when in ERB mode
         ivar_name = node.children.first
         prop_name = ivar_name.to_s[1..-1].to_sym  # @title -> title
+
+        # In layouts, read ivars from context (set by views via $context.prop = value)
+        if erb_layout_mode?
+          return s(:attr, s(:lvar, :context), prop_name)
+        end
+
         s(:lvar, prop_name)
       end
 
-      # Convert instance variable assignments to local variable assignments
-      # @scores = value -> scores = value
+      # Convert instance variable assignments:
+      # - In views: @layout_class = "books" -> $context.layout_class = "books"
+      #   (stored on context so layouts can read them)
+      # - Also create a local alias for use within the same view
       def on_ivasgn(node)
         return super unless @erb_bufvar  # Only transform when in ERB mode
         ivar_name, value = node.children
-        prop_name = ivar_name.to_s[1..-1].to_sym  # @scores -> scores
-        s(:lvasgn, prop_name, process(value))
+        prop_name = ivar_name.to_s[1..-1].to_sym  # @layout_class -> layout_class
+        processed_value = process(value)
+
+        # Store on $context for layout access AND set local variable
+        s(:begin,
+          s(:send, s(:lvar, :"$context"), "#{prop_name}=".to_sym, processed_value),
+          s(:lvasgn, prop_name, s(:attr, s(:lvar, :"$context"), prop_name)))
       end
 
       # Handle buffer initialization: _erbout = +''; or _buf = ::String.new
