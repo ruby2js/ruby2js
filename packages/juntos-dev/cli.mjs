@@ -2650,7 +2650,8 @@ async function runEject(options) {
         const relativePath = `app/views/layouts/${file}`;
         try {
           const source = readFileSync(join(layoutsDir, file), 'utf-8');
-          const result = await transformErb(source, join(layoutsDir, file), true, config, metadata);
+          const isLayout = !file.startsWith('_');
+          const result = await transformErb(source, join(layoutsDir, file), isLayout, config, metadata);
           // Pass relative output path for correct import resolution
           const relativeOutPath = `app/views/layouts/${file.replace('.html.erb', '.js')}`;
           let code = fixImportsForEject(result.code, relativeOutPath, config);

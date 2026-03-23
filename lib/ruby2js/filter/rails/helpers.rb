@@ -2017,7 +2017,13 @@ module Ruby2JS
           # Build unified props hash with $context, action_name, and locals
           # Use the appropriate context reference (context in layout mode, $context otherwise)
           pairs = [s(:pair, s(:sym, :"$context"), context_ref)]
-          pairs << s(:pair, s(:sym, :action_name), s(:lvar, :action_name))
+          # In layouts, action_name comes from context; in views, it's a local
+          is_layout = @options && @options[:layout]
+          if is_layout
+            pairs << s(:pair, s(:sym, :action_name), s(:attr, s(:lvar, :context), :action_name))
+          else
+            pairs << s(:pair, s(:sym, :action_name), s(:lvar, :action_name))
+          end
           locals.keys.each do |key|
             pairs << s(:pair, s(:sym, key), process(locals[key]))
           end
@@ -2026,7 +2032,9 @@ module Ruby2JS
           # instance variables are automatically available in partials).
           # Uses ...rest spread so controller props flow through to partials
           # without the caller needing to know what the partial needs.
-          if @erb_ivars
+          # Skip in layouts — layouts don't have rest params from controller.
+          is_layout = @options && @options[:layout]
+          if @erb_ivars && !is_layout
             @erb_needs_rest_forwarding = true
             pairs << s(:kwsplat, s(:lvar, :_rest))
           end

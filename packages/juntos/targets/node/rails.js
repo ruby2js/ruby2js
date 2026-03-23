@@ -353,7 +353,7 @@ export class Router extends RouterServer {
     const hydrationPath = Application.enableHydration ? (context.request?.path || '/') : null;
     const viewProps = Application.enableHydration ? context.viewProps : null;
     const html = await resolveContent(content, hydrationPath, viewProps);
-    let fullHtml = Application.wrapInLayout(context, html);
+    let fullHtml = await Application.wrapInLayout(context, html);
 
     // Inject hydration script for dual bundle mode (SSR + client hydration)
     if (Application.enableHydration) {
