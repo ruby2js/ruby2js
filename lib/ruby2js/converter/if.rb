@@ -73,6 +73,13 @@ module Ruby2JS
 
       then_block ||= s(:nil)
 
+      # Pre-declare variables assigned in if conditions (if x = expr)
+      # Ruby implicitly declares; JS strict mode requires explicit declaration
+      if condition.type == :lvasgn && !@vars[condition.children.first]
+        @vars[condition.children.first] = true
+        put "let #{condition.children.first}#{@sep}"
+      end
+
       if @state == :statement
         begin
           inner, @inner = @inner, @ast

@@ -2732,6 +2732,29 @@ export async function transformErb(code, id, isLayout, config, metadata = null) 
     js = `import { escapeHTML } from "juntos/erb_runtime.mjs";\n` + js;
   }
 
+  // Add helper imports for any helper methods used in the template
+  if (metadata?.helpers) {
+    const allHelperMethods = {};
+    for (const [mod, methods] of Object.entries(metadata.helpers)) {
+      for (const method of methods) {
+        allHelperMethods[method] = mod;
+      }
+    }
+    const usedHelpers = {};
+    for (const [method, mod] of Object.entries(allHelperMethods)) {
+      if (js.includes(method + '(')) {
+        if (!usedHelpers[mod]) usedHelpers[mod] = [];
+        usedHelpers[mod].push(method);
+      }
+    }
+    for (const [mod, methods] of Object.entries(usedHelpers)) {
+      const importPath = `@helpers/${mod}.js`;
+      if (!js.includes(importPath)) {
+        js = `import { ${methods.join(', ')} } from "${importPath}";\n` + js;
+      }
+    }
+  }
+
   if (isLayout) {
     js = js.replace(/(^|\n)(async )?function layout/, '$1export $2function layout');
   } else {

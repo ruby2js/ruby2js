@@ -492,6 +492,16 @@ describe Ruby2JS do
         must_equal 'let x, y; if (start) [x, y] = start'
     end
 
+    it "should pre-declare variables assigned in if conditions" do
+      to_js( 'if x = foo(); x; end' ).
+        must_equal 'let x; if (x = foo()) x'
+    end
+
+    it "should not re-declare already declared variables in if conditions" do
+      to_js( 'x = nil; if x = foo(); x; end' ).
+        must_equal 'let x = null; if (x = foo()) x'
+    end
+
     it "should handle while loop" do
       to_js( 'a = 0; while true; a += 1; end' ).
         must_equal 'let a = 0; while (true) {a++}'

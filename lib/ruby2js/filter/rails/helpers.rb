@@ -291,6 +291,21 @@ module Ruby2JS
         def on_send(node)
           target, method, *args = node.children
 
+          # Force function call syntax for known helper methods (zero-arg)
+          # hide_from_user_style_tag → hide_from_user_style_tag()
+          if target.nil? && args.empty? && @erb_bufvar
+            meta = @options && @options[:metadata]
+            if meta && meta['helpers']
+              is_helper = false
+              meta['helpers'].each_pair do |mod, methods|
+                is_helper = true if methods.include?(method.to_s)
+              end
+              if is_helper
+                return process s(:or, s(:send!, nil, method), s(:str, ''))
+              end
+            end
+          end
+
           # Handle form builder methods: f.text_field :name, f.submit, etc.
           if @erb_block_var && target&.type == :lvar &&
              target.children.first == @erb_block_var
