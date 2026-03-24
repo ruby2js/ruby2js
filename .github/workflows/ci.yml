@@ -319,6 +319,26 @@ jobs:
           path: artifacts/demo-ballroom.tar.gz
           retention-days: 7
 
+  package-writebook:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Package writebook demo
+        run: |
+          mkdir -p artifacts
+          cp -r test/writebook artifacts/writebook
+          tar --exclude='node_modules' --exclude='.git' -czf artifacts/demo-writebook.tar.gz -C artifacts writebook
+
+      - name: Upload writebook demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-writebook
+          path: artifacts/demo-writebook.tar.gz
+          retention-days: 7
+
   # ===========================================================================
   # Stage 2: Tests (some run immediately, others depend on Stage 1 artifacts)
   # ===========================================================================
@@ -406,6 +426,45 @@ jobs:
         run: |
           cd test/ballroom
           npx juntos test
+
+  writebook-test:
+    needs: [build-tarballs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          name: tarballs
+          path: artifacts/tarballs
+
+      - name: Install dependencies
+        run: |
+          cd test/writebook
+          npm install \
+            ../../artifacts/tarballs/ruby2js-beta.tgz \
+            ../../artifacts/tarballs/juntos-beta.tgz \
+            ../../artifacts/tarballs/juntos-dev-beta.tgz \
+            ../../artifacts/tarballs/vite-plugin-ruby2js-beta.tgz
+
+      - name: Eject and verify server starts
+        run: |
+          cd test/writebook
+          npx juntos eject -t node
+          cd ejected
+          npm install
+          timeout 10 node main.js &
+          sleep 5
+          curl -s http://localhost:3000/ | grep -q '<title>Writebook</title>'
+          echo "✓ Writebook root page renders"
 
   smoke-test-blog:
     needs: [build-tarballs, create-blog]
@@ -546,7 +605,7 @@ jobs:
   # ===========================================================================
 
   build-site:
-    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-dictaphone, create-workflow, create-notes, create-astro-blog, create-ssg-blog, package-ballroom]
+    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-dictaphone, create-workflow, create-notes, create-astro-blog, create-ssg-blog, package-ballroom, package-writebook]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -683,7 +742,8 @@ jobs:
                 <li><a href="demo-photo-gallery.tar.gz">demo-photo-gallery.tar.gz</a> - Photo gallery demo (Camera, Capacitor, Electron)</li>
                 <li><a href="demo-dictaphone.tar.gz">demo-dictaphone.tar.gz</a> - Dictaphone demo (Active Storage, Whisper)</li>
                 <li><a href="demo-workflow.tar.gz">demo-workflow.tar.gz</a> - Workflow builder demo (React Flow, RPC)</li>
-                <li><a href="demo-ballroom.tar.gz">demo-ballroom.tar.gz</a> - Ballroom demo (component showcase)</li>
+                <li><a href="demo-ballroom.tar.gz">demo-ballroom.tar.gz</a> - Ballroom (full application)</li>
+                <li><a href="demo-writebook.tar.gz">demo-writebook.tar.gz</a> - Writebook (full application)</li>
               </ul>
             </div>
             <div class="section">
@@ -858,16 +918,30 @@ jobs:
                   <a href="releases/demo-workflow.tar.gz">Tarball</a>
                 </div>
               </div>
+            </div>
+
+            <h2 class="section">Full Applications <span style="font-size: 0.6em; font-weight: normal; color: #888;">(work in progress)</span></h2>
+            <div class="demos">
               <div class="demo">
                 <div class="demo-content">
                   <h3><a href="ballroom/">Ballroom</a></h3>
-                  <p>Juntos component showcase and testing ground.</p>
+                  <p>Dance competition scoring. 40+ models, concerns, validations. (Rails)</p>
                 </div>
                 <div class="demo-links">
                   <a href="editor/?demo=ballroom">Editor</a>
                   <a href="editor/?demo=ballroom&mode=test">Test</a>
                   <a href="https://github.com/rubys/ballroom">GitHub</a>
                   <a href="releases/demo-ballroom.tar.gz">Tarball</a>
+                </div>
+              </div>
+              <div class="demo">
+                <div class="demo-content">
+                  <h3>Writebook</h3>
+                  <p>Collaborative book publishing. Basecamp's Rails 8 app. (Rails)</p>
+                </div>
+                <div class="demo-links">
+                  <a href="https://github.com/rubys/writebook">GitHub</a>
+                  <a href="releases/demo-writebook.tar.gz">Tarball</a>
                 </div>
               </div>
             </div>
@@ -894,7 +968,7 @@ jobs:
               // GitHub Pages SPA redirect for direct URL access
               // Detects which demo the path belongs to and redirects there
               const path = location.pathname;
-              const demos = ['ssg-blog', 'astro-blog', 'blog', 'chat', 'notes', 'photo-gallery', 'dictaphone', 'workflow', 'ballroom'];
+              const demos = ['ssg-blog', 'astro-blog', 'blog', 'chat', 'notes', 'photo-gallery', 'dictaphone', 'workflow', 'ballroom', 'writebook'];
               const base = '/ruby2js/';
 
               // Find which demo this path belongs to
