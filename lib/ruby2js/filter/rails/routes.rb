@@ -858,7 +858,6 @@ module Ruby2JS
           seen_controllers = {}
           all_controllers.each do |ctrl|
             next if seen_controllers[ctrl[:controller_name]]
-            next if known_controllers && !known_controllers[ctrl[:controller_name]]
             seen_controllers[ctrl[:controller_name]] = true
             statements << s(:import, "../app/controllers/#{ctrl[:controller_file]}.js",
               [s(:const, nil, ctrl[:controller_name].to_sym)])
