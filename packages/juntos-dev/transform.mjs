@@ -728,56 +728,77 @@ export function deriveAssociationMap(metadata) {
 /**
  * Fix imports in transpiled code to use virtual modules and source files.
  * Used by Vite plugin for on-the-fly transformation.
+ *
+ * Single-pass resolver: one regex matches all `from '...'` imports,
+ * a resolver function decides the target based on the source path.
  */
 export function fixImports(js, fromFile) {
-  // Virtual modules for runtime
-  js = js.replace(/from ['"]\.\.\/lib\/rails\.js['"]/g, "from 'juntos:rails'");
-  js = js.replace(/from ['"]\.\.\/\.\.\/lib\/rails\.js['"]/g, "from 'juntos:rails'");
-  js = js.replace(/from ['"]\.\.\/\.\.\/\.\.\/lib\/rails\.js['"]/g, "from 'juntos:rails'");
-  js = js.replace(/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, "from 'juntos:active-record'");
-  js = js.replace(/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, "from 'juntos:active-record'");
+  const inModels = fromFile?.includes('/models/') || false;
 
-  // Model imports: .js → .rb (same directory, including nested paths like identity/access_token)
-  js = js.replace(/from ['"]\.\/([\w/]+)\.js['"]/g, "from './$1.rb'");
+  return js.replace(/from (['"])(.*?)\1/g, (match, quote, source) => {
+    const resolved = resolveImport(source, inModels);
+    return resolved ? `from '${resolved}'` : match;
+  });
+}
 
-  // Model imports from controllers: ../models/*.js → ../models/*.rb (including nested paths)
-  js = js.replace(/from ['"]\.\.\/models\/([\w/]+)\.js['"]/g, "from '../models/$1.rb'");
+function resolveImport(source, inModels) {
+  // Static virtual module mappings (any number of ../ prefixes)
+  const libMatch = source.match(/^(?:\.\.\/)+lib\/rails\.js$/);
+  if (libMatch) return 'juntos:rails';
 
-  // View partials first (more specific): ../views/comments/_comment.js → app/views/comments/_comment.html.erb
-  js = js.replace(/from ['"]\.\.\/views\/(\w+)\/(\_[\w]+)\.js['"]/g, "from 'app/views/$1/$2.html.erb'");
-  // View barrels: ../views/*.js or ../views/pages/edits.js → juntos:views/*
-  js = js.replace(/from ['"](?:\.\.\/)+views\/([\w/]+)\.js['"]/g, "from 'juntos:views/$1'");
+  const arMatch = source.match(/^(?:\.\.\/)+lib\/active_record\.mjs$/);
+  if (arMatch) return 'juntos:active-record';
 
-  // Config: ../../config/paths.js → juntos:paths (path helpers virtual module)
-  // This breaks the circular dependency between routes.rb and controllers
-  js = js.replace(/from ['"]\.\.\/\.\.\/config\/paths\.js['"]/g, "from 'juntos:paths'");
-  js = js.replace(/from ['"]\.\/paths\.js['"]/g, "from 'juntos:paths'");
+  // Config paths → virtual module
+  if (/^(?:\.\.\/)+config\/paths\.js$/.test(source)) return 'juntos:paths';
+  if (source === './paths.js') return 'juntos:paths';
 
-  // Helpers: @helpers/*.js → @helpers/*.rb (Vite resolves @helpers alias to app/helpers/)
-  js = js.replace(/from ['"]@helpers\/([\w]+)\.js['"]/g, "from '@helpers/$1.rb'");
+  // Migrations → virtual module
+  if (/^(?:\.\.\/)+db\/migrate\/index\.js$/.test(source)) return 'juntos:migrations';
+
+  // Seeds → source file
+  if (/^(?:\.\.\/)+db\/seeds\.js$/.test(source)) return 'db/seeds.rb';
+
+  // Models index → virtual module
+  if (/^(?:\.\.\/)+app\/models\/index\.js$/.test(source)) return 'juntos:models';
+  if (source === './index.js' && inModels) return 'juntos:models';
+
+  // Layout → ERB source
+  if (/^(?:\.\.\/)+app\/views\/layouts\/application\.js$/.test(source)) {
+    return '@views/layouts/application.html.erb';
+  }
 
   // Controllers: ../app/controllers/*.js → app/controllers/*.rb
-  js = js.replace(/from ['"]\.\.\/app\/controllers\/(\w+)\.js['"]/g, "from 'app/controllers/$1.rb'");
+  const ctrlMatch = source.match(/^(?:\.\.\/)+app\/controllers\/([\w/]+)\.js$/);
+  if (ctrlMatch) return `app/controllers/${ctrlMatch[1]}.rb`;
 
-  // Migrations: ../db/migrate/index.js → juntos:migrations
-  js = js.replace(/from ['"]\.\.\/db\/migrate\/index\.js['"]/g, "from 'juntos:migrations'");
+  // @helpers/*.js → @helpers/*.rb
+  const helperMatch = source.match(/^@helpers\/([\w]+)\.js$/);
+  if (helperMatch) return `@helpers/${helperMatch[1]}.rb`;
 
-  // Seeds: ../db/seeds.js → db/seeds.rb
-  js = js.replace(/from ['"]\.\.\/db\/seeds\.js['"]/g, "from 'db/seeds.rb'");
+  // View imports (must distinguish barrels from partials)
+  const viewMatch = source.match(/^(?:\.\.\/)+views\/([\w/]+)\.js$/);
+  if (viewMatch) {
+    const viewPath = viewMatch[1];
+    // Partials: last segment starts with _
+    const lastSegment = viewPath.split('/').pop();
+    if (lastSegment.startsWith('_')) {
+      return `app/views/${viewPath}.html.erb`;
+    }
+    // View barrels → virtual module
+    return `juntos:views/${viewPath}`;
+  }
 
-  // Models index: ../app/models/index.js → juntos:models
-  js = js.replace(/from ['"]\.\.\/app\/models\/index\.js['"]/g, "from 'juntos:models'");
-  js = js.replace(/from ['"]\.\/index\.js['"]/g, (match) => {
-    // Only apply if we're in models directory
-    if (fromFile.includes('/models/')) return "from 'juntos:models'";
-    return match;
-  });
+  // Model imports from controllers: ../models/*.js → ../models/*.rb
+  const modelFromCtrl = source.match(/^\.\.\/models\/([\w/]+)\.js$/);
+  if (modelFromCtrl) return `../models/${modelFromCtrl[1]}.rb`;
 
-  // Layout: ../app/views/layouts/application.js → @views/layouts/application.html.erb
-  js = js.replace(/from ['"]\.\.\/app\/views\/layouts\/application\.js['"]/g,
-    "from '@views/layouts/application.html.erb'");
+  // Same-directory .js → .rb (models referencing other models)
+  const localJs = source.match(/^\.\/([\w/]+)\.js$/);
+  if (localJs) return `./${localJs[1]}.rb`;
 
-  return js;
+  // No match — leave unchanged
+  return null;
 }
 
 /**
