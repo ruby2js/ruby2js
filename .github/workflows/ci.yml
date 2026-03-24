@@ -657,7 +657,7 @@ jobs:
             (cd "artifacts/$demo" && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
           done
 
-          # Writebook: full Rails app with its own package.json
+          # Writebook: full Rails app with SQLite OPFS via SharedWorker
           echo "Building writebook for browser..."
           (cd "artifacts/writebook" && node ../cli/package/cli.mjs init --no-install)
           (cd "artifacts/writebook" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/juntos-beta.tgz ../tarballs/juntos-dev-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz @hotwired/turbo @hotwired/stimulus @rails/request.js)

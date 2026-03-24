@@ -1839,6 +1839,23 @@ export { application };`,
         }
       }
 
+      // Worker target: copy coi-serviceworker.js for COOP/COEP headers on static hosts
+      if (config.target === 'worker') {
+        try {
+          const coiSource = new URL('juntos/coi-serviceworker.js', import.meta.url).pathname;
+          const coiDest = path.join(distDir, 'coi-serviceworker.js');
+          fs.copyFileSync(coiSource, coiDest);
+          console.log('[juntos] Copied coi-serviceworker.js for cross-origin isolation');
+        } catch {
+          // Fallback: try resolving from node_modules
+          const coiPath = path.join(appRoot, 'node_modules/juntos/coi-serviceworker.js');
+          if (fs.existsSync(coiPath)) {
+            fs.copyFileSync(coiPath, path.join(distDir, 'coi-serviceworker.js'));
+            console.log('[juntos] Copied coi-serviceworker.js for cross-origin isolation');
+          }
+        }
+      }
+
       // Generate Electrobun config files
       if (config.target === 'electrobun') {
         generateElectrobunConfig(distDir, appRoot);
@@ -2184,7 +2201,7 @@ function createBrowserEntryPlugin(config, appRoot) {
     if (!indexHtmlContent) {
       const appName = detectAppName(appRoot);
       const cssPath = detectCssPath(appRoot);
-      indexHtmlContent = generateBrowserIndexHtml(appName, '/.browser/main.js', cssPath);
+      indexHtmlContent = generateBrowserIndexHtml(appName, '/.browser/main.js', cssPath, { target: config.target });
     }
     return indexHtmlContent;
   }

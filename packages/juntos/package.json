@@ -29,6 +29,7 @@
     "./url_helpers.mjs": "./url_helpers.mjs",
     "./current_attributes.mjs": "./current_attributes.mjs",
     "./rails_stubs.mjs": "./rails_stubs.mjs",
+    "./coi-serviceworker.js": "./coi-serviceworker.js",
     "./renderers/*": "./renderers/*"
   },
   "files": [
@@ -52,6 +53,7 @@
     "url_helpers.mjs",
     "current_attributes.mjs",
     "rails_stubs.mjs",
+    "coi-serviceworker.js",
     "renderers/"
   ],
   "keywords": [
