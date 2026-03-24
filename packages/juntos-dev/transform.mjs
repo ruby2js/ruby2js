@@ -743,9 +743,10 @@ export function fixImports(js, fromFile) {
   // Model imports from controllers: ../models/*.js → ../models/*.rb (including nested paths)
   js = js.replace(/from ['"]\.\.\/models\/([\w/]+)\.js['"]/g, "from '../models/$1.rb'");
 
-  // Views: ../views/*.js → juntos:views/*
-  js = js.replace(/from ['"]\.\.\/views\/(\w+)\.js['"]/g, "from 'juntos:views/$1'");
-  js = js.replace(/from ['"]\.\.\/views\/(\w+)\/([\w_]+)\.js['"]/g, "from 'app/views/$1/$2.html.erb'");
+  // View partials first (more specific): ../views/comments/_comment.js → app/views/comments/_comment.html.erb
+  js = js.replace(/from ['"]\.\.\/views\/(\w+)\/(\_[\w]+)\.js['"]/g, "from 'app/views/$1/$2.html.erb'");
+  // View barrels: ../views/*.js or ../views/pages/edits.js → juntos:views/*
+  js = js.replace(/from ['"](?:\.\.\/)+views\/([\w/]+)\.js['"]/g, "from 'juntos:views/$1'");
 
   // Config: ../../config/paths.js → juntos:paths (path helpers virtual module)
   // This breaks the circular dependency between routes.rb and controllers
