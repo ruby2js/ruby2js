@@ -254,9 +254,15 @@ export class ImportResolver {
           js = `import { modelRegistry } from 'app/models/application_record.rb';\n${js}`;
         } else {
           // Eject: import from relative application_record.js
-          const depth = currentModelPath ? currentModelPath.split('/').length - 1 : 0;
-          const prefix = depth > 0 ? '../'.repeat(depth) : './';
-          js = `import { modelRegistry } from '${prefix}application_record.js';\n${js}`;
+          let arPath;
+          if (this.#fileType === 'model') {
+            const depth = currentModelPath ? currentModelPath.split('/').length - 1 : 0;
+            const prefix = depth > 0 ? '../'.repeat(depth) : './';
+            arPath = `${prefix}application_record.js`;
+          } else {
+            arPath = `${this.#rootPrefix}app/models/application_record.js`;
+          }
+          js = `import { modelRegistry } from '${arPath}';\n${js}`;
         }
       }
 
