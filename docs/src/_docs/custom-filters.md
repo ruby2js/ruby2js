@@ -344,6 +344,146 @@ test_cases.each do |code|
 end
 ```
 
+## Filter DSL
+
+For app-specific filters, Ruby2JS provides a declarative DSL that is simpler than writing raw `on_*` methods with `s()` calls. Filters written with the DSL can be transpiled to JavaScript for use with the selfhost runtime.
+
+The DSL supports multiple layers, from most declarative to most flexible. You can mix layers freely within a single filter.
+
+### Layer 1: Declarative Rewrites
+
+The simplest approach — match a Ruby expression pattern and replace it:
+
+```ruby
+require 'ruby2js/filter_dsl'
+
+Ruby2JS.filter(:MyApp) do
+  # Rename method calls
+  rewrite 'puts(_1)', to: 'console.log(_1)'
+  rewrite 'p(_1)', to: 'console.log(_1)'
+
+  # Stub a gem with a static value
+  rewrite 'RQRCode::QRCode.new(_1).as_svg(_2)',
+    to: '"<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>"'
+
+  # Replace a constant
+  rewrite 'Rails::Html::WhiteListSanitizer.allowed_tags',
+    to: '%w[a b em strong p br]'
+end
+```
+
+Placeholders `_1`, `_2`, etc. match any subtree and can be referenced in the replacement. The pattern and replacement strings are parsed as Ruby expressions at definition time.
+
+### Layer 2: Pattern Matching
+
+When you need conditional logic, use Ruby's `case/in` pattern matching on AST nodes. This is valid Ruby syntax that transpiles to JavaScript automatically:
+
+```ruby
+Ruby2JS.filter(:MyApp) do
+  on_send do |node|
+    case node
+    in type: :send, children: [nil, :log, {type: :str} => msg]
+      s(:send, s(:lvar, :console), :log, msg)
+    else
+      nil  # return nil to skip (falls through to super)
+    end
+  end
+end
+```
+
+### Layer 3: Builders
+
+For generating complex AST structures, builder classes provide a readable API:
+
+```ruby
+require 'ruby2js/builder'
+
+# Call builder — chainable method calls
+call = Ruby2JS::Builder::Call.self(:save).await
+# => s(:send, nil, :await, s(:send, s(:self), :save))
+
+call = Ruby2JS::Builder::Call.on(receiver, :find, id).chain(:first).await
+# => await receiver.find(id).first()
+
+# Property access (no parentheses)
+call = Ruby2JS::Builder::Call.self_attr(:name)
+# => this.name
+
+# Member builder — class members
+Ruby2JS::Builder::Member.getter(:name, body)
+# => get name() { body }
+
+Ruby2JS::Builder::Member.cached_getter(:comments, constructor)
+# => get comments() { if (this._comments) return this._comments; return this._comments = constructor; }
+
+Ruby2JS::Builder::Member.accessor(:items, constructor)
+# => getter + setter pair
+
+Ruby2JS::Builder::Member.async(:create, args, body)
+# => async create(args) { body }
+
+# Html builder — HTML template literals
+Ruby2JS::Builder::Html.tag(:a, {class: "btn", href: path_expr}, text_expr)
+# Static attrs collapse into strings; dynamic attrs use template interpolation
+
+Ruby2JS::Builder::Html.void(:input, {type: "hidden", name: "token", value: val})
+# => <input type="hidden" name="token" value="${val}" />
+```
+
+### Layer 4: Raw s() Calls
+
+You can always drop down to raw AST construction when no higher-level abstraction fits:
+
+```ruby
+Ruby2JS.filter(:MyApp) do
+  on_send do |node|
+    receiver, method, *args = node.children
+    if some_unusual_condition?(receiver, method)
+      s(:send, nil, :custom_thing, *args)
+    end
+  end
+end
+```
+
+### Combining Layers
+
+All layers coexist in a single filter:
+
+```ruby
+Ruby2JS.filter(:MyApp) do
+  # Layer 1: simple rewrites
+  rewrite 'puts(_1)', to: 'console.log(_1)'
+
+  # Layer 2+3+4: custom handler with pattern matching and builders
+  on_send do |node|
+    case node
+    in type: :send, children: [nil, :positioned_within, {type: :sym, children: [parent]}, *]
+      Ruby2JS::Builder::Member.method(:positioning_parent, s(:args),
+        Ruby2JS::Builder::Call.self(parent).node)
+    else
+      nil
+    end
+  end
+end
+```
+
+### App-Specific Filters (Juntos)
+
+For Juntos applications, place your filter at `config/ruby2js_filter.rb`. It will be automatically transpiled to JavaScript and loaded before the built-in filters.
+
+```ruby
+# config/ruby2js_filter.rb
+filter :Writebook do
+  # Stub QR code gem (not needed in browser)
+  rewrite 'RQRCode::QRCode.new(_1).as_svg(_2)',
+    to: '"<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>"'
+
+  # Replace sanitizer constant
+  rewrite 'Rails::Html::WhiteListSanitizer.allowed_tags',
+    to: '%w[a abbr b blockquote br code em h1 h2 h3 h4 h5 h6 hr i li ol p pre s span strong u ul]'
+end
+```
+
 ## Real-World Examples
 
 For more complex examples, explore the built-in filters in the Ruby2JS source:
