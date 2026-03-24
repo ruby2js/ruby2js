@@ -228,6 +228,27 @@ import { loadDatabaseConfig } from 'juntos/config.mjs';
  * @param {Object} overrides - Option overrides from juntos() call
  * @returns {Object} Merged configuration
  */
+/**
+ * Parse config/importmap.rb for pin_all_from entries and generate Vite aliases.
+ * pin_all_from "app/javascript/helpers", under: "helpers"
+ * → { helpers: path.join(appRoot, "app/javascript/helpers") }
+ */
+function parseImportmapAliases(appRoot) {
+  const aliases = {};
+  const importmapPath = path.join(appRoot, 'config/importmap.rb');
+  if (!fs.existsSync(importmapPath)) return aliases;
+
+  const source = fs.readFileSync(importmapPath, 'utf-8');
+  const pattern = /pin_all_from\s+["']([^"']+)["']\s*,\s*under:\s*["']([^"']+)["']/g;
+  let match;
+  while ((match = pattern.exec(source)) !== null) {
+    const dir = match[1];   // e.g., "app/javascript/helpers"
+    const under = match[2]; // e.g., "helpers"
+    aliases[under] = path.join(appRoot, dir);
+  }
+  return aliases;
+}
+
 export function loadConfig(appRoot, overrides = {}) {
   const env = process.env.RAILS_ENV || process.env.NODE_ENV || 'development';
 
@@ -617,11 +638,10 @@ function createErbPlugin(config) {
     // Fix cross-directory partial imports: ../comments/_comment.js -> @views/comments/_comment.html.erb
     js = js.replace(/from ["']\.\.\/(\w+)\/(\_\w+)\.js["']/g, 'from "@views/$1/$2.html.erb"');
 
-    // Fix view module imports: import { PhotoViews } from "../photos.js" -> from "juntos:views/photos"
-    // The helpers filter generates these for turbo_stream shorthand: turbo_stream.prepend "photos", @photo
-    // Match pattern: import { <Name>Views } from "../<resource>.js"
-    js = js.replace(/import\s*\{\s*(\w+)Views\s*\}\s*from\s*["']\.\.\/(\w+)\.js["']/g,
-      (match, name, plural) => `import { ${name}Views } from "juntos:views/${plural}"`);
+    // Fix view module imports: import { PhotoViews } from "../views/<resource>.js" -> from "juntos:views/<resource>"
+    // Handles both flat (../photos.js) and nested (../../views/pages/edits.js) controller view imports
+    js = js.replace(/import\s*\{\s*(\w+)Views\s*\}\s*from\s*["'](?:\.\.\/)+(?:views\/)?([\w/]+)\.js["']/g,
+      (match, name, resourcePath) => `import { ${name}Views } from "juntos:views/${resourcePath}"`);
 
     // Fix helper imports: @helpers/*.js -> @helpers/*.rb
     // Helpers are source .rb files that Vite transforms on-the-fly via @helpers alias
@@ -991,6 +1011,16 @@ function createRubyTransformPlugin(config, appRoot) {
         if (!source.startsWith('.') && !source.startsWith('/')) {
           const absPath = path.join(appRoot, source);
           if (fs.existsSync(absPath)) return absPath;
+        }
+      }
+
+      // Resolve .js imports as .rb when the .js doesn't exist (eject-style paths in Vite)
+      if (source.endsWith('.js') && importer) {
+        const importerDir = path.dirname(importer);
+        const jsPath = path.resolve(importerDir, source);
+        if (!fs.existsSync(jsPath)) {
+          const rbPath = jsPath.replace(/\.js$/, '.rb');
+          if (fs.existsSync(rbPath)) return rbPath;
         }
       }
 
@@ -1404,6 +1434,9 @@ function createConfigPlugin(config, appRoot) {
 
         // Rails importmap uses bare "controllers" for app/javascript/controllers
         'controllers': path.join(appRoot, 'app/javascript/controllers'),
+
+        // Parse config/importmap.rb for pin_all_from entries
+        ...parseImportmapAliases(appRoot),
 
         // node_modules is now at appRoot (standard Vite structure)
         // No aliases needed - Vite resolves these automatically
