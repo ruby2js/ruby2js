@@ -532,7 +532,7 @@ export class Router extends RouterBase {
   // Handles both sync and async views, and both string and React element returns
   static async htmlResponse(context, content, status = 200) {
     const html = await resolveContent(content);
-    let fullHtml = Application.wrapInLayout(context, html);
+    let fullHtml = await Application.wrapInLayout(context, html);
 
     // Inject client hydration script if dual bundle mode is active
     // The client.js file is generated when RPC imports are detected
