@@ -24,11 +24,13 @@
     "./svelte": "./dist/svelte_component_transformer.mjs",
     "./vue": "./dist/vue_component_transformer.mjs",
     "./dist/*": "./dist/*",
-    "./lib/*": "./lib/*"
+    "./lib/*": "./lib/*",
+    "./import-resolver.mjs": "./import-resolver.mjs"
   },
   "files": [
     "cli.mjs",
     "vite.mjs",
+    "import-resolver.mjs",
     "vite-models.mjs",
     "vite-ssr-dev.mjs",
     "transform.mjs",

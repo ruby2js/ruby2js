@@ -725,80 +725,20 @@ export function deriveAssociationMap(metadata) {
 // Import path rewriting
 // ============================================================
 
+import { ImportResolver } from './import-resolver.mjs';
+
 /**
  * Fix imports in transpiled code to use virtual modules and source files.
  * Used by Vite plugin for on-the-fly transformation.
- *
- * Single-pass resolver: one regex matches all `from '...'` imports,
- * a resolver function decides the target based on the source path.
+ * Delegates to shared ImportResolver in 'vite' mode.
  */
 export function fixImports(js, fromFile) {
-  const inModels = fromFile?.includes('/models/') || false;
-
-  return js.replace(/from (['"])(.*?)\1/g, (match, quote, source) => {
-    const resolved = resolveImport(source, inModels);
-    return resolved ? `from '${resolved}'` : match;
+  const resolver = new ImportResolver({
+    mode: 'vite',
+    fromFile: fromFile || '',
+    config: {}
   });
-}
-
-function resolveImport(source, inModels) {
-  // Static virtual module mappings (any number of ../ prefixes)
-  const libMatch = source.match(/^(?:\.\.\/)+lib\/rails\.js$/);
-  if (libMatch) return 'juntos:rails';
-
-  const arMatch = source.match(/^(?:\.\.\/)+lib\/active_record\.mjs$/);
-  if (arMatch) return 'juntos:active-record';
-
-  // Config paths → virtual module
-  if (/^(?:\.\.\/)+config\/paths\.js$/.test(source)) return 'juntos:paths';
-  if (source === './paths.js') return 'juntos:paths';
-
-  // Migrations → virtual module
-  if (/^(?:\.\.\/)+db\/migrate\/index\.js$/.test(source)) return 'juntos:migrations';
-
-  // Seeds → source file
-  if (/^(?:\.\.\/)+db\/seeds\.js$/.test(source)) return 'db/seeds.rb';
-
-  // Models index → virtual module
-  if (/^(?:\.\.\/)+app\/models\/index\.js$/.test(source)) return 'juntos:models';
-  if (source === './index.js' && inModels) return 'juntos:models';
-
-  // Layout → ERB source
-  if (/^(?:\.\.\/)+app\/views\/layouts\/application\.js$/.test(source)) {
-    return '@views/layouts/application.html.erb';
-  }
-
-  // Controllers: ../app/controllers/*.js → app/controllers/*.rb
-  const ctrlMatch = source.match(/^(?:\.\.\/)+app\/controllers\/([\w/]+)\.js$/);
-  if (ctrlMatch) return `app/controllers/${ctrlMatch[1]}.rb`;
-
-  // @helpers/*.js → @helpers/*.rb
-  const helperMatch = source.match(/^@helpers\/([\w]+)\.js$/);
-  if (helperMatch) return `@helpers/${helperMatch[1]}.rb`;
-
-  // View imports (must distinguish barrels from partials)
-  const viewMatch = source.match(/^(?:\.\.\/)+views\/([\w/]+)\.js$/);
-  if (viewMatch) {
-    const viewPath = viewMatch[1];
-    // Partials: last segment starts with _
-    const lastSegment = viewPath.split('/').pop();
-    if (lastSegment.startsWith('_')) {
-      return `app/views/${viewPath}.html.erb`;
-    }
-    // View barrels → virtual module
-    return `juntos:views/${viewPath}`;
-  }
-
-  // Model imports from controllers: ../models/*.js → ../models/*.rb
-  const modelFromCtrl = source.match(/^\.\.\/models\/([\w/]+)\.js$/);
-  if (modelFromCtrl) return `../models/${modelFromCtrl[1]}.rb`;
-
-  // Same-directory .js → .rb (models referencing other models)
-  const localJs = source.match(/^\.\/([\w/]+)\.js$/);
-  if (localJs) return `./${localJs[1]}.rb`;
-
-  // No match — leave unchanged
-  return null;
+  return resolver.resolve(js);
 }
 
 /**
@@ -838,74 +778,13 @@ export function fixTestImportsForEject(js) {
  * @param {object} config - Configuration with target/database info
  */
 export function fixImportsForEject(js, fromFile, config = {}) {
-  // Determine the target runtime based on config
-  // Default to 'node' for sqlite3/better_sqlite3, 'browser' for dexie
-  let target = config.target || 'node';
-  if (!config.target && config.database === 'dexie') {
-    target = 'browser';
-  }
-
-  const railsModule = `juntos/targets/${target}/rails.js`;
-  const adapterFile = getActiveRecordAdapterFile(config.database);
-
-  // Depth-relative prefix for resolving paths from the current file to the project root
-  const depth = fromFile ? fromFile.split('/').length - 1 : 1;
-  const rootPrefix = '../'.repeat(depth);
-
-  // Import path resolution table: source module → target module.
-  // A single pass matches all `from '...'` imports and resolves them.
-  const importMap = {
-    // Virtual modules
-    'juntos:rails': railsModule,
-    'juntos:active-storage': 'juntos/adapters/active_storage_base.mjs',
-    'juntos:url-helpers': 'juntos/url_helpers.mjs',
-
-    // Runtime lib paths (various depths) → target-specific modules
-    '../lib/rails.js': railsModule,
-    '../../lib/rails.js': railsModule,
-    '../../../lib/rails.js': railsModule,
-    'lib/rails.js': railsModule,
-    'ruby2js-rails/rails_base.js': railsModule,
-    'juntos/rails_base.js': railsModule,
-    '../lib/active_record.mjs': `juntos/adapters/${adapterFile}`,
-    '../../lib/active_record.mjs': `juntos/adapters/${adapterFile}`,
-  };
-
-  // Dynamic path patterns (require prefix computation)
-  const dynamicPatterns = {
-    // @config/paths.js → depth-relative config/paths.js
-    '@config/paths.js': `${rootPrefix}config/paths.js`,
-  };
-
-  // Resolve static and dynamic imports in a single pass
-  js = js.replace(/from (['"])(.*?)\1/g, (match, quote, source) => {
-    // Check static map first
-    if (importMap[source]) {
-      return `from '${importMap[source]}'`;
-    }
-
-    // Check dynamic patterns
-    if (dynamicPatterns[source]) {
-      return `from '${dynamicPatterns[source]}'`;
-    }
-
-    // @helpers/*.js → depth-relative app/helpers/*.js
-    if (source.startsWith('@helpers/')) {
-      const helperFile = source.slice(9).replace(/\.rb$/, '.js');
-      return `from '${rootPrefix}app/helpers/${helperFile}'`;
-    }
-
-    return match;
+  // Delegate to shared ImportResolver in 'eject' mode
+  const resolver = new ImportResolver({
+    mode: 'eject',
+    fromFile: fromFile || '',
+    config
   });
-
-  // Rewrite _url imports to _path (the helpers filter transforms _url calls
-  // to new URL(_path(...), request.url).toString(), so the import needs _path)
-  js = js.replace(/import\s*\{([^}]+)\}\s*from\s*(['"])(.*?paths\.js)\2/g, (match, names, quote, source) => {
-    const rewritten = names.replace(/(\w+)_url\b/g, '$1_path');
-    // Deduplicate (if both _url and _path were imported, now both are _path)
-    const unique = [...new Set(rewritten.split(',').map(s => s.trim()))].join(', ');
-    return `import { ${unique} } from ${quote}${source}${quote}`;
-  });
+  js = resolver.resolve(js);
 
   // Fix selfhost converter Struct.new pattern: [(X = function X(...) {...}).prototype] = [X.prototype]
   // The right side references X before assignment completes. Simplify to plain let declaration.
@@ -920,211 +799,31 @@ export function fixImportsForEject(js, fromFile, config = {}) {
     /^(\w+)\.prototype\.(\w+) = \1\.prototype\.(\w+)$/gm,
     '{ let _p = $1.prototype; while (_p && !Object.getOwnPropertyDescriptor(_p, "$3")) _p = Object.getPrototypeOf(_p); if (_p) Object.defineProperty($1.prototype, "$2", Object.getOwnPropertyDescriptor(_p, "$3")); }');
 
-  // Handle relative paths to config/paths.js (keep as paths.js, not routes.js)
-  // This is used for controllers: ../../config/paths.js → ../../config/paths.js
-  // No change needed - paths.js is the correct target
+  // Remaining import resolution (nested depth, controller concerns, superclass
+  // imports, model cross-references, _url rewriting) is handled by ImportResolver.
+  // Only JS syntax fixes remain below.
 
-  // For nested model files (in subdirectories), adjust ./ imports to point back to models root.
-  // The model filter generates all paths relative to app/models/, but nested files are in subdirs.
-  // e.g., identity/access_token.js has './application_record.js' → '../application_record.js'
-  if (fromFile && fromFile.startsWith('app/models/')) {
-    const modelRelPath = fromFile.replace('app/models/', '');
-    const depth = modelRelPath.split('/').length - 1; // 0 for top-level, 1 for identity/x.js, etc.
-    if (depth > 0) {
-      const prefix = '../'.repeat(depth);
-      js = js.replace(/from ['"]\.\/([\w/]+\.js)['"]/g, `from '${prefix}$1'`);
-    }
-  }
-
-  // For controller files, fix concern imports BEFORE depth adjustment.
-  // The controller filter generates ALL includes as ../models/xxx.js, but controller concerns
-  // live in ./concerns/xxx.js. Fix this first so depth adjustment applies correctly.
-  if (fromFile && fromFile.startsWith('app/controllers/')) {
-    const controllerConcerns = config.controllerConcerns;
-    const concernFallbackPatterns = ['scoped', 'authentication', 'authorization'];
-    js = js.replace(/from ['"]\.\.\/models\/([\w]+)\.js['"]/g, (match, name) => {
-      if (controllerConcerns) {
-        // Exact match against known controller concern files
-        if (controllerConcerns.has(name)) {
-          return `from './concerns/${name}.js'`;
-        }
-      } else {
-        // Fallback to pattern matching when concern list unavailable (e.g., dev mode)
-        const isLikelyConcern = concernFallbackPatterns.some(p => name.toLowerCase().includes(p));
-        if (isLikelyConcern) {
-          return `from './concerns/${name}.js'`;
-        }
-      }
-      return match;
-    });
-
-    // For nested controller files (in subdirectories), adjust relative imports.
-    // The controller filter generates paths relative to app/controllers/, but nested files
-    // (e.g., cards/closures_controller.js) are in subdirs.
-    // ./concerns/card_scoped.js → ../concerns/card_scoped.js (one level)
-    // ../models/current.js → ../../models/current.js (one level)
-    // ../views/foo.js → ../../views/foo.js (one level)
-    const ctrlRelPath = fromFile.replace('app/controllers/', '');
-    const depth = ctrlRelPath.split('/').length - 1; // 0 for top-level, 1 for cards/x.js, etc.
-    if (depth > 0) {
-      const prefix = '../'.repeat(depth);
-      // Adjust any ../ relative imports by prepending depth prefix.
-      // Handles ../models/*, ../../config/*, etc. — any number of ../ levels.
-      js = js.replace(/from ['"]((?:\.\.\/)+)([\w/]+\.(?:js|mjs))['"]/g,
-        (match, dots, path) => `from '${prefix}${dots}${path}'`);
-      // Adjust ./ relative imports (e.g., ./concerns/*)
-      js = js.replace(/from ['"]\.\/([\w/]+\.(?:js|mjs))['"]/g, `from '${prefix}$1'`);
-    }
-  }
-
-  // Add missing superclass imports for nested model files.
-  // When ESM autoexport unnests a namespaced class (e.g., Account::Export < Export),
-  // the model filter may not generate an import for the superclass if it doesn't recognize
-  // the class as an ActiveRecord model. We detect `extends ClassName` without a matching
-  // import and add it, using the models list to find the correct path.
-  if (fromFile && fromFile.startsWith('app/models/') && config.models) {
-    const modelRelPath = fromFile.replace('app/models/', '').replace(/\.js$/, '');
-    const depth = modelRelPath.split('/').length - 1;
-    if (depth > 0) {
-      // Check for extends clause without a corresponding import
-      const extendsMatch = js.match(/(?:class \w+ extends |class extends )(\w+)\s*\{/);
-      if (extendsMatch) {
-        const superclassName = extendsMatch[1];
-        // Check if this superclass is already imported
-        const importPattern = new RegExp(`import\\s+\\{[^}]*\\b${superclassName}\\b[^}]*\\}\\s+from`);
-        if (!importPattern.test(js) && superclassName !== 'ApplicationRecord') {
-          // Convert PascalCase to snake_case to find the model file
-          const snakeName = superclassName.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
-          // Try same-namespace path first (e.g., account/data_transfer/record_set for RecordSet
-          // in account/data_transfer/account_record_set.js), then top-level.
-          // Skip self-references (account/export shouldn't import from itself).
-          const currentNamespace = modelRelPath.split('/').slice(0, -1).join('/');
-          const namespacedPath = currentNamespace ? `${currentNamespace}/${snakeName}` : snakeName;
-          if (namespacedPath !== modelRelPath && config.models.includes(namespacedPath)) {
-            const prefix = '../'.repeat(depth);
-            js = `import { ${superclassName} } from '${prefix}${namespacedPath}.js';\n${js}`;
-          } else if (config.models.includes(snakeName)) {
-            const prefix = '../'.repeat(depth);
-            js = `import { ${superclassName} } from '${prefix}${snakeName}.js';\n${js}`;
-          }
-        }
-      }
-    }
-  }
-
-  // Handle dotted superclass references from Ruby's :: namespace operator.
-  // Ruby's Account::DataTransfer::RecordSet becomes Account.DataTransfer.RecordSet in JS,
-  // but that's a property chain requiring Account to exist. Instead, resolve the full
-  // namespace path to a direct import of the leaf class.
-  // e.g., extends Account.DataTransfer.RecordSet → import { RecordSet } from './record_set.js'
-  if (fromFile && fromFile.startsWith('app/models/') && config.models) {
-    const dottedMatch = js.match(/class \w+ extends ((\w+\.)+\w+)\s*\{/);
-    if (dottedMatch) {
-      const dottedName = dottedMatch[1]; // e.g., "Account.DataTransfer.RecordSet"
-      const parts = dottedName.split('.'); // ['Account', 'DataTransfer', 'RecordSet']
-      const leafName = parts[parts.length - 1]; // 'RecordSet'
-
-      // Convert PascalCase parts to snake_case path
-      const pathParts = parts.map(p => p.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, ''));
-      const superModelPath = pathParts.join('/'); // 'account/data_transfer/record_set'
-
-      if (config.models.includes(superModelPath)) {
-        // Compute relative path from current file to superclass file
-        const modelRelPath = fromFile.replace('app/models/', '').replace(/\.js$/, '');
-        const currentDir = modelRelPath.split('/').slice(0, -1);
-        const superDir = pathParts.slice(0, -1);
-        const superFile = pathParts[pathParts.length - 1];
-
-        // Find common directory prefix
-        let common = 0;
-        while (common < currentDir.length && common < superDir.length &&
-               currentDir[common] === superDir[common]) {
-          common++;
-        }
-
-        // Build relative path
-        const up = currentDir.length - common;
-        const down = superDir.slice(common);
-        let relativePath;
-        if (up === 0 && down.length === 0) {
-          relativePath = `./${superFile}.js`;
-        } else if (up === 0) {
-          relativePath = `./${[...down, superFile + '.js'].join('/')}`;
-        } else {
-          relativePath = [...Array(up).fill('..'), ...down, superFile + '.js'].join('/');
-        }
-
-        // Replace dotted extends with leaf name and add import
-        js = js.replace(`extends ${dottedName}`, `extends ${leafName}`);
-        js = `import { ${leafName} } from '${relativePath}';\n${js}`;
-      }
-    }
-  }
-
-  // General model reference resolution: replace bare ClassName.method or new ClassName(
-  // references with modelRegistry.ClassName to avoid circular imports between models.
-  // This handles cases like User referencing Book.with_everyone_access.
-  if (fromFile && fromFile.startsWith('app/models/') && config.models && config.modelClassMap) {
-    const modelRelPath = fromFile.replace('app/models/', '').replace(/\.js$/, '');
-
-    for (const [className, modelPath] of Object.entries(config.modelClassMap)) {
-      // Skip if already imported (explicit import takes precedence)
-      const importPattern = new RegExp(`import\\s+\\{[^}]*\\b${className}\\b[^}]*\\}\\s+from`);
-      if (importPattern.test(js)) continue;
-
-      // Skip self-references
-      if (modelPath === modelRelPath) continue;
-
-      // Skip if this file defines/exports a class with the same name
-      const definesClass = new RegExp(`(export\\s+)?(class|const|let|var|function)\\s+${className}\\b`);
-      if (definesClass.test(js)) continue;
-
-      // Replace bare ClassName references with modelRegistry.ClassName
-      // Matches ClassName.method and new ClassName( but not inside strings/imports
-      const refPattern = new RegExp(`\\b${className}\\b(?=\\.|\\()`, 'g');
-      if (refPattern.test(js)) {
-        // Ensure modelRegistry is imported
-        if (!js.includes('modelRegistry')) {
-          const depth = modelRelPath.split('/').length - 1;
-          const prefix = depth > 0 ? '../'.repeat(depth) : './';
-          js = `import { modelRegistry } from '${prefix}application_record.js';\n${js}`;
-        }
-        js = js.replace(new RegExp(`(?<!\\.)\\b${className}\\b(?=\\.)`, 'g'), `modelRegistry.${className}`);
-      }
-    }
-  }
-
-  // Model imports: resolve nested model paths using actual models list.
-  // For top-level model files, resolve association imports to nested paths when needed.
-  // e.g., in identity.js: import { AccessToken } from './access_token.js'
-  //   → import { AccessToken } from './identity/access_token.js'
-  // This handles Rails' namespace convention where Identity has_many :access_tokens
-  // maps to Identity::AccessToken at app/models/identity/access_token.rb
-  if (fromFile && fromFile.startsWith('app/models/') && config.models) {
-    const modelRelPath = fromFile.replace('app/models/', '').replace(/\.js$/, '');
-    const depth = modelRelPath.split('/').length - 1;
-    if (depth === 0) {
-      // Top-level model: resolve flat imports to nested paths when the model doesn't exist at top level
-      const topLevelModels = new Set(config.models.filter(m => !m.includes('/')));
-      js = js.replace(/from ['"]\.\/([\w]+)\.js['"]/g, (match, name) => {
-        if (name === 'application_record') return match;
-        if (topLevelModels.has(name)) return match;
-        // Try namespace-prefixed path (e.g., identity/access_token)
-        const nested = `${modelRelPath}/${name}`;
-        if (config.models.includes(nested)) {
-          return `from './${nested}.js'`;
-        }
-        return match;
-      });
-    }
-  }
-  // Controller concern fix is now handled inside the controller block above (before depth adjustment)
-
-  // Path helper → juntos package
+  // Path helper import fix (preserves bundle path)
   js = js.replace(/from ['"](ruby2js-rails|juntos)\/path_helper\.mjs['"]/g, "from 'juntos/path_helper.mjs'");
 
   return js;
 }
+
+// JS syntax fixes (not import resolution — kept separate)
+export function fixJsSyntax(js) {
+  // Fix selfhost converter Struct.new pattern
+  js = js.replace(/^\[\((\w+ = function \w+\([^)]*\) \{[\s\S]*?\})\)\.prototype\] = \[\w+\.prototype\];?/m, 'let $1;');
+  // Fix alias_method pattern
+  js = js.replace(/^(\w+)\.prototype\.(\w+) = \1\.prototype\.(\w+)$/gm,
+    '{ let _p = $1.prototype; while (_p && !Object.getOwnPropertyDescriptor(_p, "$3")) _p = Object.getPrototypeOf(_p); if (_p) Object.defineProperty($1.prototype, "$2", Object.getOwnPropertyDescriptor(_p, "$3")); }');
+  return js;
+}
+
+// Removed: nested depth, controller concerns, superclass imports,
+// dotted namespace, model cross-references, path helper fixes.
+// All now handled by ImportResolver (import-resolver.mjs).
+//
+// The following was the old fixImportsForEject continuation:
 
 // ============================================================
 // Virtual module content generators
