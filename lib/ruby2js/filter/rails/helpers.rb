@@ -214,9 +214,13 @@ module Ruby2JS
               var_name = asset_info[:var_name]
               import_path = asset_info[:import_path]
 
-              # Path is relative from app/views/<resource>/ to app/assets/
-              # e.g., ../../../assets/images/logo.png
-              full_import_path = "../../../assets/#{import_path}"
+              # Path is relative from the view file to app/assets/
+              # Compute depth from file path (app/views/books/ = 3, app/views/layouts/ = 3)
+              file = @options[:file].to_s
+              view_rel = file.sub(%r{.*app/views/}, '')
+              depth = view_rel.count('/') + 1  # +1 for the filename itself
+              prefix = '../' * depth
+              full_import_path = "#{prefix}assets/#{import_path}"
 
               # Default import: import _asset_logo_png from '...';
               # Format: s(:import, path, default_name)
