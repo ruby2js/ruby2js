@@ -1826,13 +1826,14 @@ export { application };`,
           const indexHtml = path.join(distDir, 'index.html');
           if (fs.existsSync(indexHtml)) {
             let html = fs.readFileSync(indexHtml, 'utf8');
+            const base = config.base || '/';
             if (workerEntry?.file) {
-              html = html.replace('</head>', `  <meta name="juntos-worker" content="/${workerEntry.file}">\n</head>`);
-              console.log(`[juntos] Worker URL: /${workerEntry.file}`);
+              html = html.replace('</head>', `  <meta name="juntos-worker" content="${base}${workerEntry.file}">\n</head>`);
+              console.log(`[juntos] Worker URL: ${base}${workerEntry.file}`);
             }
             if (dbWorkerEntry?.file) {
-              html = html.replace('</head>', `  <meta name="juntos-db-worker" content="/${dbWorkerEntry.file}">\n</head>`);
-              console.log(`[juntos] DB Worker URL: /${dbWorkerEntry.file}`);
+              html = html.replace('</head>', `  <meta name="juntos-db-worker" content="${base}${dbWorkerEntry.file}">\n</head>`);
+              console.log(`[juntos] DB Worker URL: ${base}${dbWorkerEntry.file}`);
             }
             fs.writeFileSync(indexHtml, html);
           }
