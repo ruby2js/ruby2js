@@ -35,6 +35,10 @@ String.prototype.html_safe = String.prototype.html_safe || function() { return t
 // The callback mutates _buf as a side effect.
 globalThis.cache = globalThis.cache || function(key, fn) { return fn(); };
 
+// Application helper stubs (used before helpers are properly loaded)
+globalThis.custom_styles_tag = globalThis.custom_styles_tag || function() { return ''; };
+globalThis.hide_from_user_style_tag = globalThis.hide_from_user_style_tag || function() { return ''; };
+
 // Authentication stubs (Rails 8 generated authentication concern)
 globalThis.allow_unauthenticated_access = globalThis.allow_unauthenticated_access || function() {};
 globalThis.signed_in = false;  // Default to not authenticated

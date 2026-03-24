@@ -1015,10 +1015,15 @@ function createRubyTransformPlugin(config, appRoot) {
       }
 
       // Resolve .js imports as .rb or .html.erb when the .js doesn't exist (eject-style paths in Vite)
-      if (source.endsWith('.js') && importer) {
-        const importerDir = path.dirname(importer);
-        const jsPath = path.resolve(importerDir, source);
-        if (!fs.existsSync(jsPath)) {
+      if (source.endsWith('.js')) {
+        let jsPath;
+        if (source.startsWith('@helpers/')) {
+          // @helpers alias resolves to app/helpers/
+          jsPath = path.join(appRoot, 'app/helpers', source.slice(9));
+        } else if (importer) {
+          jsPath = path.resolve(path.dirname(importer), source);
+        }
+        if (jsPath && !fs.existsSync(jsPath)) {
           const rbPath = jsPath.replace(/\.js$/, '.rb');
           if (fs.existsSync(rbPath)) return rbPath;
           const erbPath = jsPath.replace(/\.js$/, '.html.erb');
