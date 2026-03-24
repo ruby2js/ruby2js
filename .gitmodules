@@ -1,3 +1,6 @@
 [submodule "test/ballroom"]
 	path = test/ballroom
 	url = https://github.com/rubys/ballroom.git
+[submodule "test/writebook"]
+	path = test/writebook
+	url = https://github.com/rubys/writebook.git

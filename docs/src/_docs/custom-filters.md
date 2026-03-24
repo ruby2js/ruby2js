@@ -350,6 +350,8 @@ For app-specific filters, Ruby2JS provides a declarative DSL that is simpler tha
 
 The DSL supports multiple layers, from most declarative to most flexible. You can mix layers freely within a single filter.
 
+All DSL handlers run **before** the core filters — your transformations modify the AST before the model, controller, or ERB filters see it. Return `nil` from a handler to leave the node unchanged for other filters to process.
+
 ### Layer 1: Declarative Rewrites
 
 The simplest approach — match a Ruby expression pattern and replace it:
@@ -385,7 +387,7 @@ Ruby2JS.filter(:MyApp) do
     in type: :send, children: [nil, :log, {type: :str} => msg]
       s(:send, s(:lvar, :console), :log, msg)
     else
-      nil  # return nil to skip (falls through to super)
+      nil  # return nil to leave unchanged for core filters
     end
   end
 end

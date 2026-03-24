@@ -32,7 +32,8 @@ module Ruby2JS
     end
 
     def on_class(&block)
-      @handlers[:class] = block
+      @handlers[:class] ||= []
+      @handlers[:class] << block
     end
 
     def on_block(&block)
@@ -46,9 +47,7 @@ module Ruby2JS
         include Ruby2JS::Filter::SEXP
 
         define_method(:on_send) do |node|
-          node = super(node)
-
-          # Try each rewrite rule
+          # Try each rewrite rule before other filters
           dsl.rewrites.each do |rule|
             bindings = {}
             if FilterDSL.match_pattern(node, rule[:pattern], bindings)
@@ -56,28 +55,32 @@ module Ruby2JS
             end
           end
 
-          # Try custom handler
+          # Try custom handler before other filters
           if dsl.handlers[:send]
             result = dsl.handlers[:send].call(node)
             return result if result
           end
 
-          node
+          super(node)
         end
 
         if dsl.handlers[:class]
+          class_handlers = dsl.handlers[:class]
           define_method(:on_class) do |node|
-            node = super(node)
-            result = dsl.handlers[:class].call(node)
-            result || node
+            # Run app handlers before other filters
+            class_handlers.each do |handler|
+              result = handler.call(node)
+              node = result if result
+            end
+            super(node)
           end
         end
 
         if dsl.handlers[:block]
           define_method(:on_block) do |node|
-            node = super(node)
             result = dsl.handlers[:block].call(node)
-            result || node
+            node = result if result
+            super(node)
           end
         end
       end
