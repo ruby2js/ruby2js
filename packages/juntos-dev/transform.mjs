@@ -2787,8 +2787,8 @@ export async function transformErb(code, id, isLayout, config, metadata = null) 
       }
     }
     for (const [mod, methods] of Object.entries(usedHelpers)) {
-      const importPath = `@helpers/${mod}.js`;
-      if (!js.includes(importPath)) {
+      const importPath = `@helpers/${mod}.rb`;
+      if (!js.includes(importPath) && !js.includes(`@helpers/${mod}.js`)) {
         js = `import { ${methods.join(', ')} } from "${importPath}";\n` + js;
       }
     }
