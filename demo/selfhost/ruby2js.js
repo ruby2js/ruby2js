@@ -443,6 +443,14 @@ const Ruby2JS = (() => {
   };
 
   const Inflector = (() => {
+    const CUSTOM_IRREGULARS_SINGULAR = {};
+    const CUSTOM_IRREGULARS_PLURAL = {};
+
+    function add_irregular(singular, plural) {
+      CUSTOM_IRREGULARS_SINGULAR[plural.toLowerCase()] = singular.toLowerCase();
+      return CUSTOM_IRREGULARS_PLURAL[singular.toLowerCase()] = plural.toLowerCase()
+    };
+
     const IRREGULARS_SINGULAR = Object.freeze({
       people: "person",
       men: "man",
@@ -567,7 +575,7 @@ const Ruby2JS = (() => {
     function singularize(word) {
       let lower = word.toLowerCase();
       if (UNCOUNTABLES.includes(lower)) return word;
-      let irregular = IRREGULARS_SINGULAR[lower];
+      let irregular = CUSTOM_IRREGULARS_SINGULAR[lower] ?? IRREGULARS_SINGULAR[lower];
 
       if (irregular) {
         if (word[0] === word[0].toUpperCase()) {
@@ -596,9 +604,20 @@ const Ruby2JS = (() => {
 
       while (i < word.length) {
         let ch = word[i];
+        let is_upper = ch === ch.toUpperCase() && ch !== ch.toLowerCase();
 
-        if (ch === ch.toUpperCase() && ch !== ch.toLowerCase()) {
-          if (i > 0) result += "_";
+        if (is_upper) {
+          if (i > 0) {
+            let prev_upper = word[i - 1] === word[i - 1].toUpperCase() && word[i - 1] !== word[i - 1].toLowerCase();
+            let next_lower = i + 1 < word.length && word[i + 1] === word[i + 1].toLowerCase() && word[i + 1] !== word[i + 1].toUpperCase();
+
+            if (prev_upper && next_lower) {
+              result += "_"
+            } else if (!prev_upper) {
+              result += "_"
+            }
+          };
+
           result += ch.toLowerCase()
         } else {
           result += ch
@@ -613,7 +632,7 @@ const Ruby2JS = (() => {
     function pluralize(word) {
       let lower = word.toLowerCase();
       if (UNCOUNTABLES.includes(lower)) return word;
-      let irregular = IRREGULARS_PLURAL[lower];
+      let irregular = CUSTOM_IRREGULARS_PLURAL[lower] ?? IRREGULARS_PLURAL[lower];
 
       if (irregular) {
         if (word[0] === word[0].toUpperCase()) {
@@ -631,6 +650,9 @@ const Ruby2JS = (() => {
     };
 
     return {
+      CUSTOM_IRREGULARS_SINGULAR,
+      CUSTOM_IRREGULARS_PLURAL,
+      add_irregular,
       IRREGULARS_SINGULAR,
       IRREGULARS_PLURAL,
       UNCOUNTABLES,
@@ -3930,6 +3952,10 @@ const Ruby2JS = (() => {
         args.push(this.s("arg", ...kwargs.last.children));
         kwargs = []
       };
+
+      args = args.filter(arg => (
+        !(arg.type === "blockarg" && arg.children.length === 0)
+      ));
 
       let count = [0];
       args = args.map(arg => this.dedup_underscores(arg, count));
@@ -10567,6 +10593,11 @@ const Ruby2JS = (() => {
 
       then_block ??= this.s("nil");
 
+      if (condition.type === "lvasgn" && !this._vars[condition.children.first]) {
+        this._vars[condition.children.first] = true;
+        this.put(`let ${condition.children.first ?? ""}${this._sep ?? ""}`)
+      };
+
       if (this._state === "statement") {
         {
           let inner;
@@ -11020,18 +11051,59 @@ const Ruby2JS = (() => {
       let block = children.first;
 
       if (this._state === "expression") {
-        this.parse(this.s(
-          "send",
+        let has_rescue = children.some(c => c?.type === "rescue");
 
-          this.s(
-            "block",
-            this.s("send", null, "proc"),
-            this.s("args"),
-            this.s("begin", this.s("autoreturn", ...children))
-          ),
+        if (has_rescue) {
+          let wrapped = children.map((child) => {
+            let rc;
 
-          "[]"
-        ));
+            if (child?.type === "rescue") {
+              rc = child.children.dup();
+              if (rc[0]) rc[0] = this.s("autoreturn", rc[0]);
+
+              for (let i = 1; i < rc.length; i++) {
+                if (rc[i]?.type !== "resbody") continue;
+                let resbody_children = rc[i].children.dup();
+
+                if (resbody_children[2]) {
+                  resbody_children[2] = this.s("autoreturn", resbody_children[2])
+                };
+
+                rc[i] = rc[i].updated(null, resbody_children)
+              };
+
+              return child.updated(null, rc)
+            } else {
+              return child
+            }
+          });
+
+          this.parse(this.s(
+            "send",
+
+            this.s(
+              "block",
+              this.s("send", null, "proc"),
+              this.s("args"),
+              this.s("begin", ...wrapped)
+            ),
+
+            "[]"
+          ))
+        } else {
+          this.parse(this.s(
+            "send",
+
+            this.s(
+              "block",
+              this.s("send", null, "proc"),
+              this.s("args"),
+              this.s("begin", this.s("autoreturn", ...children))
+            ),
+
+            "[]"
+          ))
+        };
 
         return
       };
@@ -11168,8 +11240,6 @@ const Ruby2JS = (() => {
           };
 
           this.scope(recovers.first.children.last);
-
-          // find reference to exception ($!)
           this.sput("}")
         } else {
           let catch_var = $var ?? this.s("gvar", "$EXCEPTION");
@@ -11195,7 +11265,7 @@ const Ruby2JS = (() => {
                   this.parse(catch_var);
                   this.put(" == \"string\"")
                 } else {
-                  this.parse(catch_var) // For ERB->JS source maps;
+                  this.parse(catch_var);
                   this.put(" instanceof ");
                   this.parse(exception)
                 }

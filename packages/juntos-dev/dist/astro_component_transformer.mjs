@@ -204,7 +204,8 @@ export class AstroComponentTransformer {
 
     lines.push("");
     lines.push(js);
-    return lines.join(`\n`)
+    return lines.join(`
+`)
   };
 
   // Convert CamelCase to snake_case
@@ -229,6 +230,11 @@ export class AstroComponentTransformer {
 
   // Build the final Astro component
   #buildComponent(frontmatter, template) {
-    return frontmatter && frontmatter.trim().length != 0 ? `---\n${frontmatter}\n---\n\n${template}\n` : template
+    return frontmatter && frontmatter.trim().length != 0 ? `---
+${frontmatter}
+---
+
+${template}
+` : template
   }
 }

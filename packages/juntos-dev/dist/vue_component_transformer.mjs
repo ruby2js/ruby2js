@@ -335,7 +335,8 @@ ${this.#indentTemplate(template)}
   // Note: Use split instead of lines for JS compatibility
   // Note: Use explicit parens for JS compatibility
   #indentTemplate(template) {
-    return template.split("\n").map(line => "  " + line.trimEnd()).join(`\n`).trim()
+    return template.split("\n").map(line => "  " + line.trimEnd()).join(`
+`).trim()
   };
 
   // Convert camelCase to snake_case

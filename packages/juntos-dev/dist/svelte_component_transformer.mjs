@@ -322,7 +322,12 @@ export class SvelteComponentTransformer {
 
   // Build the final Svelte component
   #buildComponent(script, template) {
-    return `<script>\n${script}\n</script>\n\n${template}\n`
+    return `<script>
+${script}
+</script>
+
+${template}
+`
   };
 
   // Convert camelCase to snake_case

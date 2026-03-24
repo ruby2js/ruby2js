@@ -443,6 +443,14 @@ const Ruby2JS = (() => {
   };
 
   const Inflector = (() => {
+    const CUSTOM_IRREGULARS_SINGULAR = {};
+    const CUSTOM_IRREGULARS_PLURAL = {};
+
+    function add_irregular(singular, plural) {
+      CUSTOM_IRREGULARS_SINGULAR[plural.toLowerCase()] = singular.toLowerCase();
+      return CUSTOM_IRREGULARS_PLURAL[singular.toLowerCase()] = plural.toLowerCase()
+    };
+
     const IRREGULARS_SINGULAR = Object.freeze({
       people: "person",
       men: "man",
@@ -567,7 +575,7 @@ const Ruby2JS = (() => {
     function singularize(word) {
       let lower = word.toLowerCase();
       if (UNCOUNTABLES.includes(lower)) return word;
-      let irregular = IRREGULARS_SINGULAR[lower];
+      let irregular = CUSTOM_IRREGULARS_SINGULAR[lower] ?? IRREGULARS_SINGULAR[lower];
 
       if (irregular) {
         if (word[0] === word[0].toUpperCase()) {
@@ -596,9 +604,20 @@ const Ruby2JS = (() => {
 
       while (i < word.length) {
         let ch = word[i];
+        let is_upper = ch === ch.toUpperCase() && ch !== ch.toLowerCase();
 
-        if (ch === ch.toUpperCase() && ch !== ch.toLowerCase()) {
-          if (i > 0) result += "_";
+        if (is_upper) {
+          if (i > 0) {
+            let prev_upper = word[i - 1] === word[i - 1].toUpperCase() && word[i - 1] !== word[i - 1].toLowerCase();
+            let next_lower = i + 1 < word.length && word[i + 1] === word[i + 1].toLowerCase() && word[i + 1] !== word[i + 1].toUpperCase();
+
+            if (prev_upper && next_lower) {
+              result += "_"
+            } else if (!prev_upper) {
+              result += "_"
+            }
+          };
+
           result += ch.toLowerCase()
         } else {
           result += ch
@@ -613,7 +632,7 @@ const Ruby2JS = (() => {
     function pluralize(word) {
       let lower = word.toLowerCase();
       if (UNCOUNTABLES.includes(lower)) return word;
-      let irregular = IRREGULARS_PLURAL[lower];
+      let irregular = CUSTOM_IRREGULARS_PLURAL[lower] ?? IRREGULARS_PLURAL[lower];
 
       if (irregular) {
         if (word[0] === word[0].toUpperCase()) {
@@ -631,6 +650,9 @@ const Ruby2JS = (() => {
     };
 
     return {
+      CUSTOM_IRREGULARS_SINGULAR,
+      CUSTOM_IRREGULARS_PLURAL,
+      add_irregular,
       IRREGULARS_SINGULAR,
       IRREGULARS_PLURAL,
       UNCOUNTABLES,
@@ -3654,9 +3676,11 @@ const Ruby2JS = (() => {
             return text.replace(/^=begin/m, "/*").replace(/^=end$/m, "*/")
           }
         } else if (text.startsWith("#")) {
-          return text.replace(/^#/m, "//") + `\n`
+          return text.replace(/^#/m, "//") + `
+`
         } else {
-          return "// " + text + `\n`
+          return "// " + text + `
+`
         }
       }).compact
     };
@@ -3928,6 +3952,10 @@ const Ruby2JS = (() => {
         args.push(this.s("arg", ...kwargs.last.children));
         kwargs = []
       };
+
+      args = args.filter(arg => (
+        !(arg.type === "blockarg" && arg.children.length === 0)
+      ));
 
       let count = [0];
       args = args.map(arg => this.dedup_underscores(arg, count));
@@ -4240,23 +4268,24 @@ const Ruby2JS = (() => {
               }
             };
 
-            let merge = Object.fromEntries(Object.entries([
-              ...body[i].children[1].to_a,
-              ...body[j].children[1].to_a
-            ].reduce(
-              ($acc, [name, value]) => {
-                let $key = (name ?? "").toString();
-                ($acc[$key] = $acc[$key] ?? []).push([name, value]);
-                return $acc
-              },
+            let merge = Object.fromEntries(Array.from(
+              [...body[i].children[1].to_a, ...body[j].children[1].to_a].reduce(
+                ($acc, [name, value]) => {
+                  let $key = (name ?? "").toString();
+                  $acc.set($key, ($acc.get($key) ?? []).concat([[name, value]]));
+                  return $acc
+                },
 
-              {}
-            )).map(([name, values]) => (
-              [
-                name,
-                values.map(item => item.last).reduce((a, b) => ({...a, ...b}))
-              ]
-            )));
+                new Map()
+              ),
+
+              ([name, values]) => (
+                [
+                  name,
+                  values.map(item => item.last).reduce((a, b) => ({...a, ...b}))
+                ]
+              )
+            ));
 
             body[j] = this.s("prop", body[j].children[0], merge);
             body[i] = null;
@@ -9990,7 +10019,7 @@ const Ruby2JS = (() => {
         this.ast_node(child) && child.type === "str"
       )).map(child => child.children.last).join("");
 
-      let heredoc = strings.length > 40 && (strings.match(/\n/g) ?? []).length > 3;
+      let heredoc = (strings.match(/\n/g) ?? []).length > 0;
       this.put("`");
 
       for (let child of children) {
@@ -10035,7 +10064,7 @@ const Ruby2JS = (() => {
         this.ast_node(child) && child.type === "str"
       )).map(child => child.children.last).join("");
 
-      let heredoc = strings.length > 40 && (strings.match(/\n/g) ?? []).length > 3;
+      let heredoc = (strings.match(/\n/g) ?? []).length > 0;
       this.put("`");
 
       for (let child of children) {
@@ -10564,6 +10593,11 @@ const Ruby2JS = (() => {
 
       then_block ??= this.s("nil");
 
+      if (condition.type === "lvasgn" && !this._vars[condition.children.first]) {
+        this._vars[condition.children.first] = true;
+        this.put(`let ${condition.children.first ?? ""}${this._sep ?? ""}`)
+      };
+
       if (this._state === "statement") {
         {
           let inner;
@@ -11017,18 +11051,59 @@ const Ruby2JS = (() => {
       let block = children.first;
 
       if (this._state === "expression") {
-        this.parse(this.s(
-          "send",
+        let has_rescue = children.some(c => c?.type === "rescue");
 
-          this.s(
-            "block",
-            this.s("send", null, "proc"),
-            this.s("args"),
-            this.s("begin", this.s("autoreturn", ...children))
-          ),
+        if (has_rescue) {
+          let wrapped = children.map((child) => {
+            let rc;
 
-          "[]"
-        ));
+            if (child?.type === "rescue") {
+              rc = child.children.dup();
+              if (rc[0]) rc[0] = this.s("autoreturn", rc[0]);
+
+              for (let i = 1; i < rc.length; i++) {
+                if (rc[i]?.type !== "resbody") continue;
+                let resbody_children = rc[i].children.dup();
+
+                if (resbody_children[2]) {
+                  resbody_children[2] = this.s("autoreturn", resbody_children[2])
+                };
+
+                rc[i] = rc[i].updated(null, resbody_children)
+              };
+
+              return child.updated(null, rc)
+            } else {
+              return child
+            }
+          });
+
+          this.parse(this.s(
+            "send",
+
+            this.s(
+              "block",
+              this.s("send", null, "proc"),
+              this.s("args"),
+              this.s("begin", ...wrapped)
+            ),
+
+            "[]"
+          ))
+        } else {
+          this.parse(this.s(
+            "send",
+
+            this.s(
+              "block",
+              this.s("send", null, "proc"),
+              this.s("args"),
+              this.s("begin", this.s("autoreturn", ...children))
+            ),
+
+            "[]"
+          ))
+        };
 
         return
       };
@@ -11165,8 +11240,6 @@ const Ruby2JS = (() => {
           };
 
           this.scope(recovers.first.children.last);
-
-          // find reference to exception ($!)
           this.sput("}")
         } else {
           let catch_var = $var ?? this.s("gvar", "$EXCEPTION");
@@ -11192,7 +11265,7 @@ const Ruby2JS = (() => {
                   this.parse(catch_var);
                   this.put(" == \"string\"")
                 } else {
-                  this.parse(catch_var) // For ERB->JS source maps;
+                  this.parse(catch_var);
                   this.put(" instanceof ");
                   this.parse(exception)
                 }
@@ -18716,7 +18789,8 @@ const Ruby2JS = (() => {
 
     on_vue_file(script, template) {
       this.put("<template>\n");
-      this.put(`  ${template ?? ""}\n`);
+      this.put(`  ${template ?? ""}
+`);
       this.put("</template>\n\n");
 
       if (script && script.length !== 0) {
@@ -19890,7 +19964,8 @@ const Ruby2JS = (() => {
       this._converter.ivars = this._options.ivars;
       if (this._options.width) this._converter.width = this._options.width;
 
-      if (this._options.source?.includes(`\n`)) {
+      if (this._options.source?.includes(`
+`)) {
         return this._converter.enable_vertical_whitespace
       }
     };
@@ -20658,24 +20733,30 @@ function urlToPath(pathOrUrl) {
   return pathOrUrl;
 }
 
-globalThis.File = {
-  exist(path) {
+// Ruby File polyfill (exist/mtime). Add methods to the existing File
+// object/constructor rather than replacing it, so the browser's native
+// File constructor (used by Turbo, FormData, etc.) is preserved.
+if (!globalThis.File) {
+  globalThis.File = {};
+}
+if (!globalThis.File.exist) {
+  globalThis.File.exist = function(path) {
     if (!_fs) return false;
     try {
       return _fs.existsSync(urlToPath(path));
     } catch {
       return false;
     }
-  },
-  mtime(path) {
+  };
+  globalThis.File.mtime = function(path) {
     if (!_fs) return null;
     try {
       return _fs.statSync(urlToPath(path)).mtime;
     } catch {
       return null;
     }
-  }
-};
+  };
+}
 
 // Array.prototype.dup - Ruby's dup creates a shallow copy
 if (!Array.prototype.dup) {

@@ -59,8 +59,10 @@ export class ImportResolver {
       return resolved ? `from '${resolved}'` : match;
     });
 
-    // Step 2: Add model cross-references (modelRegistry for both modes)
-    if (this.#config.modelClassMap) {
+    // Step 2: Add model cross-references
+    // Eject mode: use modelRegistry to prevent circular imports
+    // Vite mode: skip (addCrossModelImports in vite.mjs handles direct imports)
+    if (this.#mode === 'eject' && this.#config.modelClassMap) {
       js = this.#addModelReferences(js);
     }
 
