@@ -901,7 +901,16 @@ function createRubyTransformPlugin(config, appRoot) {
             }
           }
 
-          js = addCrossModelImports(js, filePath);
+          {
+            const { ImportResolver } = await import('juntos-dev/import-resolver.mjs');
+            const resolver = new ImportResolver({
+              mode: 'vite',
+              fromFile: path.relative(appRoot, filePath),
+              appRoot,
+              config: { modelClassMap: getModelClassMap() }
+            });
+            js = resolver.resolve(js);
+          }
 
           const map = result.map;
           if (map) {
@@ -1277,7 +1286,17 @@ export { application };
           }
         }
 
-        js = addCrossModelImports(js, id);
+        // Add model cross-references via modelRegistry (prevents circular imports)
+        {
+          const { ImportResolver } = await import('juntos-dev/import-resolver.mjs');
+          const resolver = new ImportResolver({
+            mode: 'vite',
+            fromFile: path.relative(appRoot, id),
+            appRoot,
+            config: { modelClassMap: getModelClassMap() }
+          });
+          js = resolver.resolve(js);
+        }
 
         // Test files: add imports for controllers and path helpers
         if (section === 'test') {
@@ -1318,9 +1337,16 @@ export { application };
     },
 
     // Add cross-model imports for ERB view files (loaded by the ERB plugin)
-    transform(code, id) {
+    async transform(code, id) {
       if (!id.endsWith('.erb')) return null;
-      const js = addCrossModelImports(code, id);
+      const { ImportResolver } = await import('juntos-dev/import-resolver.mjs');
+      const resolver = new ImportResolver({
+        mode: 'vite',
+        fromFile: path.relative(appRoot, id),
+        appRoot,
+        config: { modelClassMap: getModelClassMap() }
+      });
+      const js = resolver.resolve(code);
       return js !== code ? { code: js, map: null } : null;
     }
   };

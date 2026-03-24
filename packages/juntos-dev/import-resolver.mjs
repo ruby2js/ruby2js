@@ -186,8 +186,9 @@ export class ImportResolver {
       return this.#mode === 'vite' ? `../models/${modelFromCtrl[1]}.rb` : null;
     }
 
-    // --- Same-directory .js → .rb (vite only) ---
-    if (this.#mode === 'vite') {
+    // --- Same-directory .js → .rb (vite only, models/controllers/helpers) ---
+    // Views use .html.erb which is resolved by Vite's resolveId fallback
+    if (this.#mode === 'vite' && this.#fileType !== 'view') {
       const localJs = source.match(/^\.\/([\w/]+)\.js$/);
       if (localJs) return `./${localJs[1]}.rb`;
     }
