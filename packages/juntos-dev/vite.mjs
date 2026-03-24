@@ -622,39 +622,16 @@ function createErbPlugin(config) {
     // Step 3.5: Fix import paths for Vite-native structure
     // The selfhost converter generates relative paths assuming .juntos/ structure
     // We redirect everything to virtual modules and source files
-
-    // Paths: ../../../config/paths.js → juntos:paths (path helpers virtual module)
-    // This breaks the circular dependency between routes.rb and controllers
-    js = js.replace(/from ["']\.\.\/\.\.\/\.\.\/config\/paths\.js["']/g, 'from "juntos:paths"');
-
-    // Rails runtime: use virtual module
-    js = js.replace(/from ["']\.\.\/\.\.\/\.\.\/lib\/rails\.js["']/g, 'from "juntos:rails"');
-    js = js.replace(/from ["']lib\/rails\.js["']/g, 'from "juntos:rails"');
-
-    // Fix partial imports: _./_partial.js -> ./_partial.html.erb
-    // Partials are source files that Vite will transform on-the-fly
-    js = js.replace(/from ["'](\.\/_\w+)\.js["']/g, 'from "$1.html.erb"');
-
-    // Fix cross-directory partial imports: ../comments/_comment.js -> @views/comments/_comment.html.erb
-    js = js.replace(/from ["']\.\.\/(\w+)\/(\_\w+)\.js["']/g, 'from "@views/$1/$2.html.erb"');
-
-    // Fix view module imports: import { PhotoViews } from "../views/<resource>.js" -> from "juntos:views/<resource>"
-    // Handles both flat (../photos.js) and nested (../../views/pages/edits.js) controller view imports
-    js = js.replace(/import\s*\{\s*(\w+)Views\s*\}\s*from\s*["'](?:\.\.\/)+(?:views\/)?([\w/]+)\.js["']/g,
-      (match, name, resourcePath) => `import { ${name}Views } from "juntos:views/${resourcePath}"`);
-
-    // Fix helper imports: @helpers/*.js -> @helpers/*.rb
-    // Helpers are source .rb files that Vite transforms on-the-fly via @helpers alias
-    js = js.replace(/from ["']@helpers\/([\w]+)\.js["']/g, 'from "@helpers/$1.rb"');
-
-    // Fix model imports from views: ../photos.js -> app/models/photo.rb
-    // Views import models like Photo from "../photos.js" (plural, relative up)
-    // These should resolve to app/models/<singular>.rb
-    // Note: This runs AFTER view module replacement, so it won't affect *Views imports
-    js = js.replace(/from ["']\.\.\/(\w+)\.js["']/g, (match, plural) => {
-      const singular = singularize(plural);
-      return `from "app/models/${singular}.rb"`;
-    });
+    {
+      const { ImportResolver } = await import('juntos-dev/import-resolver.mjs');
+      const resolver = new ImportResolver({
+        mode: 'vite',
+        fromFile: path.relative(appRoot, id),
+        appRoot,
+        config: {}
+      });
+      js = resolver.resolve(js);
+    }
 
     // Step 4: Generate source map pointing to original ERB
     const map = result.sourcemap;

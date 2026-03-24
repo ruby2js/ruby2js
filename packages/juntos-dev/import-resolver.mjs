@@ -12,7 +12,7 @@
  * - Eject: .js extensions, juntos/* package paths
  */
 
-import { getActiveRecordAdapterFile } from './transform.mjs';
+import { getActiveRecordAdapterFile, singularize } from './transform.mjs';
 
 export class ImportResolver {
   #mode;        // 'vite' | 'eject'
@@ -53,6 +53,15 @@ export class ImportResolver {
    * @returns {string} - Modified source with resolved imports
    */
   resolve(js) {
+    // Step 0: Resolve full-statement patterns (need import specifier, not just source)
+    // View barrel imports: import { XViews } from "../<resource>.js" → juntos:views/<resource>
+    if (this.#mode === 'vite' && this.#fileType === 'view') {
+      js = js.replace(
+        /import\s*\{\s*(\w+)Views\s*\}\s*from\s*["'](?:\.\.\/)+(?:views\/)?([\w/]+)\.js["']/g,
+        (match, name, resourcePath) => `import { ${name}Views } from 'juntos:views/${resourcePath}'`
+      );
+    }
+
     // Step 1: Resolve all from '...' imports in a single pass
     js = js.replace(/from (['"])(.*?)\1/g, (match, quote, source) => {
       const resolved = this.#resolveSource(source);
@@ -186,6 +195,29 @@ export class ImportResolver {
     const modelFromCtrl = source.match(/^\.\.\/models\/([\w/]+)\.js$/);
     if (modelFromCtrl) {
       return this.#mode === 'vite' ? `../models/${modelFromCtrl[1]}.rb` : null;
+    }
+
+    // --- View-specific patterns (partials and model imports) ---
+    if (this.#fileType === 'view') {
+      // Same-directory partials: ./_comment.js → ./_comment.html.erb
+      const localPartial = source.match(/^(\.\/_.+)\.js$/);
+      if (localPartial) {
+        return this.#mode === 'vite' ? `${localPartial[1]}.html.erb` : null;
+      }
+
+      // Cross-directory partials: ../comments/_comment.js → @views/comments/_comment.html.erb
+      const crossPartial = source.match(/^\.\.\/(\w+)\/(_.+)\.js$/);
+      if (crossPartial) {
+        return this.#mode === 'vite' ? `@views/${crossPartial[1]}/${crossPartial[2]}.html.erb` : null;
+      }
+
+      // Model imports from views: ../photos.js → app/models/photo.rb (singular)
+      // Runs after *Views barrel handled in Step 0, so only plain model refs remain
+      const viewModelMatch = source.match(/^\.\.\/(\w+)\.js$/);
+      if (viewModelMatch) {
+        const singular = singularize(viewModelMatch[1]);
+        return this.#mode === 'vite' ? `app/models/${singular}.rb` : null;
+      }
     }
 
     // --- Same-directory .js → .rb (vite only, models/controllers/helpers) ---
