@@ -467,15 +467,15 @@ export class Application extends ApplicationServer {
         contentType === 'application/octet-stream' ||
         contentType === 'application/pdf';
 
-      let body;
+      let responseBody;
       if (isBinary) {
         const buffer = await response.arrayBuffer();
         const bytes = new Uint8Array(buffer);
         let binary = '';
         for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-        body = btoa(binary);
+        responseBody = btoa(binary);
       } else {
-        body = await response.text();
+        responseBody = await response.text();
       }
 
       port.postMessage({
@@ -483,7 +483,7 @@ export class Application extends ApplicationServer {
         type: 'response',
         status: response.status,
         headers: responseHeaders,
-        body,
+        body: responseBody,
         binary: isBinary
       });
     } catch (e) {
