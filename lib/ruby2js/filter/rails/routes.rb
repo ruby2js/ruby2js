@@ -849,10 +849,16 @@ module Ruby2JS
           end
 
           # Import controllers - collect from resources and custom routes (deduplicated)
+          # Only import controllers that exist (skip routes with no controller file)
+          known_controllers = @options[:metadata] &&
+            @options[:metadata]['controller_files'] ?
+            @options[:metadata]['controller_files'] : nil
+
           all_controllers = collect_all_controllers(@rails_resources)
           seen_controllers = {}
           all_controllers.each do |ctrl|
             next if seen_controllers[ctrl[:controller_name]]
+            next if known_controllers && !known_controllers[ctrl[:controller_name]]
             seen_controllers[ctrl[:controller_name]] = true
             statements << s(:import, "../app/controllers/#{ctrl[:controller_file]}.js",
               [s(:const, nil, ctrl[:controller_name].to_sym)])
@@ -862,10 +868,18 @@ module Ruby2JS
           @rails_routes_list.each do |route|
             ctrl_name = route[:controller]
             next if seen_controllers[ctrl_name]
-            seen_controllers[ctrl_name] = true
 
             # Skip Rails framework controllers (health, pwa)
             next if ctrl_name.start_with?('Rails::')
+
+            # Skip controllers that don't exist in the app
+            # Use leaf name for lookup (Books::PublicationsController → PublicationsController)
+            leaf_name = ctrl_name.include?('::') ? ctrl_name.split('::').last + 'Controller' : ctrl_name
+            leaf_name = ctrl_name.split('::').last
+            leaf_name = leaf_name + 'Controller' unless leaf_name.end_with?('Controller')
+            next if known_controllers && !known_controllers[leaf_name]
+
+            seen_controllers[ctrl_name] = true
 
             # Derive file path from controller name
             parts = ctrl_name.sub(/Controller$/, '').split('::')
