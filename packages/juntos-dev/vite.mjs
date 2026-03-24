@@ -376,7 +376,7 @@ export function juntos(options = {}) {
     createJsxRbPlugin(config, appRoot),
 
     // ERB file handling (server-rendered templates as JS modules)
-    createErbPlugin(config),
+    createErbPlugin(config, appRoot),
 
     // Dual bundle support (generates client.js for hydration when RPC detected)
     createDualBundlePlugin(config, appRoot),
@@ -549,7 +549,7 @@ function createJsxRbPlugin(config, appRoot) {
  * ERB plugin for Rails ERB templates.
  * Compiles ERB → Ruby → JavaScript with HMR support.
  */
-function createErbPlugin(config) {
+function createErbPlugin(config, appRoot) {
   let convert, initPrism;
   let prismReady = false;
 
