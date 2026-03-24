@@ -100,7 +100,7 @@ export class Router extends RouterBase {
 
     if (!result) {
       console.warn('  No route matched');
-      return Application.wrapInLayout(context, '<h1>404 Not Found</h1>');
+      return await Application.wrapInLayout(context, '<h1>404 Not Found</h1>');
     }
 
     const { route, match } = result;
@@ -121,10 +121,10 @@ export class Router extends RouterBase {
 
       console.log(`  Rendering ${controllerName}/${action}`);
       context.flash.writeToCookie();
-      return Application.wrapInLayout(context, html);
+      return await Application.wrapInLayout(context, html);
     } catch (e) {
       console.error('  Error:', e.message || e);
-      return Application.wrapInLayout(context, '<h1>Not Found</h1>');
+      return await Application.wrapInLayout(context, '<h1>Not Found</h1>');
     }
   }
 

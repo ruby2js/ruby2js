@@ -134,7 +134,7 @@ export class Router extends RouterServer {
   // (Parent class references its own Application which doesn't have layoutFn set)
   static async htmlResponse(context, content, status = 200) {
     const html = await resolveContent(content);
-    const fullHtml = Application.wrapInLayout(context, html);
+    const fullHtml = await Application.wrapInLayout(context, html);
     const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
     const flashCookie = context.flash.getResponseCookie();
