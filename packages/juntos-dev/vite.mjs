@@ -2264,6 +2264,7 @@ Application.start();
         const routesPath = '../config/routes.rb';
         const layoutFile = path.join(appRoot, 'app/views/layouts/application.html.erb');
         let workerJs = `// SharedWorker entry point\n`;
+        workerJs += `import 'juntos/rails_stubs.mjs';\n`;
         workerJs += `import { Application } from '${routesPath}';\n`;
         if (fs.existsSync(layoutFile)) {
           workerJs += `import { layout } from '${layoutFile.replace(appRoot + '/', '../')}';\n`;
