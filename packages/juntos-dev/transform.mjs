@@ -891,7 +891,8 @@ export function fixImportsForEject(js, fromFile, config = {}) {
 
     // @helpers/*.js → depth-relative app/helpers/*.js
     if (source.startsWith('@helpers/')) {
-      return `from '${rootPrefix}app/helpers/${source.slice(9)}'`;
+      const helperFile = source.slice(9).replace(/\.rb$/, '.js');
+      return `from '${rootPrefix}app/helpers/${helperFile}'`;
     }
 
     return match;
