@@ -1195,6 +1195,7 @@ export { application };
         let result;
         if (id.endsWith('/routes.rb')) {
           const { convert } = await ensureRuby2jsReady();
+          const meta = await ensureManifest();
           // Get routes-specific config from ruby2js.yml if available
           const sectionConfig = config.sections?.routes || null;
           const options = {
@@ -1203,7 +1204,8 @@ export { application };
             database: config.database,
             target: config.target,
             paths_file: 'juntos:paths',  // Import path helpers from virtual module
-            base: config.base || '/'
+            base: config.base || '/',
+            metadata: meta
           };
           result = convert(source, options);
         } else if (section === 'test') {
