@@ -657,6 +657,12 @@ jobs:
             (cd "artifacts/$demo" && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
           done
 
+          # Writebook: full Rails app with its own package.json
+          echo "Building writebook for browser..."
+          (cd "artifacts/writebook" && node ../cli/package/cli.mjs init --no-install)
+          (cd "artifacts/writebook" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/juntos-beta.tgz ../tarballs/juntos-dev-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz @hotwired/turbo @hotwired/stimulus @rails/request.js)
+          (cd "artifacts/writebook" && bin/juntos build -d sqlite_wasm -t worker --base "/ruby2js/writebook/" --sourcemap)
+
       - name: Package editor snapshots
         run: |
           mkdir -p _site/editor/snapshots
@@ -778,6 +784,7 @@ jobs:
           cp -r artifacts/dictaphone/dist _site/dictaphone
           cp -r artifacts/workflow/dist _site/workflow
           cp -r artifacts/ballroom/dist _site/ballroom
+          cp -r artifacts/writebook/dist _site/writebook
           cp -r artifacts/astro-blog/dist _site/astro-blog
           cp -r artifacts/ssg-blog/_site _site/ssg-blog
 
@@ -936,10 +943,11 @@ jobs:
               </div>
               <div class="demo">
                 <div class="demo-content">
-                  <h3>Writebook</h3>
+                  <h3><a href="writebook/">Writebook</a></h3>
                   <p>Collaborative book publishing. Basecamp's Rails 8 app. (Rails)</p>
                 </div>
                 <div class="demo-links">
+                  <a href="writebook/">Live</a>
                   <a href="https://github.com/rubys/writebook">GitHub</a>
                   <a href="releases/demo-writebook.tar.gz">Tarball</a>
                 </div>
