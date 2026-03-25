@@ -1139,9 +1139,13 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     return { sql: clauses.join(' AND '), values };
   }
 
-  // Format a value for binding (override in dialect for booleans)
+  // Format a value for binding
+  // Normalizes JS types to SQLite-safe values:
+  //   Date → ISO string, boolean → 0/1, object → JSON, undefined → null
   static _formatValue(val) {
     if (val instanceof Date) return val.toISOString();
+    if (typeof val === 'boolean') return val ? 1 : 0;
+    if (val === undefined) return null;
     // Serialize plain objects/arrays to JSON for storage (e.g., JSON columns like particulars)
     // Use a replacer to handle model instances (convert to ID) and avoid circular refs
     if (val !== null && typeof val === 'object') {
