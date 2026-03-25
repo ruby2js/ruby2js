@@ -718,6 +718,8 @@ function createRubyTransformPlugin(config, appRoot) {
   // Add imports for cross-model references in method bodies.
   // Scans for bare ClassName.method or new ClassName( patterns and adds
   // import statements for models that aren't already imported.
+  // For model-to-model references, uses modelRegistry to prevent circular imports.
+  // For helpers, views, and tests, uses direct imports (no cycle risk).
   function addCrossModelImports(js, filePath) {
     const relPath = path.relative(appRoot, filePath);
     const isModel = relPath.startsWith('app/models/') || relPath.startsWith('app' + path.sep + 'models' + path.sep);
@@ -754,57 +756,41 @@ function createRubyTransformPlugin(config, appRoot) {
       const refPattern = new RegExp(`\\b${className}\\b\\.\\w|\\bnew\\s+${className}\\b`);
       if (!refPattern.test(js)) continue;
 
-      let importPath;
       if (isModel) {
-        // Compute relative path from current model to target model
-        const currentParts = currentRelPath.split('/');
-        const targetParts = modelPath.split('/');
-        const currentDir = currentParts.slice(0, -1);
-        const targetDir = targetParts.slice(0, -1);
-        const targetFile = targetParts[targetParts.length - 1];
+        // Model-to-model: use modelRegistry to prevent circular imports
+        // Skip references to models in a subdirectory named after this file
+        // (prevents circular dependency with subclasses)
+        const baseName = currentRelPath.split('/').pop();
+        if (modelPath.startsWith(currentRelPath.replace(/[^/]+$/, baseName + '/'))) continue;
 
-        let common = 0;
-        while (common < currentDir.length && common < targetDir.length &&
-               currentDir[common] === targetDir[common]) {
-          common++;
+        // Ensure modelRegistry is imported
+        if (!js.includes('modelRegistry')) {
+          js = `import { modelRegistry } from 'app/models/application_record.rb';\n${js}`;
         }
-        const up = currentDir.length - common;
-        const down = targetDir.slice(common);
-        if (up === 0 && down.length === 0) {
-          importPath = `./${targetFile}.rb`;
-        } else if (up === 0) {
-          importPath = `./${[...down, targetFile + '.rb'].join('/')}`;
-        } else {
-          importPath = [...Array(up).fill('..'), ...down, targetFile + '.rb'].join('/');
-        }
-      } else if (isTest) {
-        // Test files use absolute-style imports resolved by the plugin
-        importPath = `app/models/${modelPath}.rb`;
-      } else if (isView) {
-        // Compute relative path from view to model (app/views/events/ → app/models/)
-        const currentParts = currentRelPath.split('/');
-        const currentDir = currentParts.slice(0, -1);
-        const targetParts = modelPath.split('/');
-        const targetDir = targetParts.slice(0, -1);
-        const targetFile = targetParts[targetParts.length - 1];
 
-        // Go up from views/controller/ to app/, then down to models/
-        const upCount = currentDir.length + 1; // +1 to exit views/
-        importPath = [...Array(upCount).fill('..'), 'models', ...targetDir, targetFile + '.rb'].join('/');
+        // Rewrite bare ClassName references to modelRegistry.ClassName
+        js = js.replace(new RegExp(`(?<!\\.)\\b${className}\\b(?=\\.)`, 'g'), `modelRegistry.${className}`);
+        js = js.replace(new RegExp(`\\bnew\\s+${className}\\b`, 'g'), `new modelRegistry.${className}`);
       } else {
-        // Compute relative path from helper to model (app/helpers/ → app/models/)
-        const currentParts = currentRelPath.split('/');
-        const currentDir = currentParts.slice(0, -1);
-        const targetParts = modelPath.split('/');
-        const targetDir = targetParts.slice(0, -1);
-        const targetFile = targetParts[targetParts.length - 1];
+        // Helpers, views, tests: use direct imports (no cycle risk)
+        let importPath;
+        if (isTest) {
+          importPath = `app/models/${modelPath}.rb`;
+        } else {
+          // Compute relative path from current file to model
+          const currentParts = currentRelPath.split('/');
+          const currentDir = currentParts.slice(0, -1);
+          const targetParts = modelPath.split('/');
+          const targetDir = targetParts.slice(0, -1);
+          const targetFile = targetParts[targetParts.length - 1];
 
-        // Go up from helpers/subdir to app/, then down to models/subdir
-        const upCount = currentDir.length + 1; // +1 to exit helpers/
-        importPath = [...Array(upCount).fill('..'), 'models', ...targetDir, targetFile + '.rb'].join('/');
+          // Go up from views/ or helpers/ to app/, then down to models/
+          const upCount = currentDir.length + 1; // +1 to exit views/ or helpers/
+          importPath = [...Array(upCount).fill('..'), 'models', ...targetDir, targetFile + '.rb'].join('/');
+        }
+
+        js = `import { ${className} } from '${importPath}';\n${js}`;
       }
-
-      js = `import { ${className} } from '${importPath}';\n${js}`;
     }
 
     return js;
