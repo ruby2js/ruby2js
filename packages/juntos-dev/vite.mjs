@@ -63,6 +63,7 @@ import {
   extractHelperMethods,
   shouldIncludeFile,
   deriveAssociationMap,
+  getActiveRecordAdapterFile,
   ErbCompiler
 } from './transform.mjs';
 
@@ -2982,29 +2983,7 @@ function createVirtualPlugin(config, appRoot) {
     'fly': 'node'  // Fly.io runs Node.js
   };
 
-  // Map database names to adapter file names
-  const ADAPTER_FILE_MAP = {
-    'dexie': 'active_record_dexie.mjs',
-    'sqlite': 'active_record_better_sqlite3.mjs',
-    'sqlite3': 'active_record_better_sqlite3.mjs',
-    'better_sqlite3': 'active_record_better_sqlite3.mjs',
-    'pg': 'active_record_pg.mjs',
-    'postgres': 'active_record_pg.mjs',
-    'mysql2': 'active_record_mysql2.mjs',
-    'neon': 'active_record_neon.mjs',
-    'turso': 'active_record_turso.mjs',
-    'planetscale': 'active_record_planetscale.mjs',
-    'd1': 'active_record_d1.mjs',
-    'do': 'active_record_do.mjs',
-    'sqljs': 'active_record_sqljs.mjs',
-    'sqlite_wasm': 'active_record_sqlite_wasm.mjs',
-    'sqlite-wasm': 'active_record_sqlite_wasm.mjs',
-    'wa_sqlite': 'active_record_wa_sqlite.mjs',
-    'wa-sqlite': 'active_record_wa_sqlite.mjs',
-    'pglite': 'active_record_pglite.mjs',
-    'supabase': 'active_record_supabase.mjs',
-    'rpc': 'active_record_rpc.mjs'  // RPC adapter for client-side model access
-  };
+  // Map database names to adapter file names (shared with eject via transform.mjs)
 
   // Map targets to Active Storage adapter file names
   // Browser targets use IndexedDB, server targets use disk, edge targets use S3
@@ -3027,7 +3006,7 @@ function createVirtualPlugin(config, appRoot) {
   };
 
   const targetDir = TARGET_DIR_MAP[config.target] || 'browser';
-  const adapterFile = ADAPTER_FILE_MAP[config.database] || 'active_record_dexie.mjs';
+  const adapterFile = getActiveRecordAdapterFile(config.database);
   const storageAdapterFile = STORAGE_ADAPTER_MAP[config.target] || 'active_storage_indexeddb.mjs';
 
   // Load database config for injection

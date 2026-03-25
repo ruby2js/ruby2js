@@ -16,14 +16,18 @@ Juntos analyzes controllers, models, and concerns during transpilation and share
 When `juntos build` or `juntos transform` processes your application, each filter captures metadata about the file it transpiles. Downstream filters use this metadata to make better decisions:
 
 ```
-Models          → associations, scopes, enums, instance methods, parameterized methods
-Concerns        → method names, constants
-Controllers     → instance variable types, file paths
+Models          → associations, scopes, enums, delegated types, instance methods,
+                  parameterized methods, file paths
+Concerns        → method names, constants, file paths
+Helpers         → exported method names
+Controllers     → instance variable types per action
+Routes          → route helper → controller mappings
                      ↓
 Controllers     ← uses model metadata for async/sync decisions
 Views (ERB)     ← uses controller types for Map/Array/Hash disambiguation
 Tests           ← uses model metadata for async/sync, fixtures, method call syntax
                 ← uses controller metadata for imports
+                ← uses route metadata for standalone route helpers
 ```
 
 ## Controller → View Type Inference
@@ -178,6 +182,18 @@ The test filter knows `article.draft?` and `article.published!` don't need `awai
 
 Named scopes are recorded so the test filter can generate correct query chains.
 
+### Delegated Types
+
+`delegated_type` declarations generate type-specific predicates (e.g., `leaf.page?`, `leaf.section?`) that are synchronous — like enum predicates, they check in-memory state. The model filter records these as `delegated_type_predicates` so the test filter knows not to add `await`:
+
+```ruby
+class Leaf < ApplicationRecord
+  delegated_type :leafable, types: %w[Page Section Picture]
+end
+```
+
+In tests, `leaf.page?` is not awaited because the metadata identifies it as a delegated type predicate.
+
 ### Instance Methods
 
 Methods defined in the model that contain async operations (database queries, association access) are recorded in the `instance_methods` list. The test filter uses this to wrap calls with `await`:
@@ -205,6 +221,18 @@ end
 ```
 
 Without this metadata, `entry.subject_category` in a test would transpile to property access (`entry.subject_category`). With it, the transpiler correctly generates `entry.subject_category()`.
+
+### File Paths
+
+The model's source file path is recorded in metadata. The test filter uses this to generate correct import paths when a test references model classes.
+
+## Helper Metadata
+
+Helper modules (`app/helpers/*_helper.rb`) are transpiled and their exported method names are recorded. This allows downstream consumers to know which methods are available from helpers — for example, when a view or test references a helper method, the transpiler can generate the correct import.
+
+## Route Metadata
+
+The routes file (`config/routes.rb`) is pre-analyzed to build a mapping from route helper names to controllers. This lets the test filter correctly resolve standalone route helpers (e.g., `settings_event_index_path`) to the right controller for import generation.
 
 ## Concern Metadata
 
@@ -245,9 +273,20 @@ The model filter resolves `Leafable::TYPES` by looking it up in concern metadata
 
 The concern's source file path is recorded in metadata. The model filter uses this to generate correct import paths — particularly for namespaced concerns (e.g., `Account::Joinable` at `app/models/account/joinable.rb`) that don't follow the default `concerns/` directory convention.
 
-## Dependency Resolution
+## Processing Order and Dependency Resolution
 
-Model files are processed sequentially, and each filter writes metadata that downstream files may depend on. When a file references metadata that hasn't been populated yet (e.g., a constant from a concern that hasn't been processed), transpilation raises a dependency error and the file is deferred.
+`buildAppManifest` processes files in a fixed order so that each stage can consume metadata from earlier stages:
+
+1. **Models and concerns** — processed together with deferred dependency resolution. Concerns are model-directory files that contribute metadata (methods, constants) consumed by other models.
+2. **Helpers** — transpiled to extract exported method names.
+3. **Controllers** — transpiled to capture instance variable types per action.
+4. **Routes** — analyzed to build route helper → controller mappings.
+
+Views and tests are not pre-processed — they consume the accumulated metadata on demand when individually transpiled.
+
+### Deferred Resolution
+
+Within the model/concern pass, files are processed sequentially, and each filter writes metadata that downstream files may depend on. When a file references metadata that hasn't been populated yet (e.g., a constant from a concern that hasn't been processed), transpilation raises a dependency error and the file is deferred.
 
 The build loop retries deferred files after each pass. As long as each pass successfully processes at least one file, the loop continues. This handles arbitrary dependency chains without requiring a pre-scan or explicit ordering — most applications process all files in a single pass with zero overhead.
 
