@@ -210,13 +210,24 @@ export async function closeDatabase() {
 // Only needs to implement driver-specific execution
 export class ActiveRecord extends SQLiteDialect {
   // Execute SQL and return raw result
+  // Built-in node:sqlite only accepts null, number, string, bigint, Uint8Array.
+  // Coerce any unsupported types as a safety net (most are handled by _formatValue).
   static async _execute(sql, params = []) {
+    const safe = params.map(v => {
+      if (v === undefined) return null;
+      if (typeof v === 'boolean') return v ? 1 : 0;
+      if (v instanceof Date) return v.toISOString();
+      if (v !== null && typeof v === 'object' && !(v instanceof Uint8Array)) {
+        return JSON.stringify(v);
+      }
+      return v;
+    });
     const stmt = db.prepare(sql);
     // For SELECT queries, use all(); for others, use run()
     if (sql.trim().toUpperCase().startsWith('SELECT')) {
-      return { rows: stmt.all(...params), type: 'select' };
+      return { rows: stmt.all(...safe), type: 'select' };
     } else {
-      return { info: stmt.run(...params), type: 'run' };
+      return { info: stmt.run(...safe), type: 'run' };
     }
   }
 
