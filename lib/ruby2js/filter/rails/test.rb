@@ -1056,7 +1056,12 @@ module Ruby2JS
           return nil unless node
 
           if node.type == :begin
-            children = node.children.map { |child| process(child) }.compact
+            # Strip visibility modifiers (private/protected) — meaningless in describe blocks
+            filtered = node.children.reject { |c|
+              c.type == :send && c.children[0].nil? &&
+                [:private, :protected].include?(c.children[1]) && c.children.length == 2
+            }
+            children = filtered.map { |child| process(child) }.compact
             # Filter out hide nodes (from stripped require statements)
             children = children.reject { |c| c.respond_to?(:type) && c.type == :hide }
             children.length == 1 ? children.first : s(:begin, *children)
