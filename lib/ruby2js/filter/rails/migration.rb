@@ -88,6 +88,12 @@ module Ruby2JS
               if method_name == :change || method_name == :up
                 process_migration_method(child.children[2])
               end
+            # Handle class-level blocks (e.g., change_table at top level)
+            elsif child.type == :block
+              process_migration_block(child)
+            # Handle class-level sends (e.g., add_column at top level)
+            elsif child.type == :send
+              process_migration_send(child)
             end
           end
         end
@@ -129,6 +135,8 @@ module Ruby2JS
           case method
           when :create_table
             process_create_table(args, block_args, body)
+          when :change_table
+            process_change_table(args, block_args, body)
           end
         end
 
@@ -243,6 +251,33 @@ module Ruby2JS
           # Emit inline t.index calls after the createTable
           inline_indexes.each do |idx|
             process_add_index([s(:str, idx[:table]), *idx[:args]])
+          end
+        end
+
+        # change_table emits add_column for each column definition in the block
+        def process_change_table(args, block_args, body)
+          return if args.empty?
+
+          table_name = extract_string_value(args[0])
+          return unless table_name
+
+          if body
+            column_children = body.type == :begin ? body.children : [body]
+
+            column_children.each do |child|
+              next unless child&.type == :send
+
+              result = process_column(child, table_name)
+              if result && result[:column]
+                col = result[:column]
+                @migration_statements.push({
+                  type: :add_column,
+                  table: table_name,
+                  column: col[:name],
+                  column_type: col[:type]
+                })
+              end
+            end
           end
         end
 
