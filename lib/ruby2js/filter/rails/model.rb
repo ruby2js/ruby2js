@@ -640,10 +640,20 @@ module Ruby2JS
                   s(:lvar, :"$record"),
                   method,
                   *args.map { |arg| transform_callback_body(arg) })
-              else
-                # Keep other bare calls (including turbo-stream broadcast methods)
-                # These will be processed by on_send
+              elsif BROADCAST_METHODS.include?(method)
+                # Broadcast methods are transformed by on_send — keep bare
                 node.updated(nil, [target, method, *args.map { |arg| transform_callback_body(arg) }])
+              else
+                # Other bare calls in callbacks are instance methods on the record
+                # (e.g., generate_join_code, custom_method, etc.)
+                # Apply underscore prefix for private methods (factory concerns
+                # use underscored_private, so _method is the JS name)
+                js_method = @rails_model_private_methods&.key?(method) ?
+                  :"_#{method}" : method
+                s(:send,
+                  s(:lvar, :"$record"),
+                  js_method,
+                  *args.map { |arg| transform_callback_body(arg) })
               end
             elsif target&.type == :self
               # self.foo -> check if it's an association
@@ -997,8 +1007,8 @@ module Ruby2JS
               next
             end
 
-            # Collect private methods
-            if in_private && child.type == :def
+            # Collect private methods (concerns use :defm instead of :def)
+            if in_private && (child.type == :def || child.type == :defm)
               method_name = child.children[0]
               @rails_model_private_methods[method_name] = child
               next
