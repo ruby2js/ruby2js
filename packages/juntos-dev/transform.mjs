@@ -187,7 +187,7 @@ export function getBuildOptions(section, target, sectionConfig = null) {
     controllers: ['Pragma', 'Rails_Controller', ...nodeFilter, 'ActiveSupport', 'Functions', 'ESM', 'Return'],
     jsx: ['Pragma', 'Rails_Helpers', 'React', 'Functions', 'ESM', 'Return'],
     erb: ['Pragma', 'Rails_Helpers', 'Erb', ...nodeFilter, 'ActiveSupport', 'Functions', 'Return'],
-    default: ['Pragma', 'Rails_Concern', 'Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', ...nodeFilter, 'ActiveSupport', 'Functions', 'ESM', 'Return']
+    default: ['Pragma', 'Rails_Concern', 'Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', ...nodeFilter, 'ActiveSupport', 'SecureRandom', 'Functions', 'ESM', 'Return']
   };
 
   // Use filters from sectionConfig if provided, otherwise use defaults
@@ -2265,6 +2265,9 @@ export async function ensureRuby2jsReady(appRoot) {
 
     // Node.js filter (File operations, backtick commands, etc.)
     await import('ruby2js/filters/node.js');
+
+    // SecureRandom filter (Web Crypto API)
+    await import('ruby2js/filters/securerandom.js');
 
     filtersLoaded = true;
   }
