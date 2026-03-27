@@ -1,6 +1,6 @@
 require 'ruby2js'
 require 'ruby2js/inflector'
-require 'ruby2js/filter/rails/active_record'
+require_relative 'active_record'
 
 module Ruby2JS
   module Filter
@@ -1888,7 +1888,7 @@ module Ruby2JS
               model_refs = Set.new
               models_meta = @options[:metadata]&.[]('models')
               if models_meta
-                models_meta.each { |name, _| model_refs.add(name) }
+                models_meta.keys.each { |name| model_refs.add(name) }
               end
               # Also scan method body for capitalized constants
               scan_const_refs(body_rewritten, model_refs)
@@ -1900,7 +1900,12 @@ module Ruby2JS
                 body_rewritten
               ])
               # Convert to :defm since callback methods are called by framework
-              method_node = rewritten.updated(:defm, rewritten.children)
+              # Wrap with async if body contains await (AR operations need async)
+              if ActiveRecordHelpers.contains_await?(body_rewritten)
+                method_node = rewritten.updated(:async, rewritten.children)
+              else
+                method_node = rewritten.updated(:defm, rewritten.children)
+              end
               transformed << process(method_node)
             end
           end
