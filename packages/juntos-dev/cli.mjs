@@ -1140,6 +1140,32 @@ async function transpileTestFiles(appRoot, config, { preview = false } = {}) {
   // Generate test/__fixtures.mjs — shared fixture creation module
   generateFixturesFile(testDir, fullPlan);
 
+  // Transpile test helpers (test/test_helpers/*.rb → .mjs)
+  // Same processing as eject: extract exports, rewrite this.X → X, add async
+  const helperExports = [];
+  const testHelpersDir = join(testDir, 'test_helpers');
+  if (existsSync(testHelpersDir)) {
+    const helperFiles = readdirSync(testHelpersDir)
+      .filter(f => f.endsWith('.rb') && !f.startsWith('._'));
+    if (helperFiles.length > 0) {
+      const modelNames = Object.keys(metadata.models || {});
+      for (const file of helperFiles) {
+        const outName = file.replace(/\.rb$/, '.mjs');
+        try {
+          const source = readFileSync(join(testHelpersDir, file), 'utf-8');
+          const result = await transformRuby(source, join(testHelpersDir, file), null, config, appRoot, metadata);
+          const { code, exports: exportNames } = postProcessTestHelper(result.code, modelNames);
+          if (exportNames.length > 0) {
+            writeFileSync(join(testHelpersDir, outName), code);
+            helperExports.push({ file: outName, exports: exportNames });
+          }
+        } catch (err) {
+          console.warn(`    Skipped test helper ${file}: ${err.message}`);
+        }
+      }
+    }
+  }
+
   // Generate vitest.config.js — always regenerate to match database/environment
   const isBrowserTest = DEFAULT_TARGETS[config.database] === 'browser';
   const vitestConfigPath = join(appRoot, 'vitest.config.js');
@@ -1232,6 +1258,7 @@ export default mergeConfig(viteConfig, defineConfig({
     database: config.database,
     target: config.target,
     hasFixtures: true,
+    helpers: helperExports,
     stimulusControllers,
     cssImport
   }));
