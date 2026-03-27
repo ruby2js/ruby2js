@@ -891,145 +891,54 @@ function buildUniversalReplacementsMap(fixtures) {
  * @param {string} modelsDir - Path to transpiled models directory (for filtering)
  * @returns {string} JavaScript module source code
  */
-function generateFixturesModule(fixtures, associationMap, currentAttributes, modelsDir) {
-  // Determine which model files actually exist (skip join tables without models)
-  const existingModelFiles = new Set();
-  if (existsSync(modelsDir)) {
-    for (const f of readdirSync(modelsDir)) {
-      if (f.endsWith('.js') && f !== 'index.js' && f !== 'application_record.js') {
-        existingModelFiles.add(f.replace('.js', ''));
-      }
-    }
+/**
+ * Generate a fixtures module from buildFixturePlan output.
+ * Shared by both eject and vitest pipelines via the mode parameter.
+ *
+ * @param {Object} fullPlan - Return value from buildFixturePlan({ loadAll: true })
+ * @param {Object} options
+ * @param {string} options.mode - 'vite' | 'eject'
+ * @returns {string} JavaScript module source code
+ */
+function generateFixturesModuleFromPlan(fullPlan, { mode = 'vite' } = {}) {
+  if (!fullPlan) {
+    const varName = mode === 'eject' ? 'fixtures' : '_fixtures';
+    return `export const ${varName} = {};\n\nexport async function loadFixtures() {}\n`;
   }
 
-  // Collect all tables and their fixtures, skipping tables without model files
-  const allFixtures = new Map();
-  for (const [table, tableFixtures] of Object.entries(fixtures)) {
-    if (!tableFixtures || typeof tableFixtures !== 'object') continue;
-    // Check if a model file exists for this table
-    const modelFileName = underscore(singularize(table));
-    if (!existingModelFiles.has(modelFileName)) {
-      if (DEBUG) console.warn(`    Skipping fixtures for ${table}: no model file ${modelFileName}.js`);
-      continue;
-    }
-    for (const fixtureName of Object.keys(tableFixtures)) {
-      const key = `${table}_${fixtureName}`;
-      allFixtures.set(key, { table, fixture: fixtureName });
-    }
+  const models = fullPlan.fixtureModels || [];
+  const varName = mode === 'eject' ? 'fixtures' : '_fixtures';
+
+  // Generate imports based on mode
+  let importLine;
+  if (mode === 'eject') {
+    importLine = models.map(name => {
+      const fileName = underscore(name) + '.js';
+      return `import { ${name} } from '../app/models/${fileName}';`;
+    }).join('\n');
+  } else {
+    importLine = models.length > 0
+      ? `import { ${models.join(', ')} } from "juntos:models";`
+      : '';
   }
 
-  if (allFixtures.size === 0) return '';
+  // Extract creation body from setupCode (strip beforeEach wrapper)
+  const body = fullPlan.setupCode
+    .replace(/^beforeEach\(async \(\) => \{\n/, '')
+    .replace(/\n\}\);$/, '');
 
-  // Sort tables by dependency
-  const referencedTables = new Set([...allFixtures.values()].map(f => f.table));
-  const sortedTables = topologicalSortTables(referencedTables, fixtures, associationMap);
+  // Rewrite variable name if needed (buildFixturePlan uses _fixtures)
+  const rewrittenBody = mode === 'eject'
+    ? body.replace(/_fixtures\./g, 'fixtures.')
+    : body;
 
-  // Collect unique model names for imports
-  const modelNames = new Set();
-  for (const table of sortedTables) {
-    modelNames.add(camelize(singularize(table)));
-  }
+  return `${importLine}${importLine ? '\n\n' : ''}export const ${varName} = {};
 
-  // Build has_one back-reference assignments
-  const reverseBackRefs = [];
-  for (const [modelTable, assocs] of Object.entries(associationMap)) {
-    for (const [assocName, assocEntry] of Object.entries(assocs)) {
-      if (!assocEntry || assocEntry.type !== 'has_one') continue;
-      const reverseTable = assocEntry.table;
-      if (!reverseTable || !fixtures[reverseTable]) continue;
-      if (!referencedTables.has(modelTable) || !referencedTables.has(reverseTable)) continue;
-
-      const fkCol = singularize(modelTable);
-      for (const [revFixtureName, revFixtureData] of Object.entries(fixtures[reverseTable])) {
-        if (!revFixtureData || typeof revFixtureData !== 'object') continue;
-        const fkValue = revFixtureData[fkCol];
-        if (typeof fkValue !== 'string') continue;
-
-        const ref = resolveFixtureRef(fkValue, modelTable, fixtures);
-        if (ref) {
-          const parentKey = `${modelTable}_${ref.fixtureName}`;
-          const childKey = `${reverseTable}_${revFixtureName}`;
-          if (allFixtures.has(parentKey) && allFixtures.has(childKey)) {
-            reverseBackRefs.push({ parentKey, assocName, childKey });
-          }
-        }
-      }
-    }
-  }
-
-  // Generate model imports
-  const importLines = [];
-  for (const name of [...modelNames].sort()) {
-    const fileName = underscore(name) + '.js';
-    importLines.push(`import { ${name} } from '../app/models/${fileName}';`);
-  }
-
-  // Generate fixture creation lines
-  const createLines = [];
-  for (const table of sortedTables) {
-    const tableFixtures = [...allFixtures.values()].filter(f => f.table === table);
-    for (const { fixture } of tableFixtures) {
-      const fixtureData = fixtures[table]?.[fixture];
-      if (!fixtureData || typeof fixtureData !== 'object') continue;
-
-      const key = `${table}_${fixture}`;
-      const modelName = camelize(singularize(table));
-
-      const attrs = [];
-      for (const [col, value] of Object.entries(fixtureData)) {
-        if (typeof value === 'string') {
-          const resolved = resolveFixtureValue(value, col, table, associationMap, fixtures);
-          if (resolved) {
-            const { ref, targetTable } = resolved;
-            if (allFixtures.has(`${targetTable}_${ref.fixtureName}`)) {
-              attrs.push(`${col}: fixtures.${targetTable}_${ref.fixtureName}`);
-            } else {
-              attrs.push(`${col}_id: ${JSON.stringify(fixtureIdentifyUUID(ref.fixtureName))}`);
-            }
-            continue;
-          }
-        }
-        attrs.push(`${col}: ${JSON.stringify(value)}`);
-      }
-
-      createLines.push(`  fixtures.${key} = await ${modelName}.create({${attrs.join(', ')}}, {validate: false, callbacks: false});`);
-    }
-  }
-
-  // Add back-reference assignments
-  for (const { parentKey, assocName, childKey } of reverseBackRefs) {
-    createLines.push(`  fixtures.${parentKey}.${assocName} = fixtures.${childKey};`);
-  }
-
-  // Generate Current attribute assignments
-  const currentLines = [];
-  if (currentAttributes && currentAttributes.length > 0) {
-    for (const { attr, table, fixture } of currentAttributes) {
-      const varName = `${table}_${fixture}`;
-      currentLines.push(`  Current.${attr} = fixtures.${varName};`);
-    }
-    currentLines.push(`  await Current.settle();`);
-  }
-
-  // Assemble module
-  const lines = [
-    ...importLines,
-    '',
-    'export const fixtures = {};',
-    '',
-    'export async function loadFixtures() {',
-    '  for (const key of Object.keys(fixtures)) delete fixtures[key];',
-    '',
-    ...createLines,
-  ];
-
-  if (currentLines.length > 0) {
-    lines.push('', ...currentLines);
-  }
-
-  lines.push('}', '');
-
-  return lines.join('\n');
+export async function loadFixtures() {
+  for (const key of Object.keys(${varName})) delete ${varName}[key];
+${rewrittenBody}
+}
+`;
 }
 
 // ============================================
@@ -1050,33 +959,10 @@ function generateFixturesModule(fixtures, associationMap, currentAttributes, mod
  * Generate test/__fixtures.mjs — shared fixture creation module.
  * Called by both transpileTestFiles (vitest) and transpileE2EFiles (playwright).
  */
-function generateFixturesFile(testDir, fullPlan) {
-  const fixturesModulePath = join(testDir, '__fixtures.mjs');
-  if (fullPlan) {
-    const models = fullPlan.fixtureModels || [];
-    const importLine = models.length > 0
-      ? `import { ${models.join(', ')} } from "juntos:models";\n\n`
-      : '';
-    // Extract creation body from setupCode (strip beforeEach wrapper)
-    const body = fullPlan.setupCode
-      .replace(/^beforeEach\(async \(\) => \{\n/, '')
-      .replace(/\n\}\);$/, '');
-
-    writeFileSync(fixturesModulePath,
-`${importLine}export const _fixtures = {};
-
-export async function loadFixtures() {
-  for (const key of Object.keys(_fixtures)) delete _fixtures[key];
-${body}
-}
-`);
-  } else {
-    writeFileSync(fixturesModulePath,
-`export const _fixtures = {};
-
-export async function loadFixtures() {}
-`);
-  }
+function generateFixturesFile(testDir, fullPlan, { mode = 'vite' } = {}) {
+  const fileName = mode === 'eject' ? 'fixtures.mjs' : '__fixtures.mjs';
+  const fixturesModulePath = join(testDir, fileName);
+  writeFileSync(fixturesModulePath, generateFixturesModuleFromPlan(fullPlan, { mode }));
 }
 
 /**
@@ -1156,8 +1042,13 @@ async function transpileTestFiles(appRoot, config, { preview = false } = {}) {
           const result = await transformRuby(source, join(testHelpersDir, file), null, config, appRoot, metadata);
           const { code, exports: exportNames } = postProcessTestHelper(result.code, modelNames);
           if (exportNames.length > 0) {
-            writeFileSync(join(testHelpersDir, outName), code);
-            helperExports.push({ file: outName, exports: exportNames });
+            // Check for known JS strict mode violations (e.g., `delete identifier`)
+            if (/\bdelete\s+\w+[;\n)]/m.test(code)) {
+              console.warn(`    Skipped test helper ${file}: contains 'delete' on identifier (HTTP verb not yet supported)`);
+            } else {
+              writeFileSync(join(testHelpersDir, outName), code);
+              helperExports.push({ file: outName, exports: exportNames });
+            }
           }
         } catch (err) {
           console.warn(`    Skipped test helper ${file}: ${err.message}`);
@@ -2624,17 +2515,16 @@ async function runEject(options) {
 
     // Parse fixtures once and generate shared fixtures module
     const fixtures = await parseFixtureFiles(APP_ROOT);
-    const associationMap = buildAssociationMap(join(outDir, 'app/models'));
+    const associationMap = deriveAssociationMap(metadata);
     hasFixtures = Object.keys(fixtures).length > 0;
 
     if (hasFixtures) {
-      const currentAttributes = metadata.current_attributes || [];
-      const fixturesModule = generateFixturesModule(fixtures, associationMap, currentAttributes, join(outDir, 'app/models'));
+      const fullPlan = buildFixturePlan('', fixtures, associationMap, { loadAll: true });
       const outTestDir2 = join(outDir, 'test');
       if (!existsSync(outTestDir2)) {
         mkdirSync(outTestDir2, { recursive: true });
       }
-      writeFileSync(join(outTestDir2, 'fixtures.mjs'), fixturesModule);
+      generateFixturesFile(outTestDir2, fullPlan, { mode: 'eject' });
       fileCount++;
       console.log('  Generated test/fixtures.mjs');
 
