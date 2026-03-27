@@ -69,9 +69,9 @@ export class ImportResolver {
     });
 
     // Step 2: Add model cross-references
-    // Eject mode: use modelRegistry to prevent circular imports
-    // Vite mode: skip (addCrossModelImports in vite.mjs handles direct imports)
-    if (this.#mode === 'eject' && this.#config.modelClassMap) {
+    // Models: use modelRegistry (prevents circular imports)
+    // Other files: use direct imports (no cycle risk)
+    if (this.#config.modelClassMap) {
       js = this.#addModelReferences(js);
     }
 
@@ -237,20 +237,23 @@ export class ImportResolver {
   }
 
   // ============================================================
-  // Model cross-references (shared between modes)
+  // Model cross-references
   // ============================================================
 
   /**
-   * Scan for bare ClassName.method or new ClassName( references to known
-   * models and rewrite to modelRegistry.ClassName. Prevents circular imports.
+   * Scan for ClassName.method or new ClassName( references to known models.
+   * - Model files: use modelRegistry to prevent circular imports
+   * - Other files (helpers, views, tests): use direct imports (no cycle risk)
    */
   #addModelReferences(js) {
     const modelClassMap = this.#config.modelClassMap;
     if (!modelClassMap) return js;
 
+    const isModel = this.#fileType === 'model';
+
     // Determine current file's model path (for self-reference skip)
     let currentModelPath = null;
-    if (this.#fileType === 'model') {
+    if (isModel) {
       currentModelPath = this.#fromFile
         .replace(/^.*app\/models\//, '')
         .replace(/\.(js|rb)$/, '');
@@ -268,38 +271,42 @@ export class ImportResolver {
       const definesClass = new RegExp(`(export\\s+)?(class|const|let|var|function)\\s+${className}\\b`);
       if (definesClass.test(js)) continue;
 
-      // Skip references to models in a subdirectory named after this file
-      // (prevents circular dependency with subclasses)
-      if (currentModelPath) {
+      // Check if referenced (ClassName.something or new ClassName)
+      const refDot = new RegExp(`(?<!\\.)\\b${className}\\b(?=\\.)`, 'g');
+      const refNew = new RegExp(`\\bnew\\s+${className}\\b`);
+      const refBare = new RegExp(`\\b${className}\\b`);
+      const hasRef = refDot.test(js) || refNew.test(js) ||
+        // For non-model files, also check bare ClassName references (e.g., instanceof)
+        (!isModel && refBare.test(js));
+      if (!hasRef) continue;
+
+      if (isModel) {
+        // Model-to-model: use modelRegistry to prevent circular imports
         const baseName = currentModelPath.split('/').pop();
         if (modelPath.startsWith(currentModelPath.replace(/[^/]+$/, baseName + '/'))) continue;
-      }
 
-      // Check if this class name is referenced
-      const refPattern = new RegExp(`(?<!\\.)\\b${className}\\b(?=\\.)`, 'g');
-      if (!refPattern.test(js)) continue;
-
-      // Ensure modelRegistry is imported
-      if (!js.includes('modelRegistry')) {
-        if (this.#mode === 'vite') {
-          // Vite: import from application_record.rb
-          js = `import { modelRegistry } from 'app/models/application_record.rb';\n${js}`;
-        } else {
-          // Eject: import from relative application_record.js
-          let arPath;
-          if (this.#fileType === 'model') {
+        if (!js.includes('modelRegistry')) {
+          if (this.#mode === 'vite') {
+            js = `import { modelRegistry } from 'app/models/application_record.rb';\n${js}`;
+          } else {
             const depth = currentModelPath ? currentModelPath.split('/').length - 1 : 0;
             const prefix = depth > 0 ? '../'.repeat(depth) : './';
-            arPath = `${prefix}application_record.js`;
-          } else {
-            arPath = `${this.#rootPrefix}app/models/application_record.js`;
+            js = `import { modelRegistry } from '${prefix}application_record.js';\n${js}`;
           }
-          js = `import { modelRegistry } from '${arPath}';\n${js}`;
         }
-      }
 
-      // Replace bare ClassName references with modelRegistry.ClassName
-      js = js.replace(new RegExp(`(?<!\\.)\\b${className}\\b(?=\\.)`, 'g'), `modelRegistry.${className}`);
+        js = js.replace(new RegExp(`(?<!\\.)\\b${className}\\b(?=\\.)`, 'g'), `modelRegistry.${className}`);
+        js = js.replace(new RegExp(`\\bnew\\s+${className}\\b`, 'g'), `new modelRegistry.${className}`);
+      } else {
+        // Non-model files: use direct imports (no cycle risk)
+        let importPath;
+        if (this.#mode === 'vite') {
+          importPath = `app/models/${modelPath}.rb`;
+        } else {
+          importPath = `${this.#rootPrefix}app/models/${modelPath}.js`;
+        }
+        js = `import { ${className} } from '${importPath}';\n${js}`;
+      }
     }
 
     return js;

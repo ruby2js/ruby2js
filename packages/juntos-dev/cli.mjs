@@ -1035,13 +1035,30 @@ async function transpileTestFiles(appRoot, config, { preview = false } = {}) {
       .filter(f => f.endsWith('.rb') && !f.startsWith('._'));
     if (helperFiles.length > 0) {
       const modelNames = Object.keys(metadata.models || {});
+      // Build model class map for ImportResolver (ClassName → model path)
+      const modelClassMap = {};
+      for (const [name, info] of Object.entries(metadata.models || {})) {
+        if (info.file) {
+          modelClassMap[name] = info.file.replace(/^app\/models\//, '').replace(/\.rb$/, '');
+        }
+      }
+
       for (const file of helperFiles) {
         const outName = file.replace(/\.rb$/, '.mjs');
         try {
           const source = readFileSync(join(testHelpersDir, file), 'utf-8');
           const result = await transformRuby(source, join(testHelpersDir, file), null, config, appRoot, metadata);
-          const { code, exports: exportNames } = postProcessTestHelper(result.code, modelNames);
+          let { code, exports: exportNames } = postProcessTestHelper(result.code, modelNames);
+          // Add model imports for referenced model classes
           if (exportNames.length > 0) {
+            const { ImportResolver } = await import('./import-resolver.mjs');
+            const resolver = new ImportResolver({
+              mode: 'vite',
+              fromFile: `test/test_helpers/${file}`,
+              appRoot,
+              config: { modelClassMap }
+            });
+            code = resolver.resolve(code);
             writeFileSync(join(testHelpersDir, outName), code);
             helperExports.push({ file: outName, exports: exportNames });
           }
