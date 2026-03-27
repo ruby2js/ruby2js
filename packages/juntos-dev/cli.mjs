@@ -1049,7 +1049,7 @@ async function transpileTestFiles(appRoot, config, { preview = false } = {}) {
           const source = readFileSync(join(testHelpersDir, file), 'utf-8');
           const result = await transformRuby(source, join(testHelpersDir, file), null, config, appRoot, metadata);
           let { code, exports: exportNames } = postProcessTestHelper(result.code, modelNames);
-          // Add model imports for referenced model classes
+          // Add model imports and path helper imports
           if (exportNames.length > 0) {
             const { ImportResolver } = await import('./import-resolver.mjs');
             const resolver = new ImportResolver({
@@ -1059,6 +1059,19 @@ async function transpileTestFiles(appRoot, config, { preview = false } = {}) {
               config: { modelClassMap }
             });
             code = resolver.resolve(code);
+
+            // Convert _url references to _path and add import from juntos:paths
+            code = code.replace(/\b(\w+)_url\b/g, '$1_path');
+            const pathRefs = code.match(/\b\w+_path\b/g);
+            if (pathRefs) {
+              const unique = [...new Set(pathRefs)].filter(name => {
+                return !new RegExp(`import\\s+\\{[^}]*\\b${name}\\b[^}]*\\}\\s+from`).test(code);
+              });
+              if (unique.length > 0) {
+                code = `import { ${unique.join(', ')} } from 'juntos:paths';\n${code}`;
+              }
+            }
+
             writeFileSync(join(testHelpersDir, outName), code);
             helperExports.push({ file: outName, exports: exportNames });
           }
