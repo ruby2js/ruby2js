@@ -262,7 +262,7 @@ function resolveFixtureValue(value, col, table, associationMap, fixtures) {
  * Parse all fixture YAML files from test/fixtures/.
  * Returns a map: { table_name: { fixture_name: { column: value, ... }, ... }, ... }
  */
-function parseFixtureFiles(appRoot) {
+async function parseFixtureFiles(appRoot) {
   const fixturesDir = join(appRoot, 'test/fixtures');
   if (!existsSync(fixturesDir)) return {};
   if (!yaml) return {};
@@ -275,17 +275,17 @@ function parseFixtureFiles(appRoot) {
     const tableName = file.replace('.yml', '');
     try {
       let content = readFileSync(join(fixturesDir, file), 'utf-8');
-      // Evaluate ActiveRecord::FixtureSet.identify() calls before generic ERB strip
+
+      // Evaluate ActiveRecord::FixtureSet.identify() calls (fixture-specific, not transpilable)
       content = content.replace(/<%=\s*ActiveRecord::FixtureSet\.identify\(["']([^"']+)["'],\s*:uuid\)\s*%>/g,
         (m, label) => fixtureIdentifyUUID(label));
       content = content.replace(/<%=\s*ActiveRecord::FixtureSet\.identify\(["']([^"']+)["']\)\s*%>/g,
         (m, label) => fixtureIdentifyInteger(label));
-      // Handle simple ERB expressions (e.g., <%= Date.current.iso8601 %>)
-      content = content.replace(/<%=\s*Date\.current\.iso8601\s*%>/g, new Date().toISOString().split('T')[0]);
-      content = content.replace(/<%=\s*Date\.today\.iso8601\s*%>/g, new Date().toISOString().split('T')[0]);
-      content = content.replace(/<%=\s*Time\.now\.iso8601\s*%>/g, new Date().toISOString());
-      // Remove remaining ERB tags (best-effort)
-      content = content.replace(/<%.*?%>/g, '""');
+
+      // For remaining ERB: transpile via ErbCompiler → Ruby2JS → evaluate
+      if (content.includes('<%')) {
+        content = await evaluateFixtureERB(content);
+      }
 
       const parsed = yaml.load(content);
       if (parsed && typeof parsed === 'object') {
@@ -298,6 +298,57 @@ function parseFixtureFiles(appRoot) {
     }
   }
   return fixtures;
+}
+
+/**
+ * Evaluate ERB in fixture YAML by transpiling to JavaScript.
+ * Uses ErbCompiler to produce Ruby, then Ruby2JS to produce JS,
+ * then evaluates the JS to get a plain YAML string.
+ */
+async function evaluateFixtureERB(content) {
+  try {
+    const { convert } = await ensureRuby2jsReady();
+
+    // ErbCompiler produces Ruby with _buf string building
+    const compiler = new ErbCompiler(content);
+    const ruby = compiler.src;
+
+    // Transpile to JS with erb filter (handles _buf/append= patterns)
+    // and securerandom filter (handles SecureRandom.* calls)
+    const result = convert(ruby, {
+      eslevel: 2022,
+      filters: ['erb', 'functions', 'securerandom']
+    });
+    let js = result.toString();
+
+    // Provide escapeHTML as identity (fixtures are YAML, not HTML)
+    // and BCrypt.Password.create as bcrypt hash generator
+    let hashSync;
+    try {
+      hashSync = (await import('bcryptjs')).hashSync;
+    } catch {
+      // bcryptjs not available
+    }
+
+    const BCrypt = {
+      Password: {
+        create(password) {
+          if (hashSync) return hashSync(password, 10);
+          // Fallback: placeholder hash for apps without bcryptjs
+          return `$2a$10$fixture_hash_${password.replace(/[^a-zA-Z0-9]/g, '')}`;
+        }
+      }
+    };
+
+    const fn = new Function('escapeHTML', 'BCrypt', js + '\nreturn render();');
+    return fn(s => s, BCrypt);
+  } catch (err) {
+    if (DEBUG) {
+      console.warn(`    Warning: ERB evaluation failed: ${err.message}`);
+    }
+    // Fall back to stripping ERB tags
+    return content.replace(/<%.*?%>/g, '""');
+  }
 }
 
 /**
@@ -1054,7 +1105,7 @@ async function transpileTestFiles(appRoot, config, { preview = false } = {}) {
   const associationMap = deriveAssociationMap(metadata);
 
   // Parse fixture YAML files
-  const fixtures = parseFixtureFiles(appRoot);
+  const fixtures = await parseFixtureFiles(appRoot);
 
   // Build shared fixture plan (all fixtures, loaded once in beforeAll)
   const hasFixtures = Object.keys(fixtures).length > 0;
@@ -2742,7 +2793,7 @@ async function runEject(options) {
     }
 
     // Parse fixtures once and generate shared fixtures module
-    const fixtures = parseFixtureFiles(APP_ROOT);
+    const fixtures = await parseFixtureFiles(APP_ROOT);
     const associationMap = buildAssociationMap(join(outDir, 'app/models'));
     hasFixtures = Object.keys(fixtures).length > 0;
 
@@ -4748,7 +4799,7 @@ async function runTransform(options, files) {
           }
 
           // Build fixture plan if fixtures exist
-          const fixtures = parseFixtureFiles(APP_ROOT);
+          const fixtures = await parseFixtureFiles(APP_ROOT);
           if (Object.keys(fixtures).length > 0) {
             const associationMap = deriveAssociationMap(metadata);
             const fullPlan = buildFixturePlan('', fixtures, associationMap, { loadAll: true });
@@ -4977,7 +5028,7 @@ async function transpileE2EFiles(appRoot, config) {
 
   // Build fixture plan for e2e tests (same as vitest flow)
   const associationMap = deriveAssociationMap(metadata);
-  const fixtures = parseFixtureFiles(appRoot);
+  const fixtures = await parseFixtureFiles(appRoot);
   const hasFixtures = Object.keys(fixtures).length > 0;
   const fullPlan = hasFixtures
     ? buildFixturePlan('', fixtures, associationMap, { loadAll: true })
