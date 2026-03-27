@@ -1637,8 +1637,8 @@ export default mergeConfig(viteConfig, defineConfig({
 
     writeFileSync(setupPath, generateTestSetup({
       mode: 'vite',
-      database: config.database,
-      target: config.target,
+      database: options.database || 'sqlite',
+      target: options.target,
       hasFixtures: true,
       stimulusControllers
     }));
