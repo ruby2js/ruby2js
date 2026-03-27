@@ -232,6 +232,12 @@ export class Relation {
     return this.model._executePluck(this, columns);
   }
 
+  // Return array of IDs: User.where({active: true}).ids → [1, 2, 3]
+  // Implemented as getter so it works without () (matching Ruby's .ids)
+  get ids() {
+    return this.pluck('id');
+  }
+
   // Return a single value: User.where({admin: true}).pick('name') → 'Alice'
   async pick(...columns) {
     const results = await this.model._executePluck(this.limit(1), columns);
