@@ -478,7 +478,18 @@ module Ruby2JS
 
         elsif method == :delete and args.length == 1
           if not target
-            process S(:undef, args.first)
+            # Bare delete(x): convert to JS delete only if arg is a property
+            # access (has a target, e.g., a.x) or an ivar/gvar. A bare method
+            # call (no target, e.g., session_url) is likely HTTP DELETE verb
+            # in Rails tests — leave for other filters to handle.
+            arg = args.first
+            if arg.type == :send && arg.children[0]
+              process S(:undef, arg)
+            elsif [:ivar, :gvar, :lvar].include?(arg.type)
+              process S(:undef, arg)
+            else
+              super
+            end
           elsif args.first.type == :str
             key = args.first.children.first
             # Use bracket notation if key is not a valid JS identifier

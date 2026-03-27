@@ -200,6 +200,13 @@ module Ruby2JS
             end
           end
 
+          # HTTP verbs in test helper modules: prevent functions filter from
+          # converting `delete url` to JS delete operator. Keep as function call.
+          if @rails_test_describe_depth == 0 && target.nil? &&
+             [:get, :post, :patch, :put, :delete].include?(method) && args.length > 0
+            return node.updated(:send!, [nil, method, *process_all(args)])
+          end
+
           # Only transform assertions inside test describe blocks
           if @rails_test_describe_depth > 0
             # Integration test specific transforms
@@ -524,7 +531,9 @@ module Ruby2JS
           file_str.end_with?('_test.rb') ||
             file_str.end_with?('.test.rb') ||
             file_str.include?('/test/') ||
-            file_str.include?('/spec/')
+            file_str.start_with?('test/') ||
+            file_str.include?('/spec/') ||
+            file_str.start_with?('spec/')
         end
 
         # Extract instance variable names from a setup body.

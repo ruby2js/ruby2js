@@ -1042,13 +1042,8 @@ async function transpileTestFiles(appRoot, config, { preview = false } = {}) {
           const result = await transformRuby(source, join(testHelpersDir, file), null, config, appRoot, metadata);
           const { code, exports: exportNames } = postProcessTestHelper(result.code, modelNames);
           if (exportNames.length > 0) {
-            // Check for known JS strict mode violations (e.g., `delete identifier`)
-            if (/\bdelete\s+\w+[;\n)]/m.test(code)) {
-              console.warn(`    Skipped test helper ${file}: contains 'delete' on identifier (HTTP verb not yet supported)`);
-            } else {
-              writeFileSync(join(testHelpersDir, outName), code);
-              helperExports.push({ file: outName, exports: exportNames });
-            }
+            writeFileSync(join(testHelpersDir, outName), code);
+            helperExports.push({ file: outName, exports: exportNames });
           }
         } catch (err) {
           console.warn(`    Skipped test helper ${file}: ${err.message}`);
