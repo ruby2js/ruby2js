@@ -103,3 +103,38 @@ globalThis.assert_no_changes = globalThis.assert_no_changes || async function(ex
 globalThis.assert_enqueued_with = globalThis.assert_enqueued_with || function() {};
 globalThis.assert_enqueued_jobs = globalThis.assert_enqueued_jobs || function(count, fn) { if (fn) return fn(); };
 globalThis.assert_no_enqueued_jobs = globalThis.assert_no_enqueued_jobs || function(fn) { if (fn) return fn(); };
+
+// --- Integration test HTTP verbs ---
+// Rails test helpers call post(), get(), delete() etc. as bare functions.
+// These route through the fetch interceptor (installed by test setup) which
+// dispatches to controller actions via RouterBase.match().
+function _httpVerb(method) {
+  return async function(url, options = {}) {
+    const params = options.params || {};
+    const headers = { accept: 'text/html', ...options.headers };
+    const body = typeof params === 'object' && Object.keys(params).length > 0
+      ? JSON.stringify(params)
+      : undefined;
+    const contentType = body ? 'application/json' : undefined;
+    const response = await fetch(url, {
+      method,
+      headers: { ...headers, ...(contentType ? { 'content-type': contentType } : {}) },
+      body
+    });
+    // Store response and cookies for assertion helpers
+    globalThis._lastResponse = response;
+    return response;
+  };
+}
+globalThis.get = globalThis.get || _httpVerb('GET');
+globalThis.post = globalThis.post || _httpVerb('POST');
+globalThis.put = globalThis.put || _httpVerb('PUT');
+globalThis.patch = globalThis.patch || _httpVerb('PATCH');
+globalThis.$delete = globalThis.$delete || _httpVerb('DELETE');
+
+// cookies accessor for test helpers (reads from fetch interceptor's cookie jar)
+globalThis.cookies = globalThis.cookies || new Proxy({}, {
+  get(_, key) {
+    return globalThis._testCookies?.[key];
+  }
+});
