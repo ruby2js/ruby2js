@@ -1163,6 +1163,43 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     return rows.map(row => new this(row));
   }
 
+  // Bulk insert rows without callbacks/validations (Rails insert_all)
+  static async insert_all(records) {
+    if (!records || records.length === 0) return;
+    const keys = Object.keys(records[0]);
+    const cols = keys.map(k => quoteId(k));
+    for (const record of records) {
+      const values = keys.map(k => this._formatValue(record[k]));
+      const placeholders = keys.map((_, i) => this._param(i + 1));
+      const sql = `INSERT INTO ${this.tableName} (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`;
+      await this._execute(sql, values);
+    }
+  }
+
+  // Bulk upsert rows (Rails upsert_all)
+  static async upsert_all(records, options = {}) {
+    if (!records || records.length === 0) return;
+    const keys = Object.keys(records[0]);
+    const cols = keys.map(k => quoteId(k));
+    const uniqueBy = options.unique_by || [];
+    for (const record of records) {
+      const values = keys.map(k => this._formatValue(record[k]));
+      const placeholders = keys.map((_, i) => this._param(i + 1));
+      let sql = `INSERT INTO ${this.tableName} (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`;
+      if (uniqueBy.length > 0) {
+        const conflictCols = uniqueBy.map(k => quoteId(k)).join(', ');
+        const updateSets = keys.filter(k => !uniqueBy.includes(k))
+          .map(k => `${quoteId(k)} = excluded.${quoteId(k)}`);
+        if (updateSets.length > 0) {
+          sql += ` ON CONFLICT (${conflictCols}) DO UPDATE SET ${updateSets.join(', ')}`;
+        } else {
+          sql += ` ON CONFLICT (${conflictCols}) DO NOTHING`;
+        }
+      }
+      await this._execute(sql, values);
+    }
+  }
+
   // Snake case aliases
   static find_by(conditions) { return this.findBy(conditions); }
   static find_or_create_by(attrs) { return this.findOrCreateBy(attrs); }
