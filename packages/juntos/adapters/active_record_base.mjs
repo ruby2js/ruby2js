@@ -242,6 +242,8 @@ export class ActiveRecordBase {
   async save(options) {
     if (!(options && options.validate === false) && !await this.isValid()) return false;
 
+    const skipCallbacks = options && options.callbacks === false;
+
     // Set timestamps centrally - adapters don't need to handle this
     const now = new Date().toISOString();
     this.attributes.updated_at = now;
@@ -249,19 +251,21 @@ export class ActiveRecordBase {
 
     // Run callbacks via the registration system (_runCallbacks handles both
     // string method names and function callbacks)
-    await this._runCallbacks('before_save');
+    if (!skipCallbacks) await this._runCallbacks('before_save');
 
     if (this._persisted) {
-      await this._runCallbacks('before_update');
+      if (!skipCallbacks) await this._runCallbacks('before_update');
 
       const result = await this._update();
 
       if (result) {
         await this._processNestedAttributes();
-        await this._runCallbacks('after_update');
-        await this._runCallbacks('after_save');
-        await this._runCallbacks('after_update_commit');
-        await this._runCallbacks('after_save_commit');
+        if (!skipCallbacks) {
+          await this._runCallbacks('after_update');
+          await this._runCallbacks('after_save');
+          await this._runCallbacks('after_update_commit');
+          await this._runCallbacks('after_save_commit');
+        }
         this._changes = {};  // Clear dirty tracking after successful save
       }
       return result;
@@ -274,7 +278,7 @@ export class ActiveRecordBase {
         await this._resolveDefaults();
       }
 
-      await this._runCallbacks('before_create');
+      if (!skipCallbacks) await this._runCallbacks('before_create');
 
       let result;
       try {
@@ -290,10 +294,12 @@ export class ActiveRecordBase {
 
       if (result) {
         await this._processNestedAttributes();
-        await this._runCallbacks('after_create');
-        await this._runCallbacks('after_save');
-        await this._runCallbacks('after_create_commit');
-        await this._runCallbacks('after_save_commit');
+        if (!skipCallbacks) {
+          await this._runCallbacks('after_create');
+          await this._runCallbacks('after_save');
+          await this._runCallbacks('after_create_commit');
+          await this._runCallbacks('after_save_commit');
+        }
         this._changes = {};  // Clear dirty tracking after successful save
       }
       return result;
