@@ -1,5 +1,6 @@
 require 'ruby2js'
 require 'ruby2js/inflector'
+require 'ruby2js/filter/rails/active_record'
 
 module Ruby2JS
   module Filter
@@ -1881,10 +1882,22 @@ module Ruby2JS
                   locals.push(arg.children[0]) if arg.respond_to?(:children) && arg.children[0]
                 end
               end
+              body_rewritten = rewrite_bare_sends_to_self(node.children[2], locals)
+              # Wrap AR operations with await (same helper used by seeds/test filters)
+              # Build model refs from metadata for AR async wrapping
+              model_refs = Set.new
+              models_meta = @options[:metadata]&.[]('models')
+              if models_meta
+                models_meta.each { |name, _| model_refs.add(name) }
+              end
+              # Also scan method body for capitalized constants
+              scan_const_refs(body_rewritten, model_refs)
+              body_rewritten = ActiveRecordHelpers.wrap_ar_operations(
+                body_rewritten, model_refs, models_meta)
               rewritten = node.updated(nil, [
                 node.children[0],
                 node.children[1],
-                rewrite_bare_sends_to_self(node.children[2], locals)
+                body_rewritten
               ])
               # Convert to :defm since callback methods are called by framework
               method_node = rewritten.updated(:defm, rewritten.children)
@@ -2327,6 +2340,15 @@ module Ruby2JS
           Array Hash String Integer Float
           freeze_time travel_to travel_back
         ]
+
+        # Collect constant references from an AST node (e.g., Book, User)
+        def scan_const_refs(node, refs)
+          return unless node.respond_to?(:type)
+          if node.type == :const && node.children[0].nil?
+            refs.add(node.children[1].to_s)
+          end
+          node.children.each { |c| scan_const_refs(c, refs) if c.respond_to?(:type) }
+        end
 
         def rewrite_bare_sends_to_self(node, locals)
           return node unless node.respond_to?(:type)
