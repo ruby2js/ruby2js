@@ -1746,10 +1746,15 @@ module Ruby2JS
               callback)
           end
 
-        elsif method == :map and call.children.length == 2
+        elsif [:map, :collect].include?(method) and call.children.length == 2
           # For destructuring (multiple args), wrap in mlhs: ([a, b]) => ...
           args = node.children[1]
           return super unless args  # Ruby 3.4 it blocks handled by converter
+
+          # Normalize :collect to :map (Ruby aliases)
+          if method == :collect
+            call = call.updated(nil, [call.children.first, :map])
+          end
 
           # Hash receiver with 2+ args: Object.entries(hash).map(([k, v]) => ...)
           receiver = call.children[0]
@@ -1766,10 +1771,10 @@ module Ruby2JS
           node.updated nil, [process(call), processed_args,
             s(:autoreturn, *process_all(node.children[2..-1]))]
 
-        elsif [:map!, :select!].include? method
+        elsif [:map!, :collect!, :select!].include? method
           # input: a.map! {expression}
           # output: a.splice(0, a.length, *a.map {expression})
-          method = (method == :map! ? :map : :select)
+          method = ([:map!, :collect!].include?(method) ? :map : :select)
           target = call.children.first
           process call.updated(:send, [target, :splice, s(:splat, s(:send,
             s(:array, s(:int, 0), s(:attr, target, :length)), :concat,

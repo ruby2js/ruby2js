@@ -23,6 +23,7 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `.chars` {{ caret }} `Array.from()`
 * `.chr` {{ caret }} `fromCharCode`
 * `.clear` {{ caret }} `.length = 0`
+* `.collect {}` {{ caret }} `.map()` (alias for `.map`)
 * `.compact` {{ caret }} `.filter(x => x != null)`
 * `.compact!` {{ caret }} `.splice(0, a.length, ...a.filter(x => x != null))` (mutating)
 * `debugger` {{ caret }} `debugger` (JS debugger statement)
@@ -171,7 +172,8 @@ fn = proc { |x| x * 2 }
 ## Additional Features
 
 * `.sub!` and `.gsub!` become equivalent `x = x.replace` statements
-* `.map!`, `.reverse!`, and `.select!` become equivalent
+* `.collect` becomes `.map` (Ruby alias)
+* `.map!`, `.collect!`, `.reverse!`, and `.select!` become equivalent
   `.splice(0, .length, *.method())` statements
 * `setInterval` and `setTimeout` allow block to be treated as the
     first parameter on the call
