@@ -1117,17 +1117,18 @@ afterAll(() => {
   out += `
 beforeAll(async () => {
   // Import models (registers them with Application and modelRegistry)
-  const models = await import('${modelsImport}');
+  await import('${modelsImport}');
+`;
 
-  // Make all models globally available (Rails autoloads all models)
+  if (!isVite) {
+    // Eject: make all models globally available (Vite resolves via virtual modules)
+    out += `  const models = await import('${modelsImport}');
   for (const [name, value] of Object.entries(models)) {
     if (typeof value === 'function' || typeof value === 'object') {
       globalThis[name] = value;
     }
   }
 `;
-
-  if (!isVite) {
     // Eject: handle nested model classes and CurrentAttributes promotion
     out += `  // Attach nested classes to parent namespaces (e.g., Card.Closeable = Closeable)
   const _nesting = (globalThis._modelNesting || []);
