@@ -1164,11 +1164,16 @@ export class ActiveRecordSQL extends ActiveRecordBase {
   }
 
   // Bulk insert rows without callbacks/validations (Rails insert_all)
+  // Auto-adds created_at/updated_at timestamps (matching Rails behavior)
   static async insert_all(records) {
     if (!records || records.length === 0) return;
-    const keys = Object.keys(records[0]);
+    const now = new Date().toISOString();
+    const stamped = records.map(r => ({
+      created_at: now, updated_at: now, ...r
+    }));
+    const keys = Object.keys(stamped[0]);
     const cols = keys.map(k => quoteId(k));
-    for (const record of records) {
+    for (const record of stamped) {
       const values = keys.map(k => this._formatValue(record[k]));
       const placeholders = keys.map((_, i) => this._param(i + 1));
       const sql = `INSERT INTO ${this.tableName} (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`;
