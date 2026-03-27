@@ -317,7 +317,7 @@ async function evaluateFixtureERB(content) {
     // and securerandom filter (handles SecureRandom.* calls)
     const result = convert(ruby, {
       eslevel: 2022,
-      filters: ['erb', 'functions', 'securerandom']
+      filters: ['Erb', 'Functions', 'SecureRandom']
     });
     let js = result.toString();
 
@@ -1242,6 +1242,10 @@ export default mergeConfig(viteConfig, defineConfig({
     writeFileSync(setupPath, `// Test setup for Vitest (browser database)
 // Re-initializes the database and reloads fixtures before each test
 
+// Rails stubs MUST be imported before anything that loads models
+// (concerns use delegate, validates, etc. during class definition)
+import 'juntos/rails_stubs.mjs';
+
 import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { installFetchInterceptor, resetCookies } from 'juntos/test_fetch.mjs';
 import { loadFixtures, _fixtures } from './__fixtures.mjs';${stimSection}${cssImport}
@@ -1318,6 +1322,10 @@ afterEach(async () => {
     // SQL databases (better-sqlite3, pg, etc.): use savepoints for fast rollback
     writeFileSync(setupPath, `// Test setup for Vitest
 // Initializes the database once, loads fixtures, uses savepoints per test
+
+// Rails stubs MUST be imported before anything that loads models
+// (concerns use delegate, validates, etc. during class definition)
+import 'juntos/rails_stubs.mjs';
 
 import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { installFetchInterceptor, resetCookies } from 'juntos/test_fetch.mjs';
@@ -1785,6 +1793,10 @@ export default mergeConfig(viteConfig, defineConfig({
 
     writeFileSync(setupPath, `// Test setup for Vitest
 // Initializes the database once, loads fixtures, uses savepoints per test
+
+// Rails stubs MUST be imported before anything that loads models
+// (concerns use delegate, validates, etc. during class definition)
+import 'juntos/rails_stubs.mjs';
 
 import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { installFetchInterceptor, resetCookies } from 'juntos/test_fetch.mjs';
