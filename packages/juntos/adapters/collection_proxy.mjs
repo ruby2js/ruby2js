@@ -133,15 +133,15 @@ export class CollectionProxy {
   // Bulk insert scoped to this association's foreign key
   async insert_all(records) {
     if (!records || records.length === 0) return;
-    const scoped = records.map(r => ({ ...r, [this.metadata.foreignKey]: this.owner.id }));
-    return this.model.insert_all(scoped);
+    const scoped = records.map(r => ({ ...r, [this._association.foreignKey]: this._owner.id }));
+    return this._model.insert_all(scoped);
   }
 
   // Bulk upsert scoped to this association's foreign key
   async upsert_all(records, options = {}) {
     if (!records || records.length === 0) return;
-    const scoped = records.map(r => ({ ...r, [this.metadata.foreignKey]: this.owner.id }));
-    return this.model.upsert_all(scoped, options);
+    const scoped = records.map(r => ({ ...r, [this._association.foreignKey]: this._owner.id }));
+    return this._model.upsert_all(scoped, options);
   }
 
   // Snake case aliases
