@@ -1006,22 +1006,51 @@ export function generatePackageJsonForEject(appName, config = {}) {
 }
 
 /**
- * Generate test/setup.mjs for ejected output.
+ * Generate test/setup.mjs for both Vite dev mode and ejected output.
+ *
+ * @param {Object} config
+ * @param {string} config.mode - 'vite' | 'eject'
+ * @param {string} config.database - Database adapter name
+ * @param {string} [config.target] - Build target (node, browser, etc.)
+ * @param {boolean} [config.hasFixtures] - Whether fixture loading is needed
+ * @param {Array} [config.helpers] - [{file, exports}] test helper modules
+ * @param {Array} [config.stimulusControllers] - [{name, className, file}]
+ * @param {boolean} [config.cssImport] - Include CSS import (Vite dev only)
  */
-export function generateTestSetupForEject(config = {}) {
-  const adapterFile = getActiveRecordAdapterFile(config.database);
+export function generateTestSetup(config = {}) {
+  const mode = config.mode || 'vite';
+  const isVite = mode === 'vite';
+  const isBrowserDb = ['dexie', 'pglite', 'sqljs', 'sql.js'].includes(config.database);
 
-  // Determine target for importing Application
-  let target = config.target || 'node';
-  if (!config.target && config.database === 'dexie') {
-    target = 'browser';
+  // --- Import paths differ by mode ---
+  const modelsImport = isVite ? 'juntos:models' : '../app/models/index.js';
+  const migrationsImport = isVite ? 'juntos:migrations' : '../db/migrate/index.js';
+  const routesImport = isVite ? '../config/routes.rb' : '../config/routes.js';
+
+  let adapterImport;
+  if (isVite) {
+    adapterImport = 'juntos:active-record';
+  } else {
+    const adapterFile = getActiveRecordAdapterFile(config.database);
+    adapterImport = `juntos/adapters/${adapterFile}`;
   }
-  const railsModule = `juntos/targets/${target}/rails.js`;
 
-  const fixtureImport = config.hasFixtures ? `\nimport { loadFixtures } from './fixtures.mjs';` : '';
-  const fixtureLoad = config.hasFixtures ? `\n  await loadFixtures();` : '';
+  let railsImport;
+  if (isVite) {
+    railsImport = 'juntos:rails';
+  } else {
+    let target = config.target || 'node';
+    if (!config.target && config.database === 'dexie') target = 'browser';
+    railsImport = `juntos/targets/${target}/rails.js`;
+  }
 
-  // Generate imports and globalThis assignments for test helpers
+  // --- Fixture handling ---
+  const fixtureFile = isVite ? './__fixtures.mjs' : './fixtures.mjs';
+  const fixtureImport = config.hasFixtures !== false
+    ? `\nimport { loadFixtures, _fixtures } from '${fixtureFile}';`
+    : '';
+
+  // --- Test helpers ---
   const helpers = config.helpers || [];
   const helperImports = helpers.map(h =>
     `import { ${h.exports.join(', ')} } from './test_helpers/${h.file}';`
@@ -1033,7 +1062,7 @@ export function generateTestSetupForEject(config = {}) {
     ? `\n${helperImports}\n\n// Make test helpers globally available (like Rails includes)\n${helperGlobals}\n`
     : '';
 
-  // Generate Stimulus controller registration for system tests
+  // --- Stimulus controllers ---
   const stimulusControllers = config.stimulusControllers || [];
   const stimulusImports = stimulusControllers.map(c =>
     `import ${c.className} from '../app/javascript/controllers/${c.file}';`
@@ -1045,9 +1074,19 @@ export function generateTestSetupForEject(config = {}) {
     ? `\nimport { registerController } from 'juntos/system_test.mjs';\n${stimulusImports}\n${stimulusRegistrations}\n`
     : '';
 
-  return `// Test setup for Vitest - ejected version
-import { beforeAll, beforeEach, afterEach, expect } from 'vitest';
-import { installFetchInterceptor, resetCookies } from 'juntos/test_fetch.mjs';${fixtureImport}${stimulusSection}${helperSection}
+  // --- CSS import (Vite dev only, for Tailwind) ---
+  const cssImport = config.cssImport ? `\nimport '${config.cssImport}';` : '';
+
+  // --- Build the setup file ---
+  let out = `// Test setup for Vitest
+// Initializes the database, loads fixtures, isolates tests
+
+// Rails stubs MUST be imported before anything that loads models
+// (concerns use delegate, validates, etc. during class definition)
+import 'juntos/rails_stubs.mjs';
+
+import { beforeAll, beforeEach, afterEach, afterAll, expect } from 'vitest';
+import { installFetchInterceptor, resetCookies } from 'juntos/test_fetch.mjs';${fixtureImport}${stimulusSection}${helperSection}${cssImport}
 
 // Compare ActiveRecord model instances by class and id (like Rails)
 expect.addEqualityTesters([
@@ -1057,25 +1096,40 @@ expect.addEqualityTesters([
     if (aIsModel && bIsModel) {
       return a.constructor === b.constructor && a.id === b.id;
     }
-    // If only one is a model, they're not equal
     if (aIsModel || bIsModel) return false;
     return undefined; // fall through to default for non-models
   }
 ]);
 
+// Suppress ActiveRecord CRUD logging during tests
+const _info = console.info;
+const _debug = console.debug;
+console.info = () => {};
+console.debug = () => {};
+
+afterAll(() => {
+  console.info = _info;
+  console.debug = _debug;
+});
+`;
+
+  // --- beforeAll: init models, migrations, routes, database ---
+  out += `
 beforeAll(async () => {
   // Import models (registers them with Application and modelRegistry)
-  const models = await import('../app/models/index.js');
+  const models = await import('${modelsImport}');
 
   // Make all models globally available (Rails autoloads all models)
-  // Also detect nested model patterns (e.g. ZipFile + Writer -> ZipFile.Writer)
-  const modelNames = Object.keys(models);
   for (const [name, value] of Object.entries(models)) {
     if (typeof value === 'function' || typeof value === 'object') {
       globalThis[name] = value;
     }
   }
-  // Attach nested classes to parent namespaces (e.g., Card.Closeable = Closeable)
+`;
+
+  if (!isVite) {
+    // Eject: handle nested model classes and CurrentAttributes promotion
+    out += `  // Attach nested classes to parent namespaces (e.g., Card.Closeable = Closeable)
   const _nesting = (globalThis._modelNesting || []);
   for (const [parent, child] of _nesting) {
     if (globalThis[parent] && globalThis[child]) {
@@ -1085,35 +1139,98 @@ beforeAll(async () => {
   // Promote CurrentAttributes instance methods to static on Current
   if (globalThis.Current?._promoteInstanceMethods) Current._promoteInstanceMethods();
 
-  // Configure and initialize database once (like Rails db:test:prepare)
-  const { Application } = await import('${railsModule}');
-  const { migrations } = await import('../db/migrate/index.js');
-  Application.configure({ migrations });
+`;
+  }
 
-  const activeRecord = await import('juntos/adapters/${adapterFile}');
-  await activeRecord.initDatabase({ database: ':memory:' });
-  await Application.runMigrations(activeRecord);
+  out += `  // Configure and initialize database
+  const rails = await import('${railsImport}');
+  const { migrations } = await import('${migrationsImport}');
+  rails.Application.configure({ migrations });
 
-  // Import routes (registers routes with Router via RouterBase.resources())
-  await import('../config/routes.js');
+  // Import routes (registers routes with Router)
+  await import('${routesImport}');
 
   // Install fetch interceptor so Stimulus controllers can reach controller actions
   installFetchInterceptor();
+`;
+
+  if (isBrowserDb) {
+    // Browser databases: full init function for re-use in beforeEach
+    out += `
+  await initBrowserDb();
 });
 
-// Transactional tests: wrap each test in a transaction that rolls back,
-// so fixture data from beforeEach is cleaned up automatically (like Rails)
+async function initBrowserDb() {
+  const activeRecord = await import('${adapterImport}');
+  await activeRecord.initDatabase({ database: ':memory:' });
+
+  // For Dexie/IndexedDB: register table schemas and open database
+  if (activeRecord.defineSchema) {
+    const { migrations } = await import('${migrationsImport}');
+    activeRecord.registerSchema('schema_migrations', '&version');
+    for (const migration of migrations) {
+      if (migration.tableSchemas) {
+        for (const [table, schema] of Object.entries(migration.tableSchemas)) {
+          activeRecord.registerSchema(table, schema);
+        }
+      }
+    }
+    activeRecord.defineSchema(1);
+    await activeRecord.openDatabase();
+  }
+
+  const rails = await import('${railsImport}');
+  await rails.Application.runMigrations(activeRecord);
+  ${config.hasFixtures !== false ? 'await loadFixtures();\n  globalThis.__fixtures = _fixtures;' : ''}
+}
+
 beforeEach(async () => {
   resetCookies();
-  const activeRecord = await import('juntos/adapters/${adapterFile}');
-  activeRecord.beginTransaction();${fixtureLoad}
+  const activeRecord = await import('${adapterImport}');
+  if (activeRecord.closeDatabase) {
+    await activeRecord.closeDatabase();
+  }
+  await initBrowserDb();
 });
 
 afterEach(async () => {
-  const activeRecord = await import('juntos/adapters/${adapterFile}');
-  activeRecord.rollbackTransaction();
+  // cleanup handled in beforeEach
 });
 `;
+  } else {
+    // SQL databases: init once, use savepoints/transactions for isolation
+    const beginIsolation = isVite ? 'activeRecord.beginSavepoint()' : 'activeRecord.beginTransaction()';
+    const endIsolation = isVite ? 'activeRecord.rollbackSavepoint()' : 'activeRecord.rollbackTransaction()';
+
+    out += `
+  const activeRecord = await import('${adapterImport}');
+  await activeRecord.initDatabase({ database: ':memory:' });
+  await rails.Application.runMigrations(activeRecord);
+  ${config.hasFixtures !== false ? 'await loadFixtures();\n  globalThis.__fixtures = _fixtures;' : ''}
+});
+
+beforeEach(async () => {
+  resetCookies();
+  const activeRecord = await import('${adapterImport}');
+  ${beginIsolation};
+});
+
+afterEach(async () => {
+  const activeRecord = await import('${adapterImport}');
+  ${endIsolation};
+});
+`;
+  }
+
+  return out;
+}
+
+/**
+ * Generate test/setup.mjs for ejected output.
+ * Thin wrapper around generateTestSetup for backward compatibility.
+ */
+export function generateTestSetupForEject(config = {}) {
+  return generateTestSetup({ ...config, mode: 'eject' });
 }
 
 /**

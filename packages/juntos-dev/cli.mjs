@@ -42,6 +42,7 @@ import {
   generateTurboStreamModuleForEject,
   generatePackageJsonForEject,
   generateViteConfigForEject,
+  generateTestSetup,
   generateTestSetupForEject,
   generateTestGlobalsForEject,
   generateTestRunnerForEject,
@@ -1200,187 +1201,40 @@ export default mergeConfig(viteConfig, defineConfig({
   }
 
   // Generate test/setup.mjs — always regenerate to match current juntos version
-  let stimSection = '';
+  const stimulusControllers = [];
   const stimDir = join(appRoot, 'app/javascript/controllers');
   if (hasSystemTests && existsSync(stimDir)) {
-    const stimEntries = [];
     for (const f of readdirSync(stimDir)) {
       if (f.endsWith('_controller.rb') || f.endsWith('_controller.js')) {
         const name = f.replace(/_controller\.(rb|js)$/, '').replace(/_/g, '-');
         const className = f.replace(/_controller\.(rb|js)$/, '')
           .split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('') + 'Controller';
         const ext = f.endsWith('.rb') ? '.rb' : '.js';
-        stimEntries.push({ name, className, file: f.replace(/\.js$/, ext) });
+        stimulusControllers.push({ name, className, file: f.replace(/\.js$/, ext) });
       }
-    }
-    if (stimEntries.length > 0) {
-      const imports = stimEntries.map(c =>
-        `import ${c.className} from '../app/javascript/controllers/${c.file}';`
-      ).join('\n');
-      const regs = stimEntries.map(c =>
-        `registerController('${c.name}', ${c.className});`
-      ).join('\n');
-      stimSection = `\nimport { registerController } from 'juntos/system_test.mjs';\n${imports}\n${regs}\n`;
     }
   }
 
   const setupPath = join(testDir, 'setup.mjs');
-  const isBrowserDb = DEFAULT_TARGETS[config.database] === 'browser';
 
   // Detect CSS for browser test mode (so views render with styles)
-  let cssImport = '';
+  let cssImport = null;
   const tailwindCss = join(appRoot, 'app/assets/tailwind/application.css');
   const juntossCss = join(appRoot, 'app/assets/tailwind/juntos.css');
   if (existsSync(tailwindCss)) {
-    cssImport = `\nimport '../app/assets/tailwind/application.css';`;
+    cssImport = '../app/assets/tailwind/application.css';
   } else if (existsSync(juntossCss)) {
-    cssImport = `\nimport '../app/assets/tailwind/juntos.css';`;
+    cssImport = '../app/assets/tailwind/juntos.css';
   }
 
-  if (isBrowserDb) {
-    // Browser databases (Dexie, PGlite, sql.js): no savepoints, re-init per test
-    writeFileSync(setupPath, `// Test setup for Vitest (browser database)
-// Re-initializes the database and reloads fixtures before each test
-
-// Rails stubs MUST be imported before anything that loads models
-// (concerns use delegate, validates, etc. during class definition)
-import 'juntos/rails_stubs.mjs';
-
-import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
-import { installFetchInterceptor, resetCookies } from 'juntos/test_fetch.mjs';
-import { loadFixtures, _fixtures } from './__fixtures.mjs';${stimSection}${cssImport}
-
-// Suppress ActiveRecord CRUD logging during tests
-const _info = console.info;
-const _debug = console.debug;
-console.info = () => {};
-console.debug = () => {};
-
-afterAll(() => {
-  console.info = _info;
-  console.debug = _debug;
-});
-
-let rails, migrations;
-
-beforeAll(async () => {
-  // Import models (registers them with Application and modelRegistry)
-  await import('juntos:models');
-
-  // Configure migrations
-  rails = await import('juntos:rails');
-  migrations = await import('juntos:migrations');
-  rails.Application.configure({ migrations: migrations.migrations });
-
-  // Import routes (registers routes with Router via RouterBase.resources())
-  await import('../config/routes.rb');
-
-  // Install fetch interceptor so Stimulus controllers can reach controller actions
-  installFetchInterceptor();
-
-  // Initial database setup so globalThis.__fixtures is available for test beforeAll hooks
-  await initBrowserDb();
-});
-
-async function initBrowserDb() {
-  const activeRecord = await import('juntos:active-record');
-  await activeRecord.initDatabase({ database: ':memory:' });
-
-  // For Dexie/IndexedDB: register table schemas and open database
-  if (activeRecord.defineSchema) {
-    activeRecord.registerSchema('schema_migrations', '&version');
-    for (const migration of migrations.migrations) {
-      if (migration.tableSchemas) {
-        for (const [table, schema] of Object.entries(migration.tableSchemas)) {
-          activeRecord.registerSchema(table, schema);
-        }
-      }
-    }
-    activeRecord.defineSchema(1);
-    await activeRecord.openDatabase();
-  }
-
-  await rails.Application.runMigrations(activeRecord);
-  await loadFixtures();
-  globalThis.__fixtures = _fixtures;
-}
-
-beforeEach(async () => {
-  resetCookies();
-  const activeRecord = await import('juntos:active-record');
-  if (activeRecord.closeDatabase) {
-    await activeRecord.closeDatabase();
-  }
-  await initBrowserDb();
-});
-
-afterEach(async () => {
-  // cleanup handled in beforeEach
-});
-`);
-  } else {
-    // SQL databases (better-sqlite3, pg, etc.): use savepoints for fast rollback
-    writeFileSync(setupPath, `// Test setup for Vitest
-// Initializes the database once, loads fixtures, uses savepoints per test
-
-// Rails stubs MUST be imported before anything that loads models
-// (concerns use delegate, validates, etc. during class definition)
-import 'juntos/rails_stubs.mjs';
-
-import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
-import { installFetchInterceptor, resetCookies } from 'juntos/test_fetch.mjs';
-import { loadFixtures, _fixtures } from './__fixtures.mjs';${stimSection}
-
-// Suppress ActiveRecord CRUD logging during tests
-const _info = console.info;
-const _debug = console.debug;
-console.info = () => {};
-console.debug = () => {};
-
-afterAll(() => {
-  console.info = _info;
-  console.debug = _debug;
-});
-
-let dbReady = false;
-
-beforeAll(async () => {
-  // Import models (registers them with Application and modelRegistry)
-  await import('juntos:models');
-
-  // Configure migrations
-  const rails = await import('juntos:rails');
-  const migrations = await import('juntos:migrations');
-  rails.Application.configure({ migrations: migrations.migrations });
-
-  // Import routes (registers routes with Router via RouterBase.resources())
-  await import('../config/routes.rb');
-
-  // Install fetch interceptor so Stimulus controllers can reach controller actions
-  installFetchInterceptor();
-
-  if (!dbReady) {
-    const activeRecord = await import('juntos:active-record');
-    await activeRecord.initDatabase({ database: ':memory:' });
-    await rails.Application.runMigrations(activeRecord);
-    await loadFixtures();
-    globalThis.__fixtures = _fixtures;
-    dbReady = true;
-  }
-});
-
-beforeEach(async () => {
-  resetCookies();
-  const activeRecord = await import('juntos:active-record');
-  activeRecord.beginSavepoint();
-});
-
-afterEach(async () => {
-  const activeRecord = await import('juntos:active-record');
-  activeRecord.rollbackSavepoint();
-});
-`);
-  }
+  writeFileSync(setupPath, generateTestSetup({
+    mode: 'vite',
+    database: config.database,
+    target: config.target,
+    hasFixtures: true,
+    stimulusControllers,
+    cssImport
+  }));
 }
 
 // ============================================
@@ -1765,92 +1619,29 @@ export default mergeConfig(viteConfig, defineConfig({
     }
 
     // Discover Stimulus controllers for system test registration
-    let stimSection = '';
+    const stimulusControllers = [];
     const systemTestDir = join(destDir, 'test/system');
     const hasSystemTests = existsSync(systemTestDir) && readdirSync(systemTestDir).some(f => f.endsWith('.rb'));
     const stimDir = join(destDir, 'app/javascript/controllers');
     if (hasSystemTests && existsSync(stimDir)) {
-      const stimEntries = [];
       for (const f of readdirSync(stimDir)) {
         if (f.endsWith('_controller.rb') || f.endsWith('_controller.js')) {
           const name = f.replace(/_controller\.(rb|js)$/, '').replace(/_/g, '-');
           const className = f.replace(/_controller\.(rb|js)$/, '')
             .split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('') + 'Controller';
           const ext = f.endsWith('.rb') ? '.rb' : '.js';
-          stimEntries.push({ name, className, file: f.replace(/\.js$/, ext) });
+          stimulusControllers.push({ name, className, file: f.replace(/\.js$/, ext) });
         }
-      }
-      if (stimEntries.length > 0) {
-        const imports = stimEntries.map(c =>
-          `import ${c.className} from '../app/javascript/controllers/${c.file}';`
-        ).join('\n');
-        const regs = stimEntries.map(c =>
-          `registerController('${c.name}', ${c.className});`
-        ).join('\n');
-        stimSection = `\nimport { registerController } from 'juntos/system_test.mjs';\n${imports}\n${regs}\n`;
       }
     }
 
-    writeFileSync(setupPath, `// Test setup for Vitest
-// Initializes the database once, loads fixtures, uses savepoints per test
-
-// Rails stubs MUST be imported before anything that loads models
-// (concerns use delegate, validates, etc. during class definition)
-import 'juntos/rails_stubs.mjs';
-
-import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
-import { installFetchInterceptor, resetCookies } from 'juntos/test_fetch.mjs';
-import { loadFixtures, _fixtures } from './__fixtures.mjs';${stimSection}
-
-// Suppress ActiveRecord CRUD logging during tests
-const _info = console.info;
-const _debug = console.debug;
-console.info = () => {};
-console.debug = () => {};
-
-afterAll(() => {
-  console.info = _info;
-  console.debug = _debug;
-});
-
-let dbReady = false;
-
-beforeAll(async () => {
-  // Import models (registers them with Application and modelRegistry)
-  await import('juntos:models');
-
-  // Configure migrations
-  const rails = await import('juntos:rails');
-  const migrations = await import('juntos:migrations');
-  rails.Application.configure({ migrations: migrations.migrations });
-
-  // Import routes (registers routes with Router via RouterBase.resources())
-  await import('../config/routes.rb');
-
-  // Install fetch interceptor so Stimulus controllers can reach controller actions
-  installFetchInterceptor();
-
-  if (!dbReady) {
-    const activeRecord = await import('juntos:active-record');
-    await activeRecord.initDatabase({ database: ':memory:' });
-    await rails.Application.runMigrations(activeRecord);
-    await loadFixtures();
-    globalThis.__fixtures = _fixtures;
-    dbReady = true;
-  }
-});
-
-beforeEach(async () => {
-  resetCookies();
-  const activeRecord = await import('juntos:active-record');
-  activeRecord.beginSavepoint();
-});
-
-afterEach(async () => {
-  const activeRecord = await import('juntos:active-record');
-  activeRecord.rollbackSavepoint();
-});
-`);
+    writeFileSync(setupPath, generateTestSetup({
+      mode: 'vite',
+      database: config.database,
+      target: config.target,
+      hasFixtures: true,
+      stimulusControllers
+    }));
   } else {
     if (!quiet) console.log('  Skipping test/setup.mjs (already exists)');
   }
