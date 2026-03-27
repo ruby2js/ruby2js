@@ -56,3 +56,50 @@ Function.prototype.cattr_accessor = Function.prototype.cattr_accessor || functio
     configurable: true
   });
 };
+
+// --- Rails test assertion helpers ---
+// These are standard minitest/Rails assertion methods that the test filter
+// transforms into vitest-compatible calls. They need to be globally available
+// for both Vite and eject pipelines.
+
+// assert_difference(expression, difference, fn) - verify a numeric change
+globalThis.assert_difference = globalThis.assert_difference || async function(expr, diff, fn) {
+  if (typeof diff === 'function') { fn = diff; diff = 1; }
+  const evalExpr = (e) => typeof e === 'function' ? e() : eval(e.replace(/::/g, '.'));
+  const before = await evalExpr(expr);
+  await fn();
+  const after = await evalExpr(expr);
+  const { expect } = await import('vitest');
+  expect(after - before).toBe(diff);
+};
+
+// assert_no_difference(expression, fn)
+globalThis.assert_no_difference = globalThis.assert_no_difference || async function(expr, fn) {
+  return assert_difference(expr, 0, fn);
+};
+
+// assert_changes(expression, opts_or_fn, fn) - verify a value change
+globalThis.assert_changes = globalThis.assert_changes || async function(expr, ...args) {
+  let fn = args.pop();
+  const evalExpr = (e) => typeof e === 'function' ? e() : eval(e.replace(/::/g, '.'));
+  const before = await evalExpr(expr);
+  await fn();
+  const after = await evalExpr(expr);
+  const { expect } = await import('vitest');
+  expect(after).not.toEqual(before);
+};
+
+// assert_no_changes(expression, fn)
+globalThis.assert_no_changes = globalThis.assert_no_changes || async function(expr, fn) {
+  const evalExpr = (e) => typeof e === 'function' ? e() : eval(e.replace(/::/g, '.'));
+  const before = await evalExpr(expr);
+  await fn();
+  const after = await evalExpr(expr);
+  const { expect } = await import('vitest');
+  expect(after).toEqual(before);
+};
+
+// ActiveJob test helpers
+globalThis.assert_enqueued_with = globalThis.assert_enqueued_with || function() {};
+globalThis.assert_enqueued_jobs = globalThis.assert_enqueued_jobs || function(count, fn) { if (fn) return fn(); };
+globalThis.assert_no_enqueued_jobs = globalThis.assert_no_enqueued_jobs || function(fn) { if (fn) return fn(); };
