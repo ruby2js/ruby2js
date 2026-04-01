@@ -29,14 +29,18 @@ defmodule JuntosBeam do
 
     # Convert headers map to array of [key, value] pairs (QuickBEAM's Headers format)
     headers_pairs = headers |> Enum.map(fn {k, v} -> [k, v] end) |> Jason.encode!()
-    body_js = if body, do: ", body: #{Jason.encode!(body)}", else: ""
+    # body is passed via globalThis.__requestBody, not through Request constructor
+
+    # Store raw body for parseBody to access (Request.text() not available in QuickBEAM)
+    escaped_body = if body, do: Jason.encode!(body), else: "null"
 
     js = """
       async function __dispatch() {
         try {
+          globalThis.__requestBody = #{escaped_body};
           const request = new Request('http://localhost#{path}', {
             method: '#{method}',
-            headers: new Headers(#{headers_pairs})#{body_js}
+            headers: new Headers(#{headers_pairs})
           });
           const response = await Router.dispatch(request);
           const responseHeaders = {};
@@ -137,8 +141,28 @@ defmodule JuntosBeam do
       for _i <- 1..pool_size do
         {:ok, rt} = QuickBEAM.start(handlers: handlers)
 
-        # Stub browser globals
-        QuickBEAM.eval(rt, "globalThis.window = globalThis;")
+        # Stub browser globals and patch Response constructor for string bodies
+        # QuickBEAM's Response requires Uint8Array body; this wrapper auto-encodes strings
+        QuickBEAM.eval(rt, """
+          globalThis.window = globalThis;
+          const _OrigResponse = globalThis.Response;
+          globalThis.Response = class extends _OrigResponse {
+            constructor(body, init = {}) {
+              const encoded = typeof body === 'string' ? new TextEncoder().encode(body)
+                : body instanceof Uint8Array ? body
+                : body == null ? null
+                : new TextEncoder().encode(String(body));
+              const headers = init.headers instanceof Headers ? init.headers
+                : new Headers(Object.entries(init.headers || {}));
+              super(encoded, {
+                status: init.status || 200,
+                statusText: init.statusText || 'OK',
+                headers: headers,
+                url: init.url || ''
+              });
+            }
+          };
+        """)
 
         # Load the application
         {:ok, _} = QuickBEAM.eval(rt, app_code)

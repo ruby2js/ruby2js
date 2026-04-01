@@ -27,25 +27,9 @@ import {
 // Re-export everything from server module
 export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from, stylesheetLinkTag, javascriptImportmapTags, getAssetPath };
 
-// Helper: create a Response that works in QuickBEAM
-// QuickBEAM's Response constructor requires Uint8Array body, not strings
-function beamResponse(body, init) {
-  const encoded = typeof body === 'string' ? new TextEncoder().encode(body)
-    : body instanceof Uint8Array ? body
-    : body == null ? null
-    : new TextEncoder().encode(String(body));
-  // QuickBEAM Response needs: (Uint8Array|null, {status, statusText, headers, url})
-  const headers = init.headers instanceof Headers ? init.headers
-    : new Headers(Object.entries(init.headers || {}));
-  return new Response(encoded, {
-    status: init.status || 200,
-    statusText: init.statusText || 'OK',
-    headers: headers,
-    url: init.url || ''
-  });
-}
-
 // Router with BEAM-specific overrides
+// Note: Response constructor is patched globally by the Elixir host to accept
+// string bodies (QuickBEAM's native Response requires Uint8Array)
 export class Router extends RouterServer {
   // Override redirect to use full URL (like Cloudflare/Vercel targets)
   static redirect(context, path) {
@@ -57,18 +41,23 @@ export class Router extends RouterServer {
       headers.set('Set-Cookie', flashCookie);
     }
 
-    return beamResponse(null, { status: 302, headers });
+    return new Response(null, { status: 302, headers });
   }
 
-  // Override parseBody to handle multipart/form-data via Fetch API
+  // Override parseBody to read from globalThis.__requestBody
+  // QuickBEAM's Request doesn't support .text()/.json()/.formData()
+  // The Elixir host passes the raw body via globalThis.__requestBody
   static async parseBody(req) {
+    const text = globalThis.__requestBody;
+    if (!text) return {};
+
     const contentType = req.headers.get('content-type') || '';
 
     try {
       if (contentType.includes('application/json')) {
-        return await req.json();
-      } else if (contentType.includes('application/x-www-form-urlencoded')) {
-        const text = await req.text();
+        return JSON.parse(text);
+      } else {
+        // URL-encoded form data (most common for Rails forms)
         const params = {};
         const pairs = text.split('&');
         for (const pair of pairs) {
@@ -77,15 +66,6 @@ export class Router extends RouterServer {
             const decodedKey = decodeURIComponent(key.replace(/\+/g, ' '));
             const decodedValue = decodeURIComponent((value || '').replace(/\+/g, ' '));
             setNestedParam(params, decodedKey, decodedValue);
-          }
-        }
-        return params;
-      } else if (contentType.includes('multipart/form-data')) {
-        const formData = await req.formData();
-        const params = {};
-        for (const [key, value] of formData.entries()) {
-          if (typeof value === 'string') {
-            setNestedParam(params, key, value);
           }
         }
         return params;
@@ -128,7 +108,7 @@ export class Router extends RouterServer {
       headers['Set-Cookie'] = flashCookie;
     }
 
-    return beamResponse(html, { status: 200, headers });
+    return new Response(html, { status: 200, headers });
   }
 
   // Override htmlResponse to use the correct Application class
@@ -142,7 +122,7 @@ export class Router extends RouterServer {
       headers['Set-Cookie'] = flashCookie;
     }
 
-    return beamResponse(fullHtml, { status, headers });
+    return new Response(fullHtml, { status, headers });
   }
 }
 
@@ -190,7 +170,7 @@ export class Application extends ApplicationServer {
         return await Router.dispatch(request);
       } catch (e) {
         console.error('BEAM handler error:', e);
-        return beamResponse(`<h1>500 Internal Server Error</h1><pre>${e.stack}</pre>`, {
+        return new Response(`<h1>500 Internal Server Error</h1><pre>${e.stack}</pre>`, {
           status: 500,
           headers: { 'Content-Type': 'text/html' }
         });
