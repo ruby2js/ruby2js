@@ -59,7 +59,16 @@ defmodule JuntosBeam.Database do
 
     opts =
       if url do
-        Postgrex.Utils.parse_url(url)
+        # Parse DATABASE_URL into Postgrex options
+        uri = URI.parse(url)
+        userinfo = String.split(uri.userinfo || "", ":")
+        [
+          hostname: uri.host,
+          port: uri.port || 5432,
+          database: String.trim_leading(uri.path || "/juntos_dev", "/"),
+          username: Enum.at(userinfo, 0),
+          password: Enum.at(userinfo, 1)
+        ]
       else
         [
           hostname: config["host"] || "localhost",

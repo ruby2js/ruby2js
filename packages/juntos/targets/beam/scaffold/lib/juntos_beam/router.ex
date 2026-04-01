@@ -37,19 +37,14 @@ defmodule JuntosBeam.Router do
     {:ok, body, conn} = Plug.Conn.read_body(conn)
     body = if body == "", do: nil, else: body
 
-    case JuntosBeam.dispatch(method, full_path, headers, body) do
-      {:ok, status, resp_headers, resp_body} ->
-        conn =
-          Enum.reduce(resp_headers, conn, fn {key, value}, acc ->
-            Plug.Conn.put_resp_header(acc, key, value)
-          end)
+    {:ok, status, resp_headers, resp_body} =
+      JuntosBeam.dispatch(method, full_path, headers, body)
 
-        Plug.Conn.send_resp(conn, status, resp_body)
+    conn =
+      Enum.reduce(resp_headers, conn, fn {key, value}, acc ->
+        Plug.Conn.put_resp_header(acc, key, value)
+      end)
 
-      {:error, _reason} ->
-        conn
-        |> Plug.Conn.put_resp_content_type("text/html")
-        |> Plug.Conn.send_resp(500, "<h1>500 Internal Server Error</h1>")
-    end
+    Plug.Conn.send_resp(conn, status, resp_body)
   end
 end

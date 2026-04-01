@@ -66,7 +66,7 @@ defmodule JuntosBeam do
       await __dispatch()
     """
 
-    case QuickBEAM.Pool.eval(@pool_name, js) do
+    case QuickBEAM.Pool.run(@pool_name, fn rt -> QuickBEAM.eval(rt, js) end, 30_000) do
       {:ok, result} when is_binary(result) ->
         case Jason.decode(result) do
           {:ok, %{"status" => status, "headers" => resp_headers, "body" => resp_body}} ->
@@ -147,7 +147,7 @@ defmodule JuntosBeam do
         handlers: handlers,
         init: init_fn
       ]]},
-      type: :supervisor
+      type: :worker
     }
   end
 
