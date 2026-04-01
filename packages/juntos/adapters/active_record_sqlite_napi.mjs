@@ -150,8 +150,11 @@ export class ActiveRecord extends SQLiteDialect {
       const stmt = db.query(sql);
       return { rows: stmt.all(...params), type: 'select' };
     } else {
-      // Use db.run() for mutations — returns { changes, lastInsertRowid }
-      const info = db.run(sql, ...params);
+      // Use db.run() for mutations
+      let info = db.run(sql, ...params);
+      // Handle async run() if it returns a Promise
+      if (info && typeof info.then === 'function') info = await info;
+      console.log('db.run result:', typeof info, JSON.stringify(info));
       return { info, type: 'run' };
     }
   }
