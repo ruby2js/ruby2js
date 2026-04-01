@@ -26,6 +26,7 @@ These targets require transpilation. Rails can't run here; Juntos can:
 | **[Electron](/docs/juntos/deploying/electron)** | Desktop apps (macOS/Windows/Linux) | SQLite, sql.js, HTTP-based |
 | **[Tauri](/docs/juntos/deploying/tauri)** | Lightweight desktop apps | sql.js, PGlite, HTTP-based |
 | **[Electrobun](/docs/juntos/deploying/electrobun)** | Ultra-lightweight desktop apps (Bun backend) | sql.js, PGlite, HTTP-based |
+| **[BEAM](/docs/juntos/deploying/beam)** | Fault tolerance, distributed real-time, OTP clustering | SQLite, PostgreSQL |
 
 ## Also Works
 
@@ -44,16 +45,16 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 
 ## Quick Comparison
 
-| Aspect | Worker | Browser | Node.js | Fly.io | Vercel | Cloudflare | Capacitor | Electron | Tauri | Electrobun |
-|--------|--------|---------|---------|--------|--------|------------|-----------|----------|-------|------------|
-| Infrastructure | None (static) | None (static) | Server/container | Container | On-demand | On-demand | App stores | User install | User install | User install |
-| Scaling | N/A | N/A | Manual | Automatic | Automatic | Automatic | Per-device | Per-device | Per-device | Per-device |
-| Cold starts | None | None | N/A | ~200-500ms | ~50-250ms | ~5-50ms | None | None | None | None |
-| Database | OPFS (Worker) | Client-side | TCP/file | MPG (Postgres) | HTTP APIs | D1 binding | Client-side | File/client | Client-side | Client-side |
-| Multi-tab | Shared | Independent | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Native APIs | Limited | Limited | N/A | N/A | N/A | N/A | Full device | Full OS | Rust backend | Bun/TypeScript |
-| Distribution | URL | URL | Deploy | Deploy | Deploy | Deploy | App Store | DMG/EXE | DMG/EXE | DMG/EXE |
-| Bundle size | N/A | N/A | N/A | N/A | N/A | N/A | ~5MB | ~150MB | ~3-10MB | ~14MB |
+| Aspect | Worker | Browser | BEAM | Node.js | Fly.io | Vercel | Cloudflare | Capacitor | Electron | Tauri | Electrobun |
+|--------|--------|---------|------|---------|--------|--------|------------|-----------|----------|-------|------------|
+| Infrastructure | None (static) | None (static) | Server | Server/container | Container | On-demand | On-demand | App stores | User install | User install | User install |
+| Scaling | N/A | N/A | Pooled + cluster | Manual | Automatic | Automatic | Automatic | Per-device | Per-device | Per-device | Per-device |
+| Cold starts | None | None | N/A | N/A | ~200-500ms | ~50-250ms | ~5-50ms | None | None | None | None |
+| Database | OPFS (Worker) | Client-side | SQLite/Postgres | TCP/file | MPG (Postgres) | HTTP APIs | D1 binding | Client-side | File/client | Client-side | Client-side |
+| Multi-tab | Shared | Independent | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| Native APIs | Limited | Limited | BEAM NIFs | N/A | N/A | N/A | N/A | Full device | Full OS | Rust backend | Bun/TypeScript |
+| Distribution | URL | URL | Deploy | Deploy | Deploy | Deploy | Deploy | App Store | DMG/EXE | DMG/EXE | DMG/EXE |
+| Bundle size | N/A | N/A | N/A | N/A | N/A | N/A | N/A | ~5MB | ~150MB | ~3-10MB | ~14MB |
 
 ## Choosing a Target
 
@@ -81,6 +82,13 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 - You want CLI-driven workflow (no dashboard copying)
 - You want managed Postgres with automatic failover
 - *Rails works here too—but Juntos + MPG provides a streamlined CLI workflow*
+
+**Choose BEAM if:**
+- You need fault tolerance with OTP supervision (runtime crashes don't take down the server)
+- You want distributed real-time without Redis (`:pg` spans clustered nodes)
+- You want true parallel request handling (pooled JS runtimes on OS threads)
+- You plan to integrate with Phoenix or the Elixir ecosystem
+- *Rails can't do this*
 
 **Choose Node.js, Bun, or Deno if:**
 - You need npm packages not available in Ruby
@@ -127,6 +135,8 @@ bin/juntos up -d neon         # → vercel
 bin/juntos up -d d1           # → cloudflare
 bin/juntos up -d do           # → cloudflare
 bin/juntos up -d mpg          # → fly
+bin/juntos up -d sqlite_napi  # → beam
+bin/juntos up -d postgrex     # → beam
 ```
 
 Override with `-t`:
@@ -143,6 +153,7 @@ You don't need to hit remote databases during development. Use the familiar `con
 
 | Deploy Target | Prod Database | Dev Adapter | Dev Target | Notes |
 |---------------|---------------|-------------|------------|-------|
+| BEAM | postgrex | sqlite_napi | beam | Local SQLite, prod Postgres |
 | Cloudflare Workers | d1 | sqlite | node | Same SQL dialect |
 | Cloudflare Workers | do | sqlite | node | Same SQL dialect, cell architecture |
 | Vercel Edge | neon | pglite | worker | No server needed |
