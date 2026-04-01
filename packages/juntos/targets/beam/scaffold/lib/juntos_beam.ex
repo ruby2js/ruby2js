@@ -2,21 +2,31 @@ defmodule JuntosBeam do
   @moduledoc """
   Juntos on BEAM - runs a Ruby2JS-transpiled Rails app inside QuickBEAM.
 
-  Uses a pool of QuickBEAM runtimes for concurrent request handling.
-  Each runtime has its own JS context with the app loaded.
+  Uses a pool of QuickBEAM runtimes with round-robin dispatch for
+  concurrent request handling. Each runtime has its own JS context
+  and OS thread, providing true parallelism.
   """
+
+  use GenServer
 
   require Logger
 
   @app_script "app.js"
-  @pool_name JuntosBeam.Pool
+
+  # Client API
+
+  def start_link(opts \\ []) do
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  end
 
   @doc """
   Dispatch an HTTP request to the JS application.
-  Checks out a runtime from the pool, dispatches, and checks it back in.
-  Returns {:ok, status, headers, body} or {:ok, 500, %{}, error_message}.
+  Picks the next runtime from the pool via round-robin.
+  Returns {:ok, status, headers, body}.
   """
   def dispatch(method, path, headers, body \\ nil) do
+    rt = GenServer.call(__MODULE__, :checkout)
+
     # Convert headers map to array of [key, value] pairs (QuickBEAM's Headers format)
     headers_pairs = headers |> Enum.map(fn {k, v} -> [k, v] end) |> Jason.encode!()
     body_js = if body, do: ", body: #{Jason.encode!(body)}", else: ""
@@ -66,7 +76,7 @@ defmodule JuntosBeam do
       await __dispatch()
     """
 
-    case QuickBEAM.Pool.run(@pool_name, fn rt -> QuickBEAM.eval(rt, js) end, 30_000) do
+    case QuickBEAM.eval(rt, js) do
       {:ok, result} when is_binary(result) ->
         case Jason.decode(result) do
           {:ok, %{"status" => status, "headers" => resp_headers, "body" => resp_body}} ->
@@ -87,10 +97,10 @@ defmodule JuntosBeam do
     end
   end
 
-  @doc """
-  Returns the child spec for the QuickBEAM pool.
-  """
-  def child_spec(opts) do
+  # Server callbacks
+
+  @impl true
+  def init(opts) do
     adapter = Keyword.get(opts, :adapter, System.get_env("JUNTOS_DATABASE", "sqlite_napi"))
     database = Keyword.get(opts, :database, default_database(adapter))
     pool_size = Keyword.get(opts, :pool_size, max(4, System.schedulers_online()))
@@ -117,38 +127,44 @@ defmodule JuntosBeam do
 
     app_code = File.read!(@app_script)
 
-    init_fn = fn rt ->
-      # Stub browser globals
-      QuickBEAM.eval(rt, "globalThis.window = globalThis;")
-
-      # Load the application
-      {:ok, _} = QuickBEAM.eval(rt, app_code)
-
-      # Load sqlite-napi addon for SQLite adapters
-      if adapter in ["sqlite_napi", "sqlite-napi"] do
-        load_sqlite_addon(rt)
-      end
-
-      # Initialize the database
-      db_config = Jason.encode!(%{database: database})
-      {:ok, _} = QuickBEAM.eval(rt, "await initDatabase(#{db_config});")
-    end
-
     Logger.info(
       "Starting QuickBEAM pool: #{pool_size} runtimes " <>
       "(adapter: #{adapter}, database: #{database})"
     )
 
-    %{
-      id: __MODULE__,
-      start: {QuickBEAM.Pool, :start_link, [[
-        name: @pool_name,
-        size: pool_size,
-        handlers: handlers,
-        init: init_fn
-      ]]},
-      type: :worker
-    }
+    # Start N runtimes, each with the app loaded
+    runtimes =
+      for _i <- 1..pool_size do
+        {:ok, rt} = QuickBEAM.start(handlers: handlers)
+
+        # Stub browser globals
+        QuickBEAM.eval(rt, "globalThis.window = globalThis;")
+
+        # Load the application
+        {:ok, _} = QuickBEAM.eval(rt, app_code)
+
+        # Load sqlite-napi addon for SQLite adapters
+        if adapter in ["sqlite_napi", "sqlite-napi"] do
+          load_sqlite_addon(rt)
+        end
+
+        # Initialize the database
+        db_config = Jason.encode!(%{database: database})
+        {:ok, _} = QuickBEAM.eval(rt, "await initDatabase(#{db_config});")
+
+        rt
+      end
+
+    Logger.info("QuickBEAM pool ready (#{pool_size} runtimes)")
+
+    {:ok, %{runtimes: List.to_tuple(runtimes), counter: 0, size: pool_size}}
+  end
+
+  @impl true
+  def handle_call(:checkout, _from, state) do
+    index = rem(state.counter, state.size)
+    rt = elem(state.runtimes, index)
+    {:reply, rt, %{state | counter: state.counter + 1}}
   end
 
   # Private

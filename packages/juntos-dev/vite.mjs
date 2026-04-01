@@ -1365,6 +1365,17 @@ function createStructurePlugin(config, appRoot) {
       // CSS is now added as a Vite input (see createConfigPlugin)
       // so it gets fingerprinted and added to the manifest
 
+      // BEAM target: symlink storage directory for database access
+      if (config.target === 'beam') {
+        const storageLink = path.join(distDir, 'storage');
+        const storageTarget = path.join(appRoot, 'storage');
+        if (fs.existsSync(storageTarget) && !fs.existsSync(storageLink)) {
+          try {
+            await fs.promises.symlink(storageTarget, storageLink, 'junction');
+          } catch {}
+        }
+      }
+
       // BEAM target: copy Elixir scaffold files to dist/
       if (config.target === 'beam') {
         const scaffoldDir = path.join(appRoot, 'node_modules/juntos/targets/beam/scaffold');
