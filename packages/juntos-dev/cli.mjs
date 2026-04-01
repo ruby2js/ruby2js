@@ -1374,6 +1374,10 @@ function loadDatabaseConfig(options) {
       options.database = _ADAPTER_ALIASES[options.database];
     }
     options.dbName = options.dbName || `${basename(APP_ROOT)}_${env}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    // Still infer target from database if not explicitly set
+    if (!options.target && DEFAULT_TARGETS[options.database]) {
+      options.target = DEFAULT_TARGETS[options.database];
+    }
     return;
   }
 
