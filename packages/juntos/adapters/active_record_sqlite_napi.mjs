@@ -142,7 +142,11 @@ export class ActiveRecord extends SQLiteDialect {
     if (sql.trim().toUpperCase().startsWith('SELECT')) {
       return { rows: stmt.all(...params), type: 'select' };
     } else {
-      return { info: stmt.run(...params), type: 'run' };
+      const info = stmt.run(...params);
+      if (sql.trim().toUpperCase().startsWith('INSERT')) {
+        console.log('sqlite-napi run() result:', JSON.stringify(info), 'keys:', Object.keys(info || {}));
+      }
+      return { info, type: 'run' };
     }
   }
 
@@ -153,7 +157,10 @@ export class ActiveRecord extends SQLiteDialect {
 
   // Get last insert ID from result
   static _getLastInsertId(result) {
-    return result.info?.lastInsertRowid;
+    const info = result.info;
+    if (!info) return undefined;
+    // sqlite-napi may use lastInsertRowid or lastRowId
+    return info.lastInsertRowid ?? info.lastRowId ?? info.last_insert_rowid;
   }
 
   // Disable/enable foreign key checks
