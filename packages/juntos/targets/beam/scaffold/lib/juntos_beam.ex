@@ -1,82 +1,22 @@
 defmodule JuntosBeam do
   @moduledoc """
   Juntos on BEAM - runs a Ruby2JS-transpiled Rails app inside QuickBEAM.
-  """
 
-  use GenServer
+  Uses a pool of QuickBEAM runtimes for concurrent request handling.
+  Each runtime has its own JS context with the app loaded.
+  """
 
   require Logger
 
   @app_script "app.js"
-
-  # Client API
-
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-  end
+  @pool_name JuntosBeam.Pool
 
   @doc """
-  Dispatch a Plug.Conn-style request to the JS application.
-  Returns {status, headers, body}.
+  Dispatch an HTTP request to the JS application.
+  Checks out a runtime from the pool, dispatches, and checks it back in.
+  Returns {:ok, status, headers, body} or {:ok, 500, %{}, error_message}.
   """
   def dispatch(method, path, headers, body \\ nil) do
-    GenServer.call(__MODULE__, {:dispatch, method, path, headers, body}, 30_000)
-  end
-
-  # Server callbacks
-
-  @impl true
-  def init(opts) do
-    port = Keyword.get(opts, :port, String.to_integer(System.get_env("PORT", "3000")))
-    adapter = Keyword.get(opts, :adapter, System.get_env("JUNTOS_DATABASE", "sqlite_napi"))
-    database = Keyword.get(opts, :database, default_database(adapter))
-
-    # Base handlers (broadcast)
-    handlers = %{
-      "__broadcast" => fn [channel, html] ->
-        JuntosBeam.Cable.broadcast(channel, html)
-      end
-    }
-
-    # Add database handlers for Postgrex adapter
-    handlers =
-      if adapter in ["postgrex", "pg", "postgres"] do
-        Map.merge(handlers, JuntosBeam.Database.postgrex_handlers())
-      else
-        handlers
-      end
-
-    # Start QuickBEAM runtime
-    {:ok, rt} = QuickBEAM.start(handlers: handlers)
-
-    # Stub browser globals that server-side code may reference
-    QuickBEAM.eval(rt, "globalThis.window = globalThis;")
-
-    # Load the application script
-    {:ok, _} = QuickBEAM.eval(rt, File.read!(@app_script))
-
-    # Load sqlite-napi addon for SQLite adapters
-    if adapter in ["sqlite_napi", "sqlite-napi"] do
-      load_sqlite_addon(rt)
-    end
-
-    # Ensure database directory exists for file-based databases
-    if adapter in ["sqlite_napi", "sqlite-napi"] do
-      database |> Path.dirname() |> File.mkdir_p!()
-    end
-
-    # Initialize the database
-    db_config = Jason.encode!(%{database: database})
-    {:ok, _} = QuickBEAM.eval(rt, "await initDatabase(#{db_config});")
-
-    Logger.info("Juntos BEAM app ready (adapter: #{adapter}, database: #{database}, port: #{port})")
-
-    {:ok, %{runtime: rt, port: port}}
-  end
-
-  @impl true
-  def handle_call({:dispatch, method, path, headers, body}, _from, state) do
-    # Build a Web Request object in JS and dispatch it
     # Convert headers map to array of [key, value] pairs (QuickBEAM's Headers format)
     headers_pairs = headers |> Enum.map(fn {k, v} -> [k, v] end) |> Jason.encode!()
     body_js = if body, do: ", body: #{Jason.encode!(body)}", else: ""
@@ -97,7 +37,6 @@ defmodule JuntosBeam do
               if (v) responseHeaders[name] = v;
             }
           }
-          // Read body — try text() first, fall back to decoding raw body
           let body = '';
           try {
             body = await response.text();
@@ -127,25 +66,89 @@ defmodule JuntosBeam do
       await __dispatch()
     """
 
-    case QuickBEAM.eval(state.runtime, js) do
+    case QuickBEAM.Pool.eval(@pool_name, js) do
       {:ok, result} when is_binary(result) ->
         case Jason.decode(result) do
           {:ok, %{"status" => status, "headers" => resp_headers, "body" => resp_body}} ->
-            {:reply, {:ok, status, resp_headers, resp_body}, state}
+            {:ok, status, resp_headers, resp_body}
 
           {:error, _} ->
             Logger.error("Failed to parse JS response: #{inspect(result)}")
-            {:reply, {:ok, 500, %{}, "Internal Server Error"}, state}
+            {:ok, 500, %{}, "Internal Server Error"}
         end
 
       {:ok, other} ->
         Logger.error("Unexpected JS result: #{inspect(other)}")
-        {:reply, {:ok, 500, %{}, "Internal Server Error"}, state}
+        {:ok, 500, %{}, "Internal Server Error"}
 
       {:error, reason} ->
         Logger.error("JS dispatch error: #{inspect(reason)}")
-        {:reply, {:ok, 500, %{}, "Internal Server Error"}, state}
+        {:ok, 500, %{}, "Internal Server Error"}
     end
+  end
+
+  @doc """
+  Returns the child spec for the QuickBEAM pool.
+  """
+  def child_spec(opts) do
+    adapter = Keyword.get(opts, :adapter, System.get_env("JUNTOS_DATABASE", "sqlite_napi"))
+    database = Keyword.get(opts, :database, default_database(adapter))
+    pool_size = Keyword.get(opts, :pool_size, max(4, System.schedulers_online()))
+
+    # Ensure database directory exists for file-based databases
+    if adapter in ["sqlite_napi", "sqlite-napi"] do
+      database |> Path.dirname() |> File.mkdir_p!()
+    end
+
+    # Base handlers (broadcast)
+    handlers = %{
+      "__broadcast" => fn [channel, html] ->
+        JuntosBeam.Cable.broadcast(channel, html)
+      end
+    }
+
+    # Add database handlers for Postgrex adapter
+    handlers =
+      if adapter in ["postgrex", "pg", "postgres"] do
+        Map.merge(handlers, JuntosBeam.Database.postgrex_handlers())
+      else
+        handlers
+      end
+
+    app_code = File.read!(@app_script)
+
+    init_fn = fn rt ->
+      # Stub browser globals
+      QuickBEAM.eval(rt, "globalThis.window = globalThis;")
+
+      # Load the application
+      {:ok, _} = QuickBEAM.eval(rt, app_code)
+
+      # Load sqlite-napi addon for SQLite adapters
+      if adapter in ["sqlite_napi", "sqlite-napi"] do
+        load_sqlite_addon(rt)
+      end
+
+      # Initialize the database
+      db_config = Jason.encode!(%{database: database})
+      {:ok, _} = QuickBEAM.eval(rt, "await initDatabase(#{db_config});")
+    end
+
+    Logger.info(
+      "Starting QuickBEAM pool: #{pool_size} runtimes " <>
+      "(adapter: #{adapter}, database: #{database})"
+    )
+
+    %{
+      id: __MODULE__,
+      start: {QuickBEAM.Pool, :start_link, [[
+        name: @pool_name,
+        size: pool_size,
+        handlers: handlers,
+        init: init_fn
+      ]]},
+      type: :supervisor
+    }
   end
 
   # Private

@@ -8,8 +8,8 @@ defmodule JuntosBeam.Application do
     children = [
       # Start :pg for distributed broadcast subscriptions
       JuntosBeam.Cable,
-      # Start the JS runtime with the Juntos app
-      {JuntosBeam, port: port},
+      # Start the QuickBEAM runtime pool
+      JuntosBeam,
       # Start the HTTP server
       {Bandit, plug: JuntosBeam.Router, port: port}
     ]
