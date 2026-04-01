@@ -128,7 +128,11 @@ export async function query(sql, params = []) {
 
 // Execute interface for rails_base.js migration system
 export async function execute(sql, params = []) {
-  return db.run(sql, ...params);
+  if (params.length === 0) {
+    db.exec(sql);
+  } else {
+    db.query(sql).run(...params);
+  }
 }
 
 // Insert a row
@@ -137,7 +141,7 @@ export async function insert(tableName, data) {
   const values = Object.values(data);
   const placeholders = keys.map(() => '?');
   const sql = `INSERT INTO ${tableName} (${keys.map(k => quoteId(k)).join(', ')}) VALUES (${placeholders.join(', ')})`;
-  return db.run(sql, ...values);
+  db.query(sql).run(...values);
 }
 
 // sqlite-napi ActiveRecord implementation
@@ -150,12 +154,25 @@ export class ActiveRecord extends SQLiteDialect {
       const stmt = db.query(sql);
       return { rows: stmt.all(...params), type: 'select' };
     } else {
-      // Use db.run() for mutations
-      let info = db.run(sql, ...params);
-      // Handle async run() if it returns a Promise
-      if (info && typeof info.then === 'function') info = await info;
-      console.log('db.run result:', typeof info, JSON.stringify(info));
-      return { info, type: 'run' };
+      // Try multiple execution approaches
+      // 1. db.exec for non-parameterized, db.query().run() for parameterized
+      if (params.length === 0) {
+        db.exec(sql);
+      } else {
+        // Prepare statement and run with params
+        const stmt = db.query(sql);
+        stmt.run(...params);
+      }
+
+      // Get last insert ID if this was an INSERT
+      let lastInsertRowid;
+      if (sql.trim().toUpperCase().startsWith('INSERT')) {
+        const row = db.query('SELECT last_insert_rowid() as id').get();
+        lastInsertRowid = row?.id;
+        console.log('Insert completed, lastInsertRowid:', lastInsertRowid);
+      }
+
+      return { info: { lastInsertRowid }, type: 'run' };
     }
   }
 
