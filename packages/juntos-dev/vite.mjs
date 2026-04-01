@@ -1364,6 +1364,59 @@ function createStructurePlugin(config, appRoot) {
 
       // CSS is now added as a Vite input (see createConfigPlugin)
       // so it gets fingerprinted and added to the manifest
+
+      // BEAM target: copy Elixir scaffold files to dist/
+      if (config.target === 'beam') {
+        const scaffoldDir = path.join(appRoot, 'node_modules/juntos/targets/beam/scaffold');
+        if (fs.existsSync(scaffoldDir)) {
+          const copyRecursive = (src, dest) => {
+            if (fs.statSync(src).isDirectory()) {
+              fs.mkdirSync(dest, { recursive: true });
+              for (const entry of fs.readdirSync(src)) {
+                copyRecursive(path.join(src, entry), path.join(dest, entry));
+              }
+            } else {
+              fs.copyFileSync(src, dest);
+            }
+          };
+          copyRecursive(scaffoldDir, distDir);
+
+          // Patch app.js: convert ES module exports to globalThis assignments
+          // QuickBEAM loads scripts (not modules), so exports aren't accessible
+          const appJs = path.join(distDir, 'app.js');
+          if (fs.existsSync(appJs)) {
+            let code = fs.readFileSync(appJs, 'utf8');
+            // Replace "export { Foo, Bar as B, ... }" with globalThis assignments
+            code = code.replace(/^export \{([^}]+)\};?$/m, (match, exports) => {
+              const assignments = exports.split(',').map(e => {
+                const parts = e.trim().split(/\s+as\s+/);
+                const localName = parts[0].trim();
+                const exportName = (parts[1] || parts[0]).trim();
+                return `globalThis.${exportName} = ${localName};`;
+              });
+              return assignments.join('\n');
+            });
+            // Remove import statements (externals like node:fs, node:path)
+            // QuickBEAM provides these as built-in globals
+            code = code.replace(/^import\s+.*\s+from\s+['"]node:.*['"];?\s*$/gm, '');
+            fs.writeFileSync(appJs, code);
+          }
+
+          // Create package.json for sqlite-napi (if using sqlite_napi adapter)
+          if (config.database === 'sqlite_napi' || config.database === 'sqlite-napi') {
+            const pkgJson = JSON.stringify({
+              name: "juntos-beam-app",
+              private: true,
+              dependencies: { "sqlite-napi": "^1.0.1" }
+            }, null, 2);
+            fs.writeFileSync(path.join(distDir, 'package.json'), pkgJson);
+          }
+
+          if (this.environment?.config?.logLevel !== 'silent') {
+            console.log('[juntos] Copied BEAM scaffold to dist/');
+          }
+        }
+      }
     }
   };
 }
@@ -1430,7 +1483,7 @@ function createConfigPlugin(config, appRoot) {
       const buildTarget = getBuildTarget(config.target);
 
       // Add CSS to inputs for server targets so Vite fingerprints it
-      const serverTargets = ['node', 'bun', 'deno', 'fly', 'vercel-node'];
+      const serverTargets = ['node', 'bun', 'deno', 'fly', 'vercel-node', 'beam'];
       if (serverTargets.includes(config.target) && rollupOptions.input) {
         const tailwindJuntos = path.join(appRoot, 'app/assets/tailwind/juntos.css');
         const tailwindSource = path.join(appRoot, 'app/assets/tailwind/application.css');
@@ -1928,7 +1981,7 @@ function createExternalMatcher(patterns) {
 /**
  * Server-side JavaScript runtimes (must match builder.rb SERVER_RUNTIMES)
  */
-const SERVER_RUNTIMES = ['node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'fly'];
+const SERVER_RUNTIMES = ['node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'fly', 'beam'];
 
 /**
  * Check if target is a server runtime (requires RPC for client-side model access)
@@ -1962,6 +2015,8 @@ function getBuildTarget(target) {
     case 'vercel-edge':
     case 'deno-deploy':
       return 'esnext'; // Edge runtimes support modern JS
+    case 'beam':
+      return 'esnext'; // QuickBEAM supports modern JS
     default:
       return undefined; // Use Vite's default browser targets
   }
@@ -2062,6 +2117,18 @@ function getRollupOptions(target, database) {
         output: {
           entryFileNames: 'index.js'
         }
+      };
+
+    case 'beam':
+      return {
+        input: {
+          app: 'config/routes.rb'
+        },
+        external: getNativeModules(database),
+        output: {
+          entryFileNames: '[name].js'
+        },
+        preserveEntrySignatures: 'allow-extension'
       };
 
     default:
@@ -2980,7 +3047,8 @@ function createVirtualPlugin(config, appRoot) {
     'vercel-node': 'vercel-node',
     'worker': 'worker',
     'deno-deploy': 'vercel-edge',  // Deno Deploy uses same runtime as Vercel Edge
-    'fly': 'node'  // Fly.io runs Node.js
+    'fly': 'node',  // Fly.io runs Node.js
+    'beam': 'beam'  // BEAM (Erlang/OTP) via QuickBEAM
   };
 
   // Map database names to adapter file names (shared with eject via transform.mjs)
@@ -3002,7 +3070,8 @@ function createVirtualPlugin(config, appRoot) {
     'vercel-edge': 'active_storage_s3.mjs',
     'vercel-node': 'active_storage_disk.mjs',
     // 'worker' intentionally omitted — Active Storage not yet supported in worker target
-    'deno-deploy': 'active_storage_s3.mjs'
+    'deno-deploy': 'active_storage_s3.mjs',
+    'beam': 'active_storage_disk.mjs'
   };
 
   const targetDir = TARGET_DIR_MAP[config.target] || 'browser';

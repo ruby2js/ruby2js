@@ -1738,7 +1738,10 @@ const VALID_TARGETS = {
   neon: ['node', 'vercel', 'vercel-edge', 'capacitor', 'electron', 'tauri', 'electrobun'],
   turso: ['node', 'vercel', 'vercel-edge', 'cloudflare', 'capacitor', 'electron', 'tauri', 'electrobun'],
   d1: ['cloudflare'],
-  do: ['cloudflare']
+  do: ['cloudflare'],
+  // QuickBEAM databases
+  sqlite_napi: ['beam'],
+  'sqlite-napi': ['beam']
 };
 
 // Default target for each database adapter
@@ -1752,7 +1755,9 @@ const DEFAULT_TARGETS = {
   neon: 'vercel',
   turso: 'vercel',
   d1: 'cloudflare',
-  do: 'cloudflare'
+  do: 'cloudflare',
+  sqlite_napi: 'beam',
+  'sqlite-napi': 'beam'
 };
 
 function validateDatabaseTarget(options) {
