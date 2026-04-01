@@ -36,22 +36,25 @@ BEAM deployment runs your transpiled Rails application inside QuickBEAM—a Java
 
 | Adapter | Service | Notes |
 |---------|---------|-------|
-| `sqlite_napi` | SQLite (via sqlite-napi) | File or in-memory, bundled with QuickBEAM |
+| `sqlite_napi` | SQLite (via sqlite-napi) | File or in-memory, single node |
+| `postgrex` | PostgreSQL (via Postgrex) | Full-featured, distributed-ready |
 
 ## Deployment
 
+**With SQLite:**
 ```bash
-# Build the BEAM target
 juntos build -d sqlite_napi -t beam
-
-# Enter the output directory
 cd dist
-
-# Install Elixir dependencies
 mix deps.get
-
-# Run the server
 mix run --no-halt
+```
+
+**With PostgreSQL:**
+```bash
+juntos build -d postgrex -t beam
+cd dist
+mix deps.get
+DATABASE_URL=postgres://localhost/blog_dev mix run --no-halt
 ```
 
 The server starts on port 4000 by default. Set the `PORT` environment variable to change it:
@@ -105,6 +108,5 @@ Turbo Streams broadcasting uses QuickBEAM's `BroadcastChannel`, which is backed 
 
 ## Limitations
 
-- **Single-node SQLite** — sqlite-napi is file-based, not distributed. For multi-node deployments, a PostgreSQL adapter via `Beam.callSync` would be needed.
 - **QuickJS engine** — QuickBEAM uses QuickJS-NG, not V8. Most standard JS works, but some V8-specific features may not be available.
 - **No WASM** — QuickJS does not support WebAssembly. Use native BEAM NIFs for compute-intensive tasks instead.

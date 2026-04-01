@@ -1,7 +1,7 @@
 defmodule JuntosBeam.Router do
   @moduledoc """
   Plug router that dispatches HTTP requests to the QuickBEAM JS runtime.
-  Serves static assets directly from the public/ directory.
+  Serves static assets and handles WebSocket upgrades for Turbo Streams.
   """
 
   use Plug.Router
@@ -9,10 +9,17 @@ defmodule JuntosBeam.Router do
   plug Plug.Static,
     at: "/",
     from: ".",
-    only: ~w(assets app favicon.ico icon.png icon.svg robots.txt .vite)
+    only: ~w(assets app favicon.ico icon.png icon.svg robots.txt)
 
   plug :match
   plug :dispatch
+
+  # WebSocket endpoint for Turbo Streams broadcasting
+  get "/cable" do
+    conn
+    |> WebSockAdapter.upgrade(JuntosBeam.CableSocket, [], timeout: 60_000)
+    |> halt()
+  end
 
   # Catch-all: forward everything to the JS application
   match _ do

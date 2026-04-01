@@ -146,12 +146,16 @@ export class Router extends RouterServer {
   }
 }
 
-// TurboBroadcast for BEAM - uses QuickBEAM's BroadcastChannel (backed by OTP :pg)
-// Provides distributed pub/sub across clustered BEAM nodes for free
-export class TurboBroadcast extends TurboBroadcastServer {
-  // Broadcasting uses the same in-process TurboBroadcast from rails_server.js
-  // WebSocket connections are managed by the Elixir side (Cowboy)
-  // which calls TurboBroadcast.handleMessage/sendWelcome/cleanup via Beam bridge
+// TurboBroadcast for BEAM - bridges to Elixir for WebSocket broadcasting
+// JS only sends; Elixir manages all WebSocket connections and subscriptions
+export class TurboBroadcast {
+  static broadcast(channel, html) {
+    try {
+      Beam.callSync('__broadcast', channel, html);
+    } catch (e) {
+      console.error('TurboBroadcast error:', e);
+    }
+  }
 }
 
 // Export BroadcastChannel as alias for model broadcast methods

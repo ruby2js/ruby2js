@@ -21,7 +21,9 @@ defmodule JuntosBeam.MixProject do
   defp deps do
     [
       {:quickbeam, "~> 0.8"},
-      {:bandit, "~> 1.0"}
+      {:bandit, "~> 1.0"},
+      {:websock_adapter, "~> 0.5"},
+      {:postgrex, "~> 0.19", optional: true}
     ]
   end
 end

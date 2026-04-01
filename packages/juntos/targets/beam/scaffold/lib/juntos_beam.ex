@@ -28,13 +28,26 @@ defmodule JuntosBeam do
   @impl true
   def init(opts) do
     port = Keyword.get(opts, :port, String.to_integer(System.get_env("PORT", "3000")))
-    database = Keyword.get(opts, :database, "storage/development.sqlite3")
+    adapter = Keyword.get(opts, :adapter, System.get_env("JUNTOS_DATABASE", "sqlite_napi"))
+    database = Keyword.get(opts, :database, default_database(adapter))
 
-    # Ensure database directory exists
-    database |> Path.dirname() |> File.mkdir_p!()
+    # Base handlers (broadcast)
+    handlers = %{
+      "__broadcast" => fn [channel, html] ->
+        JuntosBeam.Cable.broadcast(channel, html)
+      end
+    }
 
-    # Start QuickBEAM runtime with the bundled app
-    {:ok, rt} = QuickBEAM.start()
+    # Add database handlers for Postgrex adapter
+    handlers =
+      if adapter in ["postgrex", "pg", "postgres"] do
+        Map.merge(handlers, JuntosBeam.Database.postgrex_handlers())
+      else
+        handlers
+      end
+
+    # Start QuickBEAM runtime
+    {:ok, rt} = QuickBEAM.start(handlers: handlers)
 
     # Stub browser globals that server-side code may reference
     QuickBEAM.eval(rt, "globalThis.window = globalThis;")
@@ -42,31 +55,21 @@ defmodule JuntosBeam do
     # Load the application script
     {:ok, _} = QuickBEAM.eval(rt, File.read!(@app_script))
 
-    # Load sqlite-napi addon (makes `sqlite` global available in JS)
-    # Determine platform-specific .node file
-    {os, _} = :os.type()
-    arch = :erlang.system_info(:system_architecture) |> to_string()
-    is_arm = String.contains?(arch, "aarch64") or String.contains?(arch, "arm64")
-    node_file = case {os, is_arm} do
-      {:darwin, true} -> "sqlite-napi.darwin-arm64.node"
-      {:darwin, false} -> "sqlite-napi.darwin-x64.node"
-      {:linux, true} -> "sqlite-napi.linux-arm64-gnu.node"
-      {:linux, false} -> "sqlite-napi.linux-x64-gnu.node"
-      _ -> "sqlite-napi.darwin-arm64.node"
+    # Load sqlite-napi addon for SQLite adapters
+    if adapter in ["sqlite_napi", "sqlite-napi"] do
+      load_sqlite_addon(rt)
     end
-    addon_path = Path.join(["node_modules", "sqlite-napi", node_file])
 
-    case QuickBEAM.load_addon(rt, addon_path, as: "sqlite") do
-      {:ok, _} -> Logger.info("sqlite-napi addon loaded: #{node_file}")
-      {:error, reason} -> Logger.warning("sqlite-napi not loaded: #{inspect(reason)}")
+    # Ensure database directory exists for file-based databases
+    if adapter in ["sqlite_napi", "sqlite-napi"] do
+      database |> Path.dirname() |> File.mkdir_p!()
     end
 
     # Initialize the database
-    {:ok, _} = QuickBEAM.eval(rt, """
-      await initDatabase({ database: '#{database}' });
-    """)
+    db_config = Jason.encode!(%{database: database})
+    {:ok, _} = QuickBEAM.eval(rt, "await initDatabase(#{db_config});")
 
-    Logger.info("Juntos BEAM app ready (database: #{database}, port: #{port})")
+    Logger.info("Juntos BEAM app ready (adapter: #{adapter}, database: #{database}, port: #{port})")
 
     {:ok, %{runtime: rt, port: port}}
   end
@@ -142,6 +145,34 @@ defmodule JuntosBeam do
       {:error, reason} ->
         Logger.error("JS dispatch error: #{inspect(reason)}")
         {:reply, {:ok, 500, %{}, "Internal Server Error"}, state}
+    end
+  end
+
+  # Private
+
+  defp default_database(adapter) when adapter in ["sqlite_napi", "sqlite-napi"],
+    do: "storage/development.sqlite3"
+  defp default_database(_adapter),
+    do: System.get_env("DATABASE_URL", "postgres://localhost/juntos_dev")
+
+  defp load_sqlite_addon(rt) do
+    {os, _} = :os.type()
+    arch = :erlang.system_info(:system_architecture) |> to_string()
+    is_arm = String.contains?(arch, "aarch64") or String.contains?(arch, "arm64")
+
+    node_file = case {os, is_arm} do
+      {:darwin, true} -> "sqlite-napi.darwin-arm64.node"
+      {:darwin, false} -> "sqlite-napi.darwin-x64.node"
+      {:linux, true} -> "sqlite-napi.linux-arm64-gnu.node"
+      {:linux, false} -> "sqlite-napi.linux-x64-gnu.node"
+      _ -> "sqlite-napi.darwin-arm64.node"
+    end
+
+    addon_path = Path.join(["node_modules", "sqlite-napi", node_file])
+
+    case QuickBEAM.load_addon(rt, addon_path, as: "sqlite") do
+      {:ok, _} -> Logger.info("sqlite-napi addon loaded: #{node_file}")
+      {:error, reason} -> Logger.warning("sqlite-napi not loaded: #{inspect(reason)}")
     end
   end
 end

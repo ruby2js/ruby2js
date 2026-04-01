@@ -6,6 +6,8 @@ defmodule JuntosBeam.Application do
     port = String.to_integer(System.get_env("PORT", "3000"))
 
     children = [
+      # Start :pg for distributed broadcast subscriptions
+      JuntosBeam.Cable,
       # Start the JS runtime with the Juntos app
       {JuntosBeam, port: port},
       # Start the HTTP server

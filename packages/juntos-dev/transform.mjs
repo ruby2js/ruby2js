@@ -51,6 +51,7 @@ export const DEFAULT_TARGETS = Object.freeze({
   mpg: 'fly',
   sqlite_napi: 'beam',
   'sqlite-napi': 'beam',
+  postgrex: 'beam',
 
   // HTTP-based edge databases
   neon: 'vercel',
@@ -1845,7 +1846,8 @@ export function getActiveRecordAdapterFile(database) {
     'mysql': 'active_record_mysql2.mjs',
     'mysql2': 'active_record_mysql2.mjs',
     'sqlite_napi': 'active_record_sqlite_napi.mjs',
-    'sqlite-napi': 'active_record_sqlite_napi.mjs'
+    'sqlite-napi': 'active_record_sqlite_napi.mjs',
+    'postgrex': 'active_record_postgrex.mjs'
   };
   return adapterMap[database] || 'active_record_dexie.mjs';
 }

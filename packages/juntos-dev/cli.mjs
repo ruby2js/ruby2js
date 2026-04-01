@@ -1741,7 +1741,9 @@ const VALID_TARGETS = {
   do: ['cloudflare'],
   // QuickBEAM databases
   sqlite_napi: ['beam'],
-  'sqlite-napi': ['beam']
+  'sqlite-napi': ['beam'],
+  // BEAM via Postgrex (distributed)
+  postgrex: ['beam']
 };
 
 // Default target for each database adapter
@@ -1757,7 +1759,8 @@ const DEFAULT_TARGETS = {
   d1: 'cloudflare',
   do: 'cloudflare',
   sqlite_napi: 'beam',
-  'sqlite-napi': 'beam'
+  'sqlite-napi': 'beam',
+  postgrex: 'beam'
 };
 
 function validateDatabaseTarget(options) {
