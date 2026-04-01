@@ -119,8 +119,7 @@ export async function query(sql, params = []) {
 
 // Execute interface for rails_base.js migration system
 export async function execute(sql, params = []) {
-  const stmt = db.query(sql);
-  return stmt.run(...params);
+  return db.run(sql, ...params);
 }
 
 // Insert a row
@@ -129,7 +128,7 @@ export async function insert(tableName, data) {
   const values = Object.values(data);
   const placeholders = keys.map(() => '?');
   const sql = `INSERT INTO ${tableName} (${keys.map(k => quoteId(k)).join(', ')}) VALUES (${placeholders.join(', ')})`;
-  db.run(sql, ...values);
+  return db.run(sql, ...values);
 }
 
 // sqlite-napi ActiveRecord implementation
@@ -138,14 +137,12 @@ export async function insert(tableName, data) {
 export class ActiveRecord extends SQLiteDialect {
   // Execute SQL and return raw result
   static async _execute(sql, params = []) {
-    const stmt = db.query(sql);
     if (sql.trim().toUpperCase().startsWith('SELECT')) {
+      const stmt = db.query(sql);
       return { rows: stmt.all(...params), type: 'select' };
     } else {
-      const info = stmt.run(...params);
-      if (sql.trim().toUpperCase().startsWith('INSERT')) {
-        console.log('sqlite-napi run() result:', JSON.stringify(info), 'keys:', Object.keys(info || {}));
-      }
+      // Use db.run() for mutations — returns { changes, lastInsertRowid }
+      const info = db.run(sql, ...params);
       return { info, type: 'run' };
     }
   }
@@ -157,10 +154,7 @@ export class ActiveRecord extends SQLiteDialect {
 
   // Get last insert ID from result
   static _getLastInsertId(result) {
-    const info = result.info;
-    if (!info) return undefined;
-    // sqlite-napi may use lastInsertRowid or lastRowId
-    return info.lastInsertRowid ?? info.lastRowId ?? info.last_insert_rowid;
+    return result.info?.lastInsertRowid;
   }
 
   // Disable/enable foreign key checks
