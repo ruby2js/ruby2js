@@ -34,7 +34,15 @@ export async function initDatabase(options = {}) {
   // Time polyfill for Ruby compatibility
   initTimePolyfill(globalThis);
 
+  // Verify db is working
   console.log(`Connected to SQLite: ${dbPath}`);
+  console.log('db type:', typeof db, 'db.run type:', typeof db.run, 'db.query type:', typeof db.query);
+  try {
+    const testResult = db.run("SELECT 1");
+    console.log('db.run test:', typeof testResult, JSON.stringify(testResult));
+  } catch(e) {
+    console.log('db.run test error:', e.message);
+  }
   return db;
 }
 
