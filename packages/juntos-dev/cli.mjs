@@ -3312,6 +3312,7 @@ function runUp(options) {
   applyEnvOptions(options);
 
   const isServerTarget = ['node', 'bun', 'deno'].includes(options.target);
+  const isBeamTarget = options.target === 'beam';
 
   console.log('Building application...');
   try {
@@ -3324,7 +3325,28 @@ function runUp(options) {
     process.exit(1);
   }
 
-  if (isServerTarget) {
+  if (isBeamTarget) {
+    const distDir = join(APP_ROOT, 'dist');
+
+    // Install Elixir dependencies if needed
+    if (!existsSync(join(distDir, 'deps')) || !existsSync(join(distDir, 'mix.lock'))) {
+      console.log('Installing Elixir dependencies...');
+      try {
+        execSync('mix deps.get', { cwd: distDir, stdio: 'inherit' });
+      } catch (e) {
+        console.error('Failed to install Elixir dependencies. Is Elixir installed?');
+        process.exit(1);
+      }
+    }
+
+    console.log(`Starting BEAM server on port ${options.port}...`);
+    const env = { ...process.env, PORT: String(options.port) };
+    spawn('mix', ['run', '--no-halt'], {
+      cwd: distDir,
+      stdio: 'inherit',
+      env
+    });
+  } else if (isServerTarget) {
     console.log(`Starting ${options.target} server...`);
     const runtime = options.target === 'bun' ? 'bun' : options.target === 'deno' ? 'deno' : 'node';
     const entryPoint = join(APP_ROOT, 'dist', 'index.js');
@@ -3381,8 +3403,30 @@ function runServer(options) {
   }
 
   const isServerTarget = ['node', 'bun', 'deno'].includes(options.target);
+  const isBeamTarget = options.target === 'beam';
 
-  if (isServerTarget) {
+  if (isBeamTarget) {
+    const distDir = join(APP_ROOT, 'dist');
+    const mixFile = join(distDir, 'mix.exs');
+
+    if (!existsSync(mixFile)) {
+      console.error(`Error: ${mixFile} not found. Run "juntos build -t beam" first.`);
+      process.exit(1);
+    }
+
+    if (!existsSync(join(distDir, 'deps'))) {
+      console.log('Installing Elixir dependencies...');
+      execSync('mix deps.get', { cwd: distDir, stdio: 'inherit' });
+    }
+
+    const env = { ...process.env, PORT: String(options.port) };
+    console.log(`Starting BEAM server on port ${options.port}...`);
+    spawn('mix', ['run', '--no-halt'], {
+      cwd: distDir,
+      stdio: 'inherit',
+      env
+    });
+  } else if (isServerTarget) {
     // Run the built server directly (like 'up' command)
     const runtime = options.target === 'bun' ? 'bun' : options.target === 'deno' ? 'deno' : 'node';
     const entryPoint = join(APP_ROOT, 'dist', 'index.js');
@@ -3507,6 +3551,8 @@ async function runDbPrepare(options) {
     }
     runD1Prepare(options);
   } else {
+    // BEAM targets use the same Node-based migration path
+    // (Node is available since Vite requires it)
     await runNodePrepare(options);
   }
 }
@@ -5353,6 +5399,7 @@ Examples:
   juntos test                          # Run all tests
   juntos test -d sqlite                # Run tests with SQLite
   juntos up -d sqlite                  # Build and run with SQLite
+  juntos up -d sqlite_napi             # Build and run on BEAM (Elixir)
   juntos deploy -t cloudflare -d d1    # Deploy to Cloudflare with D1
   juntos deploy -t vercel -d neon      # Deploy to Vercel with Neon
   juntos db:prepare                    # Migrate and seed if fresh
@@ -5465,7 +5512,7 @@ switch (command) {
       console.log('Usage: juntos up [options]\n\nBuild and run locally.\n');
       console.log('Options:');
       console.log('  -d, --database ADAPTER   Database adapter');
-      console.log('  -t, --target TARGET      Runtime target (browser, node, bun)');
+      console.log('  -t, --target TARGET      Runtime target (browser, node, bun, beam)');
       console.log('  -p, --port PORT          Server port (default: 3000)');
       console.log('  --host, --binding        Listen on all interfaces (0.0.0.0)');
       process.exit(0);
@@ -5477,7 +5524,7 @@ switch (command) {
     if (options.help) {
       console.log('Usage: juntos server [options]\n\nStart production server (requires prior build).\n');
       console.log('Options:');
-      console.log('  -t, --target TARGET      Runtime target (browser, node, bun, deno)');
+      console.log('  -t, --target TARGET      Runtime target (browser, node, bun, deno, beam)');
       console.log('  -p, --port PORT          Server port (default: 3000)');
       console.log('  -e, --environment ENV    Environment (default: production)');
       console.log('  --host, --binding        Listen on all interfaces (0.0.0.0)');
