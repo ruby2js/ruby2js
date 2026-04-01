@@ -1709,7 +1709,11 @@ const DATABASE_PACKAGES = {
   // Serverless databases
   neon: ['@neondatabase/serverless'],
   turso: ['@libsql/client'],
-  d1: []  // No npm package needed, uses Cloudflare bindings
+  d1: [],  // No npm package needed, uses Cloudflare bindings
+  // BEAM databases (need Node-compatible driver for migrations + runtime driver)
+  sqlite_napi: ['better-sqlite3', 'sqlite-napi'],
+  'sqlite-napi': ['better-sqlite3', 'sqlite-napi'],
+  postgrex: ['pg']  // pg for Node-based migrations; Postgrex is an Elixir dep
 };
 
 const RUNTIME_PACKAGES = {
@@ -3809,8 +3813,13 @@ async function ensureMigrateBootstrap(options) {
     target: options.target
   });
 
-  const target = config.target || 'node';
-  const adapterFile = getActiveRecordAdapterFile(config.database);
+  // For BEAM targets, migrations run in Node — use the Node-compatible adapter
+  const migrateTarget = config.target === 'beam' ? 'node' : (config.target || 'node');
+  const migrateDatabase = {
+    'sqlite_napi': 'sqlite', 'sqlite-napi': 'sqlite',
+    'postgrex': 'pg'
+  }[config.database] || config.database;
+  const adapterFile = getActiveRecordAdapterFile(migrateDatabase);
 
   // Transpile migration files
   const migrateDir = join(APP_ROOT, 'db/migrate');
@@ -3833,7 +3842,7 @@ async function ensureMigrateBootstrap(options) {
   }
 
   // Generate minimal bootstrap config/routes.js (no actual routes needed for migrations)
-  let routesCode = `import { Application } from 'juntos/targets/${target}/rails.js';\n`;
+  let routesCode = `import { Application } from 'juntos/targets/${migrateTarget}/rails.js';\n`;
   routesCode += `export { Application };\n`;
   routesCode += `export { initDatabase } from 'juntos/adapters/${adapterFile}';\n`;
   routesCode += `export * from 'juntos/adapters/${adapterFile}';\n`;
