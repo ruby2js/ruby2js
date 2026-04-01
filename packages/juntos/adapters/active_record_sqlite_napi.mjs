@@ -134,22 +134,35 @@ export async function query(sql, params = []) {
   return stmt.all(...params);
 }
 
+// Escape a value for safe SQL interpolation (used by db.exec which has no params)
+// Note: db.query().run() doesn't persist to file in QuickBEAM's sqlite-napi;
+// only db.exec() works for mutations on file-based databases.
+function escapeValue(value) {
+  if (value === null || value === undefined) return 'NULL';
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'boolean') return value ? '1' : '0';
+  // String: escape single quotes
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+// Build a SQL string with values interpolated (for db.exec)
+function interpolateSQL(sql, params) {
+  let i = 0;
+  return sql.replace(/\?/g, () => escapeValue(params[i++]));
+}
+
 // Execute interface for rails_base.js migration system
 export async function execute(sql, params = []) {
-  if (params.length === 0) {
-    db.exec(sql);
-  } else {
-    db.query(sql).run(...params);
-  }
+  db.exec(params.length > 0 ? interpolateSQL(sql, params) : sql);
 }
 
 // Insert a row
 export async function insert(tableName, data) {
   const keys = Object.keys(data);
   const values = Object.values(data);
-  const placeholders = keys.map(() => '?');
-  const sql = `INSERT INTO ${tableName} (${keys.map(k => quoteId(k)).join(', ')}) VALUES (${placeholders.join(', ')})`;
-  db.query(sql).run(...values);
+  const valueParts = values.map(v => escapeValue(v));
+  const sql = `INSERT INTO ${tableName} (${keys.map(k => quoteId(k)).join(', ')}) VALUES (${valueParts.join(', ')})`;
+  db.exec(sql);
 }
 
 // sqlite-napi ActiveRecord implementation
@@ -157,27 +170,21 @@ export async function insert(tableName, data) {
 // Only needs to implement driver-specific execution
 export class ActiveRecord extends SQLiteDialect {
   // Execute SQL and return raw result
+  // Note: db.exec() is the only method that persists to file-based databases
+  // in QuickBEAM's sqlite-napi. db.run() and db.query().run() silently fail.
   static async _execute(sql, params = []) {
     if (sql.trim().toUpperCase().startsWith('SELECT')) {
       const stmt = db.query(sql);
       return { rows: stmt.all(...params), type: 'select' };
     } else {
-      // Try multiple execution approaches
-      // 1. db.exec for non-parameterized, db.query().run() for parameterized
-      if (params.length === 0) {
-        db.exec(sql);
-      } else {
-        // Prepare statement and run with params
-        const stmt = db.query(sql);
-        stmt.run(...params);
-      }
+      // Use db.exec with interpolated values (only method that persists)
+      db.exec(params.length > 0 ? interpolateSQL(sql, params) : sql);
 
       // Get last insert ID if this was an INSERT
       let lastInsertRowid;
       if (sql.trim().toUpperCase().startsWith('INSERT')) {
         const row = db.query('SELECT last_insert_rowid() as id').get();
         lastInsertRowid = row?.id;
-        console.log('Insert completed, lastInsertRowid:', lastInsertRowid);
       }
 
       return { info: { lastInsertRowid }, type: 'run' };
