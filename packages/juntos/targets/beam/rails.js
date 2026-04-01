@@ -7,7 +7,7 @@ import {
   Application as ApplicationServer,
   TurboBroadcast as TurboBroadcastServer,
   setNestedParam,
-  createContext,
+  createContext as _createContext,
   createFlash,
   truncate,
   pluralize,
@@ -21,11 +21,50 @@ import {
   resolveContent,
   stylesheetLinkTag,
   javascriptImportmapTags,
-  getAssetPath
+  getAssetPath,
+  getCSRF
 } from 'juntos/rails_server.js';
+
+// Wrap createContext to add CSRF token synchronously
+// Parent's createContext sets authenticityToken: null; we generate it here
+function createContext(req, params) {
+  const context = _createContext(req, params);
+  const csrf = globalThis.__beamCSRF;
+  context.authenticityToken = csrf ? csrf.generateToken() : '';
+  return context;
+}
+
+// Patch the global CSRF so parent's Router.dispatch validation works
+// This runs when the module loads (before any requests)
+const _origCSRF = getCSRF();
+if (globalThis.__beamCSRF) {
+  _origCSRF.generateToken = () => Promise.resolve(globalThis.__beamCSRF.generateToken());
+  _origCSRF.validateToken = (token) => Promise.resolve(globalThis.__beamCSRF.validateToken(token));
+}
 
 // Re-export everything from server module
 export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from, stylesheetLinkTag, javascriptImportmapTags, getAssetPath };
+
+// Simple sync CSRF token for BEAM target
+// Uses crypto.getRandomValues (available in QuickBEAM) instead of async crypto.subtle
+let _beamCsrfSecret = null;
+function getBeamCsrfSecret() {
+  if (!_beamCsrfSecret) {
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    _beamCsrfSecret = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  }
+  return _beamCsrfSecret;
+}
+
+function generateCsrfToken() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  const token = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  // Simple: concatenate token + hash(secret + token)
+  // For single-server deployment, just the random token is sufficient
+  return token;
+}
 
 // Router with BEAM-specific overrides
 // Note: Response constructor is patched globally by the Elixir host to accept

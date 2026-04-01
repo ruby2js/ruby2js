@@ -1420,6 +1420,12 @@ function createStructurePlugin(config, appRoot) {
               code = code.replace('let manifestLoaded = false;', 'let manifestLoaded = true;');
             }
 
+            // Patch createContext to add CSRF token (parent sets authenticityToken: null)
+            code = code.replace(
+              'authenticityToken: null',
+              'authenticityToken: globalThis.__beamCSRF ? globalThis.__beamCSRF.generateToken() : null'
+            );
+
             fs.writeFileSync(appJs, code);
           }
 
