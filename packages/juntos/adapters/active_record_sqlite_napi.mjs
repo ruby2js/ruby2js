@@ -22,6 +22,15 @@ export async function initDatabase(options = {}) {
 
   db = new sqlite.Database(dbPath);
 
+  // Log available methods for debugging
+  const methods = [];
+  let obj = db;
+  while (obj && obj !== Object.prototype) {
+    methods.push(...Object.getOwnPropertyNames(obj).filter(n => typeof obj[n] === 'function'));
+    obj = Object.getPrototypeOf(obj);
+  }
+  console.log('sqlite-napi Database methods:', [...new Set(methods)].sort().join(', '));
+
   // Time polyfill for Ruby compatibility
   initTimePolyfill(globalThis);
 
