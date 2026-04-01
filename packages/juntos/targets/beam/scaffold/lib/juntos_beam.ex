@@ -27,8 +27,11 @@ defmodule JuntosBeam do
 
   @impl true
   def init(opts) do
-    port = Keyword.get(opts, :port, 4000)
-    database = Keyword.get(opts, :database, "blog.db")
+    port = Keyword.get(opts, :port, String.to_integer(System.get_env("PORT", "3000")))
+    database = Keyword.get(opts, :database, "storage/development.sqlite3")
+
+    # Ensure database directory exists
+    database |> Path.dirname() |> File.mkdir_p!()
 
     # Start QuickBEAM runtime with the bundled app
     {:ok, rt} = QuickBEAM.start()

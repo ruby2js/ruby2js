@@ -1397,8 +1397,18 @@ function createStructurePlugin(config, appRoot) {
               return assignments.join('\n');
             });
             // Remove import statements (externals like node:fs, node:path)
-            // QuickBEAM provides these as built-in globals
+            // QuickBEAM loads scripts, not modules — these are not available
             code = code.replace(/^import\s+.*\s+from\s+['"]node:.*['"];?\s*$/gm, '');
+
+            // Inject Vite manifest directly into the code so getAssetPath()
+            // returns fingerprinted paths without needing fs at runtime
+            const manifestPath = path.join(distDir, '.vite', 'manifest.json');
+            if (fs.existsSync(manifestPath)) {
+              const manifest = fs.readFileSync(manifestPath, 'utf8');
+              code = code.replace('let viteManifest = null;', `let viteManifest = ${manifest};`);
+              code = code.replace('let manifestLoaded = false;', 'let manifestLoaded = true;');
+            }
+
             fs.writeFileSync(appJs, code);
           }
 
@@ -2122,7 +2132,8 @@ function getRollupOptions(target, database) {
     case 'beam':
       return {
         input: {
-          app: 'config/routes.rb'
+          app: 'config/routes.rb',
+          'app/javascript/application': 'app/javascript/application.js'
         },
         external: getNativeModules(database),
         output: {

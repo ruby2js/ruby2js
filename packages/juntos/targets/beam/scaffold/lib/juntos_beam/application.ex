@@ -3,7 +3,7 @@ defmodule JuntosBeam.Application do
 
   @impl true
   def start(_type, _args) do
-    port = String.to_integer(System.get_env("PORT", "4000"))
+    port = String.to_integer(System.get_env("PORT", "3000"))
 
     children = [
       # Start the JS runtime with the Juntos app

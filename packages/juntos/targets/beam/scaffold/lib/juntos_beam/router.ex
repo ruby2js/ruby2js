@@ -8,8 +8,8 @@ defmodule JuntosBeam.Router do
 
   plug Plug.Static,
     at: "/",
-    from: "public",
-    only: ~w(assets app favicon.ico robots.txt)
+    from: ".",
+    only: ~w(assets app favicon.ico icon.png icon.svg robots.txt .vite)
 
   plug :match
   plug :dispatch
