@@ -2185,7 +2185,7 @@ function getRollupOptions(target, database) {
  */
 function getNativeModules(database) {
   // Node.js built-in modules (both with and without node: prefix)
-  const nodeBuiltins = ['path', 'fs', 'url', 'crypto', 'http', 'https', 'net', 'tls', 'stream', 'buffer', 'util', 'os', 'string_decoder', 'fs/promises'];
+  const nodeBuiltins = ['path', 'fs', 'url', 'crypto', 'http', 'https', 'net', 'tls', 'stream', 'buffer', 'util', 'os', 'module', 'string_decoder', 'fs/promises'];
   const baseModules = [
     ...nodeBuiltins,
     ...nodeBuiltins.map(m => `node:${m}`)
