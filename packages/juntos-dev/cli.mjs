@@ -2748,7 +2748,7 @@ async function runEject(options) {
   if (isBrowserTarget) {
     // Browser targets: generate index.html and browser main.js
     const cssPath = detectCssPath(APP_ROOT);
-    writeFileSync(join(outDir, 'index.html'), generateBrowserIndexHtml(appName, './main.js', cssPath));
+    writeFileSync(join(outDir, 'index.html'), generateBrowserIndexHtml(appName, './main.js', cssPath, { external: config.external, dependencies: config.dependencies }));
     fileCount++;
     const layoutFile = join(APP_ROOT, 'app/views/layouts/application.html.erb');
     const layoutPath = existsSync(layoutFile) ? './app/views/layouts/application.js' : null;

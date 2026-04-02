@@ -2049,11 +2049,29 @@ export function detectCssPath(appRoot) {
  * @param {string} mainJsPath - Path to main.js (e.g., '/.browser/main.js' or './main.js')
  * @param {string|null} cssPath - Path to CSS file, or null for no CSS link
  */
-export function generateBrowserIndexHtml(appName, mainJsPath = './main.js', cssPath = null, { target } = {}) {
+export function generateBrowserIndexHtml(appName, mainJsPath = './main.js', cssPath = null, { target, external, dependencies } = {}) {
   const cssLink = cssPath ? `\n  <link href="${cssPath}" rel="stylesheet">` : '';
   // Worker target needs coi-serviceworker for COOP/COEP headers (SharedWorker + OPFS)
   const coiScript = target === 'worker'
     ? `\n  <script src="coi-serviceworker.js"></script>` : '';
+
+  // Generate import map for externalized packages (loaded from CDN at runtime)
+  let importMapScript = '';
+  if (external && external.length > 0 && dependencies) {
+    const imports = {};
+    for (const pkg of external) {
+      const version = dependencies[pkg];
+      if (version) {
+        // Resolve version: strip ^, ~, >= prefixes for CDN URL
+        const cleanVersion = version.replace(/^[\^~>=]+/, '');
+        imports[pkg] = `https://esm.sh/${pkg}@${cleanVersion}`;
+      }
+    }
+    if (Object.keys(imports).length > 0) {
+      importMapScript = `\n  <script type="importmap">\n  ${JSON.stringify({ imports }, null, 2).replace(/\n/g, '\n  ')}\n  </script>`;
+    }
+  }
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2061,7 +2079,7 @@ export function generateBrowserIndexHtml(appName, mainJsPath = './main.js', cssP
   <meta name="turbo-refresh-method" content="morph">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${appName}</title>
-  <link rel="icon" href="data:,">${cssLink}${coiScript}
+  <link rel="icon" href="data:,">${cssLink}${coiScript}${importMapScript}
 </head>
 <body>
   <div id="loading">Loading...</div>

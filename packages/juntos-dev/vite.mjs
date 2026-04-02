@@ -322,6 +322,8 @@ export function loadConfig(appRoot, overrides = {}) {
     base,
     // Section-specific configs from ruby2js.yml (controllers, stimulus, etc.)
     sections: sectionConfigs,
+    // App-specific dependencies from ruby2js.yml (for import maps, eject package.json)
+    dependencies: topLevelConfig.dependencies || ruby2jsConfig.dependencies || {},
     // Include/exclude patterns for filtering models and views
     include: topLevelConfig.include || [],
     exclude: topLevelConfig.exclude || []
@@ -1692,7 +1694,7 @@ export { application };`,
         // Browser targets: serve virtual index.html (SPA fallback)
         const appName = detectAppName(appRoot);
         const cssPath = detectCssPath(appRoot);
-        const indexHtml = generateBrowserIndexHtml(appName, '/.browser/main.js', cssPath);
+        const indexHtml = generateBrowserIndexHtml(appName, '/.browser/main.js', cssPath, { external: config.external, dependencies: config.dependencies });
 
         server.middlewares.use(async (req, res, next) => {
           const url = req.url || '/';
@@ -2280,7 +2282,7 @@ function createBrowserEntryPlugin(config, appRoot) {
     if (!indexHtmlContent) {
       const appName = detectAppName(appRoot);
       const cssPath = detectCssPath(appRoot);
-      indexHtmlContent = generateBrowserIndexHtml(appName, '/.browser/main.js', cssPath, { target: config.target });
+      indexHtmlContent = generateBrowserIndexHtml(appName, '/.browser/main.js', cssPath, { target: config.target, external: config.external, dependencies: config.dependencies });
     }
     return indexHtmlContent;
   }
