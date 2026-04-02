@@ -55,6 +55,7 @@ import {
   findViewResources,
   fixImports,
   generateViewsModule,
+  generateModelsModule,
   generateBrowserIndexHtml,
   generateBrowserMainJs,
   detectCssPath,
@@ -171,6 +172,20 @@ function preScanForRpcImports(appRoot) {
       }
     };
     scanDir(viewsDir);
+  }
+
+  // Scan app/javascript/controllers/*.rb for model imports
+  // Stimulus controllers that import models need RPC in the client bundle
+  const juntosModelsPattern = /from:\s*['"]juntos:models['"]/;
+  const controllersDir = path.join(appRoot, 'app/javascript/controllers');
+  if (fs.existsSync(controllersDir)) {
+    const files = fs.readdirSync(controllersDir).filter(f => f.endsWith('.rb'));
+    for (const file of files) {
+      const content = fs.readFileSync(path.join(controllersDir, file), 'utf8');
+      if (modelImportPattern.test(content) || juntosModelsPattern.test(content)) {
+        rpcFiles.push(path.join(controllersDir, file));
+      }
+    }
   }
 
   return rpcFiles;
@@ -2423,9 +2438,12 @@ function createDualBundlePlugin(config, appRoot) {
 
   // Pre-scan for RPC imports before build
   const rpcFiles = preScanForRpcImports(appRoot);
-  const needsDualBundle = rpcFiles.length > 0;
+  const hasViewRpc = rpcFiles.some(f => f.includes('/app/views/') || f.includes('/app/components/'));
+  const hasControllerRpc = rpcFiles.some(f => f.includes('/app/javascript/controllers/'));
+  const needsDualBundle = hasViewRpc;
+  const needsControllerRpc = hasControllerRpc && !hasViewRpc;
 
-  if (needsDualBundle) {
+  if (rpcFiles.length > 0) {
     rpcState.dualBundleEnabled = true;
     rpcFiles.forEach(f => rpcState.rpcImporters.add(f));
   }
@@ -2438,27 +2456,27 @@ function createDualBundlePlugin(config, appRoot) {
 
     // Log RPC detection during config (don't add client to this build)
     config(userConfig, { command }) {
-      if (!needsDualBundle) return;
+      if (!needsDualBundle && !needsControllerRpc) return;
 
       console.log('[juntos] RPC imports detected - will build client bundle separately');
       const relativeRpcFiles = rpcFiles.map(f => path.relative(appRoot, f));
       console.log('[juntos] RPC files:', relativeRpcFiles);
 
-      // Generate client entry file (will be built separately after server build)
-      const clientDir = path.join(appRoot, '.client');
-      const mainPath = path.join(clientDir, 'main.js');
+      if (needsDualBundle) {
+        // Generate React hydration entry for view-based RPC
+        const clientDir = path.join(appRoot, '.client');
+        const mainPath = path.join(clientDir, 'main.js');
 
-      if (!fs.existsSync(clientDir)) {
-        fs.mkdirSync(clientDir, { recursive: true });
+        if (!fs.existsSync(clientDir)) {
+          fs.mkdirSync(clientDir, { recursive: true });
+        }
+
+        const clientEntry = generateClientEntryForHydration(appRoot, config, relativeRpcFiles);
+        fs.writeFileSync(mainPath, clientEntry);
+        console.log('[juntos] Generated .client/main.js for hydration');
       }
 
-      // Pass relative RPC file paths to generate imports for each view
-      const clientEntry = generateClientEntryForHydration(appRoot, config, relativeRpcFiles);
-      fs.writeFileSync(mainPath, clientEntry);
-      console.log('[juntos] Generated .client/main.js for hydration');
-
-      // Don't add client entry here - it will be built separately
-      // This ensures module resolution doesn't get shared between server and client
+      // Controller RPC uses application.js as entry (no hydration needed)
     },
 
     // After server build completes, trigger separate client build
@@ -2467,6 +2485,9 @@ function createDualBundlePlugin(config, appRoot) {
         console.log('[juntos] Server build complete, starting client build...');
         await buildClientBundle(appRoot, config);
         console.log('[juntos] Dual bundle build complete (index.js + client.js)');
+      } else if (needsControllerRpc && hasApplicationJs) {
+        console.log('[juntos] Building client JS with RPC...');
+        await buildApplicationJsWithRpc(appRoot, config);
       } else if (hasApplicationJs) {
         console.log('[juntos] Building client JS...');
         await buildApplicationJs(appRoot, config);
@@ -2688,6 +2709,124 @@ export default {
       stdio: 'inherit',
       env: {
         ...process.env,
+        JUNTOS_TARGET: 'browser'
+      }
+    });
+  } finally {
+    try {
+      fs.unlinkSync(clientConfigPath);
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+  }
+}
+
+/**
+ * Build client JS (application.js) with RPC support for Stimulus controllers
+ * that import models. Uses the same RPC virtual plugin as the React hydration
+ * build, but with application.js as entry instead of .client/main.js.
+ */
+async function buildApplicationJsWithRpc(appRoot, config) {
+  const clientConfigPath = path.join(appRoot, 'vite.client.config.js');
+
+  // Build alias map from importmap.rb (same as main build)
+  const importmapAliases = parseImportmapAliases(appRoot);
+  const aliasEntries = {
+    'controllers/application': path.join(appRoot, 'app/javascript/controllers/application.js'),
+    '@hotwired/turbo-rails': '@hotwired/turbo',
+    'controllers': path.join(appRoot, 'app/javascript/controllers'),
+    ...importmapAliases
+  };
+  const aliasJson = JSON.stringify(aliasEntries);
+
+  // Pass through external config from ruby2js.yml
+  const externalJson = JSON.stringify(config.external || []);
+
+  // Pre-generate juntos:models content (imports models, registers with RPC adapter)
+  const modelsContent = generateModelsModule(appRoot)
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$');
+
+  // Pre-generate juntos:paths content (path helpers from routes.rb)
+  const pathsContent = (await generatePathsModule(appRoot, { ...config, target: 'browser' }))
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$');
+
+  const clientConfigContent = `
+import { createClientPlugins } from 'juntos-dev/vite';
+
+const MODELS_MODULE = \`${modelsContent}\`;
+const PATHS_MODULE = \`${pathsContent}\`;
+
+// RPC virtual plugin — routes model operations through RPC adapter
+const clientVirtualPlugin = {
+  name: 'juntos-client-virtual',
+  enforce: 'pre',
+  resolveId(id) {
+    if (id === 'juntos:active-record') return '\\0juntos:active-record:rpc';
+    if (id === 'juntos:rails') return '\\0juntos:rails:browser';
+    if (id === 'juntos:active-storage') return '\\0juntos:active-storage:client';
+    if (id === 'juntos:models') return '\\0juntos:models:rpc';
+    if (id === 'juntos:paths') return '\\0juntos:paths:rpc';
+    if (id.startsWith('juntos:')) return '\\0' + id + ':noop';
+    return null;
+  },
+  load(id) {
+    if (id === '\\0juntos:active-record:rpc') {
+      return "export * from 'juntos/adapters/active_record_rpc.mjs';";
+    }
+    if (id === '\\0juntos:rails:browser') {
+      return "export * from 'juntos/rails_base.js'; import { ApplicationBase } from 'juntos/rails_base.js'; export { ApplicationBase as Application }; export class BroadcastChannel { constructor() {} subscribe() {} }";
+    }
+    if (id === '\\0juntos:active-storage:client') {
+      return "export * from 'juntos/adapters/active_storage_base.mjs'; export function initActiveStorage() {}";
+    }
+    if (id === '\\0juntos:models:rpc') return MODELS_MODULE;
+    if (id === '\\0juntos:paths:rpc') return PATHS_MODULE;
+    if (id.endsWith(':noop')) return 'export default {};';
+    return null;
+  }
+};
+
+export default {
+  plugins: [
+    clientVirtualPlugin,
+    ...createClientPlugins({ skipVirtual: true })
+  ],
+  build: {
+    outDir: 'dist',
+    emptyOutDir: false,
+    rollupOptions: {
+      input: {
+        'app/javascript/application': 'app/javascript/application.js'
+      },
+      external: ${externalJson},
+      output: {
+        entryFileNames: '[name].js',
+        chunkFileNames: 'assets/client-[name]-[hash].js'
+      }
+    },
+    manifest: true
+  },
+  resolve: {
+    alias: ${aliasJson},
+    extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.jsx.rb', '.rb']
+  },
+  logLevel: 'warn'
+};
+`;
+
+  fs.writeFileSync(clientConfigPath, clientConfigContent);
+
+  try {
+    execSync('npx vite build --config vite.client.config.js', {
+      cwd: appRoot,
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        JUNTOS_DATABASE: 'rpc',
         JUNTOS_TARGET: 'browser'
       }
     });
