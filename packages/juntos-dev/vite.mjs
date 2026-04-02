@@ -2160,32 +2160,20 @@ function getRollupOptions(target, database) {
         }
       };
 
-    case 'beam': {
-      // BEAM bundles both server (app.js) and client (application.js) entries.
-      // Client modules (@hotwired/*) must be inlined for the browser,
-      // but Node builtins must be externalized for the server.
-      const allExternal = getNativeModules(database);
-      const clientOnlyModules = ['@hotwired/stimulus', '@hotwired/turbo', '@hotwired/turbo-rails'];
-      const serverExternal = new Set(allExternal);
-
+    case 'beam':
+      // Server-only build. Client JS (application.js with Turbo/Stimulus)
+      // is built separately after the server build, same as node/bun/deno.
+      // See createDualBundlePlugin's closeBundle for the client build.
       return {
         input: {
-          app: 'config/routes.rb',
-          'app/javascript/application': 'app/javascript/application.js'
+          app: 'config/routes.rb'
         },
-        external: (id, importer) => {
-          // Never externalize client modules — they must be bundled for the browser
-          if (clientOnlyModules.some(m => id === m || id.startsWith(m + '/'))) {
-            return false;
-          }
-          return serverExternal.has(id);
-        },
+        external: getNativeModules(database),
         output: {
           entryFileNames: '[name].js'
         },
         preserveEntrySignatures: 'allow-extension'
       };
-    }
 
     default:
       return {
