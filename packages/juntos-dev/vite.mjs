@@ -2771,6 +2771,8 @@ const clientVirtualPlugin = {
     if (id === 'juntos:models') return '\\0juntos:models:rpc';
     if (id === 'juntos:paths') return '\\0juntos:paths:rpc';
     if (id.startsWith('juntos:')) return '\\0' + id + ':noop';
+    // Intercept model imports of ../lib/active_record.mjs (transpiled from ApplicationRecord)
+    if (id.endsWith('/lib/active_record.mjs') || id.endsWith('/lib/rails.js')) return '\\0juntos:active-record:rpc';
     return null;
   },
   load(id) {

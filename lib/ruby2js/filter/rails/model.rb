@@ -226,8 +226,9 @@ module Ruby2JS
           model_import_nodes = []
 
           # Check if model uses broadcast methods (for BroadcastChannel import)
-          # Include both explicit broadcast_*_to calls and broadcasts_to declarations
-          uses_broadcast = body_uses_broadcasts?(body) || @rails_broadcasts_to.any?
+          # In RPC mode, skip broadcasts entirely — they're server-side concerns
+          is_rpc = @options[:database] == 'rpc'
+          uses_broadcast = !is_rpc && (body_uses_broadcasts?(body) || @rails_broadcasts_to.any?)
           if uses_broadcast
             broadcast_import = s(:send, nil, :import,
               s(:array, s(:const, nil, :BroadcastChannel)),
@@ -310,7 +311,7 @@ module Ruby2JS
           # Add Model.renderPartial = render assignment so broadcast_replace_to
           # can use the partial at runtime when called from other models
           render_partial_assignment = nil
-          if @rails_broadcasts_to.any?
+          if !is_rpc && @rails_broadcasts_to.any?
             render_partial_assignment = s(:send,
               s(:const, nil, @rails_model_name.to_sym),
               :renderPartial=,
@@ -334,16 +335,19 @@ module Ruby2JS
           trailing_nodes.push(render_partial_assignment) if render_partial_assignment
 
           # Generate callback registrations as post-class statements
+          # In RPC mode, skip callbacks — they're server-side concerns
           # e.g., Event.after_save("upload_blobs")
-          @rails_callbacks.keys.each do |callback_type|
-            methods = @rails_callbacks[callback_type]
-            next if methods.empty?
-            methods.each do |method_name|
-              trailing_nodes.push(
-                s(:send,
-                  s(:const, nil, @rails_model_name.to_sym),
-                  callback_type,
-                  s(:str, method_name.to_s)))
+          unless is_rpc
+            @rails_callbacks.keys.each do |callback_type|
+              methods = @rails_callbacks[callback_type]
+              next if methods.empty?
+              methods.each do |method_name|
+                trailing_nodes.push(
+                  s(:send,
+                    s(:const, nil, @rails_model_name.to_sym),
+                    callback_type,
+                    s(:str, method_name.to_s)))
+              end
             end
           end
 
