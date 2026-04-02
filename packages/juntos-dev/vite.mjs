@@ -1497,8 +1497,7 @@ function createConfigPlugin(config, appRoot) {
         // Alias for Rails importmap-style imports in Stimulus controllers
         'controllers/application': path.join(appRoot, 'app/javascript/controllers/application.js'),
 
-        // Rails importmap uses @hotwired/turbo-rails (gem); npm has @hotwired/turbo
-        '@hotwired/turbo-rails': '@hotwired/turbo',
+        // Rails importmap uses @hotwired/turbo-rails — now available on npm
 
         // Rails importmap uses bare "controllers" for app/javascript/controllers
         'controllers': path.join(appRoot, 'app/javascript/controllers'),
@@ -2639,7 +2638,6 @@ async function buildApplicationJs(appRoot, config) {
   const importmapAliases = parseImportmapAliases(appRoot);
   const aliasEntries = {
     'controllers/application': path.join(appRoot, 'app/javascript/controllers/application.js'),
-    '@hotwired/turbo-rails': '@hotwired/turbo',
     'controllers': path.join(appRoot, 'app/javascript/controllers'),
     ...importmapAliases
   };
@@ -2735,7 +2733,6 @@ async function buildApplicationJsWithRpc(appRoot, config) {
   const importmapAliases = parseImportmapAliases(appRoot);
   const aliasEntries = {
     'controllers/application': path.join(appRoot, 'app/javascript/controllers/application.js'),
-    '@hotwired/turbo-rails': '@hotwired/turbo',
     'controllers': path.join(appRoot, 'app/javascript/controllers'),
     ...importmapAliases
   };

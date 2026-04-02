@@ -645,7 +645,7 @@ jobs:
             # Install fresh tarballs into demo root (where package.json lives in vite-native architecture)
             # Must install: ruby2js (transpiler), juntos (runtime), juntos-dev (build tools), vite-plugin-ruby2js (build plugin)
             # Also install browser runtime dependencies: dexie (IndexedDB), turbo/stimulus (Rails UJS), react (ERB rendering)
-            (cd "artifacts/$demo" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/juntos-beta.tgz ../tarballs/juntos-dev-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz dexie @hotwired/turbo @hotwired/stimulus react react-dom)
+            (cd "artifacts/$demo" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/juntos-beta.tgz ../tarballs/juntos-dev-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz dexie @hotwired/turbo-rails @hotwired/stimulus react react-dom)
             # Demo-specific dependencies are auto-installed by ensurePackagesInstalled
             # from ruby2js.yml (e.g., @xenova/transformers for dictaphone, reactflow for workflow)
             # Build from demo root - pure JavaScript via Vite
@@ -655,7 +655,7 @@ jobs:
           # Writebook: full Rails app with SQLite OPFS via SharedWorker
           echo "Building writebook for browser..."
           (cd "artifacts/writebook" && node ../cli/package/cli.mjs init --no-install)
-          (cd "artifacts/writebook" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/juntos-beta.tgz ../tarballs/juntos-dev-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz @hotwired/turbo @hotwired/stimulus @rails/request.js)
+          (cd "artifacts/writebook" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/juntos-beta.tgz ../tarballs/juntos-dev-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz @hotwired/turbo-rails @hotwired/stimulus @rails/request.js)
           (cd "artifacts/writebook" && bin/juntos build -d sqlite_wasm -t worker --base "/ruby2js/writebook/" --sourcemap)
 
       - name: Package editor snapshots

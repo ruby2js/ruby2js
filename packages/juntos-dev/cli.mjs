@@ -1721,11 +1721,11 @@ const DATABASE_PACKAGES = {
 };
 
 const RUNTIME_PACKAGES = {
-  browser: ['@hotwired/turbo', '@hotwired/stimulus'],
-  worker: ['@hotwired/turbo', '@hotwired/stimulus'],
-  node: ['@hotwired/turbo', '@hotwired/stimulus'],
-  bun: ['@hotwired/turbo', '@hotwired/stimulus'],
-  beam: ['@hotwired/turbo', '@hotwired/stimulus'],
+  browser: ['@hotwired/turbo-rails', '@hotwired/stimulus'],
+  worker: ['@hotwired/turbo-rails', '@hotwired/stimulus'],
+  node: ['@hotwired/turbo-rails', '@hotwired/stimulus'],
+  bun: ['@hotwired/turbo-rails', '@hotwired/stimulus'],
+  beam: ['@hotwired/turbo-rails', '@hotwired/stimulus'],
   deno: []
 };
 
