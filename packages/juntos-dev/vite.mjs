@@ -2146,18 +2146,32 @@ function getRollupOptions(target, database) {
         }
       };
 
-    case 'beam':
+    case 'beam': {
+      // BEAM bundles both server (app.js) and client (application.js) entries.
+      // Client modules (@hotwired/*) must be inlined for the browser,
+      // but Node builtins must be externalized for the server.
+      const allExternal = getNativeModules(database);
+      const clientOnlyModules = ['@hotwired/stimulus', '@hotwired/turbo', '@hotwired/turbo-rails'];
+      const serverExternal = new Set(allExternal);
+
       return {
         input: {
           app: 'config/routes.rb',
           'app/javascript/application': 'app/javascript/application.js'
         },
-        external: getNativeModules(database),
+        external: (id, importer) => {
+          // Never externalize client modules — they must be bundled for the browser
+          if (clientOnlyModules.some(m => id === m || id.startsWith(m + '/'))) {
+            return false;
+          }
+          return serverExternal.has(id);
+        },
         output: {
           entryFileNames: '[name].js'
         },
         preserveEntrySignatures: 'allow-extension'
       };
+    }
 
     default:
       return {
