@@ -2693,7 +2693,7 @@ export default {
         chunkFileNames: 'assets/client-[name]-[hash].js'
       }
     },
-    manifest: true
+    manifest: false
   },
   resolve: {
     alias: ${aliasJson},
@@ -2812,7 +2812,7 @@ export default {
         chunkFileNames: 'assets/client-[name]-[hash].js'
       }
     },
-    manifest: true
+    manifest: false
   },
   resolve: {
     alias: ${aliasJson},
