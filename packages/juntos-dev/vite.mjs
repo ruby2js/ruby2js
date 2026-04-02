@@ -1543,19 +1543,17 @@ function createConfigPlugin(config, appRoot) {
       }
 
       // Add external patterns from config (e.g., from ruby2js.yml)
-      // Merge with any user-provided external function
+      // Merge with existing rollupOptions.external (from getRollupOptions)
       if (config.external && config.external.length > 0) {
         const juntosExternal = createExternalMatcher(config.external);
-        const userExternal = userConfig?.build?.rollupOptions?.external;
+        const existingExternal = rollupOptions.external;
 
-        if (typeof userExternal === 'function') {
-          // Combine user and juntos external functions
+        if (typeof existingExternal === 'function') {
           rollupOptions.external = (id, ...args) =>
-            juntosExternal(id) || userExternal(id, ...args);
-        } else if (Array.isArray(userExternal)) {
-          // Combine user array with juntos function
+            juntosExternal(id) || existingExternal(id, ...args);
+        } else if (Array.isArray(existingExternal)) {
           rollupOptions.external = (id, ...args) =>
-            juntosExternal(id) || userExternal.includes(id);
+            juntosExternal(id) || existingExternal.includes(id);
         } else {
           rollupOptions.external = juntosExternal;
         }
