@@ -2452,8 +2452,12 @@ function createDualBundlePlugin(config, appRoot) {
   return {
     name: 'juntos-dual-bundle',
 
+    // Track whether this is a build (not dev server)
+    _isBuild: false,
+
     // Log RPC detection during config (don't add client to this build)
     config(userConfig, { command }) {
+      this._isBuild = command === 'build';
       if (!needsDualBundle && !needsControllerRpc) return;
 
       console.log('[juntos] RPC imports detected - will build client bundle separately');
@@ -2479,6 +2483,7 @@ function createDualBundlePlugin(config, appRoot) {
 
     // After server build completes, trigger separate client build
     async closeBundle() {
+      if (!this._isBuild) return;
       if (needsDualBundle) {
         console.log('[juntos] Server build complete, starting client build...');
         await buildClientBundle(appRoot, config);
