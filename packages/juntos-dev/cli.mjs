@@ -1725,6 +1725,7 @@ const RUNTIME_PACKAGES = {
   worker: ['@hotwired/turbo', '@hotwired/stimulus'],
   node: ['@hotwired/turbo', '@hotwired/stimulus'],
   bun: ['@hotwired/turbo', '@hotwired/stimulus'],
+  beam: ['@hotwired/turbo', '@hotwired/stimulus'],
   deno: []
 };
 
