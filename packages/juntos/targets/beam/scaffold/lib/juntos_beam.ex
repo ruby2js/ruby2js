@@ -108,7 +108,7 @@ defmodule JuntosBeam do
   def init(opts) do
     adapter = Keyword.get(opts, :adapter, System.get_env("JUNTOS_DATABASE", "sqlite_napi"))
     database = Keyword.get(opts, :database, default_database(adapter))
-    pool_size = Keyword.get(opts, :pool_size, 1)  # TODO: restore max(4, System.schedulers_online())
+    pool_size = Keyword.get(opts, :pool_size, max(4, System.schedulers_online()))
 
     # Ensure database directory exists for file-based databases
     if adapter in ["sqlite_napi", "sqlite-napi"] do
