@@ -38,7 +38,8 @@ defmodule JuntosBeam do
       async function __dispatch() {
         try {
           globalThis.__requestBody = #{escaped_body};
-          const request = new Request('http://localhost#{path}', {
+          const host = new Headers(#{headers_pairs}).get('host') || 'localhost';
+          const request = new Request('http://' + host + '#{path}', {
             method: '#{method}',
             headers: new Headers(#{headers_pairs})
           });
