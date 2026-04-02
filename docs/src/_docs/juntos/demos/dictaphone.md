@@ -6,7 +6,7 @@ category: juntos/demos
 hide_in_toc: true
 ---
 
-A voice recording app with AI transcription. Record audio clips, get automatic transcriptions via OpenAI Whisper, and store everything locally using Active Storage.
+A voice recording app that demonstrates transparent RPC. The Stimulus controller calls `Clip.create()` and `clip.audio.attach()` directly — the same Ruby code works in the browser (IndexedDB) and on Node.js (SQLite via RPC). Audio transcription runs locally in the browser via Whisper (Transformers.js).
 
 {% toc %}
 
@@ -26,7 +26,7 @@ This creates a Rails app with:
 - **Clip model** — stores audio recordings with transcriptions
 - **Active Storage** — manages audio file attachments
 - **Dictaphone controller** — Stimulus controller written in Ruby
-- **Whisper integration** — automatic transcription via OpenAI API
+- **Whisper integration** — local speech-to-text via Transformers.js
 - **Tailwind CSS** — clean recording UI with waveform visualization
 
 ## Run with Rails
@@ -67,19 +67,9 @@ bin/juntos db:prepare -d sqlite
 bin/juntos up -d sqlite
 ```
 
-Open http://localhost:3000. Same app—but now Node.js serves requests, and audio files are stored on the local filesystem via Active Storage's disk adapter.
+Open http://localhost:3000. Same app—but now Node.js serves requests, and audio files are stored on the local filesystem via Active Storage's disk adapter. The Stimulus controller's model operations (`Clip.create()`, `clip.audio.attach()`) are automatically routed through RPC to the server — no fetch calls or form submissions needed.
 
 ## Environment Variables
-
-### OpenAI API Key (Required for Transcription)
-
-Set your OpenAI API key to enable Whisper transcription:
-
-```bash
-export OPENAI_API_KEY=sk-...
-```
-
-Without this key, recordings will be saved but transcription will be skipped.
 
 ### S3 Storage (Edge Targets)
 
@@ -96,7 +86,7 @@ export AWS_ENDPOINT_URL=https://...
 
 ## The Code
 
-The dictaphone controller is written in Ruby. **Try it** — see how it transpiles:
+The Stimulus controller imports a model and calls it directly. In the browser, this hits IndexedDB. On Node.js, the build automatically generates RPC so the same code calls the server:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
@@ -104,27 +94,24 @@ The dictaphone controller is written in Ruby. **Try it** — see how it transpil
 }'></div>
 
 ```ruby
+import ["Clip"], from: 'juntos:models'
+
 class DictaphoneController < Stimulus::Controller
-  def startRecording
-    stream = await navigator.mediaDevices.getUserMedia(audio: true)
-    @mediaRecorder = MediaRecorder.new(stream)
-    @chunks = []
+  async def save(event)
+    event.preventDefault()
+    return unless @audioBlob
 
-    @mediaRecorder.ondataavailable = ->(e) { @chunks.push(e.data) }
-    @mediaRecorder.onstop = -> { handleRecordingComplete() }
-    @mediaRecorder.start()
+    clip = await Clip.create(
+      name: nameTarget.value || "Untitled Recording",
+      transcript: transcriptTarget.value,
+      duration: parseFloat(durationTarget.value)
+    )
 
-    recordingTarget.classList.remove("hidden")
-  end
-
-  def stopRecording
-    @mediaRecorder.stop()
-    @mediaRecorder.stream.getTracks().each { |t| t.stop() }
-  end
-
-  def handleRecordingComplete
-    blob = Blob.new(@chunks, type: "audio/webm")
-    saveClip(blob)
+    extension = @audioBlob.type.include?('webm') ? 'webm' : 'm4a'
+    await clip.audio.attach(@audioBlob,
+      filename: "recording.#{extension}",
+      content_type: @audioBlob.type
+    )
   end
 end
 ```
@@ -140,17 +127,19 @@ end
 class Clip < ApplicationRecord
   has_one_attached :audio
 
-  validates :audio, presence: true
+  validates :name, presence: true
+  broadcasts_to -> { "clips" }, inserts_by: :prepend
 end
 ```
 
 ## What This Demo Shows
 
-### Audio Recording
+### Transparent RPC
 
-- **MediaRecorder API** — captures audio from microphone
-- **WebM format** — compressed audio for efficient storage
-- **Chunk handling** — collects data as it streams
+- **Direct model access** — `Clip.create()` in a Stimulus controller, no fetch or form submission
+- **Automatic routing** — browser target uses IndexedDB, Node.js target uses RPC to the server
+- **Build-time detection** — the build pipeline detects model imports and generates the RPC layer
+- **Like React Server Functions** — but for Stimulus controllers and Ruby syntax
 
 ### Active Storage Integration
 
@@ -161,27 +150,15 @@ end
 
 ### AI Transcription
 
-- **OpenAI Whisper** — speech-to-text via API
-- **Audio preprocessing** — converts WebM to proper format
-- **Async processing** — transcription runs after save
+- **Local Whisper** — speech-to-text runs in the browser via Transformers.js
+- **No API key needed** — the ~75MB model downloads on first use, then is cached
+- **Progress indicator** — shows model download progress in the UI
 
-### Stimulus Controller
+### Audio Recording
 
-- **Written in Ruby** — transpiles to JavaScript
-- **Async/await** — microphone access uses promises
-- **State management** — tracks recording status, chunks
-
-## What Works Differently
-
-- **Browser audio** — uses MediaRecorder with WebM codec
-- **Whisper API** — requires server-side call (not from browser)
-- **Storage backend** — automatically selected based on target
-
-## What Doesn't Work
-
-- **Offline transcription** — requires OpenAI API (network)
-- **Long recordings** — Whisper has a 25MB file limit
-- **Real-time transcription** — currently processes after recording stops
+- **MediaRecorder API** — captures audio from microphone
+- **WebM format** — compressed audio for efficient storage
+- **Waveform visualization** — real-time audio level display
 
 ## Next Steps
 

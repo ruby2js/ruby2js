@@ -65,8 +65,9 @@ describe('Dictaphone Demo Integration Tests', () => {
   it('can build the demo with Vite', () => {
     // Verify the build pipeline works
     // Note: @xenova/transformers is auto-installed from ruby2js.yml dependencies
+    // Uses node target to verify server + client RPC dual bundle
     try {
-      execSync('npx juntos build -d dexie', {
+      execSync('npx juntos build -d sqlite -t node', {
         cwd: DEMO_DIR,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe']
