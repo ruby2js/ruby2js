@@ -111,10 +111,24 @@ async function main() {
   // Load database config from project root (not dist/)
   const dbConfig = loadDatabaseConfig(projectRoot);
 
+  let viteServer = null;
+
   try {
     // Import the routes module which sets up Application and re-exports initDatabase
-    const routesPath = pathToFileURL(routesFile).href;
-    const routesModule = await import(routesPath);
+    let routesModule;
+    if (routesFile.endsWith('.rb')) {
+      // No pre-built .js — use Vite to transform .rb files in memory
+      const { createServer } = await import('vite');
+      viteServer = await createServer({
+        server: { middlewareMode: true },
+        logLevel: 'silent',
+        appType: 'custom'
+      });
+      routesModule = await viteServer.ssrLoadModule(routesFile);
+    } else {
+      const routesPath = pathToFileURL(routesFile).href;
+      routesModule = await import(routesPath);
+    }
     const { Application, initDatabase } = routesModule;
 
     // Choose adapter based on mode:
@@ -230,12 +244,14 @@ async function main() {
     }
 
     console.log('\n✓ Migration complete');
+    if (viteServer) await viteServer.close();
     process.exit(0);
   } catch (error) {
     console.error('\n✗ Migration failed:', error.message);
     if (process.env.DEBUG) {
       console.error(error.stack);
     }
+    if (viteServer) await viteServer.close();
     process.exit(1);
   }
 }

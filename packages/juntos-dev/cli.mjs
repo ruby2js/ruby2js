@@ -3804,68 +3804,13 @@ function runD1Prepare(options) {
 
 // Node.js database helpers
 
-// Ensure migrate.mjs can run: pre-transpile migrations and generate bootstrap if needed
-async function ensureMigrateBootstrap(options) {
-  // Already have pre-built routes.js? Nothing to do.
-  if (existsSync(join(APP_ROOT, 'dist', 'config', 'routes.js')) ||
-      existsSync(join(APP_ROOT, 'config', 'routes.js'))) {
-    return;
-  }
-
-  const { loadConfig } = await import('./vite.mjs');
-  const config = loadConfig(APP_ROOT, {
-    database: options.database,
-    target: options.target
-  });
-
-  // For BEAM targets, migrations run in Node — use the Node-compatible adapter
-  const migrateTarget = config.target === 'beam' ? 'node' : (config.target || 'node');
-  const migrateDatabase = {
-    'sqlite_napi': 'sqlite', 'sqlite-napi': 'sqlite',
-    'postgrex': 'pg'
-  }[config.database] || config.database;
-  const adapterFile = getActiveRecordAdapterFile(migrateDatabase);
-
-  // Transpile migration files
-  const migrateDir = join(APP_ROOT, 'db/migrate');
-  let hasMigrations = false;
-  if (existsSync(migrateDir)) {
-    const migrations = findMigrations(APP_ROOT);
-    if (migrations.length > 0) {
-      const { convert } = await ensureRuby2jsReady();
-      for (const m of migrations) {
-        const outFile = join(migrateDir, m.name + '.js');
-        if (!existsSync(outFile)) {
-          const source = readFileSync(join(migrateDir, m.file), 'utf-8');
-          const result = await transformRuby(source, join(migrateDir, m.file), null, config, APP_ROOT, null);
-          writeFileSync(outFile, result.code);
-        }
-      }
-      writeFileSync(join(migrateDir, 'index.js'), generateMigrationsModuleForEject(APP_ROOT));
-      hasMigrations = true;
-    }
-  }
-
-  // Generate minimal bootstrap config/routes.js (no actual routes needed for migrations)
-  let routesCode = `import { Application } from 'juntos/targets/${migrateTarget}/rails.js';\n`;
-  routesCode += `export { Application };\n`;
-  routesCode += `export { initDatabase } from 'juntos/adapters/${adapterFile}';\n`;
-  routesCode += `export * from 'juntos/adapters/${adapterFile}';\n`;
-  if (hasMigrations) {
-    routesCode += `import { migrations } from '../db/migrate/index.js';\n`;
-    routesCode += `Application.configure({ migrations });\n`;
-  }
-  writeFileSync(join(APP_ROOT, 'config/routes.js'), routesCode);
-}
-
 function migrateCommand(extraArgs = '') {
   const args = extraArgs ? ` ${extraArgs}` : '';
   return `node "${MIGRATE_SCRIPT}"${args}`;
 }
 
-async function runNodeMigrate(options) {
+function runNodeMigrate(options) {
   console.log('Running migrations...');
-  await ensureMigrateBootstrap(options);
   try {
     execSync(migrateCommand('--migrate-only'), {
       cwd: APP_ROOT,
@@ -3880,9 +3825,8 @@ async function runNodeMigrate(options) {
   }
 }
 
-async function runNodeSeed(options) {
+function runNodeSeed(options) {
   console.log('Running seeds...');
-  await ensureMigrateBootstrap(options);
   try {
     execSync(migrateCommand('--seed-only'), {
       cwd: APP_ROOT,
@@ -3896,9 +3840,8 @@ async function runNodeSeed(options) {
   }
 }
 
-async function runNodePrepare(options) {
+function runNodePrepare(options) {
   console.log('Running migrations and seeds...');
-  await ensureMigrateBootstrap(options);
   try {
     execSync(migrateCommand(), {
       cwd: APP_ROOT,
