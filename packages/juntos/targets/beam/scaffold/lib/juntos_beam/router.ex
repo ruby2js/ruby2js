@@ -16,6 +16,8 @@ defmodule JuntosBeam.Router do
 
   # WebSocket endpoint for Turbo Streams broadcasting
   get "/cable" do
+    require Logger
+    Logger.info("WebSocket upgrade request for /cable")
     conn
     |> WebSockAdapter.upgrade(JuntosBeam.CableSocket, [], timeout: 60_000)
     |> halt()
