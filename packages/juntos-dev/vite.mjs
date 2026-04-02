@@ -2106,8 +2106,8 @@ function getRollupOptions(target, database) {
         input: {
           index: 'node_modules/juntos/server.mjs',
           'config/routes': 'config/routes.rb'
-          // Note: client entry is added dynamically by createDualBundlePlugin
-          // if RPC imports are detected during pre-scan
+          // Note: client JS is built separately after the server build
+          // (see createClientBundlePlugin)
         },
         external: getNativeModules(database),
         output: {
@@ -2428,6 +2428,9 @@ function createDualBundlePlugin(config, appRoot) {
     rpcFiles.forEach(f => rpcState.rpcImporters.add(f));
   }
 
+  // Check if app/javascript/application.js exists (standard Rails client entry)
+  const hasApplicationJs = fs.existsSync(path.join(appRoot, 'app/javascript/application.js'));
+
   return {
     name: 'juntos-dual-bundle',
 
@@ -2458,13 +2461,14 @@ function createDualBundlePlugin(config, appRoot) {
 
     // After server build completes, trigger separate client build
     async closeBundle() {
-      if (!needsDualBundle) return;
-      console.log('[juntos] Server build complete, starting client build...');
-
-      // Build client bundle separately with RPC adapter
-      await buildClientBundle(appRoot, config);
-
-      console.log('[juntos] Dual bundle build complete (index.js + client.js)');
+      if (needsDualBundle) {
+        console.log('[juntos] Server build complete, starting client build...');
+        await buildClientBundle(appRoot, config);
+        console.log('[juntos] Dual bundle build complete (index.js + client.js)');
+      } else if (hasApplicationJs) {
+        console.log('[juntos] Building client JS...');
+        await buildApplicationJs(appRoot, config);
+      }
     }
   };
 }
@@ -2590,6 +2594,102 @@ export default {
     });
   } finally {
     // Clean up the temporary config
+    try {
+      fs.unlinkSync(clientConfigPath);
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+  }
+}
+
+/**
+ * Build client JS (application.js) separately from the server bundle.
+ * This is the standard SSR pattern: server build + client build.
+ * The client bundle includes Turbo, Stimulus, controllers, etc.
+ */
+async function buildApplicationJs(appRoot, config) {
+  const clientConfigPath = path.join(appRoot, 'vite.client.config.js');
+
+  // Build alias map from importmap.rb (same as main build)
+  const importmapAliases = parseImportmapAliases(appRoot);
+  const aliasEntries = {
+    'controllers/application': path.join(appRoot, 'app/javascript/controllers/application.js'),
+    '@hotwired/turbo-rails': '@hotwired/turbo',
+    'controllers': path.join(appRoot, 'app/javascript/controllers'),
+    ...importmapAliases
+  };
+  const aliasJson = JSON.stringify(aliasEntries);
+
+  // Pass through external config from ruby2js.yml
+  const externalJson = JSON.stringify(config.external || []);
+
+  const clientConfigContent = `
+import { createClientPlugins } from 'juntos-dev/vite';
+
+// Resolve juntos: virtual modules for the client build
+const clientVirtualPlugin = {
+  name: 'juntos-client-virtual',
+  enforce: 'pre',
+  resolveId(id) {
+    if (id === 'juntos:rails') return '\\0juntos:rails:browser';
+    if (id === 'juntos:active-record') return '\\0juntos:active-record:noop';
+    if (id === 'juntos:active-storage') return '\\0juntos:active-storage:client';
+    if (id.startsWith('juntos:')) return '\\0' + id + ':noop';
+    return null;
+  },
+  load(id) {
+    if (id === '\\0juntos:rails:browser') {
+      return "export * from 'juntos/targets/browser/rails.js';";
+    }
+    if (id === '\\0juntos:active-storage:client') {
+      return "export * from 'juntos/adapters/active_storage_indexeddb.mjs';";
+    }
+    // No-op for other virtual modules (active-record, paths, etc.)
+    if (id.endsWith(':noop')) return 'export default {};';
+    return null;
+  }
+};
+
+export default {
+  plugins: [
+    clientVirtualPlugin,
+    ...createClientPlugins({ skipVirtual: true })
+  ],
+  build: {
+    outDir: 'dist',
+    emptyOutDir: false,
+    rollupOptions: {
+      input: {
+        'app/javascript/application': 'app/javascript/application.js'
+      },
+      external: ${externalJson},
+      output: {
+        entryFileNames: '[name].js',
+        chunkFileNames: 'assets/client-[name]-[hash].js'
+      }
+    },
+    manifest: true
+  },
+  resolve: {
+    alias: ${aliasJson},
+    extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.jsx.rb', '.rb']
+  },
+  logLevel: 'warn'
+};
+`;
+
+  fs.writeFileSync(clientConfigPath, clientConfigContent);
+
+  try {
+    execSync('npx vite build --config vite.client.config.js', {
+      cwd: appRoot,
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        JUNTOS_TARGET: 'browser'
+      }
+    });
+  } finally {
     try {
       fs.unlinkSync(clientConfigPath);
     } catch (e) {

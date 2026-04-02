@@ -88,11 +88,15 @@ export function stylesheetLinkTag(name = 'tailwind.css') {
 }
 
 // Generate script tag to load the application JavaScript entry point.
-// In Vite context, no importmap JSON is needed — Vite resolves modules.
-// The entry point (app/javascript/application.js) imports Turbo, boots
-// Stimulus, and eagerly loads controllers.
+// In production, the client JS is built separately and resolved via manifest.
+// In dev mode, Vite transforms on-the-fly from the source path.
 export function javascriptImportmapTags() {
-  return '<script type="module" src="/app/javascript/application.js"></script>';
+  loadManifest();
+  let src = '/app/javascript/application.js';
+  if (viteManifest && viteManifest['app/javascript/application.js']) {
+    src = '/' + viteManifest['app/javascript/application.js'].file;
+  }
+  return `<script type="module" src="${src}"></script>`;
 }
 
 // View renderer — injected via setViewRenderer() by the juntos:rails virtual module.

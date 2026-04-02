@@ -64,9 +64,15 @@ describe('Dictaphone Demo Integration Tests', () => {
 
   it('can build the demo with Vite', () => {
     // Verify the build pipeline works
-    // Note: Uses sqlite/node for Node.js compatibility
+    // Install Whisper dependency (large ML package, not included by default)
+    execSync('npm install @xenova/transformers', {
+      cwd: DEMO_DIR,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
     try {
-      execSync('npx juntos build -d sqlite -t node', {
+      execSync('npx juntos build -d dexie', {
         cwd: DEMO_DIR,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe']
