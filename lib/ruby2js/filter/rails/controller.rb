@@ -260,10 +260,11 @@ module Ruby2JS
           superclass_str = superclass.children.last.to_s
 
           # Match *Controller < ApplicationController or *Controller < *Controller
+          # Exclude bare "Controller" (Stimulus::Controller normalized by stimulus filter)
           # Also match ApplicationController < ActionController::Base
           class_name_str.end_with?('Controller') &&
             (superclass_str == 'ApplicationController' ||
-             superclass_str.end_with?('Controller') ||
+             (superclass_str.end_with?('Controller') && superclass_str != 'Controller') ||
              (superclass_str == 'Base' &&
               superclass.children[0]&.type == :const &&
               superclass.children[0].children[1] == :ActionController))
