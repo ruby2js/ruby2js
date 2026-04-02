@@ -1830,6 +1830,23 @@ function ensurePackagesInstalled(options) {
     }
   }
 
+  // Check app-specific dependencies from ruby2js.yml
+  const ruby2jsYml = join(APP_ROOT, 'config/ruby2js.yml');
+  if (existsSync(ruby2jsYml)) {
+    try {
+      const parsed = yaml ? yaml.load(readFileSync(ruby2jsYml, 'utf-8')) : null;
+      if (parsed && parsed.dependencies) {
+        for (const pkg of Object.keys(parsed.dependencies)) {
+          if (!isPackageInstalled(pkg)) {
+            missing.push(pkg);
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  }
+
   // Check if app uses Tailwind CSS (needs @tailwindcss/vite to compile from source)
   const tailwindSource = join(APP_ROOT, 'app/assets/tailwind/application.css');
   if (existsSync(tailwindSource)) {

@@ -64,13 +64,7 @@ describe('Dictaphone Demo Integration Tests', () => {
 
   it('can build the demo with Vite', () => {
     // Verify the build pipeline works
-    // Install Whisper dependency (large ML package, not included by default)
-    execSync('npm install @xenova/transformers', {
-      cwd: DEMO_DIR,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-
+    // Note: @xenova/transformers is auto-installed from ruby2js.yml dependencies
     try {
       execSync('npx juntos build -d dexie', {
         cwd: DEMO_DIR,

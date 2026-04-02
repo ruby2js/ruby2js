@@ -646,13 +646,8 @@ jobs:
             # Must install: ruby2js (transpiler), juntos (runtime), juntos-dev (build tools), vite-plugin-ruby2js (build plugin)
             # Also install browser runtime dependencies: dexie (IndexedDB), turbo/stimulus (Rails UJS), react (ERB rendering)
             (cd "artifacts/$demo" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/juntos-beta.tgz ../tarballs/juntos-dev-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz dexie @hotwired/turbo @hotwired/stimulus react react-dom)
-            # Demo-specific dependencies
-            if [ "$demo" = "workflow" ]; then
-              (cd "artifacts/$demo" && npm install reactflow)
-            fi
-            if [ "$demo" = "dictaphone" ]; then
-              (cd "artifacts/$demo" && npm install @xenova/transformers)
-            fi
+            # Demo-specific dependencies are auto-installed by ensurePackagesInstalled
+            # from ruby2js.yml (e.g., @xenova/transformers for dictaphone, reactflow for workflow)
             # Build from demo root - pure JavaScript via Vite
             (cd "artifacts/$demo" && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
           done
