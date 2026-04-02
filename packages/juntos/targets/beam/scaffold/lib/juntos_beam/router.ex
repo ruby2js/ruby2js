@@ -16,11 +16,18 @@ defmodule JuntosBeam.Router do
 
   # WebSocket endpoint for Turbo Streams broadcasting
   get "/cable" do
-    require Logger
-    Logger.info("WebSocket upgrade request for /cable")
-    conn
-    |> WebSockAdapter.upgrade(JuntosBeam.CableSocket, [], timeout: 60_000)
-    |> halt()
+    # Echo the Action Cable subprotocol so the browser doesn't reject the connection
+    conn = case Plug.Conn.get_req_header(conn, "sec-websocket-protocol") do
+      [protocols | _] ->
+        # Client requests "actioncable-v1-json, actioncable-unsupported"
+        # Echo back the first supported one
+        protocol = protocols |> String.split(",") |> List.first() |> String.trim()
+        Plug.Conn.put_resp_header(conn, "sec-websocket-protocol", protocol)
+      _ ->
+        conn
+    end
+
+    WebSockAdapter.upgrade(conn, JuntosBeam.CableSocket, %{}, timeout: 60_000)
   end
 
   # Catch-all: forward everything to the JS application

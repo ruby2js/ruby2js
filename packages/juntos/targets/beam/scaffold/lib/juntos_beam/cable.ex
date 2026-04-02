@@ -75,18 +75,16 @@ defmodule JuntosBeam.CableSocket do
   require Logger
 
   @impl true
-  def init(_opts) do
-    # Send Action Cable welcome message
+  def init(state) do
     welcome = Jason.encode!(%{"type" => "welcome"})
+    Process.send_after(self(), :send_ping, 3_000)
 
-    # Start ping timer (Action Cable stale threshold is 6s)
-    Process.send_after(self(), :ping, 3_000)
-
-    {:push, {:text, welcome}, %{}}
+    {:push, {:text, welcome}, state}
   end
 
   @impl true
   def handle_in({text, [opcode: :text]}, state) do
+
     case Jason.decode(text) do
       {:ok, %{"command" => "subscribe", "identifier" => identifier}} ->
         handle_subscribe(identifier, state)
@@ -108,10 +106,22 @@ defmodule JuntosBeam.CableSocket do
     {:push, {:text, message}, state}
   end
 
-  def handle_info(:ping, state) do
+  def handle_info(:send_welcome, state) do
+    Logger.info("CableSocket: sending welcome")
+    welcome = Jason.encode!(%{"type" => "welcome"})
+    Process.send_after(self(), :send_ping, 3_000)
+    {:push, {:text, welcome}, state}
+  end
+
+  def handle_info(:send_ping, state) do
     ping = Jason.encode!(%{"type" => "ping", "message" => System.system_time(:second)})
-    Process.send_after(self(), :ping, 3_000)
+    Process.send_after(self(), :send_ping, 3_000)
     {:push, {:text, ping}, state}
+  end
+
+  def handle_info(msg, state) do
+    Logger.warning("CableSocket: unexpected message: #{inspect(msg)}")
+    {:ok, state}
   end
 
   @impl true
