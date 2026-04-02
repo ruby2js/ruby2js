@@ -3826,13 +3826,24 @@ function migrateCommand(extraArgs = '') {
   return `node "${MIGRATE_SCRIPT}"${args}`;
 }
 
+function migrateEnv(options) {
+  const env = { ...process.env, JUNTOS_DIST_DIR: join(APP_ROOT, 'dist') };
+  // For BEAM targets, use Node-compatible adapter for migrations
+  const beamAdapterMap = { 'sqlite_napi': 'sqlite', 'sqlite-napi': 'sqlite', 'postgrex': 'pg' };
+  if (beamAdapterMap[options.database]) {
+    env.JUNTOS_DATABASE = beamAdapterMap[options.database];
+    env.JUNTOS_TARGET = 'node';
+  }
+  return env;
+}
+
 function runNodeMigrate(options) {
   console.log('Running migrations...');
   try {
     execSync(migrateCommand('--migrate-only'), {
       cwd: APP_ROOT,
       stdio: 'inherit',
-      env: { ...process.env, JUNTOS_DIST_DIR: join(APP_ROOT, 'dist') }
+      env: migrateEnv(options)
     });
     console.log('Migrations completed.');
   } catch (e) {
@@ -3848,7 +3859,7 @@ function runNodeSeed(options) {
     execSync(migrateCommand('--seed-only'), {
       cwd: APP_ROOT,
       stdio: 'inherit',
-      env: { ...process.env, JUNTOS_DIST_DIR: join(APP_ROOT, 'dist') }
+      env: migrateEnv(options)
     });
     console.log('Seeds completed.');
   } catch (e) {
@@ -3863,7 +3874,7 @@ function runNodePrepare(options) {
     execSync(migrateCommand(), {
       cwd: APP_ROOT,
       stdio: 'inherit',
-      env: { ...process.env, JUNTOS_DIST_DIR: join(APP_ROOT, 'dist') }
+      env: migrateEnv(options)
     });
     console.log('Database prepared.');
   } catch (e) {
