@@ -130,8 +130,13 @@ defmodule JuntosBeam do
         handlers
       end
 
-    # Add S3 storage handlers (lazily validated — only fails if app uses Active Storage)
-    handlers = Map.merge(handlers, JuntosBeam.Storage.s3_handlers())
+    # Add S3 storage handlers if ExAws is available (deps stripped when app has no attachments)
+    handlers =
+      if Code.ensure_loaded?(ExAws) do
+        Map.merge(handlers, JuntosBeam.Storage.s3_handlers())
+      else
+        handlers
+      end
 
     app_code = File.read!(@app_script)
 

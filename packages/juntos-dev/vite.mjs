@@ -1449,7 +1449,15 @@ function createStructurePlugin(config, appRoot) {
               // Remove postgrex dep for SQLite builds
               mix = mix.replace(/\s*\{:postgrex,.*?\},?\n/g, '\n');
             }
-            // TODO: strip ex_aws/s3 deps if app doesn't use Active Storage
+            // Strip S3 deps if no model uses Active Storage
+            const models = config._metadata && config._metadata.models;
+            const usesStorage = models && Object.values(models).some(m => m.attachments);
+            if (!usesStorage) {
+              mix = mix.replace(/\s*\{:ex_aws,.*?\},?\n/g, '\n');
+              mix = mix.replace(/\s*\{:ex_aws_s3,.*?\},?\n/g, '\n');
+              mix = mix.replace(/\s*\{:sweet_xml,.*?\},?\n/g, '\n');
+              mix = mix.replace(/\s*\{:req,.*?\},?\n/g, '\n');
+            }
             fs.writeFileSync(mixExs, mix);
           }
 

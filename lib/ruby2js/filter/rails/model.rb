@@ -1132,6 +1132,9 @@ module Ruby2JS
           # Sync methods with parameters (need parens but not await)
           model_meta['parameterized_methods'] = @rails_model_parameterized_methods if @rails_model_parameterized_methods&.any?
 
+          # Active Storage attachments (signals S3 deps needed for BEAM builds)
+          model_meta['attachments'] = true if @rails_attachments.any?
+
           # Delegated type predicates (synchronous, should NOT be awaited)
           dt_predicates = []
           @rails_delegated_types.each do |dt|
