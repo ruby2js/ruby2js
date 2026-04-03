@@ -22,7 +22,7 @@ defmodule JuntosBeam.Database do
               columns |> Enum.zip(row) |> Map.new()
             end)
 
-          {:error, %Postgrex.Error{} = err} ->
+          {:error, err} ->
             raise "PostgreSQL error: #{Exception.message(err)}"
         end
       end,
@@ -42,7 +42,7 @@ defmodule JuntosBeam.Database do
               result
             end
 
-          {:error, %Postgrex.Error{} = err} ->
+          {:error, err} ->
             raise "PostgreSQL error: #{Exception.message(err)}"
         end
       end,
