@@ -7,6 +7,8 @@ defmodule JuntosBeam.Storage do
 
   require Logger
 
+  @compile {:no_warn_undefined, [ExAws, ExAws.S3]}
+
   @doc """
   Build QuickBEAM handler map for storage operations via ExAws.S3.
   """

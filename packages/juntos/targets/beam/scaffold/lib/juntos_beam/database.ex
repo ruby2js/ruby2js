@@ -7,6 +7,8 @@ defmodule JuntosBeam.Database do
 
   require Logger
 
+  @compile {:no_warn_undefined, Postgrex}
+
   # Build QuickBEAM handler map for database operations via Postgrex
   def postgrex_handlers do
     %{
