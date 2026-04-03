@@ -287,7 +287,7 @@ TURBO
 mkdir -p app/javascript/controllers
 cat > app/javascript/controllers/dictaphone_controller.rb << 'STIMULUS'
 # Whisper speech-to-text via Transformers.js
-import ["pipeline", "read_audio"], from: '@xenova/transformers'
+import ["pipeline"], from: '@xenova/transformers'
 # Active Storage for audio file persistence
 import ["initActiveStorage"], from: 'juntos:active-storage'
 # Clip model for client-side persistence
@@ -306,6 +306,7 @@ class DictaphoneController < Stimulus::Controller
     @isRecording = false
     @audioBlob = nil      # Store audio blob for Active Storage
     @audioDuration = nil  # Store recording duration
+    @rawAudioChunks = []  # Raw PCM samples for Whisper
 
     initStorage()
     loadModel()
@@ -385,6 +386,17 @@ class DictaphoneController < Stimulus::Controller
       @analyser.fftSize = 256
       source.connect(@analyser)
 
+      # Capture raw PCM audio for Whisper (avoids decodeAudioData issues)
+      @rawAudioChunks = []
+      processor = @audioContext.createScriptProcessor(4096, 1, 1)
+      processor.onaudioprocess = ->(e) {
+        data = e.inputBuffer.getChannelData(0)
+        @rawAudioChunks.push(Float32Array.new(data))
+      }
+      source.connect(processor)
+      processor.connect(@audioContext.destination)
+      @processor = processor
+
       # Determine best supported format
       mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ?
                    'audio/webm;codecs=opus' : 'audio/mp4'
@@ -431,6 +443,8 @@ class DictaphoneController < Stimulus::Controller
     @isRecording = false
 
     clearInterval(@timerInterval) if @timerInterval
+    @processor.disconnect() if @processor
+    @sampleRate = @audioContext.sampleRate if @audioContext
     @audioContext.close() if @audioContext
 
     # Update UI
@@ -466,6 +480,33 @@ class DictaphoneController < Stimulus::Controller
     requestAnimationFrame(-> { visualize() }) if @isRecording
   end
 
+  def resampleAudio(chunks, fromRate, toRate)
+    # Concatenate all chunks into a single Float32Array
+    totalLength = 0
+    chunks.each { |chunk| totalLength += chunk.length }
+    combined = Float32Array.new(totalLength)
+    offset = 0
+    chunks.each do |chunk|
+      combined.set(chunk, offset)
+      offset += chunk.length
+    end
+
+    # Resample if rates differ
+    if fromRate == toRate
+      return combined
+    end
+
+    ratio = fromRate.to_f / toRate
+    newLength = (combined.length / ratio).round
+    result = Float32Array.new(newLength)
+    i = 0
+    while i < newLength
+      result[i] = combined[(i * ratio).floor]
+      i += 1
+    end
+    result
+  end
+
   async def handleRecordingComplete
     # Create blob from chunks
     mimeType = @mediaRecorder.mimeType
@@ -498,14 +539,8 @@ class DictaphoneController < Stimulus::Controller
     transcriptTarget.placeholder = "Transcribing..."
 
     begin
-      # Create object URL for read_audio
-      audioUrl = URL.createObjectURL(blob)
-
-      # Convert audio to Float32Array at 16kHz (Whisper's expected format)
-      audioData = await read_audio(audioUrl, 16000)
-
-      # Clean up object URL
-      URL.revokeObjectURL(audioUrl)
+      # Combine raw PCM chunks and resample to 16kHz for Whisper
+      audioData = resampleAudio(@rawAudioChunks, @sampleRate, 16000)
 
       # Transcribe
       result = await @transcriber.call(audioData)
