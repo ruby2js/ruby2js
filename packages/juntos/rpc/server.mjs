@@ -227,7 +227,7 @@ export class RPCRegistry {
 export class CSRFProtection {
   constructor(secret = null) {
     // Use provided secret or generate one (should be consistent across restarts in production)
-    this.secret = secret || (typeof process !== 'undefined' && process.env?.CSRF_SECRET) || bytesToHex(getRandomBytes(32));
+    this.secret = secret || globalThis.__csrfSecret || (typeof process !== 'undefined' && process.env?.CSRF_SECRET) || bytesToHex(getRandomBytes(32));
   }
 
   /**

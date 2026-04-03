@@ -132,6 +132,9 @@ defmodule JuntosBeam do
 
     app_code = File.read!(@app_script)
 
+    # Generate a shared CSRF secret for all runtimes in the pool
+    csrf_secret = :crypto.strong_rand_bytes(32) |> Base.encode16(case: :lower)
+
     Logger.info(
       "Starting QuickBEAM pool: #{pool_size} runtimes " <>
       "(adapter: #{adapter}, database: #{database})"
@@ -146,6 +149,7 @@ defmodule JuntosBeam do
         # QuickBEAM's Response requires Uint8Array body; this wrapper auto-encodes strings
         QuickBEAM.eval(rt, """
           globalThis.window = globalThis;
+          globalThis.__csrfSecret = '#{csrf_secret}';
 
           const _OrigResponse = globalThis.Response;
           globalThis.Response = class extends _OrigResponse {
