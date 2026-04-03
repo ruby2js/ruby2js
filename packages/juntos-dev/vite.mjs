@@ -1437,12 +1437,6 @@ function createStructurePlugin(config, appRoot) {
               code = code.replace('let manifestLoaded = false;', 'let manifestLoaded = true;');
             }
 
-            // Patch createContext to add CSRF token (parent sets authenticityToken: null)
-            code = code.replace(
-              'authenticityToken: null',
-              'authenticityToken: globalThis.__beamCSRF ? globalThis.__beamCSRF.generateToken() : null'
-            );
-
             fs.writeFileSync(appJs, code);
           }
 
@@ -2481,6 +2475,19 @@ function createDualBundlePlugin(config, appRoot) {
         console.log('[juntos] Building client JS...');
         await buildApplicationJs(appRoot, config);
       }
+
+      // Merge client manifest into server manifest so javascriptImportmapTags
+      // can resolve fingerprinted client JS paths
+      const distDir = path.join(appRoot, 'dist');
+      const serverManifestPath = path.join(distDir, '.vite', 'manifest.json');
+      const clientManifestPath = path.join(distDir, 'client-manifest.json');
+      if (fs.existsSync(clientManifestPath) && fs.existsSync(serverManifestPath)) {
+        const serverManifest = JSON.parse(fs.readFileSync(serverManifestPath, 'utf8'));
+        const clientManifest = JSON.parse(fs.readFileSync(clientManifestPath, 'utf8'));
+        const merged = { ...serverManifest, ...clientManifest };
+        fs.writeFileSync(serverManifestPath, JSON.stringify(merged, null, 2));
+        fs.unlinkSync(clientManifestPath);
+      }
     }
   };
 }
@@ -2675,11 +2682,11 @@ export default {
       },
       external: ${externalJson},
       output: {
-        entryFileNames: '[name].js',
+        entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/client-[name]-[hash].js'
       }
     },
-    manifest: false
+    manifest: 'client-manifest.json'
   },
   resolve: {
     alias: ${aliasJson},
@@ -2793,11 +2800,11 @@ export default {
       },
       external: ${externalJson},
       output: {
-        entryFileNames: '[name].js',
+        entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/client-[name]-[hash].js'
       }
     },
-    manifest: false
+    manifest: 'client-manifest.json'
   },
   resolve: {
     alias: ${aliasJson},

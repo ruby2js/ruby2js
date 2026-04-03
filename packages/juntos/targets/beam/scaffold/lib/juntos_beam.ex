@@ -132,9 +132,6 @@ defmodule JuntosBeam do
 
     app_code = File.read!(@app_script)
 
-    # Generate a shared CSRF secret for all runtimes
-    csrf_secret = :crypto.strong_rand_bytes(32) |> Base.encode16(case: :lower)
-
     Logger.info(
       "Starting QuickBEAM pool: #{pool_size} runtimes " <>
       "(adapter: #{adapter}, database: #{database})"
@@ -145,11 +142,11 @@ defmodule JuntosBeam do
       for _i <- 1..pool_size do
         {:ok, rt} = QuickBEAM.start(handlers: handlers)
 
-        # Stub browser globals, patch Response, and set up sync CSRF
+        # Stub browser globals and patch Response constructor
+        # QuickBEAM's Response requires Uint8Array body; this wrapper auto-encodes strings
         QuickBEAM.eval(rt, """
           globalThis.window = globalThis;
 
-          // Patch Response constructor to accept string bodies
           const _OrigResponse = globalThis.Response;
           globalThis.Response = class extends _OrigResponse {
             constructor(body, init = {}) {
@@ -165,33 +162,6 @@ defmodule JuntosBeam do
                 headers: headers,
                 url: init.url || ''
               });
-            }
-          };
-
-          // Sync CSRF token implementation for BEAM
-          // Shared secret across all runtimes (generated once by Elixir)
-          const __csrfSecret = '#{csrf_secret}';
-
-          globalThis.__beamCSRF = {
-            generateToken() {
-              const ts = Date.now().toString(36);
-              const rand = Array.from(
-                crypto.getRandomValues(new Uint8Array(16)),
-                b => b.toString(16).padStart(2, '0')
-              ).join('');
-              const data = ts + ':' + rand;
-              return btoa(data + ':' + __csrfSecret.slice(0, 16));
-            },
-            validateToken(token) {
-              if (!token) return false;
-              try {
-                const decoded = atob(token);
-                const parts = decoded.split(':');
-                if (parts.length !== 3) return false;
-                if (parts[2] !== __csrfSecret.slice(0, 16)) return false;
-                const tokenTime = parseInt(parts[0], 36);
-                return (Date.now() - tokenTime) < 86400000;
-              } catch { return false; }
             }
           };
         """)

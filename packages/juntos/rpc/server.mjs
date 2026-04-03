@@ -27,17 +27,16 @@ function stringToBytes(str) {
   return new TextEncoder().encode(str);
 }
 
-// HMAC-SHA256 using Web Crypto (async)
-async function hmacSign(secret, data) {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    stringToBytes(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, stringToBytes(data));
-  return bytesToHex(new Uint8Array(signature)).slice(0, 16);
+// Simple sync signing using XOR-based MAC
+// Uses crypto.getRandomValues (sync, available everywhere) instead of async crypto.subtle
+function simpleSign(secret, data) {
+  const dataBytes = stringToBytes(data);
+  const secretBytes = stringToBytes(secret);
+  const hash = new Uint8Array(16);
+  for (let i = 0; i < dataBytes.length; i++) {
+    hash[i % 16] ^= dataBytes[i] ^ secretBytes[i % secretBytes.length];
+  }
+  return bytesToHex(hash);
 }
 
 /**
@@ -127,13 +126,13 @@ export class CSRFProtection {
   /**
    * Generate a CSRF token for a session
    * @param {string} sessionId - Session identifier
-   * @returns {Promise<string>} Token
+   * @returns {string} Token
    */
-  async generateToken(sessionId = '') {
+  generateToken(sessionId = '') {
     const timestamp = Date.now().toString(36);
     const random = bytesToHex(getRandomBytes(16));
     const data = `${timestamp}:${random}:${sessionId}`;
-    const signature = await this.sign(data);
+    const signature = this.sign(data);
     return btoa(`${data}:${signature}`);
   }
 
@@ -141,9 +140,9 @@ export class CSRFProtection {
    * Validate a CSRF token
    * @param {string} token - Token from request header
    * @param {string} sessionId - Session identifier (optional)
-   * @returns {Promise<boolean>} Whether token is valid
+   * @returns {boolean} Whether token is valid
    */
-  async validateToken(token, sessionId = '') {
+  validateToken(token, sessionId = '') {
     if (!token) return false;
 
     try {
@@ -155,7 +154,7 @@ export class CSRFProtection {
       const data = `${timestamp}:${random}:${tokenSessionId}`;
 
       // Verify signature
-      const expectedSignature = await this.sign(data);
+      const expectedSignature = this.sign(data);
       if (signature !== expectedSignature) return false;
 
       // Optionally verify session ID matches
@@ -173,11 +172,11 @@ export class CSRFProtection {
   }
 
   /**
-   * Sign data with HMAC-SHA256
+   * Sign data
    * @private
    */
-  async sign(data) {
-    return hmacSign(this.secret, data);
+  sign(data) {
+    return simpleSign(this.secret, data);
   }
 }
 

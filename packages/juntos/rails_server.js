@@ -272,8 +272,8 @@ export function createContext(req, params = {}) {
       headers: headers
     },
 
-    // CSRF token for form authenticity (placeholder, set by async init)
-    authenticityToken: null
+    // CSRF token for form authenticity
+    authenticityToken: getCSRF().generateToken()
   };
 }
 
