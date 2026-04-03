@@ -28,7 +28,7 @@ cd "$APP_NAME"
 # - transcript: text from speech-to-text
 # - duration: length in seconds
 # - audio: Active Storage attachment (not a column)
-rails generate model Clip name:string transcript:text duration:float
+rails generate model Clip name:string transcript:text translation:text duration:float
 
 # Install Active Storage (creates migrations for blobs and attachments tables)
 bin/rails active_storage:install
@@ -99,7 +99,7 @@ class ClipsController < ApplicationController
   private
 
   def clip_params
-    params.require(:clip).permit(:name, :transcript, :duration, :audio)
+    params.require(:clip).permit(:name, :transcript, :translation, :duration, :audio)
   end
 end
 CONTROLLER
@@ -122,7 +122,7 @@ cat > app/views/clips/index.html.erb << 'VIEW'
 
 <div class="container mx-auto px-4 py-8" data-controller="dictaphone">
   <h1 class="text-3xl font-bold mb-2">Dictaphone</h1>
-  <p class="text-gray-600 mb-8">Record audio and get automatic transcriptions powered by Whisper AI.</p>
+  <p class="text-gray-600 mb-8">Record audio, get automatic transcriptions powered by Whisper AI, and translate to Spanish.</p>
 
   <!-- Model loading status -->
   <div data-dictaphone-target="status" class="mb-6 p-4 bg-blue-50 text-blue-800 rounded-lg">
@@ -183,6 +183,19 @@ cat > app/views/clips/index.html.erb << 'VIEW'
                     class="w-full border rounded-lg p-3"></textarea>
         </div>
 
+        <div data-dictaphone-target="translating" class="mb-4 p-3 bg-purple-50 text-purple-800 rounded hidden">
+          Translating to Spanish...
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Translation (Spanish)</label>
+          <textarea name="clip[translation]"
+                    data-dictaphone-target="translation"
+                    rows="4"
+                    placeholder="Translation will appear here..."
+                    class="w-full border rounded-lg p-3"></textarea>
+        </div>
+
         <div class="flex gap-4">
           <%= f.submit "Save Clip",
                  class: "bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition cursor-pointer" %>
@@ -238,11 +251,21 @@ cat > app/views/clips/_clip.html.erb << 'PARTIAL'
   <% end %>
 
   <% if clip.transcript.present? %>
-    <div class="bg-gray-50 rounded p-3">
+    <div class="bg-gray-50 rounded p-3 mb-2">
+      <p class="text-gray-500 text-xs font-medium mb-1">English</p>
       <p class="text-gray-700 text-sm"><%= clip.transcript %></p>
     </div>
+  <% end %>
+
+  <% if clip.translation.present? %>
+    <div class="bg-purple-50 rounded p-3">
+      <p class="text-purple-500 text-xs font-medium mb-1">Espa&ntilde;ol</p>
+      <p class="text-gray-700 text-sm"><%= clip.translation %></p>
+    </div>
   <% else %>
-    <p class="text-gray-400 text-sm italic">No transcript available</p>
+    <% unless clip.transcript.present? %>
+      <p class="text-gray-400 text-sm italic">No transcript available</p>
+    <% end %>
   <% end %>
 </div>
 PARTIAL
@@ -273,6 +296,7 @@ import ["Clip"], from: 'juntos:models'
 class DictaphoneController < Stimulus::Controller
   def connect
     @transcriber = nil
+    @translator = nil
     @mediaRecorder = nil
     @audioContext = nil
     @analyser = nil
@@ -317,13 +341,26 @@ class DictaphoneController < Stimulus::Controller
         }
       )
 
+      statusTarget.textContent = "Loading translation model..."
+
+      @translator = await pipeline(
+        'translation',
+        'Xenova/opus-mt-en-es',
+        progress_callback: ->(progress) {
+          if progress.status == 'progress' && progress.progress
+            pct = progress.progress.round
+            statusTarget.textContent = "Loading translation model... #{pct}%"
+          end
+        }
+      )
+
       statusTarget.textContent = "Ready to record"
       statusTarget.classList.remove('bg-blue-50', 'text-blue-800')
       statusTarget.classList.add('bg-green-50', 'text-green-800')
       recordTarget.disabled = false
     rescue => error
-      console.error("Failed to load Whisper model:", error)
-      statusTarget.textContent = "Failed to load model. Please refresh and try again."
+      console.error("Failed to load models:", error)
+      statusTarget.textContent = "Failed to load models. Please refresh and try again."
       statusTarget.classList.remove('bg-blue-50', 'text-blue-800')
       statusTarget.classList.add('bg-red-50', 'text-red-800')
     end
@@ -472,9 +509,18 @@ class DictaphoneController < Stimulus::Controller
 
       # Transcribe
       result = await @transcriber.call(audioData)
+      transcript = result.text.strip()
 
-      transcriptTarget.value = result.text.strip()
+      transcriptTarget.value = transcript
       transcriptTarget.placeholder = "Transcription will appear here..."
+
+      # Translate
+      if @translator && transcript.length > 0
+        translatingTarget.classList.remove('hidden')
+        translation = await @translator.call(transcript)
+        translationTarget.value = translation[0].translation_text
+        translatingTarget.classList.add('hidden')
+      end
 
     rescue => error
       console.error("Transcription failed:", error)
@@ -494,6 +540,7 @@ class DictaphoneController < Stimulus::Controller
       clip = await Clip.create(
         name: nameTarget.value || "Untitled Recording",
         transcript: transcriptTarget.value,
+        translation: translationTarget.value,
         duration: parseFloat(durationTarget.value) || @audioDuration
       )
 
@@ -537,6 +584,7 @@ class DictaphoneController < Stimulus::Controller
     durationTarget.value = ""
     nameTarget.value = ""
     transcriptTarget.value = ""
+    translationTarget.value = ""
 
     # Hide preview
     previewTarget.classList.add('hidden')
@@ -751,7 +799,8 @@ echo ""
 echo "Features:"
 echo "  - Audio recording via MediaRecorder API"
 echo "  - Speech-to-text transcription via Whisper AI (runs in browser)"
-echo "  - ~75MB model download on first use (cached in IndexedDB)"
+echo "  - English to Spanish translation via OPUS-MT (runs in browser)"
+echo "  - ~75MB Whisper + ~30MB OPUS-MT model download on first use (cached)"
 echo "  - Real-time updates via Turbo Streams"
 echo "  - Active Storage for audio file persistence"
 echo ""
