@@ -73,25 +73,7 @@ See the [Workflow Builder demo](/docs/juntos/demos/workflow-builder) for React i
 
 ### Active Storage
 
-File attachments work across all deployment targets:
-
-```ruby
-# What you write
-class Clip < ApplicationRecord
-  has_one_attached :audio
-end
-
-clip.audio.attach(file)
-clip.audio.url
-```
-
-**Storage adapters by target:**
-
-- **Browser** — IndexedDB blob storage via Dexie
-- **Node.js** — Local filesystem with database-backed metadata
-- **Edge (Fly, Cloudflare, Vercel Edge, Deno)** — S3-compatible storage (AWS S3, Cloudflare R2, MinIO)
-
-See the [Dictaphone demo](/docs/juntos/demos/dictaphone) for Active Storage with audio files and AI transcription.
+File attachments work across all deployment targets with adapters for IndexedDB, local disk, S3, OPFS, and RPC. See the [Active Storage documentation](/docs/juntos/active-storage) for details.
 
 ## Planned
 

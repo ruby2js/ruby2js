@@ -111,6 +111,113 @@ export class RPCRegistry {
       return record.attributes;
     });
   }
+
+  /**
+   * Register Active Storage operations
+   * Proxies storage, blob, and attachment operations to the server-side adapter
+   */
+  registerActiveStorage() {
+    const getStorage = () => {
+      const storage = globalThis.ActiveStorage;
+      if (!storage) throw new Error('Active Storage not initialized on server');
+      return storage;
+    };
+
+    // Storage service operations
+    this.register('ActiveStorage.upload', async (key, base64Data, options) => {
+      const { service } = getStorage();
+      // Decode base64 to binary
+      const binary = atob(base64Data);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: options.contentType || 'application/octet-stream' });
+      await service.upload(key, blob, options);
+      return { success: true };
+    });
+
+    this.register('ActiveStorage.download', async (key) => {
+      const { service, blobStore } = getStorage();
+      const data = await service.download(key);
+      if (!data) return null;
+      // Encode blob to base64 for transport
+      const buffer = await data.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      // Look up content type from blob metadata
+      const blobMeta = await blobStore.get(key);
+      return {
+        data: btoa(binary),
+        content_type: blobMeta?.content_type || 'application/octet-stream'
+      };
+    });
+
+    this.register('ActiveStorage.url', async (key, options) => {
+      const { service } = getStorage();
+      return await service.url(key, options);
+    });
+
+    this.register('ActiveStorage.delete', async (key) => {
+      const { service } = getStorage();
+      await service.delete(key);
+      return { success: true };
+    });
+
+    this.register('ActiveStorage.exists', async (key) => {
+      const { service } = getStorage();
+      return await service.exists(key);
+    });
+
+    // Blob store operations
+    this.register('ActiveStorage.blobGet', async (key) => {
+      const { blobStore } = getStorage();
+      return await blobStore.get(key);
+    });
+
+    this.register('ActiveStorage.blobPut', async (record) => {
+      const { blobStore } = getStorage();
+      await blobStore.put(record);
+      return { success: true };
+    });
+
+    this.register('ActiveStorage.blobDelete', async (key) => {
+      const { blobStore } = getStorage();
+      await blobStore.delete(key);
+      return { success: true };
+    });
+
+    this.register('ActiveStorage.blobAll', async () => {
+      const { blobStore } = getStorage();
+      return await blobStore.toArray();
+    });
+
+    // Attachment store operations
+    this.register('ActiveStorage.attachmentGet', async (id) => {
+      const { attachmentStore } = getStorage();
+      return await attachmentStore.get(id);
+    });
+
+    this.register('ActiveStorage.attachmentPut', async (record) => {
+      const { attachmentStore } = getStorage();
+      await attachmentStore.put(record);
+      return { success: true };
+    });
+
+    this.register('ActiveStorage.attachmentDelete', async (id) => {
+      const { attachmentStore } = getStorage();
+      await attachmentStore.delete(id);
+      return { success: true };
+    });
+
+    this.register('ActiveStorage.attachmentAll', async () => {
+      const { attachmentStore } = getStorage();
+      return await attachmentStore.toArray();
+    });
+  }
 }
 
 /**

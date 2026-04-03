@@ -6,7 +6,7 @@ category: juntos/demos
 hide_in_toc: true
 ---
 
-A voice recording app that demonstrates transparent RPC. The Stimulus controller calls `Clip.create()` and `clip.audio.attach()` directly — the same Ruby code works in the browser (IndexedDB) and on Node.js (SQLite via RPC). Audio transcription runs locally in the browser via Whisper (Transformers.js).
+A voice recording app that demonstrates transparent RPC and client-side AI. The Stimulus controller calls `Clip.create()` and `clip.audio.attach()` directly — the same Ruby code works in the browser (IndexedDB) and on Node.js (SQLite via RPC). Audio transcription and English-to-Spanish translation run entirely in the browser via Whisper and OPUS-MT (Transformers.js) — no API keys, no server calls.
 
 {% toc %}
 
@@ -23,10 +23,11 @@ cd dictaphone
 
 This creates a Rails app with:
 
-- **Clip model** — stores audio recordings with transcriptions
+- **Clip model** — stores audio recordings with transcriptions and translations
 - **Active Storage** — manages audio file attachments
 - **Dictaphone controller** — Stimulus controller written in Ruby
 - **Whisper integration** — local speech-to-text via Transformers.js
+- **OPUS-MT translation** — local English-to-Spanish translation via Transformers.js
 - **Tailwind CSS** — clean recording UI with waveform visualization
 
 ## Run with Rails
@@ -50,10 +51,11 @@ Stop Rails. Run the same app in your browser:
 bin/juntos dev -d dexie
 ```
 
-Open http://localhost:3000. Same recording interface. Same transcription. But now:
+Open http://localhost:3000. Same recording interface. Same transcription and translation. But now:
 
 - **No Ruby runtime** — the browser runs transpiled JavaScript
 - **IndexedDB storage** — audio files persist in your browser via Active Storage's IndexedDB adapter
+- **Local AI models** — Whisper (~75MB) and OPUS-MT (~30MB) download on first use, cached in IndexedDB
 - **Hot reload** — edit a Ruby file, save, browser refreshes
 
 ### Microphone Permissions
@@ -104,6 +106,7 @@ class DictaphoneController < Stimulus::Controller
     clip = await Clip.create(
       name: nameTarget.value || "Untitled Recording",
       transcript: transcriptTarget.value,
+      translation: translationTarget.value,
       duration: parseFloat(durationTarget.value)
     )
 
@@ -148,16 +151,18 @@ end
 - **Edge** — S3 adapter stores in cloud object storage
 - **Same API** — `has_one_attached :audio` works everywhere
 
-### AI Transcription
+### Client-Side AI
 
-- **Local Whisper** — speech-to-text runs in the browser via Transformers.js
-- **No API key needed** — the ~75MB model downloads on first use, then is cached
-- **Progress indicator** — shows model download progress in the UI
+- **Whisper transcription** — speech-to-text runs in the browser via Transformers.js
+- **OPUS-MT translation** — English-to-Spanish translation, also via Transformers.js
+- **No API keys** — both models download on first use (~75MB + ~30MB), then are cached
+- **Same library** — both pipelines use `@xenova/transformers`, imported from a Stimulus controller written in Ruby
+- **Progress indicators** — model download progress shown in the UI
 
 ### Audio Recording
 
 - **MediaRecorder API** — captures audio from microphone
-- **WebM format** — compressed audio for efficient storage
+- **Raw PCM capture** — audio samples captured directly via ScriptProcessorNode for reliable Whisper input
 - **Waveform visualization** — real-time audio level display
 
 ## Next Steps

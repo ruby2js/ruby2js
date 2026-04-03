@@ -3518,8 +3518,11 @@ export * from 'juntos/adapters/${adapterFile}';
         return `export * from 'juntos/adapters/${storageAdapterFile}';`;
       }
 
-      // Client version of juntos:active-storage - always use IndexedDB
+      // Client version of juntos:active-storage - RPC for server targets, IndexedDB for browser
       if (id === '\0juntos:active-storage:client') {
+        if (targetDir !== 'browser') {
+          return `export * from 'juntos/adapters/active_storage_rpc.mjs';`;
+        }
         return `export * from 'juntos/adapters/active_storage_indexeddb.mjs';`;
       }
 

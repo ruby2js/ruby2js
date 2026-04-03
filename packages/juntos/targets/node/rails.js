@@ -456,6 +456,11 @@ export class Application extends ApplicationServer {
       registry.registerModel(name, Model);
       console.log(`  Registered RPC handlers for ${name}`);
     }
+    // Register Active Storage if initialized
+    if (globalThis.ActiveStorage) {
+      registry.registerActiveStorage();
+      console.log('  Registered RPC handlers for ActiveStorage');
+    }
     // Initialize RPC handler after models are registered
     rpcHandler = createRPCHandler({ registry });
     console.log('RPC handler initialized');
