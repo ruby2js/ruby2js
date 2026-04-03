@@ -1457,6 +1457,14 @@ function createStructurePlugin(config, appRoot) {
               mix = mix.replace(/\s*\{:ex_aws_s3,.*?\},?\n/g, '\n');
               mix = mix.replace(/\s*\{:sweet_xml,.*?\},?\n/g, '\n');
               mix = mix.replace(/\s*\{:req,.*?\},?\n/g, '\n');
+
+              // Strip ExAws config too
+              const configExs = path.join(distDir, 'config', 'config.exs');
+              if (fs.existsSync(configExs)) {
+                let cfg = fs.readFileSync(configExs, 'utf8');
+                cfg = cfg.replace(/^.*config :ex_aws.*\n/gm, '');
+                fs.writeFileSync(configExs, cfg);
+              }
             }
             fs.writeFileSync(mixExs, mix);
           }
