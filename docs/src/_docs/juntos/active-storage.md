@@ -57,7 +57,8 @@ The build target determines which storage backend is used. No code changes neede
 |--------|---------|---------|
 | Browser (dexie) | `active_storage_indexeddb.mjs` | IndexedDB via Dexie |
 | Browser (worker) | `active_storage_worker.mjs` | OPFS via dedicated Worker |
-| Node.js / Bun / Deno / BEAM | `active_storage_disk.mjs` | Local filesystem |
+| Node.js / Bun / Deno | `active_storage_disk.mjs` | Local filesystem |
+| BEAM | `active_storage_beam.mjs` | S3-compatible via ExAws (AWS S3, R2, Tigris, MinIO) |
 | Cloudflare / Fly / Vercel Edge | `active_storage_s3.mjs` | S3-compatible (AWS S3, R2, MinIO) |
 | RPC (client bundle) | `active_storage_rpc.mjs` | Proxies to server adapter via RPC |
 
@@ -75,6 +76,19 @@ Files are stored on the local filesystem in `storage/`, with metadata in the dat
 
 ```bash
 bin/juntos up -d sqlite
+```
+
+### BEAM (S3 via ExAws)
+
+BEAM deployments use S3-compatible storage via ExAws on the Elixir side. Storage operations are proxied from JS through `Beam.callSync` to Elixir, which handles S3 communication using ExAws.S3. Blob metadata is stored in the database (PostgreSQL) alongside other model data.
+
+```bash
+export S3_BUCKET=my-bucket
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+export AWS_REGION=us-east-1
+# For Tigris, R2, or MinIO:
+export AWS_ENDPOINT_URL=https://...
 ```
 
 ### Edge (S3)

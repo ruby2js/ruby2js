@@ -1440,6 +1440,19 @@ function createStructurePlugin(config, appRoot) {
             fs.writeFileSync(appJs, code);
           }
 
+          // Tree-shake mix.exs deps based on database adapter
+          const mixExs = path.join(distDir, 'mix.exs');
+          if (fs.existsSync(mixExs)) {
+            let mix = fs.readFileSync(mixExs, 'utf8');
+            const isPostgrex = config.database && ['postgrex', 'pg', 'postgres'].includes(config.database);
+            if (!isPostgrex) {
+              // Remove postgrex dep for SQLite builds
+              mix = mix.replace(/\s*\{:postgrex,.*?\},?\n/g, '\n');
+            }
+            // TODO: strip ex_aws/s3 deps if app doesn't use Active Storage
+            fs.writeFileSync(mixExs, mix);
+          }
+
           // Create package.json for sqlite-napi (if using sqlite_napi adapter)
           if (config.database === 'sqlite_napi' || config.database === 'sqlite-napi') {
             const pkgJson = JSON.stringify({
@@ -3350,7 +3363,7 @@ function createVirtualPlugin(config, appRoot) {
     'vercel-node': 'active_storage_disk.mjs',
     // 'worker' intentionally omitted — Active Storage not yet supported in worker target
     'deno-deploy': 'active_storage_s3.mjs',
-    'beam': 'active_storage_disk.mjs'
+    'beam': 'active_storage_beam.mjs'
   };
 
   const targetDir = TARGET_DIR_MAP[config.target] || 'browser';

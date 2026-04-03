@@ -23,7 +23,11 @@ defmodule JuntosBeam.MixProject do
       {:quickbeam, "~> 0.8"},
       {:bandit, "~> 1.0"},
       {:websock_adapter, "~> 0.5"},
-      {:postgrex, "~> 0.19", optional: true}
+      {:postgrex, "~> 0.19", optional: true},
+      {:ex_aws, "~> 2.5"},
+      {:ex_aws_s3, "~> 2.5"},
+      {:sweet_xml, "~> 0.7"},
+      {:req, "~> 0.5"}
     ]
   end
 end

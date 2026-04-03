@@ -130,6 +130,9 @@ defmodule JuntosBeam do
         handlers
       end
 
+    # Add S3 storage handlers (lazily validated — only fails if app uses Active Storage)
+    handlers = Map.merge(handlers, JuntosBeam.Storage.s3_handlers())
+
     app_code = File.read!(@app_script)
 
     # Generate a shared CSRF secret for all runtimes in the pool
