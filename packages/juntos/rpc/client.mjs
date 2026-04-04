@@ -61,7 +61,7 @@ export function createRPCClient(options = {}) {
 
     // Only include token if available (might be null in some contexts)
     if (token) {
-      headers['X-Authenticity-Token'] = token;
+      headers['X-CSRF-Token'] = token;
     }
 
     const response = await fetch(endpoint, {

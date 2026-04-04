@@ -160,7 +160,7 @@ async function mutatingRequest(method, path, params) {
 
   const token = getCSRFToken();
   if (token) {
-    headers['X-Authenticity-Token'] = token;
+    headers['X-CSRF-Token'] = token;
   }
 
   return fetch(url, {
