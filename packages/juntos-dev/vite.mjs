@@ -2200,9 +2200,11 @@ function getRollupOptions(target, database) {
       // Server-only build. Client JS (application.js with Turbo/Stimulus)
       // is built separately after the server build, same as node/bun/deno.
       // See createDualBundlePlugin's closeBundle for the client build.
+      // Include juntos:models to ensure model registry is populated and RPC handlers registered.
       return {
         input: {
-          app: 'config/routes.rb'
+          app: 'config/routes.rb',
+          'config/models': 'juntos:models'
         },
         external: getNativeModules(database),
         output: {
