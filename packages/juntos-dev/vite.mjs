@@ -91,6 +91,8 @@ const rpcState = {
   rpcImporters: new Set(),
   // Whether dual bundle mode is enabled (detected or configured)
   dualBundleEnabled: false,
+  // Whether a client.js hydration entry will be generated (view-based RPC only)
+  needsClientJs: false,
   // Detected view framework: 'react', 'vue', 'svelte', or null (string-only views)
   viewFramework: null,
   // Reset state for new builds
@@ -1608,7 +1610,7 @@ function createConfigPlugin(config, appRoot) {
         // globalThis.JUNTOS_HYDRATION tells rails_server.js whether client.js exists
         // This is set to true by createDualBundlePlugin when RPC is detected
         define: {
-          'globalThis.JUNTOS_HYDRATION': rpcState.dualBundleEnabled ? 'true' : 'false',
+          'globalThis.JUNTOS_HYDRATION': rpcState.needsClientJs ? 'true' : 'false',
           // Worker target: tell the SharedWorker which real adapter
           // to load in the dedicated database Worker
           ...(config.target === 'worker' ? (() => {
@@ -2453,6 +2455,7 @@ function createDualBundlePlugin(config, appRoot) {
 
   if (rpcFiles.length > 0) {
     rpcState.dualBundleEnabled = true;
+    rpcState.needsClientJs = needsDualBundle;
     rpcFiles.forEach(f => rpcState.rpcImporters.add(f));
   }
 
@@ -2806,7 +2809,7 @@ const clientVirtualPlugin = {
       return "export * from 'juntos/rails_base.js'; import { ApplicationBase } from 'juntos/rails_base.js'; export { ApplicationBase as Application }; export class BroadcastChannel { constructor() {} subscribe() {} }";
     }
     if (id === '\\0juntos:active-storage:client') {
-      return "export * from 'juntos/adapters/active_storage_base.mjs'; export function initActiveStorage() {}";
+      return "export * from 'juntos/adapters/active_storage_rpc.mjs';";
     }
     if (id === '\\0juntos:models:rpc') return MODELS_MODULE;
     if (id === '\\0juntos:paths:rpc') return PATHS_MODULE;
