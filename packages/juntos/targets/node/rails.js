@@ -454,6 +454,21 @@ export class Application extends ApplicationServer {
     this.registerModelsForRPC(models);
   }
 
+  // Override initDatabase to register Active Storage RPC handlers after storage is initialized
+  static async initDatabase(options = {}) {
+    await super.initDatabase(options);
+    // Active Storage is now initialized — register RPC handlers if not already done
+    if (globalThis.ActiveStorage && rpcHandler) {
+      const registry = getRegistry();
+      if (!registry.has('ActiveStorage.upload')) {
+        registry.registerActiveStorage();
+        console.log('  Registered RPC handlers for ActiveStorage');
+        // Recreate handler to include new registrations
+        rpcHandler = createRPCHandler({ registry });
+      }
+    }
+  }
+
   // Register models with RPC registry for remote model operations
   static registerModelsForRPC(models) {
     const registry = getRegistry();
