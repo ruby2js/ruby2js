@@ -167,10 +167,9 @@ export class ActiveRecord extends ActiveRecordBase {
     instance.id = data.id;
     instance._persisted = true;
 
-    // Run after callbacks
+    // Run after callbacks (skip commit callbacks — server already ran them)
     await instance._runCallbacks('after_create');
     await instance._runCallbacks('after_save');
-    await instance._runCallbacks('after_create_commit');
 
     console.info(`  ${this.name} Create (id: ${instance.id})`);
     return instance;
@@ -387,7 +386,7 @@ export class ActiveRecord extends ActiveRecordBase {
     }
 
     await this._runCallbacks('after_save');
-    await this._runCallbacks(this._persisted ? 'after_update_commit' : 'after_create_commit');
+    // Skip commit callbacks — server already ran them (broadcasting, etc.)
     return true;
   }
 
@@ -406,7 +405,7 @@ export class ActiveRecord extends ActiveRecordBase {
     this._persisted = false;
 
     console.info(`  ${this.constructor.name} Destroy (id: ${this.id})`);
-    await this._runCallbacks('after_destroy_commit');
+    // Skip after_destroy_commit — server already ran it
     return true;
   }
 
