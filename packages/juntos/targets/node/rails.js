@@ -33,7 +33,6 @@ import {
 } from 'juntos/rails_server.js';
 
 import { createRPCHandler, getRegistry, csrfMetaTag } from 'juntos/rpc/server.mjs';
-import { initActiveStorage } from 'juntos:active-storage';
 
 // RPC handler instance (initialized when models are registered)
 let rpcHandler = null;
@@ -461,7 +460,8 @@ export class Application extends ApplicationServer {
   static async initActiveStorageForRPC() {
     if (!globalThis.ActiveStorage) {
       try {
-        await initActiveStorage();
+        const mod = await import('juntos/adapters/active_storage_disk.mjs');
+        await mod.initActiveStorage();
       } catch (e) {
         console.warn('  Active Storage initialization skipped:', e.message);
       }
