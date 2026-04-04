@@ -454,10 +454,21 @@ export class Application extends ApplicationServer {
     this.registerModelsForRPC(models);
   }
 
-  // Override initDatabase to register Active Storage RPC handlers after storage is initialized
+  // Override initDatabase to initialize Active Storage and register RPC handlers
   static async initDatabase(options = {}) {
     await super.initDatabase(options);
-    // Active Storage is now initialized — register RPC handlers if not already done
+    // Initialize Active Storage with disk backend (uses the database for metadata)
+    if (!globalThis.ActiveStorage) {
+      try {
+        const storage = await import('juntos:active-storage');
+        if (storage.initActiveStorage) {
+          await storage.initActiveStorage(options);
+        }
+      } catch (e) {
+        // Active Storage adapter not available — skip
+      }
+    }
+    // Register Active Storage RPC handlers if available
     if (globalThis.ActiveStorage && rpcHandler) {
       const registry = getRegistry();
       if (!registry.has('ActiveStorage.upload')) {
