@@ -460,7 +460,7 @@ export class Application extends ApplicationServer {
   static async initActiveStorageForRPC() {
     if (!globalThis.ActiveStorage) {
       try {
-        const storage = await import('juntos:active-storage');
+        const storage = await import(/* @vite-ignore */ 'juntos:active-storage');
         if (storage.initActiveStorage) {
           await storage.initActiveStorage();
         }
