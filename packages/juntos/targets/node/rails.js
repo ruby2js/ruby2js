@@ -454,27 +454,25 @@ export class Application extends ApplicationServer {
     this.registerModelsForRPC(models);
   }
 
-  // Override initDatabase to initialize Active Storage and register RPC handlers
-  static async initDatabase(options = {}) {
-    await super.initDatabase(options);
-    // Initialize Active Storage with disk backend (uses the database for metadata)
+  // Initialize Active Storage and register RPC handlers during server startup
+  // Called from startServer because initDatabase is bypassed (index.js calls
+  // the adapter's standalone initDatabase, not Application.initDatabase)
+  static async initActiveStorageForRPC() {
     if (!globalThis.ActiveStorage) {
       try {
         const storage = await import('juntos:active-storage');
         if (storage.initActiveStorage) {
-          await storage.initActiveStorage(options);
+          await storage.initActiveStorage();
         }
       } catch (e) {
-        // Active Storage adapter not available — skip
+        console.warn('  Active Storage initialization skipped:', e.message);
       }
     }
-    // Register Active Storage RPC handlers if available
     if (globalThis.ActiveStorage && rpcHandler) {
       const registry = getRegistry();
       if (!registry.has('ActiveStorage.upload')) {
         registry.registerActiveStorage();
         console.log('  Registered RPC handlers for ActiveStorage');
-        // Recreate handler to include new registrations
         rpcHandler = createRPCHandler({ registry });
       }
     }
@@ -515,6 +513,9 @@ export class Application extends ApplicationServer {
   // Start HTTP server (assumes database is already initialized)
   static async startServer(port = null) {
     const listenPort = port || process.env.PORT || 3000;
+
+    // Initialize Active Storage and register RPC handlers
+    await this.initActiveStorageForRPC();
 
     try {
       const server = http.createServer(async (req, res) => {
