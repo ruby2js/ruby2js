@@ -405,7 +405,7 @@ class DictaphoneController < Stimulus::Controller
       @chunks = []
 
       @mediaRecorder.ondataavailable = ->(e) {
-        @chunks.push(e.data) if e.data.size > 0
+        @chunks.push(e.data) if e.data
       }
 
       @mediaRecorder.onstop = -> { handleRecordingComplete() }
