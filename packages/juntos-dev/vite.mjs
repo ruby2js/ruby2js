@@ -1611,6 +1611,17 @@ function createConfigPlugin(config, appRoot) {
         // This is set to true by createDualBundlePlugin when RPC is detected
         define: {
           'globalThis.JUNTOS_HYDRATION': rpcState.needsClientJs ? 'true' : 'false',
+          'globalThis.JUNTOS_IMPORTMAP': (() => {
+            if (!config.external || !config.external.length || !config.dependencies) return 'null';
+            const imports = {};
+            for (const pkg of config.external) {
+              const version = config.dependencies[pkg];
+              if (version) {
+                imports[pkg] = `https://esm.sh/${pkg}@${version.replace(/^[\^~>=]+/, '')}`;
+              }
+            }
+            return Object.keys(imports).length > 0 ? JSON.stringify(JSON.stringify({ imports })) : 'null';
+          })(),
           // Worker target: tell the SharedWorker which real adapter
           // to load in the dedicated database Worker
           ...(config.target === 'worker' ? (() => {
