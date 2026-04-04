@@ -5,8 +5,9 @@
 import http from 'node:http';
 import { parse as parseUrl } from 'node:url';
 import { StringDecoder } from 'node:string_decoder';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   Router as RouterServer,
@@ -460,8 +461,16 @@ export class Application extends ApplicationServer {
   static async initActiveStorageForRPC() {
     if (!globalThis.ActiveStorage) {
       try {
-        const mod = await import('juntos/adapters/active_storage_disk.mjs');
-        await mod.initActiveStorage();
+        // Find the active_storage_disk chunk in the built assets directory
+        // (can't use virtual module import — Vite wraps it with __vitePreload which needs document)
+        const thisDir = join(fileURLToPath(import.meta.url), '..');
+        const assetsDir = join(thisDir, '..', 'assets');
+        const files = await readdir(assetsDir);
+        const storageFile = files.find(f => f.startsWith('active_storage_disk'));
+        if (storageFile) {
+          const mod = await import(pathToFileURL(join(assetsDir, storageFile)).href);
+          if (mod.initActiveStorage) await mod.initActiveStorage();
+        }
       } catch (e) {
         console.warn('  Active Storage initialization skipped:', e.message);
       }

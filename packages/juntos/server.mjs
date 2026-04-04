@@ -35,23 +35,8 @@ console.log('Starting Ruby2JS-on-Rails Node.js Server...');
 console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
 // Initialize database with config, then start server
-initDatabase(dbConfig).then(async () => {
+initDatabase(dbConfig).then(() => {
   console.log('Database initialized');
-
-  // Initialize Active Storage if available
-  if (!globalThis.ActiveStorage) {
-    try {
-      const { readFileSync, readdirSync } = await import('fs');
-      const assetsDir = join(__dirname, 'assets');
-      const storageFile = readdirSync(assetsDir).find(f => f.startsWith('active_storage_disk'));
-      if (storageFile) {
-        const mod = await import(pathToFileURL(join(assetsDir, storageFile)).href);
-        if (mod.initActiveStorage) await mod.initActiveStorage();
-      }
-    } catch(e) { /* Active Storage not available */ }
-  }
-
-  // Start server
   return Application.startServer(port);
 }).catch(err => {
   console.error('Failed to start server:', err);
