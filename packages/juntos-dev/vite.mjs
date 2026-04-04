@@ -1274,10 +1274,6 @@ export { application };
         // - createTable, addIndex, addColumn, removeColumn, dropTable: migration operations
         if (id.endsWith('/routes.rb')) {
           js += '\nexport { initDatabase, query, execute, insert, closeDatabase, createTable, addIndex, addColumn, removeColumn, dropTable } from "juntos:active-record";\n';
-          // Import juntos:models to populate model registry and register RPC handlers
-          if (isServerTarget(config.target)) {
-            js += 'import "juntos:models";\n';
-          }
         }
 
         // Normalize sourcemap for Vite bundling
@@ -2159,7 +2155,8 @@ function getRollupOptions(target, database) {
       return {
         input: {
           index: 'node_modules/juntos/server.mjs',
-          'config/routes': 'config/routes.rb'
+          'config/routes': 'config/routes.rb',
+          'config/models': 'juntos:models'
           // Note: client JS is built separately after the server build
           // (see createClientBundlePlugin)
         },
@@ -2206,7 +2203,8 @@ function getRollupOptions(target, database) {
       // See createDualBundlePlugin's closeBundle for the client build.
       return {
         input: {
-          app: 'config/routes.rb'
+          app: 'config/routes.rb',
+          'config/models': 'juntos:models'
         },
         external: getNativeModules(database),
         output: {

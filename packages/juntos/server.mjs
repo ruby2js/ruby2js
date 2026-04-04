@@ -24,6 +24,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const routesPath = join(__dirname, 'config/routes.js');
 const { Application, initDatabase } = await import(pathToFileURL(routesPath).href);
 
+// Import models module to populate model registry and register RPC handlers
+const modelsPath = join(__dirname, 'config/models.js');
+try { await import(pathToFileURL(modelsPath).href); } catch(e) { /* models.js may not exist */ }
+
 const port = process.env.PORT || 3000;
 const dbConfig = loadDatabaseConfig(join(__dirname, '..'));
 
