@@ -2719,6 +2719,7 @@ export default {
   build: {
     outDir: 'dist',
     emptyOutDir: false,
+    minify: false,
     rollupOptions: {
       input: {
         'app/javascript/application': 'app/javascript/application.js'
@@ -2837,6 +2838,7 @@ export default {
   build: {
     outDir: 'dist',
     emptyOutDir: false,
+    minify: false,
     rollupOptions: {
       input: {
         'app/javascript/application': 'app/javascript/application.js'
