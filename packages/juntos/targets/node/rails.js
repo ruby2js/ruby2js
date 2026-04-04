@@ -448,8 +448,13 @@ export class Application extends ApplicationServer {
     return { ran, wasFresh };
   }
 
+  // Override registerModels to also register for RPC on server targets
+  static registerModels(models) {
+    super.registerModels(models);
+    this.registerModelsForRPC(models);
+  }
+
   // Register models with RPC registry for remote model operations
-  // Call this after registering models to enable RPC access
   static registerModelsForRPC(models) {
     const registry = getRegistry();
     for (const [name, Model] of Object.entries(models)) {
