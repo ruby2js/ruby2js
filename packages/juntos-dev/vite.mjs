@@ -1053,21 +1053,32 @@ function createRubyTransformPlugin(config, appRoot) {
         // Check metadata to determine what infrastructure is needed
         const modelsMeta = config._metadata?.models || {};
         const hasAttachments = Object.values(modelsMeta).some(m => m.attachments);
+        const isServer = isServerTarget(config.target);
+        const needsRPC = isServer && rpcState.dualBundleEnabled;
 
-        // Active Storage import (only when models use has_one_attached/has_many_attached)
-        const storageImport = hasAttachments && isServerTarget(config.target)
-          ? `import { initActiveStorage } from 'juntos:active-storage';\n`
-          : '';
-        const storageRegistration = hasAttachments && isServerTarget(config.target)
-          ? `\nApplication.initActiveStorage = initActiveStorage;`
-          : '';
+        // Conditional imports based on metadata
+        const extraImports = [];
+        const extraRegistrations = [];
+
+        // Active Storage (only when models use has_one_attached/has_many_attached)
+        if (hasAttachments && isServer) {
+          extraImports.push(`import { initActiveStorage } from 'juntos:active-storage';`);
+          extraRegistrations.push(`Application.initActiveStorage = initActiveStorage;`);
+        }
+
+        // RPC (only when client-side code imports models)
+        if (needsRPC) {
+          extraRegistrations.push(`Application.registerModelsForRPC(models);`);
+        }
 
         return `${imports.join('\n')}
-${storageImport}import { Application } from 'juntos:rails';
+${extraImports.join('\n')}
+import { Application } from 'juntos:rails';
 import { modelRegistry, attr_accessor } from 'juntos:active-record';
 import { migrations } from 'juntos:migrations';
 const models = { ${classNames.join(', ')} };
-Application.registerModels(models);${storageRegistration}
+Application.registerModels(models);
+${extraRegistrations.join('\n')}
 Object.assign(modelRegistry, models);
 
 // Define attribute accessors from migration schema (like Rails schema.rb)

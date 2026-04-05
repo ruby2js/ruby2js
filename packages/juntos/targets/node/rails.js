@@ -448,10 +448,8 @@ export class Application extends ApplicationServer {
     return { ran, wasFresh };
   }
 
-  // Override registerModels to also register for RPC on server targets
-  static registerModels(models) {
-    super.registerModels(models);
-    // Register all models for RPC dispatch
+  // Register models for RPC dispatch (called by juntos:models when client imports models)
+  static registerModelsForRPC(models) {
     const registry = getRegistry();
     for (const [name, Model] of Object.entries(models)) {
       registry.registerModel(name, Model);
