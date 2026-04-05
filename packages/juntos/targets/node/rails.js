@@ -5,9 +5,8 @@
 import http from 'node:http';
 import { parse as parseUrl } from 'node:url';
 import { StringDecoder } from 'node:string_decoder';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   Router as RouterServer,
@@ -452,54 +451,12 @@ export class Application extends ApplicationServer {
   // Override registerModels to also register for RPC on server targets
   static registerModels(models) {
     super.registerModels(models);
-    this.registerModelsForRPC(models);
-  }
-
-  // Initialize Active Storage and register RPC handlers during server startup
-  // Called from startServer because initDatabase is bypassed (index.js calls
-  // the adapter's standalone initDatabase, not Application.initDatabase)
-  static async initActiveStorageForRPC() {
-    if (!globalThis.ActiveStorage) {
-      try {
-        // Find the active_storage_disk chunk in the built assets directory
-        // (can't use virtual module import — Vite wraps it with __vitePreload which needs document)
-        const thisDir = join(fileURLToPath(import.meta.url), '..');
-        const assetsDir = join(thisDir, '..', 'assets');
-        const files = await readdir(assetsDir);
-        const storageFile = files.find(f => f.startsWith('active_storage_disk'));
-        if (storageFile) {
-          const mod = await import(pathToFileURL(join(assetsDir, storageFile)).href);
-          if (mod.initActiveStorage) await mod.initActiveStorage();
-        }
-      } catch (e) {
-        console.warn('  Active Storage initialization skipped:', e.message);
-      }
-    }
-    if (globalThis.ActiveStorage && rpcHandler) {
-      const registry = getRegistry();
-      if (!registry.has('ActiveStorage.upload')) {
-        registry.registerActiveStorage();
-        console.log('  Registered RPC handlers for ActiveStorage');
-        rpcHandler = createRPCHandler({ registry });
-      }
-    }
-  }
-
-  // Register models with RPC registry for remote model operations
-  static registerModelsForRPC(models) {
+    // Register all models for RPC dispatch
     const registry = getRegistry();
     for (const [name, Model] of Object.entries(models)) {
       registry.registerModel(name, Model);
-      console.log(`  Registered RPC handlers for ${name}`);
     }
-    // Register Active Storage if initialized
-    if (globalThis.ActiveStorage) {
-      registry.registerActiveStorage();
-      console.log('  Registered RPC handlers for ActiveStorage');
-    }
-    // Initialize RPC handler after models are registered
     rpcHandler = createRPCHandler({ registry });
-    console.log('RPC handler initialized');
   }
 
   // Start the HTTP server using http.createServer
@@ -521,8 +478,17 @@ export class Application extends ApplicationServer {
   static async startServer(port = null) {
     const listenPort = port || process.env.PORT || 3000;
 
-    // Initialize Active Storage and register RPC handlers
-    await this.initActiveStorageForRPC();
+    // Initialize Active Storage if the build generated an initActiveStorage function
+    // (set by juntos:models when any model has has_one_attached/has_many_attached)
+    if (this.initActiveStorage && !globalThis.ActiveStorage) {
+      await this.initActiveStorage();
+      // Register Active Storage RPC handlers
+      if (globalThis.ActiveStorage && rpcHandler) {
+        const registry = getRegistry();
+        registry.registerActiveStorage();
+        rpcHandler = createRPCHandler({ registry });
+      }
+    }
 
     try {
       const server = http.createServer(async (req, res) => {

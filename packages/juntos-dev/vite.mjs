@@ -1050,16 +1050,24 @@ function createRubyTransformPlugin(config, appRoot) {
         const classNames = models.map(m => modelClassName(m, collisions));
         // All models (including abstract) are exported
         const exportNames = allModels.map(m => modelClassName(m, collisions));
-        // Register for RPC if dual bundle mode (client needs to call server for model ops)
-        const rpcRegistration = rpcState.dualBundleEnabled
-          ? `\nApplication.registerModelsForRPC(models);`
+        // Check metadata to determine what infrastructure is needed
+        const modelsMeta = config._metadata?.models || {};
+        const hasAttachments = Object.values(modelsMeta).some(m => m.attachments);
+
+        // Active Storage import (only when models use has_one_attached/has_many_attached)
+        const storageImport = hasAttachments && isServerTarget(config.target)
+          ? `import { initActiveStorage } from 'juntos:active-storage';\n`
           : '';
+        const storageRegistration = hasAttachments && isServerTarget(config.target)
+          ? `\nApplication.initActiveStorage = initActiveStorage;`
+          : '';
+
         return `${imports.join('\n')}
-import { Application } from 'juntos:rails';
+${storageImport}import { Application } from 'juntos:rails';
 import { modelRegistry, attr_accessor } from 'juntos:active-record';
 import { migrations } from 'juntos:migrations';
 const models = { ${classNames.join(', ')} };
-Application.registerModels(models);${rpcRegistration}
+Application.registerModels(models);${storageRegistration}
 Object.assign(modelRegistry, models);
 
 // Define attribute accessors from migration schema (like Rails schema.rb)
