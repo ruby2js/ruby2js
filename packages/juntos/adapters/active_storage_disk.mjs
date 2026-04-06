@@ -36,7 +36,8 @@ let db = null;
 class BlobStore {
   async get(key) {
     if (!db) return null;
-    const row = db.prepare('SELECT * FROM active_storage_blobs WHERE key = ?').get(key);
+    // Try by key first, then fall back to matching any column (blob_id from attachments may be the generated id, not the storage key)
+    let row = db.prepare('SELECT * FROM active_storage_blobs WHERE key = ?').get(key);
     if (!row) return null;
     return {
       id: row.key,  // Use key as id for compatibility with base adapter
@@ -114,12 +115,36 @@ class BlobStore {
 
 // Database-backed store for attachments table
 class AttachmentStore {
+  // Look up attachment by composite key (record_type + record_id + name)
+  // The base adapter uses string IDs like "clips-1-audio" but SQL uses integer auto-increment
+  _parseCompositeId(id) {
+    if (typeof id === 'string' && id.includes('-')) {
+      const parts = id.split('-');
+      // Format: "tableName-recordId-attachmentName"
+      if (parts.length >= 3) {
+        const name = parts.pop();
+        const record_id = parts.pop();
+        const record_type = parts.join('-');
+        return { record_type, record_id, name };
+      }
+    }
+    return null;
+  }
+
   async get(id) {
     if (!db) return null;
-    const row = db.prepare('SELECT * FROM active_storage_attachments WHERE id = ?').get(id);
+    // Try composite key lookup first (for base adapter compatibility)
+    const composite = this._parseCompositeId(id);
+    let row;
+    if (composite) {
+      row = db.prepare('SELECT * FROM active_storage_attachments WHERE record_type = ? AND record_id = ? AND name = ?')
+        .get(composite.record_type, composite.record_id, composite.name);
+    } else {
+      row = db.prepare('SELECT * FROM active_storage_attachments WHERE id = ?').get(id);
+    }
     if (!row) return null;
     return {
-      id: row.id,
+      id: `${row.record_type}-${row.record_id}-${row.name}`,
       name: row.name,
       record_type: row.record_type,
       record_id: row.record_id,
@@ -130,16 +155,17 @@ class AttachmentStore {
 
   async put(record) {
     if (!db) return;
-    if (record.id) {
-      const existing = db.prepare('SELECT id FROM active_storage_attachments WHERE id = ?').get(record.id);
-      if (existing) {
-        db.prepare(`
-          UPDATE active_storage_attachments
-          SET name = ?, record_type = ?, record_id = ?, blob_id = ?
-          WHERE id = ?
-        `).run(record.name, record.record_type, record.record_id, record.blob_id, record.id);
-        return;
-      }
+    // Check for existing by composite key
+    const existing = db.prepare(
+      'SELECT id FROM active_storage_attachments WHERE record_type = ? AND record_id = ? AND name = ?'
+    ).get(record.record_type, record.record_id, record.name);
+    if (existing) {
+      db.prepare(`
+        UPDATE active_storage_attachments
+        SET blob_id = ?
+        WHERE id = ?
+      `).run(record.blob_id, existing.id);
+      return;
     }
     const result = db.prepare(`
       INSERT INTO active_storage_attachments (name, record_type, record_id, blob_id, created_at)
@@ -151,12 +177,18 @@ class AttachmentStore {
       record.blob_id,
       record.created_at || new Date().toISOString()
     );
-    record.id = result.lastInsertRowid;
+    record.id = `${record.record_type}-${record.record_id}-${record.name}`;
   }
 
   async delete(id) {
     if (!db) return;
-    db.prepare('DELETE FROM active_storage_attachments WHERE id = ?').run(id);
+    const composite = this._parseCompositeId(id);
+    if (composite) {
+      db.prepare('DELETE FROM active_storage_attachments WHERE record_type = ? AND record_id = ? AND name = ?')
+        .run(composite.record_type, composite.record_id, composite.name);
+    } else {
+      db.prepare('DELETE FROM active_storage_attachments WHERE id = ?').run(id);
+    }
   }
 
   async toArray() {

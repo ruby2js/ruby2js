@@ -182,9 +182,9 @@ export class Attachment {
     // Upload to storage
     await this.storage.upload(key, blob, { contentType });
 
-    // Create blob metadata
+    // Create blob metadata (use key as id for consistent lookups across adapters)
     const blobMetadata = new BlobMetadata({
-      id: generateKey(), // Use generated ID for blob
+      id: key,
       key,
       filename,
       content_type: contentType,
