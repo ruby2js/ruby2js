@@ -1411,7 +1411,8 @@ module Ruby2JS
           elsif path_node&.type == :send && path_node.children[0].nil?
             method_name = path_node.children[1].to_s
             if method_name.end_with?('_path', '_url')
-              path_helper = method_name.to_sym
+              # Convert _url helpers to _path (browser only has _path helpers)
+              path_helper = method_name.sub(/_url$/, '_path').to_sym
               @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
               if path_node.children.length > 2
                 # Path helper with args: clip_path(clip)
@@ -2794,6 +2795,10 @@ module Ruby2JS
                   # Track path helper for import if it's a path helper call
                   if value.type == :send && value.children[0].nil?
                     path_helper = value.children[1]
+                    # Convert _url helpers to _path (browser only has _path helpers)
+                    if path_helper.to_s.end_with?('_url')
+                      path_helper = path_helper.to_s.sub(/_url$/, '_path').to_sym
+                    end
                     @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
                   end
                 when :method
@@ -2862,11 +2867,12 @@ module Ruby2JS
               end
               statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, form_tag))
             else
-              # Ensure path helpers are called as functions
+              # Ensure path helpers are called as functions, convert _url to _path
               if url_node.type == :send && url_node.children[0].nil? &&
                  url_node.children[1].to_s =~ /_path$|_url$/ &&
                  url_node.children.length == 2
-                url_node = s(:send!, nil, url_node.children[1])
+                helper_name = url_node.children[1].to_s.sub(/_url$/, '_path').to_sym
+                url_node = s(:send!, nil, helper_name)
               end
               url_expr = process(url_node)
               method_suffix = needs_method_field ?
@@ -2961,11 +2967,12 @@ module Ruby2JS
               statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, form_tag))
             else
               # Dynamic URL (path helper): url: photos_path
-              # Ensure path helpers are called as functions: clips_path() not clips_path
+              # Ensure path helpers are called as functions, convert _url to _path
               if url_node.type == :send && url_node.children[0].nil? &&
                  url_node.children[1].to_s =~ /_path$|_url$/ &&
                  url_node.children.length == 2
-                url_node = s(:send!, nil, url_node.children[1])
+                helper_name = url_node.children[1].to_s.sub(/_url$/, '_path').to_sym
+                url_node = s(:send!, nil, helper_name)
               end
               url_expr = process(url_node)
               if needs_method_field
