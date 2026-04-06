@@ -1414,11 +1414,12 @@ module Ruby2JS
               path_helper = method_name.to_sym
               @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
               if path_node.children.length > 2
-                # Path helper with args: clips_path(clip)
+                # Path helper with args: clip_path(clip)
                 processed_args = path_node.children[2..-1].map { |a| process(a) }
-                s(:send, nil, path_helper, *processed_args)
+                s(:send!, nil, path_helper, *processed_args)
               else
-                s(:send, nil, path_helper)
+                # Path helper with no args: clips_path() — force parens
+                s(:send!, nil, path_helper)
               end
             else
               process(path_node)
@@ -2861,6 +2862,12 @@ module Ruby2JS
               end
               statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, form_tag))
             else
+              # Ensure path helpers are called as functions
+              if url_node.type == :send && url_node.children[0].nil? &&
+                 url_node.children[1].to_s =~ /_path$|_url$/ &&
+                 url_node.children.length == 2
+                url_node = s(:send!, nil, url_node.children[1])
+              end
               url_expr = process(url_node)
               method_suffix = needs_method_field ?
                 "\" accept-charset=\"UTF-8\" method=\"#{actual_method}\">\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\" autocomplete=\"off\">" :
@@ -2954,6 +2961,12 @@ module Ruby2JS
               statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, form_tag))
             else
               # Dynamic URL (path helper): url: photos_path
+              # Ensure path helpers are called as functions: clips_path() not clips_path
+              if url_node.type == :send && url_node.children[0].nil? &&
+                 url_node.children[1].to_s =~ /_path$|_url$/ &&
+                 url_node.children.length == 2
+                url_node = s(:send!, nil, url_node.children[1])
+              end
               url_expr = process(url_node)
               if needs_method_field
                 statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
