@@ -1958,8 +1958,8 @@ export default defineConfig({
     },
     testTimeout: 5000,
     hookTimeout: 10000,
-    pool: 'forks',
-    poolOptions: { forks: { maxForks: 4, minForks: 1 } },
+    pool: 'threads',
+    poolOptions: { threads: { maxThreads: 4, minThreads: 1 } },
     include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
     setupFiles: [resolve(__dirname, 'test/globals.mjs'), resolve(__dirname, 'test/setup.mjs')]
   }

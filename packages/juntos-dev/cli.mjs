@@ -1135,8 +1135,8 @@ export default mergeConfig(viteConfig, defineConfig({
     environment: 'jsdom',
     include: ['test/**/*_test.rb', 'test/**/*.test.mjs', 'test/**/*.test.js'],
     setupFiles: ['./test/setup.mjs'],
-    pool: 'forks',
-    poolOptions: { forks: { singleFork: true } }
+    pool: 'threads',
+    poolOptions: { threads: { singleThread: true } }
   }
 }));
 `);
@@ -1547,8 +1547,8 @@ export default mergeConfig(viteConfig, defineConfig({
     environment: 'jsdom',
     include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
     setupFiles: ['./test/setup.mjs'],
-    pool: 'forks',
-    poolOptions: { forks: { singleFork: true } }
+    pool: 'threads',
+    poolOptions: { threads: { singleThread: true } }
   }
 }));
 `);
