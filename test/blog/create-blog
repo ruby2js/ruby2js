@@ -378,10 +378,11 @@ class ArticlesControllerTest < ActionDispatch::IntegrationTest
 
   test "should create article" do
     assert_difference("Article.count") do
-      post articles_url, params: { article: { body: @article.body, title: @article.title } }
+      post articles_url, params: { article: { body: "A sufficiently long body for validation.", title: "New Title" } }
     end
 
     assert_redirected_to article_url(Article.last)
+    assert_equal "New Title", Article.last.title
   end
 
   test "should not create article with invalid params" do
@@ -407,8 +408,15 @@ class ArticlesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should update article" do
-    patch article_url(@article), params: { article: { body: @article.body, title: @article.title } }
+    patch article_url(@article), params: { article: { body: @article.body, title: "Updated Title" } }
     assert_redirected_to article_url(@article)
+    @article.reload
+    assert_equal "Updated Title", @article.title
+  end
+
+  test "should not update article with invalid params" do
+    patch article_url(@article), params: { article: { title: "", body: "" } }
+    assert_response :unprocessable_entity
   end
 
   test "should destroy article" do
