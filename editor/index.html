@@ -58,6 +58,7 @@
       <div id="preview-header">Preview</div>
       <div id="preview-placeholder">Starting server...</div>
       <iframe id="preview-iframe" style="display: none;"></iframe>
+      <iframe id="js-iframe" style="display: none; flex: 1; min-height: 0; border: none; background: #1e1e1e;"></iframe>
     </div>
     <div class="gutter-row"></div>
     <div id="terminal-pane">
@@ -130,12 +131,16 @@
     const RELEASES = 'https://ruby2js.github.io/ruby2js/releases';
     const params = new URLSearchParams(location.search);
     const demo = params.get('demo') || 'blog';
-    const mode = params.get('mode') || 'dev'; // 'dev' or 'test'
+    const mode = params.get('mode') || 'dev'; // 'dev', 'test', or 'transpile'
     const isTestMode = mode === 'test';
-    document.title = `Ruby2JS ${isTestMode ? 'Tests' : 'Editor'} — ${demo}`;
+    const isTranspileMode = mode === 'transpile';
+    const titleSuffix = isTestMode ? 'Tests' : isTranspileMode ? 'Transpile' : 'Editor';
+    document.title = `Ruby2JS ${titleSuffix} — ${demo}`;
 
-    document.getElementById('preview-header').textContent = isTestMode ? 'Test Results' : 'Preview';
-    document.getElementById('preview-placeholder').textContent = isTestMode ? 'Starting test runner...' : 'Starting server...';
+    const previewHeaderText = isTestMode ? 'Test Results' : isTranspileMode ? 'JavaScript Output' : 'Preview';
+    const previewPlaceholderText = isTestMode ? 'Starting test runner...' : isTranspileMode ? 'Starting transpiler...' : 'Starting server...';
+    document.getElementById('preview-header').textContent = previewHeaderText;
+    document.getElementById('preview-placeholder').textContent = previewPlaceholderText;
 
     const loadingStatus = document.getElementById('loading-status');
     const loadingBar = document.getElementById('loading-bar');
@@ -449,6 +454,17 @@
           automaticLayout: true,
         });
 
+        // In transpile mode the third pane is an iframe served from the WC's
+        // own origin (transpile.html), so all its fetches are same-origin and
+        // not subject to cross-origin policy. The iframe runs Monaco and
+        // receives file paths via postMessage from this parent window.
+        const jsIframe = document.getElementById('js-iframe');
+        let jsIframeReady = false;
+        if (isTranspileMode) {
+          document.getElementById('preview-placeholder').style.display = 'none';
+          jsIframe.style.display = 'block';
+        }
+
         // Extract text files for editor
         const textCache = {};
         function extractFiles(node, prefix) {
@@ -466,6 +482,27 @@
         let currentPath = null;
         let activeTreeItem = null;
         let writeTimeout = null;
+        let serverBaseUrl = null;
+
+        const TRANSPILABLE_EXT = /\.(rb|erb)$/;
+
+        function refreshTranspile() {
+          if (!isTranspileMode) return;
+          if (!jsIframeReady || !currentPath) return;
+          jsIframe.contentWindow.postMessage({
+            type: 'transpile-fetch',
+            path: currentPath,
+            transpilable: TRANSPILABLE_EXT.test(currentPath)
+          }, '*');
+        }
+
+        window.addEventListener('message', (event) => {
+          if (!event.data) return;
+          if (event.data.type === 'transpile-iframe-ready') {
+            jsIframeReady = true;
+            refreshTranspile();
+          }
+        });
 
         function openFile(path, treeEl) {
           if (activeTreeItem) activeTreeItem.classList.remove('active');
@@ -474,6 +511,7 @@
           const text = textCache[path] || '';
           const model = monaco.editor.createModel(text, langForPath(path));
           editor.setModel(model);
+          refreshTranspile();
         }
 
         // Debounced write-back to WebContainer
@@ -482,8 +520,9 @@
           const value = editor.getValue();
           textCache[currentPath] = value;
           clearTimeout(writeTimeout);
-          writeTimeout = setTimeout(() => {
-            container.fs.writeFile(currentPath, value);
+          writeTimeout = setTimeout(async () => {
+            await container.fs.writeFile(currentPath, value);
+            refreshTranspile();
           }, 300);
         });
 
@@ -532,7 +571,6 @@
 
         // Listen for server-ready and xdg-open
         const isFirefox = navigator.userAgent.includes('Firefox');
-        let serverBaseUrl = null;
 
         function showPreview(iframeUrl, label) {
           const header = document.getElementById('preview-header');
@@ -554,7 +592,11 @@
           xterm.writeln(`\r\n\x1b[32m Server ready: ${url}\x1b[0m\r\n`);
           setTerminalStatus('Server running');
 
-          if (!isTestMode) {
+          if (isTranspileMode) {
+            // Load the in-WC HTML page that hosts Monaco. It will postMessage
+            // back when ready and we'll send the current file path then.
+            jsIframe.src = url.replace(/\/?$/, '/') + 'transpile.html';
+          } else if (!isTestMode) {
             // Dev mode: load the app directly
             setTimeout(() => showPreview(url, `Preview — ${url}`), 500);
           }
@@ -575,7 +617,7 @@
         });
 
         // Step 6: Auto-run setup commands
-        const modeLabel = isTestMode ? 'TESTS' : 'DEMO';
+        const modeLabel = isTestMode ? 'TESTS' : isTranspileMode ? 'TRANSPILE' : 'DEMO';
         xterm.writeln('\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
         xterm.writeln(`\x1b[36m  ${demo.toUpperCase()} ${modeLabel} - Setting up...\x1b[0m`);
         xterm.writeln('\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m\r\n');
@@ -598,11 +640,147 @@
         // Small delay to ensure config files are fully written
         await new Promise(r => setTimeout(r, 500));
 
-        // Launch long-running process based on mode
+        // In transpile mode, inject:
+        //  - vite.config.js with a /api/transpile.js endpoint (uses
+        //    server.transformRequest() to leverage juntos's existing filter
+        //    chains and metadata pipeline)
+        //  - public/transpile.html: a same-origin Monaco page the editor's
+        //    third pane embeds via iframe, so its fetches don't hit CORS
+        if (isTranspileMode) {
+          // Same-origin Monaco host page served by our middleware.
+          const transpileHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Transpile output</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/editor/editor.main.css">
+  <style>
+    html, body { height: 100%; margin: 0; padding: 0; background: #1e1e1e; }
+    #editor { position: absolute; inset: 0; }
+  </style>
+</head>
+<body>
+  <div id="editor"></div>
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"><\/script>
+  <script>
+    let editor = null;
+    let lastSeq = 0;
+    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs' } });
+    require(['vs/editor/editor.main'], () => {
+      editor = monaco.editor.create(document.getElementById('editor'), {
+        value: '// Waiting for source...',
+        language: 'javascript',
+        theme: 'vs-dark',
+        readOnly: true,
+        minimap: { enabled: false },
+        fontSize: 13,
+        automaticLayout: true,
+      });
+      // Tell parent we're ready to receive paths.
+      try { window.parent.postMessage({ type: 'transpile-iframe-ready' }, '*'); } catch (e) {}
+    });
+
+    window.addEventListener('message', async (event) => {
+      const data = event.data || {};
+      if (data.type !== 'transpile-fetch' || !editor || !data.path) return;
+      if (data.transpilable === false) {
+        editor.setValue('// No transpile output for ' + data.path);
+        return;
+      }
+      const seq = ++lastSeq;
+      const url = '/api/transpile.js?path=' + encodeURIComponent(data.path) + '&t=' + Date.now();
+      try {
+        const response = await fetch(url);
+        const text = await response.text();
+        if (seq !== lastSeq) return;
+        if (response.ok) {
+          editor.setValue(text);
+        } else {
+          editor.setValue('// Transform error (HTTP ' + response.status + '):\\n\\n' + text);
+        }
+      } catch (err) {
+        if (seq !== lastSeq) return;
+        editor.setValue('// Fetch error: ' + (err && err.message ? err.message : String(err)));
+      }
+    });
+  <\/script>
+</body>
+</html>
+`;
+          // Embed the HTML inside vite.config.js as a string, served by our
+          // plugin middleware on /transpile.html. Avoids touching public/
+          // (which previously triggered Vite's watcher mid-startup).
+          const escapedHtml = JSON.stringify(transpileHtml);
+          const viteConfig = `import { defineConfig } from 'vite';
+import { juntos } from 'juntos-dev/vite';
+import path from 'node:path';
+
+const TRANSPILE_HTML = ${escapedHtml};
+
+const transpileEndpoint = {
+  name: 'editor-transpile-endpoint',
+  enforce: 'pre',
+  configureServer(server) {
+    server.middlewares.use(async (req, res, next) => {
+      if (!req.url) return next();
+
+      // Serve the iframe host page same-origin to the WC.
+      if (req.url === '/transpile.html' || req.url.startsWith('/transpile.html?')) {
+        res.setHeader('Cache-Control', 'no-store');
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(TRANSPILE_HTML);
+        return;
+      }
+
+      // Transpile endpoint: returns Vite's transform output for a Ruby file.
+      if (req.url.startsWith('/api/transpile.js')) {
+        const url = new URL(req.url, 'http://x');
+        const filePath = url.searchParams.get('path');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Cache-Control', 'no-store');
+        if (!filePath) {
+          res.writeHead(400, { 'Content-Type': 'text/plain' });
+          res.end('missing path query');
+          return;
+        }
+        try {
+          const abs = path.resolve(process.cwd(), filePath);
+          const result = await server.transformRequest(abs);
+          if (!result) {
+            res.writeHead(404, { 'Content-Type': 'application/javascript' });
+            res.end('// no transform output for ' + filePath);
+            return;
+          }
+          res.writeHead(200, { 'Content-Type': 'application/javascript' });
+          res.end(result.code);
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/javascript' });
+          res.end('// transform error: ' + (err && err.message ? err.message : String(err)));
+        }
+        return;
+      }
+
+      next();
+    });
+  }
+};
+
+export default defineConfig({
+  plugins: [transpileEndpoint, ...juntos()],
+  server: { cors: true, allowedHosts: true }
+});
+`;
+          await container.fs.writeFile('vite.config.js', viteConfig);
+          xterm.writeln(`\x1b[35m━━━ TRANSPILE: vite.config.js with /transpile.html and /api/transpile.js injected ━━━\x1b[0m`);
+        }
+
+        // Launch long-running process based on mode.
+        // Transpile mode reuses juntos dev: we don't display the iframe,
+        // we just fetch transformed modules from the running Vite server.
         const cmdArgs = isTestMode
           ? ['juntos', 'test', '-d', 'dexie', '--preview']
           : ['juntos', 'dev', '-d', 'dexie', '--host'];
-        const cmdLabel = isTestMode ? 'test runner' : 'dev server';
+        const cmdLabel = isTestMode ? 'test runner' : isTranspileMode ? 'transpiler' : 'dev server';
 
         setTerminalStatus(`Starting ${cmdLabel}...`);
         xterm.writeln(`\x1b[36m$ npx ${cmdArgs.join(' ')}\x1b[0m`);
@@ -621,8 +799,9 @@
         xterm.onResize(({ cols, rows }) => serverProcess.resize({ cols, rows }));
 
         serverProcess.exit.then(code => {
-          xterm.writeln(`\r\n\x1b[33m${isTestMode ? 'Test runner' : 'Dev server'} exited (code ${code}). Refresh to restart.\x1b[0m`);
-          setTerminalStatus(`${isTestMode ? 'Tests' : 'Server'} stopped`);
+          const exitedLabel = isTestMode ? 'Test runner' : isTranspileMode ? 'Transpiler' : 'Dev server';
+          xterm.writeln(`\r\n\x1b[33m${exitedLabel} exited (code ${code}). Refresh to restart.\x1b[0m`);
+          setTerminalStatus(`${isTestMode ? 'Tests' : isTranspileMode ? 'Transpiler' : 'Server'} stopped`);
         });
 
         window.container = container;
