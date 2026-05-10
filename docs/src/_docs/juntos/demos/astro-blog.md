@@ -45,10 +45,9 @@ src/
 ├── pages/
 │   ├── index.astro.rb           # Home page (Ruby frontmatter)
 │   └── posts/
-│       ├── index.astro.rb       # Post list page
-│       └── [slug].astro.rb      # Dynamic post detail page
+│       └── index.astro.rb       # Post list page
 ├── islands/
-│   ├── PostList.jsx.rb          # Interactive post list (Preact)
+│   ├── PostList.jsx.rb          # Post list with hash-based routing (Preact)
 │   ├── PostForm.jsx.rb          # Create/edit form (Preact)
 │   ├── PostDetail.jsx.rb        # View/edit/delete (Preact)
 │   └── Counter.jsx.rb           # Demo counter (Preact)
@@ -86,30 +85,27 @@ React/Preact components written in Ruby:
 
 ```ruby
 # src/islands/PostList.jsx.rb
-import ['useState', 'useEffect'], from: 'preact/hooks'
+import ['useState', 'useEffect'], from: 'react'
 import ['setupDatabase', 'Post'], from: '../lib/db.js'
 import ['withRevalidate', 'invalidate'], from: '../lib/isr.js'
+import PostDetail, from: './PostDetail.jsx'
 
 def PostList()
   posts, setPosts = useState([])
   loading, setLoading = useState(true)
+  selectedSlug, setSelectedSlug = useState("")
 
-  loadPosts = -> {
-    withRevalidate('posts:all', 60, -> { Post.all() }).then do |data|
-      setPosts(data)
-      setLoading(false)
-    end
-  }
+  # ... data loading, useEffect reads window.location.hash ...
 
-  useEffect -> {
-    setupDatabase().then { loadPosts.() }
-  }, []
-
-  return %x{<div class="loading">Loading...</div>} if loading
+  # Hash-based routing: show detail when slug is selected
+  if selectedSlug != ""
+    handleBack = -> { window.location.hash = "" }
+    return %x{<PostDetail slug={selectedSlug} onBack={handleBack} />}
+  end
 
   %x{<div class="posts">
     {posts.map { |post| <article key={post.id}>
-      <h3><a href={"/posts/" + post.slug}>{post.title}</a></h3>
+      <h3><a href={'#' + post.slug}>{post.title}</a></h3>
     </article> }}
   </div>}
 end
