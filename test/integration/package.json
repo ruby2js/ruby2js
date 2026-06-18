@@ -9,12 +9,12 @@
   },
   "devDependencies": {
     "@testing-library/react": "^16.1.0",
-    "@vitejs/plugin-react": "^5.1.2",
+    "@vitejs/plugin-react": "^5.2.0",
     "better-sqlite3": "^11.10.0",
     "jsdom": "^27.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.9"
   },
   "dependencies": {
     "@hotwired/stimulus": "^3.2.2",
